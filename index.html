@@ -292,9 +292,8 @@
     <!-- 오늘 자동판정 (엔진이 매일 화~토 08:00 자동 갱신) -->
     <h2 style="margin-top:30px"><span class="step">TODAY</span>오늘 자동판정 <span class="tag a">엔진 자동계산</span></h2>
     <p class="subtle" id="td-ts">데이터 로딩…</p>
-    <div class="card" id="td-score"></div>
     <div id="td-cards"></div>
-    <p class="subtle" style="margin-bottom:6px">위 판정은 최신 세션 종가 기준 <b>자동 계산</b>이며, 장중 3항목(시초가 지지·첫 눌림 저점·30분 판별)은 직접 확인 후 최종 진입하세요. 아래 STEP 1~6은 규칙 정의와 수동 체크·계산 도구입니다.</p>
+    <p class="subtle" style="margin-bottom:6px">최신 세션 종가 기준 <b>자동 계산</b> 결과입니다. 아래 <b>STEP 2 스코어카드</b>는 오늘 값으로 자동 체크돼 있고(수정 가능), 장중 3항목(시초가 지지·첫 눌림 저점·30분 판별)만 직접 확인 후 최종 진입하세요.</p>
     <script type="application/json" id="verdict-data">
 {
   "score": 5,
@@ -391,7 +390,7 @@
 
     <!-- STEP 2: pre-market scorecard -->
     <h2><span class="step">STEP 2</span>장 시작 전 스코어카드 <span class="tag a">저자 2-6</span></h2>
-    <p class="subtle">5개 지표 각 양호 시 1점. 체크하면 아래 점수·판정이 즉시 계산됩니다.</p>
+    <p class="subtle">5개 지표 각 양호 시 1점. <b>🤖 오늘 값으로 자동 체크됨</b> — 직접 수정하면 점수·판정이 즉시 다시 계산됩니다.</p>
     <div class="card" id="scorecard">
       <label class="chk"><input type="checkbox" data-sc><span class="txt">나스닥 선물 방향 양호 <small>플러스 & 고점 낮추지 않음</small></span></label>
       <label class="chk"><input type="checkbox" data-sc><span class="txt">S&amp;P500 선물 방향 양호</span></label>
@@ -1185,12 +1184,9 @@
     const pad = n => String(n).padStart(2,'0');
     document.getElementById('td-ts').innerHTML =
       `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())} 기준 · 최신 세션 종가`;
-    const scV = vd.score>=4?'공격 가능':(vd.score===3?'소액만':'관망');
-    document.getElementById('td-score').innerHTML =
-      `<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px">
-         <span style="font-size:30px;font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums">${vd.score}/5</span>
-         <span style="font-size:15px;font-weight:700;color:var(--head)">장 시작 전 스코어카드 — ${scV}</span></div>`
-      + vd.scorecard.map(s=>`<label class="chk" style="cursor:default"><span style="width:20px;height:20px;flex:none;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;background:${s.ok?'var(--entry)':'var(--warn)'};color:${s.ok?'#0a0d08':'#fff'};font-weight:900;font-size:12px">${s.ok?'✓':'✕'}</span><span class="txt">${s.label}</span></label>`).join('');
+    // STEP 2 스코어카드 체크박스를 오늘 자동계산 값으로 미리 체크 (사용자가 수정 가능)
+    vd.scorecard.forEach((s,i)=>{ if(scBoxes[i]) scBoxes[i].checked = !!s.ok; });
+    scUpdate();
     document.getElementById('td-cards').innerHTML = vd.verdicts.map(v=>{
       const cls = gradeCls(v.grade);
       const av = (v.avoid||[]).map(a=>`<div class="chk" style="cursor:default;color:#f0a3a5"><span class="txt">⚠ ${a}</span></div>`).join('');
