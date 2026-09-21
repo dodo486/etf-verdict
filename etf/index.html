@@ -1,0 +1,1229 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>미국 돈복사 ETF 실전 매매 플레이북</title>
+<meta name="description" content="김프로랩 『미국 돈복사 ETF 투자방법』 저자 매매기법 정리 — TQQQ·SOXL·UPRO 진입/익절/손절 규칙과 핵심 숫자 레퍼런스">
+
+<style>
+  :root{
+    --ground:#12141a; --surface:#1a1e28; --surface-2:#20242f; --line:#2b303c;
+    --text:#c7ccd6; --head:#eef1f6; --mute:#7a8194;
+    --gold:#d4a24e; --gold-dim:#8f7538;
+    --tqqq:#4c8dff; --soxl:#f0883e; --upro:#3fb950;
+    --entry:#3fb950; --warn:#e5484d;
+    --maxw:1200px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--ground); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+    font-size:16px; line-height:1.72; -webkit-font-smoothing:antialiased;
+    font-feature-settings:"tnum" 1;
+  }
+  ::selection{background:rgba(212,162,78,.28)}
+  a{color:var(--gold);text-decoration:none}
+
+  .wrap{display:grid; grid-template-columns:248px minmax(0,1fr); gap:0; max-width:var(--maxw); margin:0 auto;}
+
+  /* ---- sidebar ---- */
+  nav.side{
+    position:sticky; top:0; align-self:start; height:100vh; overflow-y:auto;
+    padding:26px 18px 40px; border-right:1px solid var(--line);
+  }
+  nav.side .brand{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); font-weight:700; margin-bottom:2px}
+  nav.side .sub{font-size:12.5px; color:var(--mute); margin-bottom:22px; line-height:1.5}
+  nav.side ol{list-style:none; margin:0; padding:0; counter-reset:c}
+  nav.side li{margin:1px 0}
+  nav.side a.navlink{
+    display:flex; gap:9px; align-items:baseline; padding:6px 9px; border-radius:7px;
+    color:var(--text); font-size:13.5px; line-height:1.35; transition:background .15s,color .15s;
+  }
+  nav.side a.navlink .n{color:var(--mute); font-size:11.5px; font-weight:700; min-width:20px; font-variant-numeric:tabular-nums}
+  nav.side a.navlink:hover{background:var(--surface); color:var(--head)}
+  nav.side a.navlink.active{background:var(--surface-2); color:var(--gold)}
+  nav.side a.navlink.active .n{color:var(--gold)}
+
+  /* ---- main ---- */
+  main{padding:0 clamp(20px,4vw,56px) 120px; min-width:0}
+
+  header.hero{padding:54px 0 30px; border-bottom:1px solid var(--line); margin-bottom:8px}
+  header.hero .kicker{font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--gold); font-weight:700}
+  header.hero h1{
+    font-size:clamp(26px,3.6vw,40px); line-height:1.18; color:var(--head); font-weight:800;
+    margin:12px 0 14px; text-wrap:balance; letter-spacing:-.01em;
+  }
+  header.hero .meta{color:var(--mute); font-size:13.5px; line-height:1.6}
+  header.hero .meta b{color:var(--text); font-weight:600}
+
+  .thesis{
+    margin:26px 0 0; padding:20px 22px; background:linear-gradient(180deg,var(--surface),var(--surface-2));
+    border:1px solid var(--line); border-left:3px solid var(--gold); border-radius:10px;
+    font-size:16.5px; color:var(--head); line-height:1.6;
+  }
+  .thesis .q{font-weight:700}
+  .thesis .src{display:block; margin-top:8px; font-size:12.5px; color:var(--mute); font-weight:400}
+
+  /* product legend */
+  .legend{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:26px 0 6px}
+  .prod{background:var(--surface); border:1px solid var(--line); border-radius:11px; padding:15px 16px; border-top:3px solid var(--pc)}
+  .prod h3{margin:0; font-size:18px; color:var(--pc); letter-spacing:.02em; font-weight:800}
+  .prod .base{font-size:12px; color:var(--mute); margin:2px 0 9px}
+  .prod .role{font-size:13.5px; color:var(--head); font-weight:600; line-height:1.4}
+  .prod .char{font-size:12.5px; color:var(--text); margin-top:6px; line-height:1.5}
+
+  /* chapters */
+  section.chap{border-bottom:1px solid var(--line); padding:6px 0}
+  details.chap{}
+  details.chap > summary{
+    list-style:none; cursor:pointer; padding:22px 4px 22px 0; display:flex; align-items:baseline; gap:14px;
+    user-select:none;
+  }
+  details.chap > summary::-webkit-details-marker{display:none}
+  details.chap > summary .cn{
+    font-variant-numeric:tabular-nums; color:var(--gold-dim); font-weight:800; font-size:14px;
+    border:1px solid var(--gold-dim); border-radius:6px; padding:3px 9px; line-height:1; flex:none; min-width:34px; text-align:center;
+  }
+  details.chap > summary h2{margin:0; font-size:clamp(19px,2.1vw,23px); color:var(--head); font-weight:800; letter-spacing:-.01em; flex:1}
+  details.chap > summary .chev{color:var(--mute); transition:transform .2s; flex:none; font-size:13px; padding-top:4px}
+  details.chap[open] > summary .chev{transform:rotate(90deg)}
+  details.chap > summary:hover h2{color:var(--gold)}
+  .chap-body{padding:0 2px 30px}
+
+  h3.sec{
+    font-size:16px; color:var(--head); font-weight:700; margin:26px 0 8px;
+    padding-left:12px; border-left:3px solid var(--gold); line-height:1.4;
+  }
+  p{margin:10px 0}
+  strong{color:var(--gold); font-weight:700}
+  ul{margin:10px 0; padding:0; list-style:none}
+  ul li{position:relative; padding:4px 0 4px 20px; line-height:1.66}
+  ul li::before{content:"·"; position:absolute; left:4px; top:3px; color:var(--gold-dim); font-weight:900; font-size:18px}
+  ul li strong{color:var(--head)}
+
+  /* callout emphasis for principle list (section 0) */
+  .principles ul li{padding-left:22px}
+  .principles ul li::before{content:"“"; color:var(--gold); font-size:20px; top:6px}
+
+  /* tables */
+  .tablewrap{overflow-x:auto; margin:16px 0; border:1px solid var(--line); border-radius:10px}
+  table{border-collapse:collapse; width:100%; font-size:13.5px; min-width:520px}
+  th,td{text-align:left; padding:10px 14px; border-bottom:1px solid var(--line); vertical-align:top; line-height:1.55}
+  thead th{background:var(--surface-2); color:var(--gold); font-weight:700; letter-spacing:.02em; position:sticky; top:0}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:var(--surface)}
+  td:first-child{color:var(--head); font-weight:600}
+  td, th{font-variant-numeric:tabular-nums}
+
+  hr.rule{display:none}
+
+  .footnote{margin-top:8px; color:var(--mute); font-size:13px}
+
+  /* coverage badge */
+  .cover{display:inline-flex; align-items:center; gap:7px; margin-top:14px; font-size:12.5px; color:var(--entry); background:rgba(63,185,80,.09); border:1px solid rgba(63,185,80,.3); padding:5px 11px; border-radius:20px}
+  .cover .dot{width:7px;height:7px;border-radius:50%;background:var(--entry)}
+
+  /* mobile */
+  .menubtn{display:none}
+  @media(max-width:860px){
+    .wrap{grid-template-columns:1fr}
+    nav.side{position:fixed; z-index:50; top:0; left:0; width:270px; background:var(--ground); transform:translateX(-100%); transition:transform .25s; box-shadow:0 0 40px rgba(0,0,0,.5)}
+    nav.side.open{transform:none}
+    .menubtn{display:inline-flex; position:fixed; z-index:60; top:14px; left:14px; background:var(--surface-2); color:var(--gold); border:1px solid var(--line); border-radius:9px; padding:9px 13px; font-size:13px; font-weight:700; cursor:pointer}
+    header.hero{padding-top:64px}
+    .legend{grid-template-columns:1fr}
+  }
+  @media(prefers-reduced-motion:reduce){*{transition:none!important; scroll-behavior:auto}}
+
+  /* 장중(👁) 뱃지: 실시간 수집 중일 때 초록으로 깜빡임 */
+  .tag.live{position:relative; overflow:visible}
+  body.intraday-live .tag.live{
+    background:rgba(63,185,80,.14); color:var(--entry); border-color:rgba(63,185,80,.5);
+    animation:livePulse 1.5s ease-in-out infinite;
+  }
+  body.intraday-live .tag.live::after{
+    content:""; position:absolute; top:50%; left:-3px; width:6px; height:6px; margin-top:-3px;
+    border-radius:50%; background:var(--entry); box-shadow:0 0 0 0 rgba(63,185,80,.6);
+    animation:livePulse 1.5s ease-in-out infinite;
+  }
+  @keyframes livePulse{
+    0%{box-shadow:0 0 0 0 rgba(63,185,80,.5)}
+    70%{box-shadow:0 0 0 6px rgba(63,185,80,0)}
+    100%{box-shadow:0 0 0 0 rgba(63,185,80,0)}
+  }
+  @media(prefers-reduced-motion:reduce){body.intraday-live .tag.live,body.intraday-live .tag.live::after{animation:none}}
+</style>
+
+<style>
+  /* ---- tabs ---- */
+  .tabbar{position:sticky; top:0; z-index:100; display:flex; gap:4px; padding:8px clamp(16px,3vw,24px) 0;
+    background:var(--ground); border-bottom:1px solid var(--line); height:52px; align-items:flex-end;
+    max-width:var(--maxw); margin:0 auto;}
+  .tab{background:none; border:none; color:var(--mute); font:inherit; font-size:14.5px; font-weight:700;
+    padding:11px 16px; cursor:pointer; border-radius:9px 9px 0 0; border-bottom:2px solid transparent;
+    display:flex; align-items:center; gap:7px; transition:color .15s}
+  .tab:hover{color:var(--text)}
+  .tab.active{color:var(--gold); border-bottom-color:var(--gold)}
+  .tabpanel{display:none}
+  .tabpanel.active{display:block}
+  #panel-playbook nav.side{top:52px; height:calc(100vh - 52px)}
+
+  /* ---- sheet ---- */
+  .sheet{max-width:960px; margin:0 auto; padding:36px clamp(18px,4vw,44px) 120px}
+  .sheet .kicker{font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--gold); font-weight:700}
+  .sheet h1{font-size:clamp(24px,3.2vw,34px); color:var(--head); font-weight:800; margin:10px 0 10px; letter-spacing:-.01em; text-wrap:balance}
+  .sheet .lede{color:var(--text); font-size:15px; line-height:1.7; margin:0 0 6px}
+  .sheet h2{font-size:20px; color:var(--head); font-weight:800; margin:44px 0 4px; letter-spacing:-.01em}
+  .sheet h2 .step{color:var(--gold-dim); font-size:13px; font-weight:800; border:1px solid var(--gold-dim); border-radius:6px; padding:2px 8px; margin-right:9px; vertical-align:middle}
+  .sheet .subtle{color:var(--mute); font-size:13px; margin:2px 0 16px; line-height:1.6}
+
+  .tag{display:inline-block; font-size:10.5px; font-weight:800; letter-spacing:.04em; padding:2px 7px; border-radius:5px; vertical-align:middle; margin-left:6px}
+  .tag.a{background:rgba(212,162,78,.14); color:var(--gold); border:1px solid var(--gold-dim)}      /* 저자 명시 */
+  .tag.o{background:rgba(122,129,148,.15); color:var(--mute); border:1px solid var(--line)}          /* 운영 정의 */
+  .tag.miss{background:transparent; color:#5a606e; border:1px dashed #3a4050; opacity:.85}            /* 대기(회색) */
+  .tag.err{background:rgba(229,72,77,.14); color:var(--warn); border:1px solid rgba(229,72,77,.5); font-weight:800}  /* 수집실패(빨강) */
+
+  .legendbar{display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px; color:var(--mute); margin:8px 0 0; padding:12px 14px; background:var(--surface); border:1px solid var(--line); border-radius:9px}
+  .legendbar b{color:var(--text)}
+
+  /* card */
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin:14px 0}
+  .card.acc{border-top:3px solid var(--pc)}
+  .card h3{margin:0 0 4px; font-size:16.5px; color:var(--head); font-weight:800}
+  .card h3 .tk{color:var(--pc)}
+
+  /* checklist */
+  .chk{display:flex; gap:11px; align-items:flex-start; padding:9px 0; border-bottom:1px solid var(--line); cursor:pointer; line-height:1.55}
+  .chk:last-child{border-bottom:none}
+  .chk input{appearance:none; -webkit-appearance:none; width:20px; height:20px; flex:none; margin-top:1px;
+    border:1.5px solid var(--mute); border-radius:6px; cursor:pointer; position:relative; transition:.12s; background:var(--ground)}
+  .chk input:checked{background:var(--entry); border-color:var(--entry)}
+  .chk input:checked::after{content:"✓"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#0a0d08; font-size:13px; font-weight:900}
+  .chk input.warn:checked{background:var(--warn); border-color:var(--warn)}
+  .chk input.warn:checked::after{color:#fff}
+  .chk input:focus-visible{outline:2px solid var(--gold); outline-offset:2px}
+  .chk .txt{font-size:14px; color:var(--text)}
+  .chk .txt small{display:block; color:var(--mute); font-size:12px; margin-top:1px}
+
+  .grouplabel{font-size:12px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; margin:14px 0 2px}
+  .grouplabel.f{color:var(--gold)}
+  .grouplabel.e{color:var(--entry)}
+  .grouplabel.x{color:var(--warn)}
+
+  /* verdict */
+  .verdict{margin-top:14px; padding:14px 16px; border-radius:10px; font-weight:800; font-size:15.5px; display:flex; align-items:center; gap:10px; border:1px solid var(--line); background:var(--surface-2); color:var(--mute)}
+  .verdict .big{font-size:20px}
+  .verdict.go{background:rgba(63,185,80,.12); border-color:rgba(63,185,80,.4); color:var(--entry)}
+  .verdict.small{background:rgba(212,162,78,.12); border-color:var(--gold-dim); color:var(--gold)}
+  .verdict.no{background:rgba(229,72,77,.12); border-color:rgba(229,72,77,.4); color:var(--warn)}
+  .verdict .sub{display:block; font-weight:600; font-size:12.5px; color:var(--mute); margin-top:2px}
+
+  .td-chip:hover{background:var(--surface-2)!important}
+
+  /* scorecard live number */
+  .score{font-variant-numeric:tabular-nums}
+
+  /* calculator */
+  .calcrow{display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin:6px 0 4px}
+  .calcrow label{font-size:13.5px; color:var(--text); font-weight:600}
+  .calcrow input[type=number]{background:var(--ground); border:1px solid var(--line); color:var(--head); font:inherit; font-size:15px; padding:9px 12px; border-radius:8px; width:150px; font-variant-numeric:tabular-nums}
+  .calcrow input:focus{outline:2px solid var(--gold); outline-offset:1px}
+  .modes{display:inline-flex; gap:6px; background:var(--surface-2); padding:5px; border-radius:11px; border:1px solid var(--line)}
+  .modes button{background:none;border:none;color:var(--mute);font:inherit;font-weight:800;font-size:13.5px;padding:7px 14px;border-radius:8px;cursor:pointer}
+  .modes button.on{background:var(--surface); color:var(--gold)}
+
+  /* memo */
+  .memo{display:grid; gap:10px; margin-top:6px}
+  .memo .field{display:grid; grid-template-columns:130px 1fr; gap:12px; align-items:center}
+  .memo .field label{font-size:13px; color:var(--gold); font-weight:700}
+  .memo .field input{background:var(--ground); border:1px solid var(--line); color:var(--head); font:inherit; font-size:14px; padding:9px 12px; border-radius:8px}
+  .memo .field input:focus{outline:2px solid var(--gold); outline-offset:1px}
+  @media(max-width:560px){.memo .field{grid-template-columns:1fr; gap:3px}}
+
+  .warnbox{margin-top:10px; padding:11px 14px; border-radius:9px; background:rgba(229,72,77,.09); border:1px solid rgba(229,72,77,.3); color:#f0a3a5; font-size:13px; line-height:1.55; display:none}
+  .warnbox.show{display:block}
+</style>
+
+<div class="tabbar">
+  <button class="tab active" data-tab="playbook">📖 플레이북</button>
+  <button class="tab" data-tab="sheet">✅ 실전 매매 시트</button>
+</div>
+
+<div class="tabpanel active" id="panel-playbook">
+<button class="menubtn" id="menubtn" aria-label="목차 열기">☰ 목차</button>
+
+<div class="wrap">
+  <nav class="side" id="side">
+    <div class="brand">ETF PLAYBOOK</div>
+    <div class="sub">김프로랩 『미국 돈복사 ETF 투자방법』<br>저자 매매기법 정리</div>
+    <ol id="nav"></ol>
+  </nav>
+
+  <main>
+    <header class="hero">
+      <div class="kicker">저자 매매기법 실전 정리</div>
+      <h1>미국 돈복사 ETF 실전 매매 플레이북</h1>
+      <div class="meta">
+        원서 <b>김프로랩 『미국 돈복사 ETF 투자방법』</b> · 프롤로그 + Chapter 1~10 + 에필로그 (전 2,968줄)<br>
+        정리 기준 — 저자가 <b>명시한 매매기법만</b> 추출 · 원문 숫자 그대로 · 저자 미명시 항목은 그대로 표시 · 지어내지 않음
+      </div>
+      <div class="cover"><span class="dot"></span> 프롤로그~에필로그 전 소절 커버리지 검증 완료 · 빠진 챕터 없음</div>
+
+      <div class="thesis">
+        <span class="q">“레버리지 ETF는 시간을 사는 상품이 아니라 구간을 사는 상품이다. 돈복사는 종목이 아니라 시스템(운용 순서)에서 나온다.”</span>
+        <span class="src">— 저자가 전 챕터에서 반복 강조하는 핵심</span>
+      </div>
+
+      <div class="legend">
+        <div class="prod" style="--pc:var(--tqqq)">
+          <h3>TQQQ</h3><div class="base">나스닥100 3배</div>
+          <div class="role">중심 카드 · 공격 엔진</div>
+          <div class="char">나스닥의 방향+힘+시간을 같이 산다. 늦게 타면 빠르게 불리.</div>
+        </div>
+        <div class="prod" style="--pc:var(--soxl)">
+          <h3>SOXL</h3><div class="base">반도체 3배</div>
+          <div class="role">짧고 강하게 쓰는 칼</div>
+          <div class="char">가장 많이 오르고 가장 빨리 무너짐. 급등 3일 내 판단.</div>
+        </div>
+        <div class="prod" style="--pc:var(--upro)">
+          <h3>UPRO</h3><div class="base">S&amp;P500 3배</div>
+          <div class="role">넓은 장의 완충 엔진</div>
+          <div class="char">얌전해 보여서 더 위험. 시장 폭 넓을 때만.</div>
+        </div>
+      </div>
+    </header>
+
+    <div id="content"></div>
+  </main>
+</div>
+</div><!-- /panel-playbook -->
+
+<div class="tabpanel" id="panel-sheet">
+  <div class="sheet">
+    <div class="kicker">Definition · 실전 적용</div>
+    <h1>실전 매매 시트 — 애매한 말을 숫자로</h1>
+    <p class="lede">책의 애매한 표현("거래량 터지며 장대양봉", "상승 초입에서 담아라")을 <b>컴퓨터도 이해할 수 있는 정량 규칙</b>으로 바꾸고, 매매 직전에 그대로 체크할 수 있게 만든 시트입니다. 아래 판정·계산은 브라우저에서 실시간으로 돌아갑니다.</p>
+    <div class="legendbar">
+      <span><b>표기</b></span>
+      <span><span class="tag a">저자</span> 책에 숫자가 명시된 규칙</span>
+      <span><span class="tag o">운영</span> 애매한 표현을 실전용으로 수치화한 정의 — 본인 검증 후 사용</span>
+    </div>
+
+    <script type="application/json" id="verdict-data">
+{"score": 5, "scorecard": [{"label": "나스닥100 방향", "ok": true}, {"label": "S&P500 방향", "ok": true}, {"label": "VIX 안정(전일 +10% 미만)", "ok": true}, {"label": "10년물 안정(+0.1%p 미만)", "ok": true}, {"label": "달러인덱스 안정(급강세 아님)", "ok": true}], "verdicts": [{"prod": "TQQQ", "color": "🔵", "grade": "✅ 매수 후보", "reason": "필터 통과 · 스코어 5/5 → 1차 분할 진입 준비", "avoid": [], "avoid_keys": [], "filter_ok": true, "vol_ok": false, "intraday": ["나스닥 시초가 위 유지", "첫 눌림 저점 높임", "빅테크 3개 중 2개↑"], "metrics": {"filter": "나스닥100 30482.4/20일선 29361.0 (+3.8%)", "vol": "거래량 53.5M/20일평균 47.4M (1.13배), 고점比 -0.7%", "vix": "^VIX 14.9 (전일比 +0.4%)", "tnx": "^TNX 4.96 (전일 5.00, -0.03%p)", "run5": "최근 5일 +13.9%", "wick": "고점 대비 종가 -0.7%"}, "close": 78.91000366210938, "ma20": 71.09500045776367, "chg": 8.631613883733657, "intraday_auto": {"status": "ok", "last": 77.39, "open": 74.845, "base": 72.64, "checks": {"open_hold": {"auto": true, "ok": true, "label": "현재 77.39 / 시가 74.84 (시가比 +3.4%) · 전일比 +6.5%"}, "leaders": {"auto": true, "ok": true, "label": "2/3↑ · 엔비디아 +1.3%, MS -0.2%, 애플 +0.4%"}, "pullback": {"auto": true, "ok": true, "label": "저점 76.91→77.27 (높임 ✓)"}}}}, {"prod": "SOXL", "color": "🟠", "grade": "⛔ 보류", "reason": "회피 신호 1개 — 과열/위험, 눌림 대기", "avoid": ["과열: 반도체 10일중 8일↑ + SOXL 5일 40%↑"], "avoid_keys": ["overheat"], "filter_ok": true, "vol_ok": false, "intraday": [], "metrics": {"filter": "SOXL 141.93/20일선 115.07 (+23.3%), ^SOX +7.2%", "vol": "거래량 60.6M/20일평균 56.6M (1.07배), 고점比 -1.4%", "vix": "^VIX 14.9 (전일比 +0.4%)", "tnx": "^TNX 4.96 (전일 5.00, -0.03%p)", "run5": "최근 5일 +40.3%", "wick": "고점 대비 종가 -1.4%", "overheat": "^SOX 10일중 8일↑ · SOXL 5일 +40%", "nvda_only": "엔비디아 +2.3%, AMD +9.9%, 브로드컴 +1.4%"}, "close": 141.92999267578125, "ma20": 115.07249946594239, "chg": 14.765096447960643, "intraday_auto": {"status": "ok", "last": 138.7902, "open": 132.01, "base": 123.67, "checks": {"open_hold": {"auto": true, "ok": true, "label": "현재 138.79 / 시가 132.01 (시가比 +5.1%) · 전일比 +12.2%"}, "leaders": {"auto": true, "ok": true, "label": "3/3↑ · 엔비디아 +1.3%, AMD +9.1%, 브로드컴 +0.4%"}, "pullback": {"auto": true, "ok": true, "label": "저점 135.71→137.86 (높임 ✓)"}}}}, {"prod": "UPRO", "color": "🟢", "grade": "✅ 매수 후보", "reason": "필터 통과 · 스코어 5/5 → 1차 분할 진입 준비", "avoid": [], "avoid_keys": [], "filter_ok": true, "vol_ok": false, "intraday": ["S&P500 20일선 종가 유지", "섹터 3개↑ 동반"], "metrics": {"filter": "S&P500 7764.7/20일선 7663.4 (+1.3%)", "vol": "거래량 2.0M/20일평균 1.8M (1.14배), 고점比 -0.5%", "vix": "^VIX 14.9 (전일比 +0.4%)", "tnx": "^TNX 4.96 (전일 5.00, -0.03%p)", "run5": "최근 5일 +5.5%", "wick": "고점 대비 종가 -0.5%"}, "close": 154.07000732421875, "ma20": 148.72800216674804, "chg": 4.674233826139998, "intraday_auto": {"status": "ok", "last": 152.01, "open": 149.89, "base": 147.19, "checks": {"open_hold": {"auto": true, "ok": true, "label": "현재 152.01 / 시가 149.89 (시가比 +1.4%) · 전일比 +3.3%"}, "pullback": {"auto": true, "ok": true, "label": "저점 151.41→151.60 (높임 ✓)"}}}}], "ts": "2026-09-22T06:42:38.782153+09:00", "intraday_ts": "2026-09-22T00:17:11.883078+09:00", "intraday_state": "ok"}
+</script>
+
+    <!-- STEP 1: Definition table -->
+    <details style="margin:26px 0 4px">
+    <summary style="cursor:pointer;list-style:none;font-size:13px;color:var(--mute);padding:4px 0">📖 규칙 근거 — 책 표현을 어떤 숫자로 바꿨는지 (위 체크리스트에 모두 반영됨 · 펼치기)</summary>
+    <p class="subtle" style="margin:8px 0 4px">아래 정의는 위 스코어카드·진입판정·청산 라인에 이미 반영돼 있습니다. 출처(<span class="tag a">저자</span>/<span class="tag o">운영</span>) 감사용 참고표입니다.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>책의 표현 (애매)</th><th>정량 정의 (명확)</th><th>구분</th></tr></thead>
+        <tbody>
+          <tr><td>"상승장이 시작되는 흔적을 보고 들어가라"</td><td>지수 종가가 <b>20일선 위</b>로 회복 + 이후 <b>2거래일</b> 20일선 안 깸</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"거래량이 터지며 힘이 실릴 때"</td><td>당일 거래량 <b>전일 대비 1.5배 이상</b> + 종가가 고점 근처 마감 (SOXL은 2배 가까이면 오히려 과열)</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"과열됐을 때 추격하지 마라" (SOXL)</td><td>반도체지수 <b>최근 10일 중 7일↑ 상승</b> + SOXL <b>5거래일 20%↑</b> → 신규 진입 금지</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"변동성 큰 날은 조심"</td><td><b>VIX 전일 대비 +10%</b> → 장 초반 추격 중단 / <b>+20%</b> + 갭상승 → 비중 축소</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"금리가 튀면 기술주 예민"</td><td>미국 10년물 <b>하루 +0.1%p 이상</b> (이틀 연속이면 TQQQ·SOXL 보수적)</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"수익 나면 나눠서 정리"</td><td>익절 <b>+7~10%</b>(SOXL +10~12%) 30% → <b>+15~20%</b> 30% → 남은 40% 추세</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"손실 늦추지 마라"</td><td>가격 <b>-5%</b> 30% 축소 · 구조 이탈 시 50% · 20일선 회복 실패 시 추가 (전체계좌 -5/-8/-12%)</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"수익 반납하지 마라" (SOXL)</td><td>최고 수익 대비 <b>30% 반납=경고, 50% 반납=축소</b> / 계좌 최고 대비 40% 반납 시 익절</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"기간도 손절이다"</td><td>단타 <b>3~5거래일</b>, 스윙 <b>5~8거래일</b>, 추세도 <b>20거래일</b> 내 재판단</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"하락 추세 종목은 피하라"</td><td>지수 <b>20일선 &amp; 60일선 아래</b>면 신규 진입 제외 (책 기준선). <b>200일선</b> 아래 제외는 선택적 추가 안전필터</td><td><span class="tag a">저자</span> · <span class="tag o">운영</span></td></tr>
+          <tr><td>"장 초반은 판별의 시간"</td><td>장 시작 후 <b>30분</b> 주문 보류, 31분째 위치로 판정</td><td><span class="tag a">저자</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    </details>
+
+    <!-- STEP 1: pre-market scorecard -->
+    <h2><span class="step">STEP 1</span>장 시작 전 스코어카드 <span class="tag a">저자 2-6</span></h2>
+    <p class="subtle">5개 지표 각 양호 시 1점. <b>🤖 오늘 값으로 자동 체크됨</b> — 직접 수정하면 점수·판정이 즉시 다시 계산됩니다.</p>
+    <div class="card" id="scorecard">
+      <label class="chk"><input type="checkbox" data-sc><span class="txt">나스닥 선물 방향 양호 <small>플러스 & 고점 낮추지 않음</small></span></label>
+      <label class="chk"><input type="checkbox" data-sc><span class="txt">S&amp;P500 선물 방향 양호</span></label>
+      <label class="chk"><input type="checkbox" data-sc><span class="txt">VIX 안정 <small>전일 대비 +10% 미만, 급하게 안 튐</small></span></label>
+      <label class="chk"><input type="checkbox" data-sc><span class="txt">미국 10년물 금리 안정 <small>+0.1%p 이상 급등 아님</small></span></label>
+      <label class="chk"><input type="checkbox" data-sc><span class="txt">달러인덱스 안정 <small>급격한 강세 아님</small></span></label>
+      <div class="verdict" id="scVerdict"><span class="big score">0 / 5</span><span id="scMsg">지표를 체크하세요</span></div>
+      <p class="subtle" style="margin:10px 0 0">SOXL 매매일 땐 여기에 <b>반도체 대표주 2개(엔비디아+브로드컴 또는 엔비디아+AMD)</b> 방향을 추가로 확인하세요.</p>
+    </div>
+
+    <!-- STEP 3: entry checklist (오늘 자동판정 흡수) -->
+    <h2><span class="step">STEP 2</span>종목별 진입 판정 <span class="tag a">🤖 오늘 자동판정</span></h2>
+    <p class="subtle" id="td-ts">최신 세션 종가 기준 · 필터·회피 자동, 진입 조건만 장중 직접 확인</p>
+    <p class="subtle" style="margin-top:0">아래 종목 칩을 누르면 상세 진입 판정이 열립니다.</p>
+    <div id="td-summary"></div>
+    <div class="card acc" id="entryCard"></div>
+    <p class="subtle" style="margin-top:8px">💡 각 종목 판정 카드 아래에 <b>매수 즉시 걸어둘 청산·손절 라인</b>이 함께 표시됩니다. 전체 계좌 손실선(-5% 신규중단 · -8% 노출 절반축소 · -12% 재설계)은 공통.</p>
+
+    <!-- STEP 4: position calculator -->
+    <h2><span class="step">STEP 3</span>비중 · 분할 계산기 <span class="tag a">저자 6-2·3-4</span></h2>
+    <p class="subtle">총 투자금과 모드를 넣으면 종목별 배분·현금·3분할 금액이 계산됩니다. (배분비율은 저자의 5,000만 원 예시 기준)</p>
+    <div class="card">
+      <div class="calcrow">
+        <label>총 투자금(만원)</label>
+        <input type="number" id="capital" value="5000" min="0" step="100">
+        <div class="modes" id="modes">
+          <button data-m="공격" class="on">공격형</button>
+          <button data-m="균형">균형형</button>
+          <button data-m="방어">방어형</button>
+        </div>
+      </div>
+      <div class="tablewrap" style="margin-top:6px">
+        <table id="calcTable">
+          <thead><tr><th>종목</th><th>배분 금액</th><th>1차 (25%)</th><th>2차 (30%)</th><th>3차 (45%)</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="subtle" id="cashLine" style="margin:8px 0 0"></p>
+    </div>
+
+    <!-- STEP 5: pre-trade memo -->
+    <h2><span class="step">STEP 4</span>매수 전 5줄 메모 <span class="tag a">저자 10-2</span></h2>
+    <p class="subtle">다섯 칸을 다 못 채우면 준비 안 된 매매입니다. 특히 <b>줄일 자리·판단 기간</b>이 비면 매수 금지.</p>
+    <div class="card">
+      <div class="memo" id="memo">
+        <div class="field"><label>① 매수 이유</label><input data-req placeholder="예: 나스닥100 20일선 위 2거래일 버팀, 빅테크 3개 중 2개 시초가 위"></div>
+        <div class="field"><label>② 매수 금액</label><input data-req placeholder="예: 1차 750만원 (총 3,000만원 계획의 25%)"></div>
+        <div class="field"><label>③ 줄일 자리</label><input data-req placeholder="예: 20일선 종가 이탈 시 / -5%에서 30% 축소"></div>
+        <div class="field"><label>④ 판단 기간</label><input data-req placeholder="예: 스윙 5~8거래일, 20일 내 재판단"></div>
+        <div class="field"><label>⑤ 환율 상태</label><input data-req placeholder="예: 현재 1,380 / 20일평균 1,355 (+25원 → 1차만 환전)"></div>
+      </div>
+      <div class="warnbox" id="memoWarn">⚠ 아직 못 채운 칸이 있습니다. 특히 ③줄일 자리·④판단 기간이 비면 감정 매매입니다 — 매수 보류.</div>
+      <div class="verdict" id="memoVerdict" style="margin-top:12px"><span id="memoMsg">다섯 칸을 채우세요</span></div>
+    </div>
+
+    <p class="subtle" style="margin-top:34px; border-top:1px solid var(--line); padding-top:18px">
+      ※ 이 시트의 규칙은 <b>김프로랩 『미국 돈복사 ETF 투자방법』</b>에서 저자가 명시한 숫자를 그대로 옮긴 것이며, <span class="tag o">운영</span> 표시 항목만 실전 적용을 위해 수치화한 것입니다. 실제 매매 전 본인의 데이터·계좌 상황으로 반드시 검증하세요.
+    </p>
+  </div>
+</div><!-- /panel-sheet -->
+
+
+<script type="text/markdown" id="src">
+## 0. 저자가 반복 강조하는 핵심 원칙 (전 챕터 공통)
+
+- **"레버리지 ETF는 시간을 사는 상품이 아니라 구간을 사는 상품이다."** (1-2, 1-4) — 일반 지수 ETF=시간을 사는 상품, 3배 ETF=속도를 빌리는 상품. 반납 시점을 알아야 한다.
+- **"상승장을 예측해서 사지 말고, 상승장이 실제로 시작되는 흔적을 보고 들어가라."** (1-2) — 예측 진입은 횡보장에서 오래 맞는다.
+- **"좋은 뉴스보다 나쁜 가격이 더 세다."** (1-5, 2-7, 4-5) — 뉴스는 설명이고 가격은 돈의 흔적. 가격을 먼저 보고 뉴스는 나중에.
+- **"안 사는 기준이 먼저다."** (프롤로그, 2장, 3장) — 매수 버튼을 누르는 기술보다 안 누르는 기준이 먼저. 안 산 날이 돈 번 날이다.
+- **"장기투자가 아니라 장기 생존을 먼저 따진다."** (1-3) — 보유 기간은 감정이 아니라 숫자로 자른다(=시간 손절). 가격 손절선에 안 닿아도 정해둔 기간에 원하는 움직임이 없으면 뺀다.
+- **"금액이 아니라 변동성(하루 흔들리는 금액)으로 비중을 계산한다."** (1-1, 1-2, 6장) — "잠을 잘 수 있는 금액"이 진짜 한도.
+- **"돈복사 구간은 짧고 조용히 시작되며, 돈삭제 구간도 조용히 시작된다."** (1-5) — 위는 막히고 아래는 열리는 장.
+- **"가격은 얼굴, 거래량은 발소리."** (7-4) — 상승률보다 거래량을 먼저 본다.
+- **"추가매수는 살아 있는 구조에 돈을 붙이는 것, 손절은 죽은 구조에서 돈을 빼는 것."** (6-5, 9-1) — 평단이 아니라 구조를 본다.
+- **"손절이 아픈 게 아니라 손절을 늦춘 시간이 사람을 망친다."** (7-6, 9장)
+- **"벌었다고 다 내 돈이 아니다."** (8장, 10-4) — 팔고 분리하고 세금까지 지나야 내 돈이다.
+- **"돈복사는 종목이 아니라 시스템(운용 순서)에서 나온다."** (에필로그)
+
+핵심 구분(1-4): QQQ/SPY/VOO = "오래 가져갈 자산" 칸, TQQQ/SOXL/UPRO = "구간을 먹을 자산" 칸. 계좌 안에서 방을 나눠라. **"장기투자" 이름표를 붙이면 매도 기준이 흐려진다.**
+
+## 2. Chapter 2 — 매수 전 7개 시장 신호 (진입 필터)
+
+저자: 매수 전 10분이 종목 선택보다 비싸다. 목적은 수익 예측이 아니라 **"오늘 매수하면 안 되는 날"을 거르는 것.**
+
+### 2-6. 장 시작 전 10분 5개 지표 점수표 (핵심 도구)
+
+① 나스닥 선물 ② S&P500 선물 ③ VIX ④ 미국 10년물 국채금리 ⑤ 달러인덱스. SOXL 볼 때만 반도체 대표주 2개(엔비디아+브로드컴 또는 엔비디아+AMD) 추가.
+- 각 항목 양호/안정 시 1점씩, **5점 만점**
+- **4점 이상 = 공격 가능 / 3점 = 소액만 / 2점 이하 = 관망**
+- 지표는 색(숫자)이 아니라 **방향의 변화**를 본다. 플러스인데 고점을 낮추면 조심, 마이너스인데 저점을 높이면 반등 가능.
+
+### 2-1. 나스닥 살아나는 날 vs 속임수 반등 (TQQQ)
+
+- **진입 조건**: 장 시작 후 30분 대기(개인은 첫 30분을 버리는 게 돈 버는 날 많음). 31분째에 나스닥·TQQQ·엔비디아·MS·애플 위치 확인. 세 줄 체크 — ㉠ 나스닥이 시초가 위인가 ㉡ 첫 눌림 저점을 높였는가 ㉢ 빅테크 3개 이상 플러스 유지. **2개 이상이면 매수 후보, 아니면 미룸.**
+- **회피**: 프리마켓 상승 하나만 보고 진입 금지. 지수는 오르는데 주도주가 갈라지는 날(엔비디아만 오르고 애플 밀림) = 얇은 반등. 장 초반 튀고 30분 뒤 전일 종가 근처까지 밀리면 이미 경고.
+- 비중·청산 숫자는 저자 미명시(이 소절 한정, 3장·6장 참조).
+
+### 2-2. S&P500 위치로 UPRO 진입 구간 판단
+
+- 3개 선만 표시: **20일선, 60일선, 직전 전고점**
+- **20일선 아래** → 비중 줄이거나 쉬는 날 / **20일선 위+전고점 아래** → 작게 들어갈 자리(확인 매수) / **전고점 돌파 후 2~3거래일 버티면** → 비중 키울 자리
+- **60일선 아래 첫 반등은 매수 기회가 아니라 탈출 기회**인 경우 많음
+- UPRO 사기 좋은 자리 = 전고점 돌파 직전이 아니라 **돌파 후 버티는 구간**. 전고점 넘었다가 2거래일 내 다시 아래로 밀리면 아직 준비 안 됨.
+- 시장 폭("속 빈 지수" 경계): 금융·헬스케어·산업재·소비재까지 같이 살아나야 UPRO가 편함. 지수만 오르고 내부 갈라지면 관망.
+
+### 2-3. 반도체 지수 흐름으로 SOXL 과열 판단
+
+저자 명시 4가지 확인(2개 이상 과열 쪽이면 손 늦춤):
+- **최근 10거래일 중 반도체 지수 7일 이상 상승 = 뜨거운 상태.** 여기에 **SOXL이 5거래일 동안 20% 이상** 뛰었으면 신규 진입 조심.
+- **5일선과의 거리** — 5일선에서 너무 멀면 추격 위험.
+- **주도주 분산** — 엔비디아, AMD, 브로드컴, 마이크론, 반도체 장비주 6개 중 **4개 이상 같은 방향이면 힘이 넓은 장.** 1~2개만 끌면 조심.
+- **뉴스 온도** — "AI 슈퍼사이클/목표가 상향/대장주 질주" 제목이 한꺼번에 쏟아지면 이미 늦었을 수 있음.
+- 과열 회피 실전: 급등한 날 안 사고, 급등 후 **2거래일 눌림**에서 반도체 지수가 전일 저점 안 깨고 다시 올라오는지 봄.
+
+### 2-4. VIX 튀는 날 추격 금지
+
+- **VIX가 전일 대비 10% 이상 튀면 장 초반 추격 매수 멈춤. 20% 이상 + 지수 갭상승이면 더 조심(비중 축소).**
+- 숫자(15냐 20이냐)보다 **속도**가 먼저 — 낮은 데서 갑자기 튀는 게(13→16) 더 불편할 때 있음.
+- 3가지 같이 봄: 지수가 상승분 지키는지, 장 초반 저점 깨는지, 대형주 동시 버티는지.
+- 저자: "VIX는 매수 금지 버튼이 아니라 속도 제한 표지판." 그날은 작게, 장 초반 추격은 피함.
+
+### 2-5. 금리·달러·채권금리 순서
+
+- 주가가 빠진 뒤 이유 찾지 말 것. **채권금리가 먼저 → 달러가 따라 → 주가는 마지막에 반응.**
+- **미국 10년물 금리가 하루 0.1%포인트 이상 튀면 기술주 예민**(4.20→4.35는 그냥 0.15가 아님). 이틀 연속 오르면 TQQQ·SOXL 보수적으로.
+- 장 열리기 전 3개만 띄움: **10년물 국채금리 + 달러인덱스 + 나스닥 선물.** 셋이 같은 방향으로 위험을 말하면(금리↑·달러강·나스닥약) 매수 줄임.
+- 질문을 "TQQQ가 오를까"가 아니라 **"오늘 TQQQ가 오르기 편한 환경인가"**로 바꿈.
+
+### 2-7. 뉴스보다 가격 위치가 먼저
+
+- 순서: **가격 먼저 → 뉴스 나중.** 뉴스 나오기 전 5거래일 이미 많이 올랐는지, 5일선과 얼마나 벌어졌는지, 뉴스 후 첫 30분 고점 지키는지 — 3개 중 2개 불편하면 그 뉴스는 조심 신호.
+
+## 3. Chapter 3 — TQQQ 운용법
+
+### 3-1. 살 수 있는 3자리 / 피해야 할 3자리
+
+**살 수 있는 위치:**
+- 하락 후 **20일선을 종가로 회복하는 자리** (장중만 넘으면 부족) — 작게(1차) 진입.
+- **전고점 돌파 후 바로 안 무너지는 자리** — 돌파 당일이 아니라 **돌파 후 2~3거래일** 버티는지 보고 비중 추가.
+- **강한 상승 후 짧은 눌림(2~4거래일) 뒤 다시 고개 드는 자리** — 하락일 거래량 과하지 않고 5일선/10일선 근처 반등. TQQQ가 가장 맛있게 움직이는 구간.
+
+**피해야 할 위치:**
+- **급등 4~5일째 장 초반 추격** — 익절 물량 받아줌.
+- **20일선 아래에서 나오는 첫 양봉** — 확인이 아니라 미끼일 때 많음.
+- **전고점 근처 윗꼬리 반복** — 위에서 파는 흔적. 전고점은 희망이 아니라 검문소.
+
+매수 전 3문장(2개 불편하면 미룸): 지금 나스닥 20일선 위인가 · 최근 5거래일 이미 너무 올랐나 · 전고점 근처 윗꼬리 반복인가.
+
+### 3-2. 20일선·60일선 활용 (상승 초입)
+
+- **20일선 = 단기 생존선.** 종가로 위에 올라서고 **최소 2거래일** 버티는지 봄(하루 양봉=숨소리, 2~3일 버팀=호흡).
+- **60일선 = 중기 체력선.** 60일선 위에서 20일선 회복 = 추세 재개 / 60일선 아래에서 20일선만 회복 = 회복 시도(조심).
+- **가장 좋은 장면 = 20일선이 60일선 위에서 다시 고개 드는 구간.**
+- **선의 기울기**도 봄: 가격이 20일선 위여도 20일선이 아래로 꺾이면 조심. 60일선이 완만히 위=중기 체력 살아있음.
+- 실전 비중 규칙: 나스닥100 **20일선 아래면 TQQQ 최대 500만 원까지만, 20일선 위+60일선 위 동시 성립 시 1,500만 원까지 허용.**
+
+### 3-3. 전고점 돌파 전후 비중 (저자 명시 3칸)
+
+- **돌파 전(전고점 1% 안쪽, 아직 미돌파)**: 전체 계획금액의 **20~30%**만. 예) 총 3,000만 원이면 600~900만 원.
+- **돌파 당일**: 종가 확인 전까지 크게 안 넣음. 장중 뚫고 종가 아래로 내려오면 "뚫은 척"=실패한 돌파.
+- **돌파 후 2~3거래일 지지 확인**: 비중 키움.
+- 예시 배분: 총 3,000만 원 → 돌파 전 700 / 돌파 당일 종가 확인 후 800 / 돌파 후 지지 확인 1,500. 또는 비율로 **25% / 25% / 50%.**
+- 원칙: **"비중은 확신이 아니라 확인에 붙인다."**
+
+### 3-4. 분할매수 3단계
+
+- **1차 탐색 진입: 전체의 20~30%** (확인 전, 시장에 던지는 첫 질문). 예) 3,000만 원 → 600~900만 원.
+- **2차 확인 진입: 약 30%** — 기준 유지 시(20일선 위 종가 유지 등). 예) 900만 원. **첫 진입이 손실 중인데 기준 깨졌으면 추가 금지(=물타기).**
+- **3차 추세 진입: 40~50%** (가장 큰 돈) — 시장이 2회 이상 "네 판단이 맞다"고 확인해준 뒤.
+- 배분 예: 총 1,000만 원 → 250/300/450, 총 3,000만 원 → 750/900/1,350, 총 1억 → 2,500/3,000/4,500. (비율 25%/30%/45%)
+- 필수 규칙: 1차 후 기준 깨지면 추가 금지 · 2차 후 전일 저점 깨면 비중 축소 · 3차 후 수익 나면 일부 익절.
+
+### 3-5. 빅테크 실적 시즌 비중 축소 순간
+
+- 실적 발표 전 나스닥100이 **이미 5거래일 이상 올랐고 TQQQ가 10% 이상 수익 중이면 30~50% 익절/축소 고민**(특히 TQQQ 10%↑ 수익이면 절반 익절 검토).
+- 실적 발표 전 **VIX가 같이 올라가면** 축소.
+- **주도주 갈라지면**(엔비디아↑ 애플↓ 등) 축소.
+- 원칙: **"실적 시즌엔 맞히려 하지 말고 노출을 줄인다."** 발표 전 손실 중이면 추가매수로 승부 보지 말고 발표 후 방향 확인.
+
+## 4. Chapter 4 — SOXL 운용법
+
+### 4-1. 가장 많이 오르고 가장 빨리 무너지는 이유 (수익 관리)
+
+- 매수 전: **반도체 전체가 같이 움직이는지** 확인 / 매수 후: **최고 수익 대비 반납률** 감시 / 손실 시: 처음 정한 보유 기간 지킴 / 급등 후: 일부 덜기.
+- **5~10거래일 내 20% 이상 수익이면 일부 익절 고민.**
+- **수익 반납률 경고선: 최고 수익 대비 30% 반납 = 경고, 50% 반납 = 일부라도 축소.** (예: 600만→420만=30% 반납)
+- 익절 3단계: 수익 **14.8% 넘으면 30% 매도, 20% 넘으면 추가 30% 매도, 남은 40%는 추세.** ("덜 먹으니 오히려 남는다")
+- 섹터 내부 균열: AMD·브로드컴·마이크론·장비주 중 **3개 이상 약해지면 SOXL 비중 축소.**
+- 보유 기간: 단타 3거래일 / 짧은 스윙 5~8거래일 / 강한 추세도 **20거래일 안엔 반드시 재판단.** 기간 늘리려면 새 가격 근거 필요.
+
+### 4-2. 엔비디아·AMD·브로드컴으로 방향 읽기
+
+- SOXL은 엔비디아 3배가 아님. **엔비디아+AMD+브로드컴** 나란히 띄우고 3줄: 엔비디아 시초가 위인가 · AMD 전일 저점 지키는가 · 브로드컴 전고점 근처서 안 밀리는가. **2개 아니면 매수 축소. 엔비디아만 좋고 나머지 약하면 절대 크게 진입 금지.**
+- 각 종목 의미: 엔비디아=방향(대장), AMD=위험 선호, 브로드컴=확산(랠리가 한 종목에 안 갇힘).
+- **장중보다 종가 위치가 중요.** 최소 기준 = 엔비디아 포함 2개가 같은 방향.
+
+### 4-3. 급등 후 3일 내 익절 신호 (5가지)
+
+- **윗꼬리** (급등 2~3일째 길게 나오면 위에서 털림) → 수익 중이면 최소 30% 덜기(15%↑ 수익이면 더).
+- **거래량 폭증 후 추가 상승 실패** — 전일 대비 **1.7배 이상** 늘었는데 종가가 고점 아래 = 매물.
+- **주도주 이탈** — 엔비디아·AMD·브로드컴 중 2개 이상 전일 저점 깨면 축소.
+- **좋은 뉴스에도 더 못 가는 장면.**
+- **본인 감정** (하루 20번↑ 계좌 확인, 자랑하고 싶을 때 = 일부 팔 때).
+- 10% 이상 수익권이면 매일 장 마감 후 3가지 기록(윗꼬리/거래량 1.5배↑+종가 밀림/주도주 2개↑ 약화) — 3개 맞으면 다음 날 익절 먼저.
+- 익절 3단계: 수익 10% 부근 30% / 15~20% 구간 30% / 남은 40% 추세.
+
+### 4-4. 단타 vs 스윙 = 기준선 2개
+
+- **단타 = 5일선.** SOXL이 5일선 위+눌림에도 5일선 크게 안 깨면 단타 살아있음. 5일선 깨고 회복 못 하면 단타 종료.
+- **스윙 = 20일선.** SOXL과 반도체 지수 모두 20일선 위여야 스윙 여지. 20일선 아래를 "반도체는 결국 간다"로 버티면 위험.
+- 매수 전 한 문장 필수: **"이번 매매는 5일선 기준 단타인가, 20일선 기준 스윙인가."** 못 적으면 매수 안 함.
+- 스윙은 금액 축소 — 단타로 3,000만 원 넣는 사람도 스윙은 1,500만 원만.
+- 회피: 단타 시 장 초반 30분 급등 추격 금지 / 스윙 시 20일선 아래 첫 반등 진입 금지.
+
+### 4-5. 반도체 뉴스 좋을 때 조심 (호재 매물)
+
+- 좋은 뉴스 = 매도 대기자의 핑계일 때 많음. **바로 사지 말고 뉴스 후 가격 반응(종가)을 봄.**
+- 위험 조건: 최근 5거래일 **SOXL 15% 이상** 올랐으면 신규 축소 · 장중 고점 대비 **4% 이상 밀려 마감** · 엔비디아만 강하고 나머지 약함 · 기대치 과열.
+- 실전: 호재 당일 장 초반 안 삼. 장 마감까지 기다려 **종가가 고점 대비 30% 이내에서 버티면** 다음 날 눌림 봄. 윗꼬리 길면 매수 안 함.
+
+## 5. Chapter 5 — UPRO 운용법
+
+### 5-1. 느리지만 오래 버티는 이유
+
+- S&P500은 여러 업종 섞임 → 특정 섹터 흔들려도 전체가 바로 안 무너짐. **좁은 장=TQQQ 유리, 넓은 장=UPRO 유리.**
+- 오래 버티는 3조건: S&P500 20일선 위 · 업종 상승 폭 넓음(섹터 5개 중 3개↑) · 투자금이 하루 변동 감당할 만큼 적당.
+- 착각 경계: "오래 버팀"≠"안전". 5,000만 원 하루 -3%면 150만 원.
+- 섹터 5개(기술주·금융·산업재·헬스케어·소비재) 중 **3개 이상 플러스 + 20일선 위면 UPRO 볼 만.** 기술주 하나만 강하면 크게 안 감.
+
+### 5-2. 상승장 초입에서 담는 법 (저자 명시 4기준)
+
+- S&P500이 **20일선을 종가로 회복**하는 날.
+- **그다음 2거래일 동안 20일선 다시 안 깸.**
+- **업종 확산** — 기술주 외 금융·산업재·헬스케어·소비재 중 **최소 3개 이상** 동반 상승.
+- **눌림의 깊이** — 회복 후 다시 눌려도 20일선 근처에서 버팀.
+- 60일선도 봄: 60일선 위 상태에서 20일선 회복 = 신뢰↑ / 60일선 아래 20일선만 회복 = 반등 시도(조심).
+- 분할 예: 20일선 아래 최대 1,500만 원 / 20일선 위 회복 3,000만 원 / 전고점 돌파 후 버티면 5,000만 원까지.
+- 회피: 하루 양봉·"저가 매수세"·좋은 뉴스만 보고 진입 = 상승 초입 아니라 반등.
+
+### 5-3. 경기침체 우려 시 비중 축소 (5신호)
+
+- **S&P500 안에서 방어주(필수소비재·헬스케어·유틸리티)만 살아나고 기술·산업재·금융 약해지면** 축소.
+- **경기민감주·금융·산업재가 전고점서 계속 밀림.**
+- **실적 전망 하향이 업종 전체로 퍼짐.**
+- **나쁜 금리 하락** — 금리 내려가는데 주식 못 오르고 금융주 약하면 = 성장 둔화 공포(축소).
+- **S&P500이 20일선 깨고 반등해도 회복 못 함.**
+- 실전: 금융·산업재 5거래일 이상 약하고 방어주만 버티면 **보유금액 30% 먼저 축소.** 20일선 아래+금융·산업재 동시 약화 시 30% 축소, 60일선까지 위협받으면 추가 30% 축소.
+- 한 문장: **"금리가 내려가는데 주식이 못 오르면 조심, S&P500 못 오르고 경기민감 업종 약하면 UPRO 축소."**
+
+### 5-4. 대형주 순환매 시 UPRO 유리 구간
+
+- 신호: 나스닥 쉬는데 **S&P500이 덜 빠짐**(나스닥100 3일 -2.4%인데 S&P500 -0.6% 등) · 금융+산업재 동반 상승 · 헬스케어·소비재가 방어 아닌 상승 · 반도체 과열 후 쉬는데 S&P500 전고점 근처 지킴.
+- **순환매(돈이 시장 안에서 이동) vs 하락장(돈이 밖으로 빠짐) 구분 필수** — 순환매는 다른 업종이 받쳐줌, 하락장은 다 같이 빠짐. VIX 튀고 달러 강하면 순환매보다 위험 회피.
+- 3조건 동시 확인: S&P500 20일선 위 유지 · 최소 3개 섹터 동반 · 나스닥 약세가 전체 붕괴로 안 번짐.
+- 비중은 한 번에 안 옮김(예: SOXL 500 줄이고 TQQQ 500 줄여 UPRO 700만 넣고 나머지 현금).
+- 실전: 매주 금요일 섹터 5개 중 몇 개 20일선 위인지 기록 — 4개↑면 UPRO 비중↑, 2개↓면 현금↑.
+
+### 5-5. TQQQ·SOXL 부담될 때 UPRO로 낮추기
+
+- **UPRO로 옮기는 저자 명시 기준**: TQQQ/SOXL 수익 **10% 이상 + VIX 전일 대비 10%↑ 튀거나 지수 전고점 윗꼬리 → 30%를 UPRO로.** 수익 **15% 이상 + 주도주 2개 이상 약화 → 50%까지.**
+- "불 끄지 말고 화력 낮추기." 단, **시장 전체 약세(S&P500 20일선 아래+VIX 튐)에서는 UPRO도 대피소 아님 → 현금 늘려야.**
+- 실전: 총 노출 5,200만→3,800만으로 낮추되 줄인 금액 전부 UPRO 아니라 일부만(1,600만) UPRO, 나머지 현금.
+
+## 6. Chapter 6 — 포트폴리오 설계
+
+### 6-1. 1:1:1이 위험한 이유
+
+- 같은 금액≠같은 위험. **거친 순서: 반도체(SOXL) > 나스닥(TQQQ) > S&P500(UPRO).** 1:1:1은 실제로 SOXL 쪽으로 기움("숫자만 균형 계좌").
+- TQQQ+SOXL은 성장주 압력 겹침 → 같이 빠짐. 이름 3개≠분산.
+- 저자 권장 방향: **SOXL 작게 · TQQQ 중간 · UPRO는 시장 폭 넓을 때 상대적으로 크게 · 현금 확보.**
+- 예: 총 5,000만 원 → SOXL 1,000 / TQQQ 1,500 / UPRO 1,500 / 현금 1,000. (1:1:1의 각 1,666만보다 버티기 쉬움)
+
+### 6-2. 공격형·균형형·방어형 (저자 명시 예시 비중)
+
+성격이 아니라 **하루 최대 손실 감당액**부터 정한다.
+- **공격형** (총 5,000만): TQQQ 1,700 / SOXL 1,200 / UPRO 900 / 현금 1,200. (SOXL이 TQQQ보다 작아야 함)
+- **균형형** (총 5,000만): TQQQ 1,300 / SOXL 700 / UPRO 1,300 / 현금 1,700.
+- **방어형** (총 5,000만): TQQQ 700 / SOXL 300 / UPRO 1,500 / 현금 2,500.
+- 시장 온도에 따라 모드 전환: 20일선 위 강세=공격형 근접 / 나스닥 과열+S&P500 버팀=균형형 / S&P500 20일선 아래+VIX 튐=방어형.
+- **손실 허용선을 수익 목표보다 먼저 정한다.** 수익률 목표부터 정하는 게 최악.
+
+### 6-3. 현금 30% 원칙
+
+- **기본값 30%.** 계산: 1,000만→300, 3,000만→900, 1억→3,000.
+- 시장 온도로 조절: 강세+VIX 안정 시 **20%까지 낮춤**, VIX 튀고 S&P500 20일선 깨고 반도체 과열 후 밀리면 **40% 이상.**
+- 현금=쉬는 돈 아니라 "다음 진입권/마른 장작/산소". 30%면 최소 2번 나눠 진입 가능.
+- TQQQ+SOXL 합이 전체 50% 넘는데 현금 10% 이하면 하락장서 반드시 판단 꼬임.
+
+### 6-4. 최대 손실 허용선 (매수 전에 정함, 세 겹)
+
+- **원금 기준**: 전체 계좌 -5% 신규매수 중단 / -8% 레버리지 노출 절반 축소 / -12% 전체 재설계.
+- **종목별**: 예 SOXL -6~7% 절반 축소, TQQQ -6~7% 재판단, UPRO는 S&P500 20일선 이탈 시 축소. (SOXL은 손실선 넓게 주면 크게 맞으니 처음부터 금액 작게)
+- **최고 수익 대비 반납선**: 계좌 최고 수익 대비 **40% 반납 시 일부 익절 확정.**
+- 말로 -12% 버틴다 해도 400만 원 손실에 잠 못 자면 실제 한계는 -8% 앞. **몸이 못 버티는 손실선은 기준이 아님.**
+
+### 6-5. 추가매수 vs 손절 구분
+
+- **기준: 손실 상태가 아니라 구조 상태.** 손실 중이어도 구조 살아있으면 추가매수, 구조 죽었으면 손절. 수익 중이어도 구조 죽으면 일부 익절/축소.
+- "구조 살아있는 하락" = TQQQ는 나스닥100 20일선 위+저점 높임 / SOXL은 엔비디아·AMD·브로드컴 중 2개 이상 저점 지킴 / UPRO는 S&P500 20/60일선 위+업종 확산 유지.
+- 손절 신호: 처음 매수 이유 사라짐(예: 20일선 회복으로 샀는데 재이탈 2거래일 이상) · 추가매수 시 손실 허용선 넘음.
+- 매수 전 **첫 매수 이유 한 줄** 적고, 손실 시 그 이유 생존 여부부터 확인.
+
+## 7. Chapter 7 — 매수·매도 타이밍 시스템
+
+### 7-1. 시초가 즉시 매수 시 당하는 5패턴
+
+- 갭상승 후 윗꼬리 · 프리마켓 착시(거래량 얇아 착각) · 첫 15분 거래량 폭발 후 정지("시초가 한 방 털림") · 지수와 주도주 엇갈림 · 장 초반 수익 착각(10분 내 수익은 아직 인정된 수익 아님).
+- 장 시작 후 **30분 주문창 닫음.** 세 줄: 시초가 지켰나 · 첫 눌림 저점 높였나 · 주도주 3개 이상 같은 방향. 2개 이상이면 후보.
+
+### 7-2. 장 초반 30분 판별
+
+- 30분은 매수 시간 아니라 **판별 시간**("첫 물 빼기"). 30분 내 상승은 놓쳐도 됨(진짜 강한 장은 30분 뒤에도 자리 줌).
+- 5가지: 시초가 지지 · 첫 눌림 저점 · 주도주 3개(TQQQ=엔비디아·MS·애플, SOXL=엔비디아·AMD·브로드컴, UPRO=기술·금융·산업재) · 첫 30분봉 몸통(윗꼬리 길면 조심) · 거래량의 질(거래량 터졌는데 시초가 아래로 밀리면 매도 우위).
+- 실전 메모: "시초가 지지 / 첫 눌림 저점 / 주도주 3개 방향" 2개 이상 좋으면 매수 후보.
+
+### 7-3. 갭상승 날 눌림 기다리기
+
+- 갭상승=선물 아님, 위에 팔 사람 대기("공중 진입"). 전주부터 많이 오른 뒤 갭상승은 더 조심.
+- 봄: **갭 지키는지**(30분 내 상승분 지키고 시초가 근처 버팀) · **첫 눌림 깊이**(전일 종가까지 안 내려오고 시초가 살짝 아래서 회복=좋음) · 주도주 3개 중 2개 시초가 위.
+- **매수 금액도 줄임**: 평소 3,000만 원 자리면 갭상승 추격 구간은 1,000만 원 이하로 시작.
+- 세 줄(2개 이상 맞기 전 매수 금지): 시초가 지켰나 · 첫 30분 저점 깼나 · 주도주 3개 같이 버티나.
+
+### 7-4. 상승률보다 거래량 먼저
+
+- **거래량 위치값**: 바닥권 상승 중 거래량=매수, 급등 후 전고점 근처 거래량+종가 밀림=매물.
+- 3가지: 오늘 거래량 **전일보다 1.5배 이상** 늘었나 · 종가가 고점 근처에서 끝났나 · **하락일 거래량이 상승일보다 커지는지**(상승일 거래량 줄고 하락일 커지면 돈 빠지는 장).
+- SOXL은 전일 대비 거래량 **2배 가까이** 터지고 윗꼬리 길면 다음 날 흔들림 커짐.
+
+### 7-5. 익절은 감이 아니라 구간별
+
+- **1구간 수익 7~10%** (SOXL은 변동성 커서 10~12%): 보유 수량 **30% 익절.**
+- **2구간 수익 15~20%**: 추가 **30% 익절** (특히 5~10거래일 내 도달 시).
+- **3구간 남은 40%**: 추세 확인용(TQQQ=나스닥 5/10일선 지지, SOXL=대표주 3개 중 2개↑, UPRO=S&P500 20일선+업종 폭).
+- 구간 종류: 가격(전고점·5일선·20일선 이탈), 수익률(+7/+15/+20%), 시간(5/10/20거래일), 반납률(최고 대비 30%/50%).
+- **금액 목표("1,000만 원 채우면 판다") 금지** — 시장과 무관한 욕심 숫자. SOXL은 최고 수익 대비 30% 반납=경고, 50%=강한 축소 후보.
+
+### 7-6. 손절 늦추면 복구 어려운 이유
+
+- **복구 수익률**: -10%→+11.1% 필요, -20%→+25%, -30%→+42.9%. 심리까지 무너져 반등 와도 본전서 팔게 됨.
+- 손절선 **가격 기준 + 구조 기준 따로**: 가격=-5/-7/-10%, 구조=나스닥 20일선 이탈·반도체 대표주 2개↑ 전일 저점 이탈·S&P500 20일선 2거래일 연속 이탈.
+- **부분 손절이 현실적**: -5%에서 30% 축소, 구조 이탈 시 50%, 20일선 회복 실패 시 추가 축소.
+
+## 8. Chapter 8 — 환율·세금·수수료
+
+### 8-1. 환율 높을 때 매수 판단
+
+- 환전과 매수는 **다른 매매**(달러 사는 것 ≠ 자산 사는 것) — 같은 날 묶지 말 것.
+- 환율 높을 때: 매수 판단을 "살까 말까"가 아니라 **"얼마나 작게 들어갈까"**로. 3단계 환전(예 총 3,000만 → 900/900/1,200).
+- 환율 위치 판단: **최근 20거래일·60거래일 평균 대비.** 20일 평균보다 크게 위+단기 급등이면 전액 환전 회피. **달러 강세+VIX 상승 동시면** ETF·환율 양쪽 불리.
+- 메모 4숫자: 현재 환율 · 20거래일 평균 · 내 평균 환전 환율 · ETF 매수가 기준 환율.
+
+### 8-2. 원화 수익 vs 달러 수익 따로
+
+- 한국 투자자는 ETF 가격+달러 가격 **둘 다 산다("두 장부 계좌").** 달러 수익률만 보면 계좌 과대/과소평가.
+- 매매일지 4개: 매수 환율 · 매도 환율 · 달러 수익률 · 원화 수익률.
+- "환율빨 수익"과 ETF 실력 수익 분리 — 안 그러면 운을 실력으로 착각해 비중 키움.
+
+### 8-3. 세금 미리 계산 ("숨은 출금")
+
+- 미국 상장 ETF 매매차익=양도소득세 대상. 수익 확정 순간부터 따라붙음.
+- 방법: 실현수익 **월별로 끊어봄** · 수익 일부를 세금 계좌로 분리(다음 매매금에서 제외) · **손실 매매도 기록** · **연말 무리한 매매 금지**("세금 앞 발악").
+- 최근 10건 실현수익·손실·매수/매도 환율 한 줄씩 기록.
+- **구체 세율·공제는 저자 미명시** — "개인 상황에 따라 확인"이라고만 함.
+
+### 8-4. 수수료보다 진입 위치가 더 무섭다
+
+- 수수료 0.05%(3,000만 원 기준 1.5만 원) < 진입 3% 실수(90만 원). **"문고리 닦다 집 무너지는 계좌."**
+- 주문 전 순서: **자리 → 금액 → 환율 → 수수료.**
+- "진입 위치 비용" 계산: 지금 가격에서 3% 불리해지면 얼마 사라지나(1,000만→30만, 3,000만→90만, 7,000만→210만). 불편하면 금액 줄이거나 눌림 기다림.
+- 매수 전 3체크: 최근 5거래일 많이 올랐나 · 전고점 근처 윗꼬리 나왔나 · 장 초반 30분 시초가 지켰나. 2개 불편하면 수수료 싸도 진입 금지.
+
+### 8-5. 환전 타이밍 vs 매수 타이밍 분리
+
+- 미국 ETF 매수 = 사실상 **두 번의 매수**(원화→달러, 달러→ETF, "이중 매수").
+- 달러 3칸 분할(예 총 3,000만 → 1,000씩). 환전 기준 환율 명시: 20거래일 평균보다 **20원 이상 높으면 전액 환전 금지, 40원 이상이면 1차만, 평균 근처/아래면 2차까지.**
+- 환전 후 ETF 주문창 바로 열지 말 것("달러 들고 손 근질병"). 달러는 준비금, ETF 매수는 별도 판단.
+- SOXL 특히 주의: 반도체 뜨거운 날=환율도 높을 때 많음 → 전액 환전+전액 매수 동시 금지. UPRO는 상승 초입 기다리며 달러 미리 확보하기 좋음.
+
+## 9. Chapter 9 — 하락장 방어 전략
+
+### 9-1. 물타기가 계좌 망치는 순간 ("평단 미용")
+
+- **가격 내려왔다는 사실만으론 부족 — 구조가 살아있어야 추가매수.** 구조 죽었는데 사면 물타기.
+- 망치는 3순간: 처음 매수 이유 사라졌는데 더 삼 · 현금 계획 없이 물타기 · 손실률 낮추려 금액 키움(총 노출↑).
+- **가장 위험한 구간: -10% 넘은 뒤** ("-10% 넘으면 머리보다 배가 말한다"). 물타기 기준은 손실 깊어지기 전 정함.
+- 물타기 전 3문장(하나라도 아니면 멈춤): 처음 매수 이유 살아있나 · 추가 후 한 번 더 -5% 나와도 손실 허용선 안인가 · 추가 후에도 현금 20~30% 남나.
+
+### 9-2. -10% / -20% / -30% 구간별 대응
+
+- **-10% 경고 구간**: "버틸까"가 아니라 **처음 매수 이유 살아있는지 검문.** 자동 물타기 절대 금지. 이유 살아있으면 작게 추가, 죽었으면 축소.
+- **-20% 구조조정 구간**: 복구 아니라 **비중 축소로 계좌 압력 먼저 낮춤**(예 절반 축소). 늦었어도 손상 속도 줄이는 게 목적.
+- **-30% 생존 구간**: 전량 복구 생각 버리고 **물량 3덩어리** — 바로 줄일 물량 30% / 반등 시 줄일 40% / 구조 회복(20일선 회복 등) 시 가져갈 30%.
+- "기다림에도 조건이 있어야 함" — 나스닥 20일선 회복까지, 대표주 3개 중 2개 전고점 회복까지, S&P500 60일선 복귀까지.
+
+### 9-3. V자 반등 기대의 함정
+
+- 반등 확률 올라가도 **내가 먹을 수 있는 반등인지**가 핵심(손실 깊으면 반등 와도 본전서 팔게 됨).
+- V자 착각 이유: 첫 양봉을 바닥으로 착각(하락장 첫 강한 양봉=숏커버링일 수 있음) · 거래량 안 봄 · VIX 무시(고점서 안 꺾였으면 거친 반등) · 현금 없이 기다림.
+- **첫 바닥 맞히지 말고 두 번째 확인을 사라.** 3거래일 봄: 첫날 급등 → 둘째 날 저점 지지 → 셋째 날 전일 고점 재도전. 첫날만 강하고 둘째 날 밀리면 추격 금지.
+- 확인 기준: 지수 전일 저점 안 깸 · 반등 다음 날 거래량 안 죽음 · 주도주 동반(TQQQ=빅테크 3개, SOXL=대표주 3개 중 2개 저점 높임, UPRO=섹터 3개↑).
+
+### 9-4. 현금 보유가 수익 전략이 되는 구간 ("총알")
+
+- 4구간: 시장 과열됐지만 아직 안 무너짐(나스닥 5일↑ 강세+TQQQ 12%↑ 단기, SOXL 과열) → 수익 일부 현금화 · VIX 튀는데 지수 아직 버팀 · 좋은 뉴스 많은데 가격 못 감 · 손절 직후(최소 2거래일 현금 대기).
+- 현금도 **재진입 조건과 붙여둠**: 나스닥 20일선 회복 시 TQQQ 1차 / 대표주 3개 중 2개 저점 높이면 SOXL 소액 / S&P500 60일선 위+업종 확산이면 UPRO.
+- 체크: TQQQ/SOXL/UPRO 각 -10% 눌렸을 때 추가 넣을 돈 있나. 없으면 과노출. 현금 10%↓=한 번만 대응, 30%=두 번, 40%=급락장서도 숨 쉼.
+
+### 9-5. 폭락 후 재진입 3단계
+
+- 바닥 맞히기 아님. **순서: ① 공포 진정(VIX 고점서 꺾임) → ② 가격 회복(20일선 회복) → ③ 눌림 지지(다시 눌렸을 때 선 지킴).**
+- 폭락 뒤 첫 반등="응급 숨"일 수 있음. 3줄(2개 맞기 전 큰돈 금지, 1개면 소액 탐색만, 3개면 비중↑): VIX 고점서 내려왔나 · 지수 20일선 회복했나 · 회복 후 첫 눌림에서 저점 지켰나.
+- 상품별 확인 다름: SOXL은 대표주 3개 중 2개 저점 높일 때(첫 반등 금지, 반등률 커 가장 위험) / TQQQ는 나스닥 20일선 회복+빅테크 3개↑+첫 눌림 전저점 안 깸 / UPRO는 기술+금융+산업재+헬스케어 동반.
+
+## 10. Chapter 10 — 실천 루틴
+
+### 10-1. 매일 밤 10분 체크 (2분 × 5)
+
+- **첫 2분 시장 방향**: 나스닥 선물+S&P500 선물 (색보다 방향 변화).
+- **2분 주도주**: TQQQ=엔비디아·MS·애플, SOXL=엔비디아·AMD·브로드컴, UPRO=기술·금융·산업재. 3개 중 2개↑ 같은 방향이어야 신뢰.
+- **2분 공포·금리**: VIX(전일 10%↑ 추격 줄임, 20%↑ 경고), 10년물 금리.
+- **2분 가격 위치**: TQQQ=나스닥100 20일선 위? SOXL=반도체 과열? UPRO=20/60일선 사이 어디?
+- **2분 내 계좌**: TQQQ+SOXL 합이 50% 넘나, 현금 30% 남나, 오늘 추가 시 하루 -5%에 얼마 사라지나.
+
+### 10-2. 매수 전 5줄 메모 (필수)
+
+- 매수 이유(가격 기준으로 — "나스닥100 20일선 위 2거래일 버팀, 빅테크 3개 중 2개 시초가 위")
+- 매수 금액(1차 얼마)
+- 줄일 자리(없으면 매수 안 함)
+- 판단 기간("매매 유통기한")
+- 환율 상태
+- 하나라도 못 쓰면 준비 안 된 매매. 특히 **줄일 자리·판단 기간** 못 쓰면 감정 매매.
+
+### 10-3. 비중 조정 주 1회
+
+- **전체 비중 구조는 주 1회만** 조정(예 매주 토요일 오전 or 월요일 장 시작 전 30분). 주중엔 손절·익절 기준만 실행.
+- 3기준: 시장 위치(주간) · 내 계좌 손상도(최고점 대비 반납률) · 현금 비중(30% 아래/40% 위).
+- 자주 바꾸면 매수가 나빠짐+기준 흐려짐+복기 불가("젓가락 계좌"). 개별 악재는 해당 종목만 축소, 전체 뒤엎지 않음.
+
+### 10-4. 수익 후 출금 전략
+
+- **실현수익 30%는 계좌 밖으로 분리**(또는 다음 매매금에서 제외). 1,000만 원↑ 수익 달엔 40%까지.
+- **수익 확정 시 3칸**: 세금 예상분 / 출금·분리금 / 재투자 가능금. 나누기 전 다음 매매 금지.
+- **수익 직후 2거래일 휴식**(자존감 커진 상태). 계좌 최고점 갱신 시 일부 분리. 생활·사업 계좌와 투자 계좌 분리.
+- 작은 수익도 습관적으로 분리(50만 벌면 15만).
+
+### 10-5. 1억 vs 1천만 원 계좌
+
+- **비율 복사 금지 — 절대 손실액으로 재계산.** 같은 30%도 300만 원과 3,000만 원은 다름.
+- **1천만 원 계좌 = 손버릇 만드는 계좌** (학습·속도, 실험 비용 예: 월 50만 원 한도. 예시 배분 TQQQ 250/SOXL 150/UPRO 250/현금 350). 대박 노리지 말 것.
+- **1억 계좌 = 생존·출금 계좌** ("느리게 밟아야 하는 차"). 커질수록 현금↑, SOXL↓. 예시: TQQQ 2,000/SOXL 800/UPRO 2,200/현금 5,000(현금 5,000만은 겁이 아니라 선택권). 매매 횟수 줄임(월 4번도 충분).
+- 커질수록 **SOXL을 가장 먼저 줄이고, TQQQ는 분할이 더 중요**(1,000만씩 3단계).
+- 최종안 예: TQQQ 최대 2,500 / SOXL 최대 1,000 / UPRO 최대 2,000 / 현금 최소 4,500.
+
+### 에필로그 — 최종 기준 5개 (책 덮기 전 작성)
+
+- TQQQ 살 수 있는 조건
+- SOXL 절대 추격 안 할 조건
+- UPRO로 비중 낮출 조건
+- 전체 계좌 손실 허용선
+- 수익금 출금 기준
+- 저자 최종 루틴 예시: 매일 밤 10분 체크 / 매수 전 5줄 / 현금 30% / 수익 10% 근처 일부 익절 / 전체 -5%에서 신규 매수 중단 / SOXL은 엔비디아 하나만 보고 안 삼 / 환율 20거래일 평균보다 30원↑면 전액 환전 금지.
+
+## A. 부록 — 저자 명시 핵심 숫자 총정리 (원문 그대로)
+
+| 항목 | 숫자 |
+|---|---|
+| 돈복사→돈삭제 의심(4개 중 2개↑) | 최근 10거래일 중 상승일 6일 이상 / 하락일 낙폭 > 상승일 상승폭 / 전고점 돌파 후 3거래일 내 재하락 / VIX 바닥권서 20% 이상 튐 |
+| 보유 기간 3분류 | 짧은 매매 3~5거래일 / 중간 10~20거래일 / 긴 매매 40~60거래일 |
+| 긴 매매 전제 낙폭 | 20거래일이면 -10%, 60거래일이면 -25% 와도 버틸 비중 |
+| 20거래일 상승·하락 판별 | 상승일 13일 이상+하락 낙폭 작으면 레버리지 힘받는 장 |
+| SOXL 과열 | 반도체 지수 최근 10거래일 중 7일↑ 상승 + SOXL 5거래일 20%↑ |
+| VIX 추격 금지 | 전일 대비 10% 이상 튀면 장 초반 추격 멈춤 / 20% 이상+갭상승 더 조심 |
+| 10년물 금리 예민 | 하루 0.1%p 이상 튀면 기술주 예민 |
+| TQQQ 20일선별 비중 | 20일 아래 최대 500만 / 20일·60일 동시 위 1,500만 |
+| TQQQ 전고점 3칸 | 돌파 전 20~30% / 돌파 당일 종가 확인 / 돌파 후 지지 50% (또는 25/25/50) |
+| TQQQ 분할 | 1차 20~30% / 2차 30% / 3차 40~50% |
+| SOXL 반납 경고 | 최고 수익 대비 30% 반납=경고, 50%=축소 |
+| SOXL 익절 3단계 | 10% 부근 30% / 15~20% 30% / 남은 40% 추세 (또는 14.8%↑ 30%, 20%↑ 추가 30%) |
+| SOXL 거래량 매물 | 전일 1.7배↑+종가 고점 아래 / 스윙 판별 시 2배 가까이+윗꼬리 |
+| 익절 1·2·3구간 | 수익 7~10%(SOXL 10~12%) 30% / 15~20% 30% / 남은 40% |
+| 손절 복구율 | -10%→+11.1% / -20%→+25% / -30%→+42.9% |
+| 손실 구간 대응 | -10% 경고 / -20% 구조조정(절반 축소) / -30% 생존(30·40·30 3덩어리) |
+| 현금 | 기본 30%, 강세 시 20%, 위험 시 40%↑ |
+| 전체 계좌 손실선 | -5% 신규중단 / -8% 노출 절반축소 / -12% 재설계 / 최고 수익 대비 40% 반납 시 익절 |
+| UPRO 이관 기준 | 수익 10%↑+VIX 10%↑ or 윗꼬리 → 30% UPRO / 15%↑+주도주 2개↑ 약화 → 50% |
+| 환전 기준 | 20거래일 평균보다 20원↑ 전액금지 / 40원↑ 1차만 / 평균 근처·아래 2차까지 |
+| 출금 | 실현수익 30%(1,000만↑ 달 40%), 수익 후 2거래일 휴식 |
+| 장 초반 대기 | 30분 |
+
+## B. 부록 — 정리 시 넘겨짚지 않은 부분
+
+- **저자 미명시로 표시한 것**: 세금 세율·공제 구체 숫자(저자가 "개인 상황에 따라 확인"이라고만 함), 2-1 소절의 개별 비중·청산 숫자(3장·6장으로 넘김).
+- **원문 사례 인물·지명·일화**(부산 서면/해운대/광안리, 개인 이름, 계좌 금액 스토리)는 기법 추출 재료로만 쓰고 옮기지 않음.
+- **원문 오탈자 확인 지점**: 1991~1997줄에 "익→익절", "기1만 원", "74.9% 반납" 등 편집 흔들림이 있으나 의미는 "SOXL 수익 13.6%에서 안 팔다가 최고 수익 대비 약 75% 반납" — 익절 기준(최고 대비 반납률)의 예시로만 사용. 기법 숫자는 소절 내 명확한 값(30%/50%, 10%/15~20% 등)을 채택.
+- **커버리지 검증**: 프롤로그 + Chapter 1~10(전 소절) + 에필로그 전부 읽고 정리. 빠진 챕터 없음.
+</script>
+
+<script>
+(function(){
+  const raw = document.getElementById('src').textContent;
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+
+  const lines = raw.split('\n');
+  let html = '';            // main content
+  const nav = [];           // {id,num,title}
+  let chapOpen = false;
+  let listBuf = [];
+  let tableBuf = [];
+  let secIdx = 0;
+
+  function flushList(){
+    if(listBuf.length){
+      html += '<ul>'+listBuf.map(li=>'<li>'+inline(li)+'</li>').join('')+'</ul>';
+      listBuf = [];
+    }
+  }
+  function flushTable(){
+    if(!tableBuf.length) return;
+    const rows = tableBuf.filter(r=>!/^\|[\s:|-]+\|$/.test(r.trim()));
+    let out = '<div class="tablewrap"><table>';
+    rows.forEach((r,i)=>{
+      const cells = r.split('|').slice(1,-1).map(c=>c.trim());
+      const tag = i===0 ? 'th' : 'td';
+      const sect = i===0 ? 'thead':'tbody';
+      if(i===0) out += '<thead><tr>'+cells.map(c=>'<th>'+inline(c)+'</th>').join('')+'</tr></thead><tbody>';
+      else out += '<tr>'+cells.map(c=>'<td>'+inline(c)+'</td>').join('')+'</tr>';
+    });
+    out += '</tbody></table></div>';
+    html += out;
+    tableBuf = [];
+  }
+  function closeChap(){
+    if(chapOpen){ flushList(); flushTable(); html += '</div></details></section>'; chapOpen=false; }
+  }
+
+  for(let line of lines){
+    const t = line.trim();
+    if(t.startsWith('|')){ flushList(); tableBuf.push(t); continue; }
+    else if(tableBuf.length){ flushTable(); }
+
+    if(t.startsWith('## ')){
+      closeChap();
+      const title = t.slice(3);
+      const m = title.match(/^([0-9A-Z]+)\.\s*(.*)$/);
+      const num = m ? m[1] : '';
+      const label = m ? m[2] : title;
+      const id = 'c'+(secIdx++);
+      nav.push({id, num, title:label});
+      const isPrinciple = num==='0';
+      html += '<section class="chap" id="'+id+'"><details class="chap"'+(isPrinciple?' open':'')+'>'
+            + '<summary><span class="cn">'+esc(num)+'</span><h2>'+inline(label)+'</h2><span class="chev">▶</span></summary>'
+            + '<div class="chap-body'+(isPrinciple?' principles':'')+'">';
+      chapOpen = true;
+    }
+    else if(t.startsWith('### ')){
+      flushList();
+      html += '<h3 class="sec">'+inline(t.slice(4))+'</h3>';
+    }
+    else if(t.startsWith('- ')){
+      listBuf.push(t.slice(2));
+    }
+    else if(t===''){
+      flushList();
+    }
+    else {
+      flushList();
+      html += '<p>'+inline(t)+'</p>';
+    }
+  }
+  closeChap();
+
+  document.getElementById('content').innerHTML = html;
+
+  document.getElementById('nav').innerHTML = nav.map(n=>
+    '<li><a class="navlink" href="#'+n.id+'"><span class="n">'+esc(n.num)+'</span><span>'+esc(n.title)+'</span></a></li>'
+  ).join('');
+
+  // active section highlight
+  const links = [...document.querySelectorAll('.navlink')];
+  const map = {};
+  links.forEach(l=>map[l.getAttribute('href').slice(1)]=l);
+  const obs = new IntersectionObserver(entries=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        links.forEach(l=>l.classList.remove('active'));
+        const l = map[e.target.id];
+        if(l) l.classList.add('active');
+      }
+    });
+  },{rootMargin:'-10% 0px -80% 0px'});
+  nav.forEach(n=>{const el=document.getElementById(n.id); if(el) obs.observe(el);});
+
+  // clicking a nav link opens that chapter
+  links.forEach(l=>l.addEventListener('click',()=>{
+    const el = document.getElementById(l.getAttribute('href').slice(1));
+    const d = el && el.querySelector('details');
+    if(d) d.open = true;
+    document.getElementById('side').classList.remove('open');
+  }));
+
+  // mobile menu
+  const btn = document.getElementById('menubtn');
+  const side = document.getElementById('side');
+  if(btn) btn.addEventListener('click',()=>side.classList.toggle('open'));
+})();
+</script>
+
+<script>
+(function(){
+  /* ---- tab switching ---- */
+  const tabs = document.querySelectorAll('.tab');
+  tabs.forEach(t=>t.addEventListener('click',()=>{
+    tabs.forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.querySelectorAll('.tabpanel').forEach(p=>p.classList.remove('active'));
+    document.getElementById('panel-'+t.dataset.tab).classList.add('active');
+    window.scrollTo(0,0);
+  }));
+
+  /* ---- STEP 2: scorecard ---- */
+  const scBoxes = [...document.querySelectorAll('[data-sc]')];
+  const scV = document.getElementById('scVerdict');
+  const scMsg = document.getElementById('scMsg');
+  function scUpdate(){
+    const n = scBoxes.filter(b=>b.checked).length;
+    scV.querySelector('.score').textContent = n+' / 5';
+    scV.classList.remove('go','small','no');
+    if(n>=4){scV.classList.add('go'); scMsg.textContent='공격 가능 — 진입 조건 충족 시 계획대로 매수';}
+    else if(n===3){scV.classList.add('small'); scMsg.textContent='소액만 — 확인 매수 수준으로 축소';}
+    else {scV.classList.add('no'); scMsg.textContent='관망 — 오늘은 신규 진입 보류';}
+  }
+  scBoxes.forEach(b=>b.addEventListener('change',scUpdate)); scUpdate();
+
+  /* ---- STEP 3: entry checklist ---- */
+  const VD = (function(){ try { return JSON.parse(document.getElementById('verdict-data').textContent); } catch(e){ return null; } })();
+  const gradeCls = g => g.includes('매수 후보') ? 'go' : (g.includes('소액') ? 'small' : (g.includes('보류')||g.includes('금지') ? 'no' : ''));
+  const DATA = {
+    TQQQ:{ v:'--tqqq', need:2,
+      filter:[{t:'나스닥100 종가가 20일선 위',src:'📊 야후 EOD · TQQQ 종가 vs 20일선'}],
+      entry:[
+        {t:'TQQQ 시초가 위 유지 (나스닥 방향)', ik:'open_hold', src:'📡 KIS 실시간 · 시가 vs 현재가'},
+        {t:'빅테크 2개↑ (엔비디아·MS·애플)', ik:'leaders', src:'📡 KIS 실시간 · NVDA·MSFT·AAPL 등락'},
+        {t:'장 초반 첫 눌림에서 저점을 높임', ik:'pullback', src:'📡 KIS 분봉 · 전반부 저점 vs 후반부 저점'}
+      ],
+      avoid:[
+        {t:'VIX 전일 대비 +10% 이상 급등',k:'vix',src:'📊 야후 EOD · ^VIX 전일비'},
+        {t:'급등 4~5일째(최근 5일 급등)',k:'run5',src:'📊 야후 EOD · 최근 5일 수익률'},
+        {t:'전고점 근처 윗꼬리',k:'wick',src:'📊 야후 EOD · 고가 대비 종가'},
+        {t:'10년물 금리 +0.1%p 급등',k:'tnx',src:'📊 야후 EOD · ^TNX 전일비'}
+      ], note:'진입 3조건 중 2개 이상 + 필터 통과 + 회피 0 → 1차 분할 진입',
+      exit:[
+        {L:'1차 익절', v:'+7~10% 도달 → 30% 매도'},
+        {L:'2차 익절', v:'+15~20% → 추가 30% 매도'},
+        {L:'잔량 40%', v:'추세 확인용 — 나스닥 5/10일선 지지·빅테크 유지 시만 보유'},
+        {L:'가격 손절', v:'-5% 30% 축소 → 구조 이탈 시 50% → 20일선 회복 실패 시 추가'},
+        {L:'반납 손절', v:'계좌 최고 대비 40% 반납 시 익절'},
+        {L:'시간 손절', v:'스윙 5~8일 · 20거래일 내 재판단'}
+      ]},
+    SOXL:{ v:'--soxl', need:2,
+      filter:[{t:'SOXL·반도체지수 모두 20일선 위',src:'📊 야후 EOD · SOXL·^SOX 종가 vs 20일선'}],
+      entry:[
+        {t:'SOXL 시초가 위 유지', ik:'open_hold', src:'📡 KIS 실시간 · 시가 vs 현재가'},
+        {t:'대표주 2개↑ (엔비디아·AMD·브로드컴)', ik:'leaders', src:'📡 KIS 실시간 · NVDA·AMD·AVGO 등락'},
+        {t:'첫 눌림에서 저점 높임', ik:'pullback', src:'📡 KIS 분봉 · 전반부 저점 vs 후반부 저점'}
+      ],
+      avoid:[
+        {t:'반도체지수 10일 중 7일↑ + SOXL 5일 20%↑ (과열)',k:'overheat',src:'📊 야후 EOD · ^SOX 10일 상승수 + SOXL 5일'},
+        {t:'최근 5거래일 SOXL 15% 이상 상승',k:'run5',src:'📊 야후 EOD · 최근 5일 수익률'},
+        {t:'장중 고점 대비 4% 이상 밀려 마감',k:'wick',src:'📊 야후 EOD · 고가 대비 종가'},
+        {t:'VIX +10%↑ / 엔비디아만 강하고 나머지 약함',k:'vix|nvda_only',src:'📊 야후 EOD · ^VIX + NVDA·AMD·AVGO'}
+      ], note:'엔비디아 하나만 보고는 절대 크게 진입 금지. 엔비디아 포함 2개↑ 필요',
+      exit:[
+        {L:'1차 익절', v:'+10~12% 도달 → 30% 매도'},
+        {L:'2차 익절', v:'+15~20%(또는 +14.8%/+20%) → 추가 30%'},
+        {L:'잔량 40%', v:'추세 확인용 — 대표주 3개 중 2개↑ 유지 시만 보유'},
+        {L:'가격 손절', v:'-5% 30% 축소 → 구조 이탈 시 50% → 회복 실패 시 추가'},
+        {L:'반납 손절', v:'최고 수익 대비 30% 반납=경고 / 50%=축소'},
+        {L:'시간 손절', v:'단타 3거래일 / 스윙 5~8일 / 20일 내 재판단'}
+      ]},
+    UPRO:{ v:'--upro', need:3,
+      filter:[{t:'S&P500 종가가 20일선 위',src:'📊 야후 EOD · UPRO 종가 vs 20일선'}],
+      entry:[
+        {t:'UPRO 시초가 위 유지', ik:'open_hold', src:'📡 KIS 실시간 · 시가 vs 현재가'},
+        {t:'눌림에도 저점 높임', ik:'pullback', src:'📡 KIS 분봉 · 전반부 저점 vs 후반부 저점'},
+        {t:'섹터 5개 중 3개↑ 동반(기술 외 금융·산업재·헬스케어·소비재)', src:'✋ 직접 · 업종 데이터(무료 없음)'}
+      ],
+      avoid:[
+        {t:'방어주만 살아나고 경기민감(기술·금융·산업재) 약화',src:'✋ 직접 · 업종 데이터'},
+        {t:'60일선 아래에서 20일선만 회복(반등 시도)',src:'✋ 직접 · 지수 60일선'},
+        {t:'VIX 튐 + 달러 강세 동시',src:'✋ 직접 · VIX·달러'}
+      ], note:'넓은 장 확인이 핵심 — 진입 4조건 중 3개 이상 권장 (운영 기준). 회피는 업종 데이터라 직접 확인',
+      exit:[
+        {L:'1차 익절', v:'+7~10% 도달 → 30% 매도'},
+        {L:'2차 익절', v:'+15~20% → 추가 30% 매도'},
+        {L:'잔량 40%', v:'추세 확인용 — S&P500 20일선·업종 폭 유지 시만 보유'},
+        {L:'가격 손절', v:'-5% 30% 축소 → 구조 이탈 시 50% → 20일선 회복 실패 시 추가'},
+        {L:'반납 손절', v:'계좌 최고 대비 40% 반납 시 익절'},
+        {L:'시간 손절', v:'스윙 5~8일 · 20거래일 내 재판단'}
+      ]}
+  };
+  const card = document.getElementById('entryCard');
+  let curP = 'TQQQ';
+  function vFor(p){ return (VD && VD.verdicts) ? VD.verdicts.find(x=>x.prod===p) : null; }
+  function renderEntry(p){
+    const d = DATA[p], vv = vFor(p);
+    card.style.setProperty('--pc','var('+d.v+')');
+    let h = '<div style="display:flex;justify-content:space-between;align-items:center"><h3><span class="tk">'+p+'</span> 진입 판정</h3>'
+          + (vv?'<span class="verdict '+gradeCls(vv.grade)+'" style="margin:0;padding:4px 11px;font-size:13.5px">'+vv.grade+'</span>':'') + '</div>';
+    if(vv && vv.close && vv.ma20){
+      const side = vv.close>vv.ma20?'위':'아래';
+      h += '<p class="subtle" style="margin:6px 0 2px">종가 <b style="color:var(--head)">'+vv.close.toFixed(2)+'</b> / 20일선 '+vv.ma20.toFixed(2)+' ('+side+') · 당일 '+(vv.chg>=0?'+':'')+vv.chg.toFixed(1)+'%</p>';
+    }
+    const ia = vv && vv.intraday_auto;  // 장중 자동판정(KIS)
+    const istate = (VD && VD.intraday_state) || 'pending';  // ok / pending / error
+    if(vv){
+      const liveNow = document.body.classList.contains('intraday-live');
+      let stMsg;
+      if(istate==='error') stMsg = ' <b style="color:var(--warn)">— ⚠ 장중 수집 실패'+(VD.intraday_error?': '+VD.intraday_error:'')+'</b>';
+      else if(istate==='ok' && liveNow) stMsg = ' <b style="color:var(--entry)">— 지금 수집 중(깜빡임)</b>';
+      else if(istate==='ok') stMsg = ' <span style="color:var(--mute)">— 방금 수집됨</span>';
+      else stMsg = ' <span style="color:var(--mute)">— 개장+31분에 갱신(현재 대기)</span>';
+      h += '<p class="subtle" style="margin:2px 0 10px"><span class="tag a">🤖</span> EOD · <span class="tag o live">⚡👁</span> 장중'+stMsg+'</p>';
+    }
+    const mt = (vv && vv.metrics) || {};
+    h += '<div class="grouplabel f">① 필터 (통과 못하면 진입 금지)</div>';
+    d.filter.forEach((c,i)=>h+=chk('f'+i,{t:c.t,src:c.src,live:mt.filter}, false, vv?!!vv.filter_ok:false, 'eod', vv?'ok':'pending'));
+    h += '<div class="grouplabel e">② 진입 조건 ('+d.need+'개 이상 충족)</div>';
+    d.entry.forEach((c,i)=>{
+      const ic = ia && c.ik && ia.checks && ia.checks[c.ik];  // KIS 장중 자동 대상
+      if(c.ik){
+        let st = istate;
+        if(ic && ic.status==='error') st='error';
+        else if(ic) st='ok';
+        else if(istate!=='error') st='pending';
+        // 수집된 값(live)이 있으면 출처 뒤에 붙임
+        h+=chk('e'+i,{t:c.t, src:c.src, live:(ic&&ic.label)}, false, !!(ic&&ic.ok), 'intra', st);
+      } else {
+        h+=chk('e'+i,c,false, false, 'manual', (istate==='ok')?'ok':'pending');
+      }
+    });
+    h+=chk('e_vol',{t:'거래량 전일 1.5배↑ + 종가 고점 근처',src:'📊 야후 EOD · 당일 거래량 vs 20일 평균',live:mt.vol}, false, vv?!!vv.vol_ok:false, 'eod', vv?'ok':'pending');
+    h += '<div class="grouplabel x">③ 회피 신호 (하나라도 걸리면 보류)</div>';
+    d.avoid.forEach((c,i)=>{
+      const ks=(c.k||'').split('|').filter(Boolean);
+      const on = vv && ks.some(k=>(vv.avoid_keys||[]).includes(k));
+      // 이 회피 항목의 대표 지표 수치(첫 키 기준)
+      const mkey = ks[0];
+      h+=chk('x'+i,{t:c.t,src:c.src,live:mkey?mt[mkey]:undefined},true, !!on, (vv&&c.k)?'eod':'', vv?'ok':'pending');
+    });
+    h += '<div class="verdict" id="enV"><span id="enMsg">항목을 체크하세요</span></div>';
+    h += '<p class="subtle" style="margin:10px 0 0">'+d.note+'</p>';
+    if(d.exit){
+      h += '<div class="grouplabel" style="color:var('+d.v+');margin-top:16px">🎯 매수 즉시 걸어둘 청산·손절 라인</div>';
+      h += '<div class="tablewrap" style="margin:6px 0 0"><table><tbody>'
+         + d.exit.map(e=>'<tr><td style="white-space:nowrap;color:var(--head)">'+e.L+'</td><td>'+e.v+'</td></tr>').join('')
+         + '</tbody></table></div>';
+      h += '<p class="subtle" style="margin:8px 0 0">전체 계좌 공통: -5% 신규중단 · -8% 노출 절반축소 · -12% 재설계</p>';
+    }
+    card.innerHTML = h;
+    card.querySelectorAll('input').forEach(b=>b.addEventListener('change',()=>evalEntry(p)));
+    evalEntry(p);
+  }
+  function chk(id,c,warn,checked,bt,state){
+    // bt: 'eod'(🤖) | 'intra'(⚡ 장중자동) | 'manual'(👁 장중수동)
+    // state: 'ok'(수집됨) | 'pending'(대기·회색) | 'error'(수집실패·빨강)
+    let badge='';
+    if(bt==='eod'){
+      badge = (state==='ok') ? ' <span class="tag a" title="아침 EOD 수집됨">🤖 자동</span>'
+                             : ' <span class="tag miss" title="아직 수집 전">⚫ 대기</span>';
+    } else if(bt==='intra'){
+      if(state==='ok') badge=' <span class="tag o live" title="장중 실시간 수집(KIS)">⚡ 장중</span>';
+      else if(state==='error') badge=' <span class="tag err" title="KIS 수집 실패 — 조치 필요">🔴 수집실패</span>';
+      else badge=' <span class="tag miss" title="개장+31분에 채워짐">⚫ 대기</span>';
+    } else if(bt==='manual'){
+      // 데이터 수집 대상이 아닌 사람 판단 항목 — 깜빡이지 않는 정적 표시
+      badge=' <span class="tag o" title="무료 데이터 없음 · HTS에서 직접 확인">✋ 직접</span>';
+    }
+    // 작은 글씨: 데이터 출처(src) + 수집된 값(live) — 없으면 기존 s
+    let small = '';
+    const srcTxt = c.src || c.s;
+    if(srcTxt) small += '<span style="color:var(--mute)">'+srcTxt+'</span>';
+    if(c.live) small += (small?' → ':'')+'<b style="color:var(--text)">'+c.live+'</b>';
+    return '<label class="chk"><input type="checkbox" data-k="'+id+'"'+(warn?' class="warn"':'')+(checked?' checked':'')
+      +'><span class="txt">'+c.t+badge+(small?'<small>'+small+'</small>':'')+'</span></label>';
+  }
+  function evalEntry(p){
+    const d = DATA[p];
+    const get = pre => [...card.querySelectorAll('[data-k^="'+pre+'"]')];
+    const fOk = get('f').every(b=>b.checked);
+    const eN = get('e').filter(b=>b.checked).length;
+    const xN = get('x').filter(b=>b.checked).length;
+    const v = document.getElementById('enV'), m = document.getElementById('enMsg');
+    v.classList.remove('go','small','no');
+    if(!fOk){ v.classList.add('no'); m.innerHTML='🚫 진입 금지<span class="sub">필터(20일선 등) 미충족 — 추세가 살아있지 않음</span>'; return; }
+    if(xN>0){ v.classList.add('no'); m.innerHTML='⛔ 보류<span class="sub">회피 신호 '+xN+'개 — 과열/추격 위험, 눌림 기다리기</span>'; return; }
+    if(eN>=d.need){ v.classList.add('go'); m.innerHTML='✅ 매수 후보<span class="sub">필터 통과 · 진입 '+eN+'/'+get('e').length+' · 회피 0 → 1차 분할 진입, 청산라인 동시 설정</span>'; }
+    else { v.classList.add('small'); m.innerHTML='🟡 장중 확인 대기<span class="sub">필터·회피 통과 — 진입 조건 '+eN+'/'+d.need+' (장중 '+(d.need-eN)+'개 더 충족 시 진입)</span>'; }
+  }
+  renderEntry('TQQQ');
+
+  /* ---- STEP 5: position calculator ---- */
+  // 저자 5,000만 예시 → 비율(%)
+  const MODES = {
+    '공격':{TQQQ:34, SOXL:24, UPRO:18, cash:24},
+    '균형':{TQQQ:26, SOXL:14, UPRO:26, cash:34},
+    '방어':{TQQQ:14, SOXL:6,  UPRO:30, cash:50}
+  };
+  let curMode='공격';
+  const cap = document.getElementById('capital');
+  const calcBody = document.querySelector('#calcTable tbody');
+  const cashLine = document.getElementById('cashLine');
+  const fmt = n => Math.round(n).toLocaleString('ko-KR');
+  function calc(){
+    const T = Math.max(0, +cap.value||0);
+    const m = MODES[curMode];
+    let rows='';
+    ['TQQQ','SOXL','UPRO'].forEach(k=>{
+      const amt = T*m[k]/100;
+      rows += '<tr><td style="color:var(--'+k.toLowerCase()+')">'+k+' ('+m[k]+'%)</td><td>'+fmt(amt)+'만</td>'
+            + '<td>'+fmt(amt*0.25)+'만</td><td>'+fmt(amt*0.30)+'만</td><td>'+fmt(amt*0.45)+'만</td></tr>';
+    });
+    calcBody.innerHTML = rows;
+    cashLine.innerHTML = '현금 보유 <b style="color:var(--gold)">'+fmt(T*m.cash/100)+'만 ('+m.cash+'%)</b> · '
+      + '각 종목은 1차 25% → 2차 30% → 3차 45% 분할 진입 (기준 깨지면 다음 차수 중단)';
+  }
+  cap.addEventListener('input',calc);
+  document.querySelectorAll('#modes button').forEach(b=>b.addEventListener('click',()=>{
+    document.querySelectorAll('#modes button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); curMode=b.dataset.m; calc();
+  }));
+  calc();
+
+  /* ---- STEP 6: memo ---- */
+  const memoInputs = [...document.querySelectorAll('#memo [data-req]')];
+  const memoWarn = document.getElementById('memoWarn');
+  const memoV = document.getElementById('memoVerdict');
+  const memoMsg = document.getElementById('memoMsg');
+  function memoUpdate(){
+    const filled = memoInputs.filter(i=>i.value.trim()).length;
+    const critical = memoInputs[2].value.trim() && memoInputs[3].value.trim(); // 줄일자리·판단기간
+    memoV.classList.remove('go','small','no');
+    if(filled===5){ memoWarn.classList.remove('show'); memoV.classList.add('go'); memoMsg.textContent='✓ 준비 완료 — 계획대로 매수 진행'; }
+    else if(!critical){ memoWarn.classList.add('show'); memoV.classList.add('no'); memoMsg.textContent='매수 보류 ('+filled+'/5) — 줄일 자리·판단 기간 필수'; }
+    else { memoWarn.classList.remove('show'); memoV.classList.add('small'); memoMsg.textContent='거의 됨 ('+filled+'/5) — 나머지 칸 채우기'; }
+  }
+  memoInputs.forEach(i=>i.addEventListener('input',memoUpdate)); memoUpdate();
+
+  /* ---- 오늘 자동판정: STEP2 스코어카드 프리필 + STEP3 요약 스트립/시각 ---- */
+  try {
+    if(VD){
+      const pad = n => String(n).padStart(2,'0');
+      const d = new Date(VD.ts);
+      const tsEl = document.getElementById('td-ts');
+      if(tsEl) tsEl.innerHTML = `<b>${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}</b> 기준(최신 세션 종가) · 필터·회피 자동, 진입 조건만 장중 직접 확인`;
+      // 장중 데이터 신선도 → 장중 뱃지 라이브 여부 결정 (body에 클래스)
+      (function(){
+        const its = VD.intraday_ts ? new Date(VD.intraday_ts) : null;
+        const live = its && ((Date.now()-its.getTime())/60000 <= 20);
+        document.body.classList.toggle('intraday-live', !!live);
+        window.__intradayTs = its;  // 툴팁용
+      })();
+      // STEP 2 스코어카드 오늘 값으로 프리필
+      (VD.scorecard||[]).forEach((s,i)=>{ if(scBoxes[i]) scBoxes[i].checked = !!s.ok; });
+      scUpdate();
+      // STEP 3: 3종목 요약 칩 = 종목 선택 UI (클릭 시 해당 종목 상세 판정)
+      const pcol = {TQQQ:'--tqqq',SOXL:'--soxl',UPRO:'--upro'};
+      const sumEl = document.getElementById('td-summary');
+      if(sumEl) sumEl.innerHTML = '<div id="td-chips" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:2px 0 14px">'
+        + VD.verdicts.map(v=>`<button class="td-chip" data-jump="${v.prod}" style="text-align:left;cursor:pointer;background:var(--surface);border:1px solid var(--line);border-top:3px solid var(${pcol[v.prod]});border-radius:10px;padding:11px 13px;transition:background .15s">
+             <div style="font-weight:800;font-size:15px;color:var(${pcol[v.prod]})">${v.color} ${v.prod}</div>
+             <div class="verdict ${gradeCls(v.grade)}" style="margin:6px 0 0;padding:3px 9px;font-size:12.5px;display:inline-block">${v.grade}</div>
+           </button>`).join('') + '</div>';
+      const setActive = p => document.querySelectorAll('.td-chip').forEach(c=>{
+        c.style.background = c.dataset.jump===p ? 'var(--surface-2)' : 'var(--surface)';
+        c.style.boxShadow = c.dataset.jump===p ? 'inset 0 0 0 1px var('+pcol[p]+')' : 'none';
+      });
+      document.querySelectorAll('.td-chip').forEach(el=>el.addEventListener('click',()=>{
+        const p = el.dataset.jump;
+        setActive(p); curP=p; renderEntry(p);
+      }));
+      setActive('TQQQ');
+    }
+  } catch(e){
+    var el=document.getElementById('td-ts'); if(el) el.textContent='판정 데이터를 불러오지 못했습니다: '+e.message;
+  }
+})();
+</script>
