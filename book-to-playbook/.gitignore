@@ -1,0 +1,22 @@
+# ==== 비밀·크레덴셜 (절대 커밋 금지) ====
+kis.env
+telegram.env
+.kis_token.json
+*.env
+!*.env.example
+
+# ==== 런타임 생성물 (매 실행마다 갱신) ====
+latest-verdict.json
+kis-intraday.json
+kis-verdict.json
+etf-verdict.html
+logs/
+
+# ==== 배포 아티팩트 (public/은 별도 레포 dodo486/etf-verdict) ====
+public/
+
+# ==== 파이썬/OS 잡파일 ====
+__pycache__/
+*.pyc
+.DS_Store
+.omc/

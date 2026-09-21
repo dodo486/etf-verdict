@@ -1,0 +1,32 @@
+{
+  "book": "김프로랩 『미국 돈복사 ETF 투자방법』",
+  "note": "etf_daily_verdict.py STEP1 정량규칙을 data_spec로 옮긴 것. verdict_engine 대조검증용.",
+  "items": [
+    {"item": "나스닥100 방향(전일 대비 +)", "source": "auto", "metric": {"type": "pct_change", "symbol": "^NDX", "min": 0}, "cadence": "eod"},
+    {"item": "S&P500 방향(전일 대비 +)", "source": "auto", "metric": {"type": "pct_change", "symbol": "^GSPC", "min": 0}, "cadence": "eod"},
+    {"item": "VIX 등락률", "source": "auto", "metric": {"type": "pct_change", "symbol": "^VIX"}, "cadence": "eod"},
+    {"item": "10년물 등락률", "source": "auto", "metric": {"type": "pct_change", "symbol": "^TNX"}, "cadence": "eod"},
+
+    {"item": "TQQQ 필터: 나스닥100 20일선 위", "source": "auto", "metric": {"type": "above_ma", "symbol": "^NDX", "ma": 20}, "cadence": "eod"},
+    {"item": "UPRO 필터: S&P500 20일선 위", "source": "auto", "metric": {"type": "above_ma", "symbol": "^GSPC", "ma": 20}, "cadence": "eod"},
+    {"item": "SOXL 필터A: SOXL 20일선 위", "source": "auto", "metric": {"type": "above_ma", "symbol": "SOXL", "ma": 20}, "cadence": "eod"},
+    {"item": "SOXL 필터B: 반도체지수 20일선 위", "source": "auto", "metric": {"type": "above_ma", "symbol": "^SOX", "ma": 20}, "cadence": "eod"},
+
+    {"item": "TQQQ 최근 5일 수익률", "source": "auto", "metric": {"type": "n_day_return", "symbol": "TQQQ", "n": 5}, "cadence": "eod"},
+    {"item": "SOXL 최근 5일 수익률", "source": "auto", "metric": {"type": "n_day_return", "symbol": "SOXL", "n": 5}, "cadence": "eod"},
+    {"item": "TQQQ 윗꼬리(고점 대비 종가)", "source": "auto", "metric": {"type": "upper_wick", "symbol": "TQQQ"}, "cadence": "eod"},
+    {"item": "SOXL 윗꼬리(고점 대비 종가)", "source": "auto", "metric": {"type": "upper_wick", "symbol": "SOXL"}, "cadence": "eod"},
+
+    {"item": "TQQQ 거래량 배수", "source": "auto", "metric": {"type": "volume_ratio", "symbol": "TQQQ", "ref": 20}, "cadence": "eod"},
+    {"item": "SOXL 거래량 배수", "source": "auto", "metric": {"type": "volume_ratio", "symbol": "SOXL", "ref": 20}, "cadence": "eod"},
+    {"item": "UPRO 거래량 배수", "source": "auto", "metric": {"type": "volume_ratio", "symbol": "UPRO", "ref": 20}, "cadence": "eod"},
+
+    {"item": "SOXL 주도주 3개 중 상승수(엔비디아·AMD·브로드컴)", "source": "auto", "metric": {"type": "count_up", "symbols": ["NVDA", "AMD", "AVGO"], "min": 2}, "cadence": "eod"},
+
+    {"item": "TQQQ 시초가 위(장중)", "source": "auto", "metric": {"type": "above_open", "symbol": "TQQQ"}, "cadence": "intraday"},
+    {"item": "TQQQ 첫 눌림 저점 높임(장중)", "source": "auto", "metric": {"type": "higher_low", "symbol": "TQQQ"}, "cadence": "intraday"},
+
+    {"item": "달러인덱스 안정(급강세 아님)", "source": "manual", "reason": "무료 달러인덱스 EOD는 심볼 폴백(DX-Y.NYB/DX=F) 불안정 → 직접 확인"},
+    {"item": "UPRO 섹터 3개↑ 동반", "source": "manual", "reason": "무료 업종/섹터 데이터 없음 → 직접 확인"}
+  ]
+}

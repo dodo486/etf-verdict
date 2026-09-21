@@ -1,0 +1,24 @@
+{
+  "site_title": "트레이딩 책 플레이북",
+  "site_subtitle": "책에서 뽑은 매매기법을 실전 체크리스트로",
+  "books": [
+    {
+      "slug": "etf",
+      "title": "미국 돈복사 ETF 투자방법",
+      "author": "김프로랩",
+      "tickers": "TQQQ · SOXL · UPRO",
+      "desc": "3배 레버리지 ETF 진입·익절·손절. 시세 자동판정(야후 EOD + KIS 장중) 연동.",
+      "live": true,
+      "accent": "#d4a24e"
+    },
+    {
+      "slug": "supply",
+      "title": "외국인 매집 3일 먼저 읽는 법",
+      "author": "김프로랩",
+      "tickers": "외국인 · 기관 · 동시매수",
+      "desc": "창구별 수급 7단계 매집신호·수급점수 100점. 한국 수급은 무료 데이터 없어 수동 체크.",
+      "live": false,
+      "accent": "#4c8dff"
+    }
+  ]
+}
