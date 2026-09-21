@@ -289,11 +289,6 @@
       <span><span class="tag o">운영</span> 애매한 표현을 실전용으로 수치화한 정의 — 본인 검증 후 사용</span>
     </div>
 
-    <!-- 오늘 자동판정 (엔진이 매일 화~토 08:00 자동 갱신) -->
-    <h2 style="margin-top:30px"><span class="step">TODAY</span>오늘 자동판정 <span class="tag a">엔진 자동계산</span></h2>
-    <p class="subtle" id="td-ts">데이터 로딩…</p>
-    <div id="td-cards"></div>
-    <p class="subtle" style="margin-bottom:6px">최신 세션 종가 기준 <b>자동 계산</b> 결과입니다. 아래 <b>STEP 2 스코어카드</b>는 오늘 값으로 자동 체크돼 있고(수정 가능), 장중 3항목(시초가 지지·첫 눌림 저점·30분 판별)만 직접 확인 후 최종 진입하세요.</p>
     <script type="application/json" id="verdict-data">
 {
   "score": 5,
@@ -410,9 +405,10 @@
       <p class="subtle" style="margin:10px 0 0">SOXL 매매일 땐 여기에 <b>반도체 대표주 2개(엔비디아+브로드컴 또는 엔비디아+AMD)</b> 방향을 추가로 확인하세요.</p>
     </div>
 
-    <!-- STEP 3: entry checklist -->
-    <h2><span class="step">STEP 3</span>종목별 진입 판정 체크리스트</h2>
-    <p class="subtle">종목을 고르고, 지금 시장에 맞는 항목을 체크하면 매수 가능 여부를 판정합니다. <b>필터를 통과 못하면 진입 금지</b>가 강제됩니다.</p>
+    <!-- STEP 3: entry checklist (오늘 자동판정 흡수) -->
+    <h2><span class="step">STEP 3</span>종목별 진입 판정 <span class="tag a">🤖 오늘 자동판정</span></h2>
+    <p class="subtle" id="td-ts">최신 세션 종가 기준 · 필터·회피 자동, 진입 조건만 장중 직접 확인</p>
+    <div id="td-summary"></div>
     <div class="picker" id="picker">
       <button data-p="TQQQ" class="on" style="--pc:var(--tqqq)">TQQQ</button>
       <button data-p="SOXL" style="--pc:var(--soxl)">SOXL</button>
@@ -1056,6 +1052,7 @@
 
   /* ---- STEP 3: entry checklist ---- */
   const VD = (function(){ try { return JSON.parse(document.getElementById('verdict-data').textContent); } catch(e){ return null; } })();
+  const gradeCls = g => g.includes('매수 후보') ? 'go' : (g.includes('소액') ? 'small' : (g.includes('보류')||g.includes('금지') ? 'no' : ''));
   const DATA = {
     TQQQ:{ v:'--tqqq', need:2,
       filter:[{t:'나스닥100 종가가 20일선 위',s:'단기 생존선 — 아래면 진입 금지'}],
@@ -1103,8 +1100,13 @@
   function renderEntry(p){
     const d = DATA[p], vv = vFor(p);
     card.style.setProperty('--pc','var('+d.v+')');
-    let h = '<h3><span class="tk">'+p+'</span> 진입 판정</h3>';
-    if(vv) h += '<p class="subtle" style="margin:2px 0 10px">🤖 오늘 자동판정: <b style="color:var(--head)">'+vv.grade+'</b> — 필터·회피는 자동 체크됨. <b>진입 조건(장중)만 31분째 직접 확인</b>하세요.</p>';
+    let h = '<div style="display:flex;justify-content:space-between;align-items:center"><h3><span class="tk">'+p+'</span> 진입 판정</h3>'
+          + (vv?'<span class="verdict '+gradeCls(vv.grade)+'" style="margin:0;padding:4px 11px;font-size:13.5px">'+vv.grade+'</span>':'') + '</div>';
+    if(vv && vv.close && vv.ma20){
+      const side = vv.close>vv.ma20?'위':'아래';
+      h += '<p class="subtle" style="margin:6px 0 2px">종가 <b style="color:var(--head)">'+vv.close.toFixed(2)+'</b> / 20일선 '+vv.ma20.toFixed(2)+' ('+side+') · 당일 '+(vv.chg>=0?'+':'')+vv.chg.toFixed(1)+'%</p>';
+    }
+    if(vv) h += '<p class="subtle" style="margin:2px 0 10px">필터·회피는 <b>🤖 자동 체크</b>됨. <b>진입 조건(장중)만 31분째 직접 확인</b>하세요.</p>';
     h += '<div class="grouplabel f">① 필터 (통과 못하면 진입 금지)</div>';
     d.filter.forEach((c,i)=>h+=chk('f'+i,c,false, vv?!!vv.filter_ok:false, !!vv, false));
     h += '<div class="grouplabel e">② 진입 조건 ('+d.need+'개 이상 충족) · 장중 직접 확인</div>';
@@ -1192,31 +1194,38 @@
   }
   memoInputs.forEach(i=>i.addEventListener('input',memoUpdate)); memoUpdate();
 
-  /* ---- 오늘의 자동판정 탭 ---- */
+  /* ---- 오늘 자동판정: STEP2 스코어카드 프리필 + STEP3 요약 스트립/시각 ---- */
   try {
-    const vd = JSON.parse(document.getElementById('verdict-data').textContent);
-    const gradeCls = g => g.includes('매수 후보') ? 'go' : (g.includes('소액') ? 'small' : (g.includes('보류')||g.includes('금지') ? 'no' : ''));
-    const pcol = {TQQQ:'--tqqq',SOXL:'--soxl',UPRO:'--upro'};
-    const d = new Date(vd.ts);
-    const pad = n => String(n).padStart(2,'0');
-    document.getElementById('td-ts').innerHTML =
-      `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())} 기준 · 최신 세션 종가`;
-    // STEP 2 스코어카드 체크박스를 오늘 자동계산 값으로 미리 체크 (사용자가 수정 가능)
-    vd.scorecard.forEach((s,i)=>{ if(scBoxes[i]) scBoxes[i].checked = !!s.ok; });
-    scUpdate();
-    document.getElementById('td-cards').innerHTML = vd.verdicts.map(v=>{
-      const cls = gradeCls(v.grade);
-      const av = (v.avoid||[]).map(a=>`<div class="chk" style="cursor:default;color:#f0a3a5"><span class="txt">⚠ ${a}</span></div>`).join('');
-      const id = (v.intraday&&v.intraday.length)
-        ? `<div class="warnbox show" style="background:var(--surface-2);border-color:var(--line);color:var(--text)"><b style="color:var(--gold)">👁 장중 확인(31분째)</b><br>${v.intraday.join(' · ')}</div>` : '';
-      const side = (v.close&&v.ma20)?(v.close>v.ma20?'위':'아래'):'';
-      const px = (v.close&&v.ma20)?`<p class="subtle" style="margin:4px 0 0">종가 <b style="color:var(--head)">${v.close.toFixed(2)}</b> / 20일선 ${v.ma20.toFixed(2)} (${side}) · 당일 ${v.chg>=0?'+':''}${v.chg.toFixed(1)}%</p>`:'';
-      return `<div class="card acc" style="--pc:var(${pcol[v.prod]})">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <h3 style="margin:0;font-size:18px;font-weight:800"><span style="color:var(${pcol[v.prod]})">${v.color} ${v.prod}</span></h3>
-          <span class="verdict ${cls}" style="margin:0;padding:5px 12px;font-size:14px">${v.grade}</span></div>
-        <p class="subtle" style="margin:8px 0 0;color:var(--text)">${v.reason}</p>${px}${av}${id}</div>`;
-    }).join('');
+    if(VD){
+      const pad = n => String(n).padStart(2,'0');
+      const d = new Date(VD.ts);
+      const tsEl = document.getElementById('td-ts');
+      if(tsEl) tsEl.innerHTML = `<b>${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}</b> 기준(최신 세션 종가) · 필터·회피 자동, 진입 조건만 장중 직접 확인`;
+      // STEP 2 스코어카드 오늘 값으로 프리필
+      (VD.scorecard||[]).forEach((s,i)=>{ if(scBoxes[i]) scBoxes[i].checked = !!s.ok; });
+      scUpdate();
+      // STEP 3 상단: 3종목 한눈 요약 스트립 (클릭 시 해당 종목 판정으로 이동)
+      const pcol = {TQQQ:'--tqqq',SOXL:'--soxl',UPRO:'--upro'};
+      const sumEl = document.getElementById('td-summary');
+      if(sumEl) sumEl.innerHTML = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:2px 0 14px">'
+        + VD.verdicts.map(v=>`<button class="td-chip" data-jump="${v.prod}" style="text-align:left;cursor:pointer;background:var(--surface);border:1px solid var(--line);border-top:3px solid var(${pcol[v.prod]});border-radius:10px;padding:11px 13px">
+             <div style="font-weight:800;font-size:15px;color:var(${pcol[v.prod]})">${v.color} ${v.prod}</div>
+             <div class="verdict ${gradeCls(v.grade)}" style="margin:6px 0 0;padding:3px 9px;font-size:12.5px;display:inline-block">${v.grade}</div>
+           </button>`).join('') + '</div>';
+      // picker 버튼에 등급 점 표시
+      document.querySelectorAll('#picker button').forEach(b=>{
+        const vv = VD.verdicts.find(x=>x.prod===b.dataset.p);
+        if(vv){ const c = gradeCls(vv.grade); const col = c==='go'?'--entry':(c==='no'?'--warn':'--gold');
+          b.insertAdjacentHTML('beforeend', ` <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(${col});vertical-align:middle"></span>`); }
+      });
+      // 요약 칩 클릭 → picker 전환
+      document.querySelectorAll('[data-jump]').forEach(el=>el.addEventListener('click',()=>{
+        const p = el.dataset.jump;
+        document.querySelectorAll('#picker button').forEach(x=>x.classList.toggle('on', x.dataset.p===p));
+        curP=p; renderEntry(p);
+        document.getElementById('entryCard').scrollIntoView({behavior:'smooth',block:'center'});
+      }));
+    }
   } catch(e){
     var el=document.getElementById('td-ts'); if(el) el.textContent='판정 데이터를 불러오지 못했습니다: '+e.message;
   }
