@@ -408,27 +408,10 @@
     <p class="subtle" style="margin-top:0">아래 종목 칩을 누르면 상세 진입 판정이 열립니다.</p>
     <div id="td-summary"></div>
     <div class="card acc" id="entryCard"></div>
+    <p class="subtle" style="margin-top:8px">💡 각 종목 판정 카드 아래에 <b>매수 즉시 걸어둘 청산·손절 라인</b>이 함께 표시됩니다. 전체 계좌 손실선(-5% 신규중단 · -8% 노출 절반축소 · -12% 재설계)은 공통.</p>
 
-    <!-- STEP 4: exit rules -->
-    <h2><span class="step">STEP 4</span>청산 · 손절 규칙 (정량표) <span class="tag a">저자</span></h2>
-    <p class="subtle">진입 즉시 아래 라인을 주문/알림으로 걸어두세요. 익절은 감이 아니라 구간으로 자동 실행.</p>
-    <div class="tablewrap">
-      <table>
-        <thead><tr><th>구분</th><th>TQQQ / UPRO</th><th>SOXL</th></tr></thead>
-        <tbody>
-          <tr><td>1차 익절</td><td>+7~10% 도달 → 30% 매도</td><td>+10~12% 도달 → 30% 매도</td></tr>
-          <tr><td>2차 익절</td><td>+15~20% → 추가 30% 매도</td><td>+15~20%(또는 +14.8%/+20%) → 추가 30%</td></tr>
-          <tr><td>잔량</td><td colspan="2">남은 40%는 추세 확인용 — 5/10일선 지지·주도주 유지될 때만 보유</td></tr>
-          <tr><td>가격 손절</td><td colspan="2">-5% 30% 축소 → 구조 이탈 시 50% → 20일선 회복 실패 시 추가 축소</td></tr>
-          <tr><td>반납 손절</td><td>계좌 최고 대비 40% 반납 시 익절</td><td>최고 수익 대비 30% 반납=경고 / 50%=축소</td></tr>
-          <tr><td>시간 손절</td><td>스윙 5~8일, 20거래일 내 재판단</td><td>단타 3거래일 / 스윙 5~8일 / 20일 내 재판단</td></tr>
-          <tr><td>전체 계좌</td><td colspan="2">-5% 신규매수 중단 · -8% 레버리지 노출 절반 축소 · -12% 전체 재설계</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- STEP 5: position calculator -->
-    <h2><span class="step">STEP 5</span>비중 · 분할 계산기 <span class="tag a">저자 6-2·3-4</span></h2>
+    <!-- STEP 4: position calculator -->
+    <h2><span class="step">STEP 4</span>비중 · 분할 계산기 <span class="tag a">저자 6-2·3-4</span></h2>
     <p class="subtle">총 투자금과 모드를 넣으면 종목별 배분·현금·3분할 금액이 계산됩니다. (배분비율은 저자의 5,000만 원 예시 기준)</p>
     <div class="card">
       <div class="calcrow">
@@ -449,8 +432,8 @@
       <p class="subtle" id="cashLine" style="margin:8px 0 0"></p>
     </div>
 
-    <!-- STEP 6: pre-trade memo -->
-    <h2><span class="step">STEP 6</span>매수 전 5줄 메모 <span class="tag a">저자 10-2</span></h2>
+    <!-- STEP 5: pre-trade memo -->
+    <h2><span class="step">STEP 5</span>매수 전 5줄 메모 <span class="tag a">저자 10-2</span></h2>
     <p class="subtle">다섯 칸을 다 못 채우면 준비 안 된 매매입니다. 특히 <b>줄일 자리·판단 기간</b>이 비면 매수 금지.</p>
     <div class="card">
       <div class="memo" id="memo">
@@ -1059,7 +1042,15 @@
         {t:'급등 4~5일째(최근 5일 급등)',k:'run5'},
         {t:'전고점 근처 윗꼬리',k:'wick'},
         {t:'10년물 금리 +0.1%p 급등',k:'tnx'}
-      ], note:'진입 3조건 중 2개 이상 + 필터 통과 + 회피 0 → 1차 분할 진입'},
+      ], note:'진입 3조건 중 2개 이상 + 필터 통과 + 회피 0 → 1차 분할 진입',
+      exit:[
+        {L:'1차 익절', v:'+7~10% 도달 → 30% 매도'},
+        {L:'2차 익절', v:'+15~20% → 추가 30% 매도'},
+        {L:'잔량 40%', v:'추세 확인용 — 나스닥 5/10일선 지지·빅테크 유지 시만 보유'},
+        {L:'가격 손절', v:'-5% 30% 축소 → 구조 이탈 시 50% → 20일선 회복 실패 시 추가'},
+        {L:'반납 손절', v:'계좌 최고 대비 40% 반납 시 익절'},
+        {L:'시간 손절', v:'스윙 5~8일 · 20거래일 내 재판단'}
+      ]},
     SOXL:{ v:'--soxl', need:2,
       filter:[{t:'SOXL·반도체지수 모두 20일선 위',s:'스윙 기준 — 단타면 5일선 위로 대체'}],
       entry:[
@@ -1072,7 +1063,15 @@
         {t:'최근 5거래일 SOXL 15% 이상 상승',k:'run5'},
         {t:'장중 고점 대비 4% 이상 밀려 마감',k:'wick'},
         {t:'VIX +10%↑ / 엔비디아만 강하고 나머지 약함',k:'vix|nvda_only'}
-      ], note:'엔비디아 하나만 보고는 절대 크게 진입 금지. 엔비디아 포함 2개↑ 필요'},
+      ], note:'엔비디아 하나만 보고는 절대 크게 진입 금지. 엔비디아 포함 2개↑ 필요',
+      exit:[
+        {L:'1차 익절', v:'+10~12% 도달 → 30% 매도'},
+        {L:'2차 익절', v:'+15~20%(또는 +14.8%/+20%) → 추가 30%'},
+        {L:'잔량 40%', v:'추세 확인용 — 대표주 3개 중 2개↑ 유지 시만 보유'},
+        {L:'가격 손절', v:'-5% 30% 축소 → 구조 이탈 시 50% → 회복 실패 시 추가'},
+        {L:'반납 손절', v:'최고 수익 대비 30% 반납=경고 / 50%=축소'},
+        {L:'시간 손절', v:'단타 3거래일 / 스윙 5~8일 / 20일 내 재판단'}
+      ]},
     UPRO:{ v:'--upro', need:3,
       filter:[{t:'S&P500 종가가 20일선 위'}],
       entry:[
@@ -1085,7 +1084,15 @@
         {t:'방어주만 살아나고 경기민감(기술·금융·산업재) 약화'},
         {t:'60일선 아래에서 20일선만 회복(반등 시도)'},
         {t:'VIX 튐 + 달러 강세 동시'}
-      ], note:'넓은 장 확인이 핵심 — 진입 4조건 중 3개 이상 권장 (운영 기준). 회피는 업종 데이터라 직접 확인'}
+      ], note:'넓은 장 확인이 핵심 — 진입 4조건 중 3개 이상 권장 (운영 기준). 회피는 업종 데이터라 직접 확인',
+      exit:[
+        {L:'1차 익절', v:'+7~10% 도달 → 30% 매도'},
+        {L:'2차 익절', v:'+15~20% → 추가 30% 매도'},
+        {L:'잔량 40%', v:'추세 확인용 — S&P500 20일선·업종 폭 유지 시만 보유'},
+        {L:'가격 손절', v:'-5% 30% 축소 → 구조 이탈 시 50% → 20일선 회복 실패 시 추가'},
+        {L:'반납 손절', v:'계좌 최고 대비 40% 반납 시 익절'},
+        {L:'시간 손절', v:'스윙 5~8일 · 20거래일 내 재판단'}
+      ]}
   };
   const card = document.getElementById('entryCard');
   let curP = 'TQQQ';
@@ -1112,6 +1119,13 @@
     });
     h += '<div class="verdict" id="enV"><span id="enMsg">항목을 체크하세요</span></div>';
     h += '<p class="subtle" style="margin:10px 0 0">'+d.note+'</p>';
+    if(d.exit){
+      h += '<div class="grouplabel" style="color:var('+d.v+');margin-top:16px">🎯 매수 즉시 걸어둘 청산·손절 라인</div>';
+      h += '<div class="tablewrap" style="margin:6px 0 0"><table><tbody>'
+         + d.exit.map(e=>'<tr><td style="white-space:nowrap;color:var(--head)">'+e.L+'</td><td>'+e.v+'</td></tr>').join('')
+         + '</tbody></table></div>';
+      h += '<p class="subtle" style="margin:8px 0 0">전체 계좌 공통: -5% 신규중단 · -8% 노출 절반축소 · -12% 재설계</p>';
+    }
     card.innerHTML = h;
     card.querySelectorAll('input').forEach(b=>b.addEventListener('change',()=>evalEntry(p)));
     evalEntry(p);
