@@ -179,7 +179,8 @@
   .tag{display:inline-block; font-size:10.5px; font-weight:800; letter-spacing:.04em; padding:2px 7px; border-radius:5px; vertical-align:middle; margin-left:6px}
   .tag.a{background:rgba(212,162,78,.14); color:var(--gold); border:1px solid var(--gold-dim)}      /* 저자 명시 */
   .tag.o{background:rgba(122,129,148,.15); color:var(--mute); border:1px solid var(--line)}          /* 운영 정의 */
-  .tag.miss{background:transparent; color:#5a606e; border:1px dashed #3a4050; opacity:.85}            /* 미수집(회색) */
+  .tag.miss{background:transparent; color:#5a606e; border:1px dashed #3a4050; opacity:.85}            /* 대기(회색) */
+  .tag.err{background:rgba(229,72,77,.14); color:var(--warn); border:1px solid rgba(229,72,77,.5); font-weight:800}  /* 수집실패(빨강) */
 
   .legendbar{display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px; color:var(--mute); margin:8px 0 0; padding:12px 14px; background:var(--surface); border:1px solid var(--line); border-radius:9px}
   .legendbar b{color:var(--text)}
@@ -308,7 +309,7 @@
     </div>
 
     <script type="application/json" id="verdict-data">
-{"score": 5, "scorecard": [{"label": "나스닥100 방향", "ok": true}, {"label": "S&P500 방향", "ok": true}, {"label": "VIX 안정(전일 +10% 미만)", "ok": true}, {"label": "10년물 안정(+0.1%p 미만)", "ok": true}, {"label": "달러인덱스 안정(급강세 아님)", "ok": true}], "verdicts": [{"prod": "TQQQ", "color": "🔵", "grade": "✅ 매수 후보", "reason": "필터 통과 · 스코어 5/5 → 1차 분할 진입 준비", "avoid": [], "avoid_keys": [], "filter_ok": true, "vol_ok": false, "intraday": ["나스닥 시초가 위 유지", "첫 눌림 저점 높임", "빅테크 3개 중 2개↑"], "close": 77.2699966430664, "ma20": 71.01300010681152, "chg": 6.373894950882622, "intraday_auto": {"status": "ok", "last": 77.26, "open": 74.845, "base": 72.64, "checks": {"open_hold": {"auto": true, "ok": true, "label": "TQQQ 시초가 위 유지"}, "leaders": {"auto": true, "ok": true, "label": "주도주 2/3↑ (엔비디아,애플)"}, "pullback": {"auto": false, "label": "첫 눌림 저점 높임 (분봉 확인)"}}}}, {"prod": "SOXL", "color": "🟠", "grade": "⛔ 보류", "reason": "회피 신호 1개 — 과열/위험, 눌림 대기", "avoid": ["과열: 반도체 10일중 8일↑ + SOXL 5일 36%↑"], "avoid_keys": ["overheat"], "filter_ok": true, "vol_ok": false, "intraday": [], "close": 137.68499755859375, "ma20": 114.86024971008301, "chg": 11.332578310951842, "intraday_auto": {"status": "ok", "last": 137.6499, "open": 132.01, "base": 123.67, "checks": {"open_hold": {"auto": true, "ok": true, "label": "SOXL 시초가 위 유지"}, "leaders": {"auto": true, "ok": true, "label": "주도주 3/3↑ (엔비디아,AMD,브로드컴)"}, "pullback": {"auto": false, "label": "첫 눌림 저점 높임 (분봉 확인)"}}}}, {"prod": "UPRO", "color": "🟢", "grade": "✅ 매수 후보", "reason": "필터 통과 · 스코어 5/5 → 1차 분할 진입 준비", "avoid": [], "avoid_keys": [], "filter_ok": true, "vol_ok": false, "intraday": ["S&P500 20일선 종가 유지", "섹터 3개↑ 동반"], "close": 151.64999389648438, "ma20": 148.60700149536132, "chg": 3.0300912977113166, "intraday_auto": {"status": "ok", "last": 151.65, "open": 149.89, "base": 147.19, "checks": {"open_hold": {"auto": true, "ok": true, "label": "UPRO 시초가 위 유지"}, "pullback": {"auto": false, "label": "첫 눌림 저점 높임 (분봉 확인)"}}}}], "ts": "2026-09-22T00:01:13.327697+09:00", "intraday_ts": "2026-09-22T00:01:05.895810+09:00", "intraday_state": "ok"}
+{"score": 5, "scorecard": [{"label": "나스닥100 방향", "ok": true}, {"label": "S&P500 방향", "ok": true}, {"label": "VIX 안정(전일 +10% 미만)", "ok": true}, {"label": "10년물 안정(+0.1%p 미만)", "ok": true}, {"label": "달러인덱스 안정(급강세 아님)", "ok": true}], "verdicts": [{"prod": "TQQQ", "color": "🔵", "grade": "✅ 매수 후보", "reason": "필터 통과 · 스코어 5/5 → 1차 분할 진입 준비", "avoid": [], "avoid_keys": [], "filter_ok": true, "vol_ok": false, "intraday": ["나스닥 시초가 위 유지", "첫 눌림 저점 높임", "빅테크 3개 중 2개↑"], "close": 77.30000305175781, "ma20": 71.01450042724609, "chg": 6.415203333238805, "intraday_auto": {"status": "ok", "last": 77.3, "open": 74.845, "base": 72.64, "checks": {"open_hold": {"auto": true, "ok": true, "label": "TQQQ 시초가 위 유지"}, "leaders": {"auto": true, "ok": true, "label": "주도주 2/3↑ (엔비디아,애플)"}, "pullback": {"auto": false, "label": "첫 눌림 저점 높임 (분봉 확인)"}}}}, {"prod": "SOXL", "color": "🟠", "grade": "⛔ 보류", "reason": "회피 신호 1개 — 과열/위험, 눌림 대기", "avoid": ["과열: 반도체 10일중 8일↑ + SOXL 5일 37%↑"], "avoid_keys": ["overheat"], "filter_ok": true, "vol_ok": false, "intraday": [], "close": 138.1999969482422, "ma20": 114.88599967956543, "chg": 11.749008647552072, "intraday_auto": {"status": "ok", "last": 138.205, "open": 132.01, "base": 123.67, "checks": {"open_hold": {"auto": true, "ok": true, "label": "SOXL 시초가 위 유지"}, "leaders": {"auto": true, "ok": true, "label": "주도주 3/3↑ (엔비디아,AMD,브로드컴)"}, "pullback": {"auto": false, "label": "첫 눌림 저점 높임 (분봉 확인)"}}}}, {"prod": "UPRO", "color": "🟢", "grade": "✅ 매수 후보", "reason": "필터 통과 · 스코어 5/5 → 1차 분할 진입 준비", "avoid": [], "avoid_keys": [], "filter_ok": true, "vol_ok": false, "intraday": ["S&P500 20일선 종가 유지", "섹터 3개↑ 동반"], "close": 151.60000610351562, "ma20": 148.6045021057129, "chg": 2.9961298926297117, "intraday_auto": {"status": "ok", "last": 151.6, "open": 149.89, "base": 147.19, "checks": {"open_hold": {"auto": true, "ok": true, "label": "UPRO 시초가 위 유지"}, "pullback": {"auto": false, "label": "첫 눌림 저점 높임 (분봉 확인)"}}}}], "ts": "2026-09-22T00:03:52.934801+09:00", "intraday_ts": "2026-09-22T00:03:53.006626+09:00", "intraday_state": "ok"}
 </script>
 
     <!-- STEP 1: Definition table -->
@@ -977,17 +978,17 @@
   const gradeCls = g => g.includes('매수 후보') ? 'go' : (g.includes('소액') ? 'small' : (g.includes('보류')||g.includes('금지') ? 'no' : ''));
   const DATA = {
     TQQQ:{ v:'--tqqq', need:2,
-      filter:[{t:'나스닥100 종가가 20일선 위',s:'단기 생존선 — 아래면 진입 금지'}],
+      filter:[{t:'나스닥100 종가가 20일선 위',src:'📊 야후 EOD · TQQQ 종가 vs 20일선'}],
       entry:[
-        {t:'TQQQ 시초가 위 유지 (나스닥 방향)', ik:'open_hold'},
-        {t:'빅테크 2개↑ (엔비디아·MS·애플)', ik:'leaders'},
-        {t:'장 초반 첫 눌림에서 저점을 높임', s:'분봉 확인 — 수동'}
+        {t:'TQQQ 시초가 위 유지 (나스닥 방향)', ik:'open_hold', src:'📡 KIS 실시간 · 시가 vs 현재가'},
+        {t:'빅테크 2개↑ (엔비디아·MS·애플)', ik:'leaders', src:'📡 KIS 실시간 · NVDA·MSFT·AAPL 등락'},
+        {t:'장 초반 첫 눌림에서 저점을 높임', src:'✋ 직접 · 분봉 저점'}
       ],
       avoid:[
-        {t:'VIX 전일 대비 +10% 이상 급등',k:'vix'},
-        {t:'급등 4~5일째(최근 5일 급등)',k:'run5'},
-        {t:'전고점 근처 윗꼬리',k:'wick'},
-        {t:'10년물 금리 +0.1%p 급등',k:'tnx'}
+        {t:'VIX 전일 대비 +10% 이상 급등',k:'vix',src:'📊 야후 EOD · ^VIX 전일비'},
+        {t:'급등 4~5일째(최근 5일 급등)',k:'run5',src:'📊 야후 EOD · 최근 5일 수익률'},
+        {t:'전고점 근처 윗꼬리',k:'wick',src:'📊 야후 EOD · 고가 대비 종가'},
+        {t:'10년물 금리 +0.1%p 급등',k:'tnx',src:'📊 야후 EOD · ^TNX 전일비'}
       ], note:'진입 3조건 중 2개 이상 + 필터 통과 + 회피 0 → 1차 분할 진입',
       exit:[
         {L:'1차 익절', v:'+7~10% 도달 → 30% 매도'},
@@ -998,17 +999,17 @@
         {L:'시간 손절', v:'스윙 5~8일 · 20거래일 내 재판단'}
       ]},
     SOXL:{ v:'--soxl', need:2,
-      filter:[{t:'SOXL·반도체지수 모두 20일선 위',s:'스윙 기준 — 단타면 5일선 위로 대체'}],
+      filter:[{t:'SOXL·반도체지수 모두 20일선 위',src:'📊 야후 EOD · SOXL·^SOX 종가 vs 20일선'}],
       entry:[
-        {t:'SOXL 시초가 위 유지', ik:'open_hold'},
-        {t:'대표주 2개↑ (엔비디아·AMD·브로드컴)', ik:'leaders'},
-        {t:'첫 눌림에서 저점 높임 / AMD·브로드컴 확인', s:'분봉 확인 — 수동'}
+        {t:'SOXL 시초가 위 유지', ik:'open_hold', src:'📡 KIS 실시간 · 시가 vs 현재가'},
+        {t:'대표주 2개↑ (엔비디아·AMD·브로드컴)', ik:'leaders', src:'📡 KIS 실시간 · NVDA·AMD·AVGO 등락'},
+        {t:'첫 눌림에서 저점 높임 / AMD·브로드컴 확인', src:'✋ 직접 · 분봉 저점'}
       ],
       avoid:[
-        {t:'반도체지수 10일 중 7일↑ + SOXL 5일 20%↑ (과열)',k:'overheat'},
-        {t:'최근 5거래일 SOXL 15% 이상 상승',k:'run5'},
-        {t:'장중 고점 대비 4% 이상 밀려 마감',k:'wick'},
-        {t:'VIX +10%↑ / 엔비디아만 강하고 나머지 약함',k:'vix|nvda_only'}
+        {t:'반도체지수 10일 중 7일↑ + SOXL 5일 20%↑ (과열)',k:'overheat',src:'📊 야후 EOD · ^SOX 10일 상승수 + SOXL 5일'},
+        {t:'최근 5거래일 SOXL 15% 이상 상승',k:'run5',src:'📊 야후 EOD · 최근 5일 수익률'},
+        {t:'장중 고점 대비 4% 이상 밀려 마감',k:'wick',src:'📊 야후 EOD · 고가 대비 종가'},
+        {t:'VIX +10%↑ / 엔비디아만 강하고 나머지 약함',k:'vix|nvda_only',src:'📊 야후 EOD · ^VIX + NVDA·AMD·AVGO'}
       ], note:'엔비디아 하나만 보고는 절대 크게 진입 금지. 엔비디아 포함 2개↑ 필요',
       exit:[
         {L:'1차 익절', v:'+10~12% 도달 → 30% 매도'},
@@ -1019,17 +1020,17 @@
         {L:'시간 손절', v:'단타 3거래일 / 스윙 5~8일 / 20일 내 재판단'}
       ]},
     UPRO:{ v:'--upro', need:3,
-      filter:[{t:'S&P500 종가가 20일선 위'}],
+      filter:[{t:'S&P500 종가가 20일선 위',src:'📊 야후 EOD · UPRO 종가 vs 20일선'}],
       entry:[
-        {t:'UPRO 시초가 위 유지', ik:'open_hold'},
-        {t:'S&P500 20일선 종가 유지', s:'수동'},
-        {t:'섹터 5개 중 3개↑ 동반(기술 외 금융·산업재·헬스케어·소비재)', s:'업종 데이터 — 수동'},
-        {t:'눌림에도 20일선 근처에서 지지', s:'수동'}
+        {t:'UPRO 시초가 위 유지', ik:'open_hold', src:'📡 KIS 실시간 · 시가 vs 현재가'},
+        {t:'S&P500 20일선 종가 유지', src:'✋ 직접 · 지수 종가'},
+        {t:'섹터 5개 중 3개↑ 동반(기술 외 금융·산업재·헬스케어·소비재)', src:'✋ 직접 · 업종 데이터'},
+        {t:'눌림에도 20일선 근처에서 지지', src:'✋ 직접 · 분봉'}
       ],
       avoid:[
-        {t:'방어주만 살아나고 경기민감(기술·금융·산업재) 약화'},
-        {t:'60일선 아래에서 20일선만 회복(반등 시도)'},
-        {t:'VIX 튐 + 달러 강세 동시'}
+        {t:'방어주만 살아나고 경기민감(기술·금융·산업재) 약화',src:'✋ 직접 · 업종 데이터'},
+        {t:'60일선 아래에서 20일선만 회복(반등 시도)',src:'✋ 직접 · 지수 60일선'},
+        {t:'VIX 튐 + 달러 강세 동시',src:'✋ 직접 · VIX·달러'}
       ], note:'넓은 장 확인이 핵심 — 진입 4조건 중 3개 이상 권장 (운영 기준). 회피는 업종 데이터라 직접 확인',
       exit:[
         {L:'1차 익절', v:'+7~10% 도달 → 30% 매도'},
@@ -1053,28 +1054,38 @@
       h += '<p class="subtle" style="margin:6px 0 2px">종가 <b style="color:var(--head)">'+vv.close.toFixed(2)+'</b> / 20일선 '+vv.ma20.toFixed(2)+' ('+side+') · 당일 '+(vv.chg>=0?'+':'')+vv.chg.toFixed(1)+'%</p>';
     }
     const ia = vv && vv.intraday_auto;  // 장중 자동판정(KIS)
+    const istate = (VD && VD.intraday_state) || 'pending';  // ok / pending / error
     if(vv){
       const liveNow = document.body.classList.contains('intraday-live');
-      h += '<p class="subtle" style="margin:2px 0 10px"><span class="tag a">🤖 자동</span> 아침 EOD 수집(정적) · <span class="tag o live">⚡👁 장중</span> 장중 실시간 수집'
-         + (liveNow ? ' <b style="color:var(--entry)">— 지금 수집 중(깜빡임)</b>' : ' <span style="color:var(--mute)">— 개장+31분에 갱신, 그때 초록으로 깜빡입니다</span>') + '</p>';
+      let stMsg;
+      if(istate==='error') stMsg = ' <b style="color:var(--warn)">— ⚠ 장중 수집 실패'+(VD.intraday_error?': '+VD.intraday_error:'')+'</b>';
+      else if(istate==='ok' && liveNow) stMsg = ' <b style="color:var(--entry)">— 지금 수집 중(깜빡임)</b>';
+      else if(istate==='ok') stMsg = ' <span style="color:var(--mute)">— 방금 수집됨</span>';
+      else stMsg = ' <span style="color:var(--mute)">— 개장+31분에 갱신(현재 대기)</span>';
+      h += '<p class="subtle" style="margin:2px 0 10px"><span class="tag a">🤖</span> EOD · <span class="tag o live">⚡👁</span> 장중'+stMsg+'</p>';
     }
     h += '<div class="grouplabel f">① 필터 (통과 못하면 진입 금지)</div>';
-    d.filter.forEach((c,i)=>h+=chk('f'+i,c,false, vv?!!vv.filter_ok:false, vv?'eod':'', !!vv));
+    d.filter.forEach((c,i)=>h+=chk('f'+i,c,false, vv?!!vv.filter_ok:false, 'eod', vv?'ok':'pending'));
     h += '<div class="grouplabel e">② 진입 조건 ('+d.need+'개 이상 충족)</div>';
     d.entry.forEach((c,i)=>{
-      const ic = ia && c.ik && ia.checks && ia.checks[c.ik];  // 이 항목이 KIS 장중 자동인가
-      if(c.ik){ // 장중 자동 대상 항목: 수집되면 intra, 아니면 미수집(회색)
-        h+=chk('e'+i,{t:c.t,s:(ic&&ic.label)||c.s}, false, !!(ic&&ic.ok), 'intra', !!ic);
-      } else { // 장중 수동 항목
-        h+=chk('e'+i,c,false, false, vv?'manual':'', !!ia);
+      const ic = ia && c.ik && ia.checks && ia.checks[c.ik];  // KIS 장중 자동 대상
+      if(c.ik){
+        let st = istate;
+        if(ic && ic.status==='error') st='error';
+        else if(ic) st='ok';
+        else if(istate!=='error') st='pending';
+        // 수집된 값(live)이 있으면 출처 뒤에 붙임
+        h+=chk('e'+i,{t:c.t, src:c.src, live:(ic&&ic.label)}, false, !!(ic&&ic.ok), 'intra', st);
+      } else {
+        h+=chk('e'+i,c,false, false, 'manual', (istate==='ok')?'ok':'pending');
       }
     });
-    h+=chk('e_vol',{t:'거래량 전일 1.5배↑ + 종가 고점 근처',s:'저자 7-4 · EOD 자동계산'}, false, vv?!!vv.vol_ok:false, vv?'eod':'', !!vv);
+    h+=chk('e_vol',{t:'거래량 전일 1.5배↑ + 종가 고점 근처',src:'📊 야후 EOD · 당일 거래량 vs 20일 평균'}, false, vv?!!vv.vol_ok:false, 'eod', vv?'ok':'pending');
     h += '<div class="grouplabel x">③ 회피 신호 (하나라도 걸리면 보류)</div>';
     d.avoid.forEach((c,i)=>{
       const ks=(c.k||'').split('|').filter(Boolean);
       const on = vv && ks.some(k=>(vv.avoid_keys||[]).includes(k));
-      h+=chk('x'+i,c,true, !!on, (vv&&c.k)?'eod':'', !!vv);
+      h+=chk('x'+i,c,true, !!on, (vv&&c.k)?'eod':'', vv?'ok':'pending');
     });
     h += '<div class="verdict" id="enV"><span id="enMsg">항목을 체크하세요</span></div>';
     h += '<p class="subtle" style="margin:10px 0 0">'+d.note+'</p>';
@@ -1089,22 +1100,28 @@
     card.querySelectorAll('input').forEach(b=>b.addEventListener('change',()=>evalEntry(p)));
     evalEntry(p);
   }
-  function chk(id,c,warn,checked,bt,collected){
-    // bt: 'eod'(🤖) | 'intra'(⚡ 장중) | 'manual'(👁 장중) | ''
-    // collected: 데이터 수집됐나. 장중 항목이 미수집이면 회색 '미수집' 뱃지.
+  function chk(id,c,warn,checked,bt,state){
+    // bt: 'eod'(🤖) | 'intra'(⚡ 장중자동) | 'manual'(👁 장중수동)
+    // state: 'ok'(수집됨) | 'pending'(대기·회색) | 'error'(수집실패·빨강)
     let badge='';
     if(bt==='eod'){
-      badge = collected ? ' <span class="tag a" title="아침 EOD 수집됨">🤖 자동</span>'
-                        : ' <span class="tag miss" title="아직 수집 전">⚫ 미수집</span>';
+      badge = (state==='ok') ? ' <span class="tag a" title="아침 EOD 수집됨">🤖 자동</span>'
+                             : ' <span class="tag miss" title="아직 수집 전">⚫ 대기</span>';
     } else if(bt==='intra'){
-      badge = collected ? ' <span class="tag o live" title="장중 실시간 수집(KIS)">⚡ 장중</span>'
-                        : ' <span class="tag miss" title="장중 데이터 아직 미수집 — 개장+31분에 채워짐">⚫ 미수집</span>';
+      if(state==='ok') badge=' <span class="tag o live" title="장중 실시간 수집(KIS)">⚡ 장중</span>';
+      else if(state==='error') badge=' <span class="tag err" title="KIS 수집 실패 — 조치 필요">🔴 수집실패</span>';
+      else badge=' <span class="tag miss" title="개장+31분에 채워짐">⚫ 대기</span>';
     } else if(bt==='manual'){
-      badge = collected ? ' <span class="tag o live" title="장중 직접 확인 항목">👁 장중</span>'
-                        : ' <span class="tag miss" title="장중 미개장 — 개장 후 직접 확인">👁 미수집</span>';
+      if(state==='ok') badge=' <span class="tag o live" title="장중 직접 확인 항목">👁 장중</span>';
+      else badge=' <span class="tag miss" title="개장 후 직접 확인">👁 대기</span>';
     }
+    // 작은 글씨: 데이터 출처(src) + 수집된 값(live) — 없으면 기존 s
+    let small = '';
+    const srcTxt = c.src || c.s;
+    if(srcTxt) small += '<span style="color:var(--mute)">'+srcTxt+'</span>';
+    if(c.live) small += (small?' → ':'')+'<b style="color:var(--text)">'+c.live+'</b>';
     return '<label class="chk"><input type="checkbox" data-k="'+id+'"'+(warn?' class="warn"':'')+(checked?' checked':'')
-      +'><span class="txt">'+c.t+badge+(c.s?'<small>'+c.s+'</small>':'')+'</span></label>';
+      +'><span class="txt">'+c.t+badge+(small?'<small>'+small+'</small>':'')+'</span></label>';
   }
   function evalEntry(p){
     const d = DATA[p];
