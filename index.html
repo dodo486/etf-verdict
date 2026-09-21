@@ -132,19 +132,23 @@
   }
   @media(prefers-reduced-motion:reduce){*{transition:none!important; scroll-behavior:auto}}
 
-  /* 실시간 수집 인디케이터 */
-  .live{display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:700; padding:4px 11px; border-radius:20px; border:1px solid var(--line); vertical-align:middle}
-  .live .pulse{width:8px; height:8px; border-radius:50%; flex:none}
-  .live.on{color:var(--entry); background:rgba(63,185,80,.10); border-color:rgba(63,185,80,.35)}
-  .live.on .pulse{background:var(--entry); animation:pulse 1.4s ease-in-out infinite; box-shadow:0 0 0 0 rgba(63,185,80,.6)}
-  .live.stale{color:var(--mute); background:var(--surface-2)}
-  .live.stale .pulse{background:var(--mute)}
-  @keyframes pulse{
-    0%{box-shadow:0 0 0 0 rgba(63,185,80,.55); opacity:1}
-    70%{box-shadow:0 0 0 7px rgba(63,185,80,0); opacity:.55}
-    100%{box-shadow:0 0 0 0 rgba(63,185,80,0); opacity:1}
+  /* 장중(👁) 뱃지: 실시간 수집 중일 때 초록으로 깜빡임 */
+  .tag.live{position:relative; overflow:visible}
+  body.intraday-live .tag.live{
+    background:rgba(63,185,80,.14); color:var(--entry); border-color:rgba(63,185,80,.5);
+    animation:livePulse 1.5s ease-in-out infinite;
   }
-  @media(prefers-reduced-motion:reduce){.live.on .pulse{animation:none}}
+  body.intraday-live .tag.live::after{
+    content:""; position:absolute; top:50%; left:-3px; width:6px; height:6px; margin-top:-3px;
+    border-radius:50%; background:var(--entry); box-shadow:0 0 0 0 rgba(63,185,80,.6);
+    animation:livePulse 1.5s ease-in-out infinite;
+  }
+  @keyframes livePulse{
+    0%{box-shadow:0 0 0 0 rgba(63,185,80,.5)}
+    70%{box-shadow:0 0 0 6px rgba(63,185,80,0)}
+    100%{box-shadow:0 0 0 0 rgba(63,185,80,0)}
+  }
+  @media(prefers-reduced-motion:reduce){body.intraday-live .tag.live,body.intraday-live .tag.live::after{animation:none}}
 </style>
 
 <style>
@@ -342,7 +346,7 @@
     </div>
 
     <!-- STEP 3: entry checklist (오늘 자동판정 흡수) -->
-    <h2><span class="step">STEP 2</span>종목별 진입 판정 <span class="tag a">🤖 오늘 자동판정</span> <span class="live stale" id="liveDot" title=""><span class="pulse"></span><span id="liveTxt">데이터 확인 중</span></span></h2>
+    <h2><span class="step">STEP 2</span>종목별 진입 판정 <span class="tag a">🤖 오늘 자동판정</span></h2>
     <p class="subtle" id="td-ts">최신 세션 종가 기준 · 필터·회피 자동, 진입 조건만 장중 직접 확인</p>
     <p class="subtle" style="margin-top:0">아래 종목 칩을 누르면 상세 진입 판정이 열립니다.</p>
     <div id="td-summary"></div>
@@ -1047,23 +1051,24 @@
     }
     const ia = vv && vv.intraday_auto;  // 장중 자동판정(KIS)
     if(vv){
-      if(ia) h += '<p class="subtle" style="margin:2px 0 10px">필터·회피·<b>시초가·주도주</b>까지 <b>🤖 자동</b>. 첫 눌림 저점만 분봉으로 직접 확인하세요.</p>';
-      else h += '<p class="subtle" style="margin:2px 0 10px">필터·회피는 <b>🤖 자동</b>. 진입 조건(장중)은 개장+31분 자동판정 실행 후 채워집니다.</p>';
+      const liveNow = document.body.classList.contains('intraday-live');
+      h += '<p class="subtle" style="margin:2px 0 10px"><span class="tag a">🤖 자동</span> 아침 EOD 수집(정적) · <span class="tag o live">⚡👁 장중</span> 장중 실시간 수집'
+         + (liveNow ? ' <b style="color:var(--entry)">— 지금 수집 중(깜빡임)</b>' : ' <span style="color:var(--mute)">— 개장+31분에 갱신, 그때 초록으로 깜빡입니다</span>') + '</p>';
     }
     h += '<div class="grouplabel f">① 필터 (통과 못하면 진입 금지)</div>';
-    d.filter.forEach((c,i)=>h+=chk('f'+i,c,false, vv?!!vv.filter_ok:false, !!vv, false));
+    d.filter.forEach((c,i)=>h+=chk('f'+i,c,false, vv?!!vv.filter_ok:false, vv?'eod':''));
     h += '<div class="grouplabel e">② 진입 조건 ('+d.need+'개 이상 충족)</div>';
     d.entry.forEach((c,i)=>{
-      const ic = ia && c.ik && ia.checks && ia.checks[c.ik];  // 이 항목이 KIS 자동인가
-      if(ic && ic.auto){ h+=chk('e'+i,{t:c.t,s:(ic.label||c.s)}, false, !!ic.ok, true, false); }
-      else h+=chk('e'+i,c,false, false, false, !!vv);
+      const ic = ia && c.ik && ia.checks && ia.checks[c.ik];  // 이 항목이 KIS 장중 자동인가
+      if(ic && ic.auto){ h+=chk('e'+i,{t:c.t,s:(ic.label||c.s)}, false, !!ic.ok, 'intra'); }
+      else h+=chk('e'+i,c,false, false, vv?'manual':'');
     });
-    h+=chk('e_vol',{t:'거래량 전일 1.5배↑ + 종가 고점 근처',s:'저자 7-4 · EOD 자동계산'}, false, vv?!!vv.vol_ok:false, !!vv, false);
+    h+=chk('e_vol',{t:'거래량 전일 1.5배↑ + 종가 고점 근처',s:'저자 7-4 · EOD 자동계산'}, false, vv?!!vv.vol_ok:false, vv?'eod':'');
     h += '<div class="grouplabel x">③ 회피 신호 (하나라도 걸리면 보류)</div>';
     d.avoid.forEach((c,i)=>{
       const ks=(c.k||'').split('|').filter(Boolean);
       const on = vv && ks.some(k=>(vv.avoid_keys||[]).includes(k));
-      h+=chk('x'+i,c,true, !!on, !!(vv&&c.k), false);
+      h+=chk('x'+i,c,true, !!on, (vv&&c.k)?'eod':'');
     });
     h += '<div class="verdict" id="enV"><span id="enMsg">항목을 체크하세요</span></div>';
     h += '<p class="subtle" style="margin:10px 0 0">'+d.note+'</p>';
@@ -1078,8 +1083,12 @@
     card.querySelectorAll('input').forEach(b=>b.addEventListener('change',()=>evalEntry(p)));
     evalEntry(p);
   }
-  function chk(id,c,warn,checked,auto,intr){
-    const badge = auto ? ' <span class="tag a">🤖 자동</span>' : (intr ? ' <span class="tag o">👁 장중</span>' : '');
+  function chk(id,c,warn,checked,bt){
+    // bt: 'eod'(🤖 아침수집·정적) | 'intra'(⚡ 장중 자동·KIS) | 'manual'(👁 장중 수동) | ''
+    let badge='';
+    if(bt==='eod') badge=' <span class="tag a" title="아침 EOD 수집">🤖 자동</span>';
+    else if(bt==='intra') badge=' <span class="tag o live" title="장중 실시간 수집(KIS)">⚡ 장중</span>';
+    else if(bt==='manual') badge=' <span class="tag o live" title="장중 직접 확인 항목">👁 장중</span>';
     return '<label class="chk"><input type="checkbox" data-k="'+id+'"'+(warn?' class="warn"':'')+(checked?' checked':'')
       +'><span class="txt">'+c.t+badge+(c.s?'<small>'+c.s+'</small>':'')+'</span></label>';
   }
@@ -1152,19 +1161,12 @@
       const d = new Date(VD.ts);
       const tsEl = document.getElementById('td-ts');
       if(tsEl) tsEl.innerHTML = `<b>${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}</b> 기준(최신 세션 종가) · 필터·회피 자동, 진입 조건만 장중 직접 확인`;
-      // 실시간 수집 인디케이터: 장중 데이터(intraday_ts) 신선도로 라이브/정지 판정
+      // 장중 데이터 신선도 → 장중 뱃지 라이브 여부 결정 (body에 클래스)
       (function(){
-        const dot=document.getElementById('liveDot'), txt=document.getElementById('liveTxt');
-        if(!dot) return;
         const its = VD.intraday_ts ? new Date(VD.intraday_ts) : null;
-        const fmt = t => `${pad(t.getHours())}:${pad(t.getMinutes())}`;
-        function tick(){
-          if(!its){ dot.className='live stale'; txt.textContent='장중 대기'; dot.title='다음 미국 개장+31분에 수집'; return; }
-          const ageMin=(Date.now()-its.getTime())/60000;
-          if(ageMin <= 20){ dot.className='live on'; txt.textContent='LIVE · '+fmt(its)+' 수집'; dot.title=`장중 시세 ${Math.round(ageMin)}분 전 수집 (실시간 갱신 중)`; }
-          else { dot.className='live stale'; txt.textContent=fmt(its)+' 수집(대기)'; dot.title=`마지막 수집 ${Math.round(ageMin)}분 전 · 장 마감 또는 다음 갱신 대기`; }
-        }
-        tick(); setInterval(tick, 30000);
+        const live = its && ((Date.now()-its.getTime())/60000 <= 20);
+        document.body.classList.toggle('intraday-live', !!live);
+        window.__intradayTs = its;  // 툴팁용
       })();
       // STEP 2 스코어카드 오늘 값으로 프리필
       (VD.scorecard||[]).forEach((s,i)=>{ if(scBoxes[i]) scBoxes[i].checked = !!s.ok; });
