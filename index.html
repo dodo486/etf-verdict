@@ -287,87 +287,7 @@
     </div>
 
     <script type="application/json" id="verdict-data">
-{
-  "score": 5,
-  "scorecard": [
-    {
-      "label": "나스닥100 방향",
-      "ok": true
-    },
-    {
-      "label": "S&P500 방향",
-      "ok": true
-    },
-    {
-      "label": "VIX 안정(전일 +10% 미만)",
-      "ok": true
-    },
-    {
-      "label": "10년물 안정(+0.1%p 미만)",
-      "ok": true
-    },
-    {
-      "label": "달러인덱스 안정(급강세 아님)",
-      "ok": true
-    }
-  ],
-  "verdicts": [
-    {
-      "prod": "TQQQ",
-      "color": "🔵",
-      "grade": "✅ 매수 후보",
-      "reason": "필터 통과 · 스코어 5/5 → 1차 분할 진입 준비",
-      "avoid": [],
-      "avoid_keys": [],
-      "filter_ok": true,
-      "vol_ok": false,
-      "intraday": [
-        "나스닥 시초가 위 유지",
-        "첫 눌림 저점 높임",
-        "빅테크 3개 중 2개↑"
-      ],
-      "close": 76.61499786376953,
-      "ma20": 70.98025016784668,
-      "chg": 5.472189575331344
-    },
-    {
-      "prod": "SOXL",
-      "color": "🟠",
-      "grade": "⛔ 보류",
-      "reason": "회피 신호 1개 — 과열/위험, 눌림 대기",
-      "avoid": [
-        "과열: 반도체 10일중 8일↑ + SOXL 5일 34%↑"
-      ],
-      "avoid_keys": [
-        "overheat"
-      ],
-      "filter_ok": true,
-      "vol_ok": false,
-      "intraday": [],
-      "close": 135.47239685058594,
-      "ma20": 114.74961967468262,
-      "chg": 9.543461515635663
-    },
-    {
-      "prod": "UPRO",
-      "color": "🟢",
-      "grade": "✅ 매수 후보",
-      "reason": "필터 통과 · 스코어 5/5 → 1차 분할 진입 준비",
-      "avoid": [],
-      "avoid_keys": [],
-      "filter_ok": true,
-      "vol_ok": false,
-      "intraday": [
-        "S&P500 20일선 종가 유지",
-        "섹터 3개↑ 동반"
-      ],
-      "close": 151.1300048828125,
-      "ma20": 148.58100204467775,
-      "chg": 2.6768138977201903
-    }
-  ],
-  "ts": "2026-09-21T23:19:19.715367+09:00"
-}
+{"score": 5, "scorecard": [{"label": "나스닥100 방향", "ok": true}, {"label": "S&P500 방향", "ok": true}, {"label": "VIX 안정(전일 +10% 미만)", "ok": true}, {"label": "10년물 안정(+0.1%p 미만)", "ok": true}, {"label": "달러인덱스 안정(급강세 아님)", "ok": true}], "verdicts": [{"prod": "TQQQ", "color": "🔵", "grade": "✅ 매수 후보", "reason": "필터 통과 · 스코어 5/5 → 1차 분할 진입 준비", "avoid": [], "avoid_keys": [], "filter_ok": true, "vol_ok": false, "intraday": ["나스닥 시초가 위 유지", "첫 눌림 저점 높임", "빅테크 3개 중 2개↑"], "close": 77.19000244140625, "ma20": 71.00900039672851, "chg": 6.263770773663044, "intraday_auto": {"last": 77.1799, "open": 74.845, "base": 72.64, "checks": {"open_hold": {"auto": true, "ok": true, "label": "TQQQ 시초가 위 유지"}, "leaders": {"auto": true, "ok": true, "label": "주도주 2/3↑ (엔비디아,애플)"}, "pullback": {"auto": false, "label": "첫 눌림 저점 높임 (분봉 확인)"}}}}, {"prod": "SOXL", "color": "🟠", "grade": "⛔ 보류", "reason": "회피 신호 1개 — 과열/위험, 눌림 대기", "avoid": ["과열: 반도체 10일중 8일↑ + SOXL 5일 35%↑"], "avoid_keys": ["overheat"], "filter_ok": true, "vol_ok": false, "intraday": [], "close": 136.80999755859375, "ma20": 114.81649971008301, "chg": 10.625050201503127, "intraday_auto": {"last": 136.81, "open": 132.01, "base": 123.67, "checks": {"open_hold": {"auto": true, "ok": true, "label": "SOXL 시초가 위 유지"}, "leaders": {"auto": true, "ok": true, "label": "주도주 3/3↑ (엔비디아,AMD,브로드컴)"}, "pullback": {"auto": false, "label": "첫 눌림 저점 높임 (분봉 확인)"}}}}, {"prod": "UPRO", "color": "🟢", "grade": "✅ 매수 후보", "reason": "필터 통과 · 스코어 5/5 → 1차 분할 진입 준비", "avoid": [], "avoid_keys": [], "filter_ok": true, "vol_ok": false, "intraday": ["S&P500 20일선 종가 유지", "섹터 3개↑ 동반"], "close": 151.6300048828125, "ma20": 148.60600204467772, "chg": 3.0165108823703815, "intraday_auto": {"last": 151.62, "open": 149.89, "base": 147.19, "checks": {"open_hold": {"auto": true, "ok": true, "label": "UPRO 시초가 위 유지"}, "pullback": {"auto": false, "label": "첫 눌림 저점 높임 (분봉 확인)"}}}}], "ts": "2026-09-21T23:36:56.350919+09:00", "intraday_ts": "2026-09-21T23:36:49.270285+09:00"}
 </script>
 
     <!-- STEP 1: Definition table -->
@@ -1038,9 +958,9 @@
     TQQQ:{ v:'--tqqq', need:2,
       filter:[{t:'나스닥100 종가가 20일선 위',s:'단기 생존선 — 아래면 진입 금지'}],
       entry:[
-        {t:'나스닥이 시초가 위에서 유지'},
-        {t:'장 초반 첫 눌림에서 저점을 높임'},
-        {t:'빅테크 3개 이상(엔비디아·MS·애플) 플러스'}
+        {t:'TQQQ 시초가 위 유지 (나스닥 방향)', ik:'open_hold'},
+        {t:'빅테크 2개↑ (엔비디아·MS·애플)', ik:'leaders'},
+        {t:'장 초반 첫 눌림에서 저점을 높임', s:'분봉 확인 — 수동'}
       ],
       avoid:[
         {t:'VIX 전일 대비 +10% 이상 급등',k:'vix'},
@@ -1059,9 +979,9 @@
     SOXL:{ v:'--soxl', need:2,
       filter:[{t:'SOXL·반도체지수 모두 20일선 위',s:'스윙 기준 — 단타면 5일선 위로 대체'}],
       entry:[
-        {t:'엔비디아 시초가 위 (대장 방향)'},
-        {t:'AMD 전일 저점 지킴 (위험선호)'},
-        {t:'브로드컴 전고점 근처서 안 밀림 (확산)'}
+        {t:'SOXL 시초가 위 유지', ik:'open_hold'},
+        {t:'대표주 2개↑ (엔비디아·AMD·브로드컴)', ik:'leaders'},
+        {t:'첫 눌림에서 저점 높임 / AMD·브로드컴 확인', s:'분봉 확인 — 수동'}
       ],
       avoid:[
         {t:'반도체지수 10일 중 7일↑ + SOXL 5일 20%↑ (과열)',k:'overheat'},
@@ -1080,10 +1000,10 @@
     UPRO:{ v:'--upro', need:3,
       filter:[{t:'S&P500 종가가 20일선 위'}],
       entry:[
-        {t:'S&P500 20일선 종가 회복'},
-        {t:'이후 2거래일 20일선 다시 안 깸'},
-        {t:'섹터 5개 중 3개↑ 동반(기술 외 금융·산업재·헬스케어·소비재)'},
-        {t:'눌림에도 20일선 근처에서 지지'}
+        {t:'UPRO 시초가 위 유지', ik:'open_hold'},
+        {t:'S&P500 20일선 종가 유지', s:'수동'},
+        {t:'섹터 5개 중 3개↑ 동반(기술 외 금융·산업재·헬스케어·소비재)', s:'업종 데이터 — 수동'},
+        {t:'눌림에도 20일선 근처에서 지지', s:'수동'}
       ],
       avoid:[
         {t:'방어주만 살아나고 경기민감(기술·금융·산업재) 약화'},
@@ -1111,11 +1031,19 @@
       const side = vv.close>vv.ma20?'위':'아래';
       h += '<p class="subtle" style="margin:6px 0 2px">종가 <b style="color:var(--head)">'+vv.close.toFixed(2)+'</b> / 20일선 '+vv.ma20.toFixed(2)+' ('+side+') · 당일 '+(vv.chg>=0?'+':'')+vv.chg.toFixed(1)+'%</p>';
     }
-    if(vv) h += '<p class="subtle" style="margin:2px 0 10px">필터·회피는 <b>🤖 자동 체크</b>됨. <b>진입 조건(장중)만 31분째 직접 확인</b>하세요.</p>';
+    const ia = vv && vv.intraday_auto;  // 장중 자동판정(KIS)
+    if(vv){
+      if(ia) h += '<p class="subtle" style="margin:2px 0 10px">필터·회피·<b>시초가·주도주</b>까지 <b>🤖 자동</b>. 첫 눌림 저점만 분봉으로 직접 확인하세요.</p>';
+      else h += '<p class="subtle" style="margin:2px 0 10px">필터·회피는 <b>🤖 자동</b>. 진입 조건(장중)은 개장+31분 자동판정 실행 후 채워집니다.</p>';
+    }
     h += '<div class="grouplabel f">① 필터 (통과 못하면 진입 금지)</div>';
     d.filter.forEach((c,i)=>h+=chk('f'+i,c,false, vv?!!vv.filter_ok:false, !!vv, false));
-    h += '<div class="grouplabel e">② 진입 조건 ('+d.need+'개 이상 충족) · 장중 직접 확인</div>';
-    d.entry.forEach((c,i)=>h+=chk('e'+i,c,false, false, false, !!vv));
+    h += '<div class="grouplabel e">② 진입 조건 ('+d.need+'개 이상 충족)</div>';
+    d.entry.forEach((c,i)=>{
+      const ic = ia && c.ik && ia.checks && ia.checks[c.ik];  // 이 항목이 KIS 자동인가
+      if(ic && ic.auto){ h+=chk('e'+i,{t:c.t,s:(ic.label||c.s)}, false, !!ic.ok, true, false); }
+      else h+=chk('e'+i,c,false, false, false, !!vv);
+    });
     h+=chk('e_vol',{t:'거래량 전일 1.5배↑ + 종가 고점 근처',s:'저자 7-4 · EOD 자동계산'}, false, vv?!!vv.vol_ok:false, !!vv, false);
     h += '<div class="grouplabel x">③ 회피 신호 (하나라도 걸리면 보류)</div>';
     d.avoid.forEach((c,i)=>{
