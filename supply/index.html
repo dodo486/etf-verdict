@@ -1,0 +1,1117 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>외국인 매집 3일 먼저 읽는 법 — 수급 매집신호 플레이북</title>
+<meta name="description" content="김프로랩 『외국인 매집 3일 먼저 읽는 법』 저자 매매기법 정리 — 외국인·기관·동시매수 수급 신호 진입/청산 규칙과 핵심 숫자 레퍼런스">
+
+<style>
+  :root{
+    --ground:#12141a; --surface:#1a1e28; --surface-2:#20242f; --line:#2b303c;
+    --text:#c7ccd6; --head:#eef1f6; --mute:#7a8194;
+    --gold:#d4a24e; --gold-dim:#8f7538;
+    --tqqq:#4c8dff; --soxl:#f0883e; --upro:#3fb950;
+    --entry:#3fb950; --warn:#e5484d;
+    --maxw:1200px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--ground); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+    font-size:16px; line-height:1.72; -webkit-font-smoothing:antialiased;
+    font-feature-settings:"tnum" 1;
+  }
+  ::selection{background:rgba(212,162,78,.28)}
+  a{color:var(--gold);text-decoration:none}
+
+  .wrap{display:grid; grid-template-columns:248px minmax(0,1fr); gap:0; max-width:var(--maxw); margin:0 auto;}
+
+  /* ---- sidebar ---- */
+  nav.side{
+    position:sticky; top:0; align-self:start; height:100vh; overflow-y:auto;
+    padding:26px 18px 40px; border-right:1px solid var(--line);
+  }
+  nav.side .brand{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); font-weight:700; margin-bottom:2px}
+  nav.side .sub{font-size:12.5px; color:var(--mute); margin-bottom:22px; line-height:1.5}
+  nav.side ol{list-style:none; margin:0; padding:0; counter-reset:c}
+  nav.side li{margin:1px 0}
+  nav.side a.navlink{
+    display:flex; gap:9px; align-items:baseline; padding:6px 9px; border-radius:7px;
+    color:var(--text); font-size:13.5px; line-height:1.35; transition:background .15s,color .15s;
+  }
+  nav.side a.navlink .n{color:var(--mute); font-size:11.5px; font-weight:700; min-width:20px; font-variant-numeric:tabular-nums}
+  nav.side a.navlink:hover{background:var(--surface); color:var(--head)}
+  nav.side a.navlink.active{background:var(--surface-2); color:var(--gold)}
+  nav.side a.navlink.active .n{color:var(--gold)}
+
+  /* ---- main ---- */
+  main{padding:0 clamp(20px,4vw,56px) 120px; min-width:0}
+
+  header.hero{padding:54px 0 30px; border-bottom:1px solid var(--line); margin-bottom:8px}
+  header.hero .kicker{font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--gold); font-weight:700}
+  header.hero h1{
+    font-size:clamp(26px,3.6vw,40px); line-height:1.18; color:var(--head); font-weight:800;
+    margin:12px 0 14px; text-wrap:balance; letter-spacing:-.01em;
+  }
+  header.hero .meta{color:var(--mute); font-size:13.5px; line-height:1.6}
+  header.hero .meta b{color:var(--text); font-weight:600}
+
+  .thesis{
+    margin:26px 0 0; padding:20px 22px; background:linear-gradient(180deg,var(--surface),var(--surface-2));
+    border:1px solid var(--line); border-left:3px solid var(--gold); border-radius:10px;
+    font-size:16.5px; color:var(--head); line-height:1.6;
+  }
+  .thesis .q{font-weight:700}
+  .thesis .src{display:block; margin-top:8px; font-size:12.5px; color:var(--mute); font-weight:400}
+
+  /* product legend */
+  .legend{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:26px 0 6px}
+  .prod{background:var(--surface); border:1px solid var(--line); border-radius:11px; padding:15px 16px; border-top:3px solid var(--pc)}
+  .prod h3{margin:0; font-size:18px; color:var(--pc); letter-spacing:.02em; font-weight:800}
+  .prod .base{font-size:12px; color:var(--mute); margin:2px 0 9px}
+  .prod .role{font-size:13.5px; color:var(--head); font-weight:600; line-height:1.4}
+  .prod .char{font-size:12.5px; color:var(--text); margin-top:6px; line-height:1.5}
+
+  /* chapters */
+  section.chap{border-bottom:1px solid var(--line); padding:6px 0}
+  details.chap{}
+  details.chap > summary{
+    list-style:none; cursor:pointer; padding:22px 4px 22px 0; display:flex; align-items:baseline; gap:14px;
+    user-select:none;
+  }
+  details.chap > summary::-webkit-details-marker{display:none}
+  details.chap > summary .cn{
+    font-variant-numeric:tabular-nums; color:var(--gold-dim); font-weight:800; font-size:14px;
+    border:1px solid var(--gold-dim); border-radius:6px; padding:3px 9px; line-height:1; flex:none; min-width:34px; text-align:center;
+  }
+  details.chap > summary h2{margin:0; font-size:clamp(19px,2.1vw,23px); color:var(--head); font-weight:800; letter-spacing:-.01em; flex:1}
+  details.chap > summary .chev{color:var(--mute); transition:transform .2s; flex:none; font-size:13px; padding-top:4px}
+  details.chap[open] > summary .chev{transform:rotate(90deg)}
+  details.chap > summary:hover h2{color:var(--gold)}
+  .chap-body{padding:0 2px 30px}
+
+  h3.sec{
+    font-size:16px; color:var(--head); font-weight:700; margin:26px 0 8px;
+    padding-left:12px; border-left:3px solid var(--gold); line-height:1.4;
+  }
+  p{margin:10px 0}
+  strong{color:var(--gold); font-weight:700}
+  ul{margin:10px 0; padding:0; list-style:none}
+  ul li{position:relative; padding:4px 0 4px 20px; line-height:1.66}
+  ul li::before{content:"·"; position:absolute; left:4px; top:3px; color:var(--gold-dim); font-weight:900; font-size:18px}
+  ul li strong{color:var(--head)}
+
+  /* callout emphasis for principle list (section 0) */
+  .principles ul li{padding-left:22px}
+  .principles ul li::before{content:"“"; color:var(--gold); font-size:20px; top:6px}
+
+  /* tables */
+  .tablewrap{overflow-x:auto; margin:16px 0; border:1px solid var(--line); border-radius:10px}
+  table{border-collapse:collapse; width:100%; font-size:13.5px; min-width:520px}
+  th,td{text-align:left; padding:10px 14px; border-bottom:1px solid var(--line); vertical-align:top; line-height:1.55}
+  thead th{background:var(--surface-2); color:var(--gold); font-weight:700; letter-spacing:.02em; position:sticky; top:0}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:var(--surface)}
+  td:first-child{color:var(--head); font-weight:600}
+  td, th{font-variant-numeric:tabular-nums}
+
+  hr.rule{display:none}
+
+  .footnote{margin-top:8px; color:var(--mute); font-size:13px}
+
+  /* coverage badge */
+  .cover{display:inline-flex; align-items:center; gap:7px; margin-top:14px; font-size:12.5px; color:var(--entry); background:rgba(63,185,80,.09); border:1px solid rgba(63,185,80,.3); padding:5px 11px; border-radius:20px}
+  .cover .dot{width:7px;height:7px;border-radius:50%;background:var(--entry)}
+
+  /* mobile */
+  .menubtn{display:none}
+  @media(max-width:860px){
+    .wrap{grid-template-columns:1fr}
+    nav.side{position:fixed; z-index:50; top:0; left:0; width:270px; background:var(--ground); transform:translateX(-100%); transition:transform .25s; box-shadow:0 0 40px rgba(0,0,0,.5)}
+    nav.side.open{transform:none}
+    .menubtn{display:inline-flex; position:fixed; z-index:60; top:14px; left:14px; background:var(--surface-2); color:var(--gold); border:1px solid var(--line); border-radius:9px; padding:9px 13px; font-size:13px; font-weight:700; cursor:pointer}
+    header.hero{padding-top:64px}
+    .legend{grid-template-columns:1fr}
+  }
+  @media(prefers-reduced-motion:reduce){*{transition:none!important; scroll-behavior:auto}}
+</style>
+
+<style>
+  /* ---- tabs ---- */
+  .tabbar{position:sticky; top:0; z-index:100; display:flex; gap:4px; padding:8px clamp(16px,3vw,24px) 0;
+    background:var(--ground); border-bottom:1px solid var(--line); height:52px; align-items:flex-end;
+    max-width:var(--maxw); margin:0 auto;}
+  .tab{background:none; border:none; color:var(--mute); font:inherit; font-size:14.5px; font-weight:700;
+    padding:11px 16px; cursor:pointer; border-radius:9px 9px 0 0; border-bottom:2px solid transparent;
+    display:flex; align-items:center; gap:7px; transition:color .15s}
+  .tab:hover{color:var(--text)}
+  .tab.active{color:var(--gold); border-bottom-color:var(--gold)}
+  .tabpanel{display:none}
+  .tabpanel.active{display:block}
+  #panel-playbook nav.side{top:52px; height:calc(100vh - 52px)}
+
+  /* ---- sheet ---- */
+  .sheet{max-width:960px; margin:0 auto; padding:36px clamp(18px,4vw,44px) 120px}
+  .sheet .kicker{font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--gold); font-weight:700}
+  .sheet h1{font-size:clamp(24px,3.2vw,34px); color:var(--head); font-weight:800; margin:10px 0 10px; letter-spacing:-.01em; text-wrap:balance}
+  .sheet .lede{color:var(--text); font-size:15px; line-height:1.7; margin:0 0 6px}
+  .sheet h2{font-size:20px; color:var(--head); font-weight:800; margin:44px 0 4px; letter-spacing:-.01em}
+  .sheet h2 .step{color:var(--gold-dim); font-size:13px; font-weight:800; border:1px solid var(--gold-dim); border-radius:6px; padding:2px 8px; margin-right:9px; vertical-align:middle}
+  .sheet .subtle{color:var(--mute); font-size:13px; margin:2px 0 16px; line-height:1.6}
+
+  .tag{display:inline-block; font-size:10.5px; font-weight:800; letter-spacing:.04em; padding:2px 7px; border-radius:5px; vertical-align:middle; margin-left:6px}
+  .tag.a{background:rgba(212,162,78,.14); color:var(--gold); border:1px solid var(--gold-dim)}      /* 저자 명시 */
+  .tag.o{background:rgba(122,129,148,.15); color:var(--mute); border:1px solid var(--line)}          /* 운영 정의 */
+
+  .legendbar{display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px; color:var(--mute); margin:8px 0 0; padding:12px 14px; background:var(--surface); border:1px solid var(--line); border-radius:9px}
+  .legendbar b{color:var(--text)}
+
+  /* card */
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin:14px 0}
+  .card.acc{border-top:3px solid var(--pc)}
+  .card h3{margin:0 0 4px; font-size:16.5px; color:var(--head); font-weight:800}
+  .card h3 .tk{color:var(--pc)}
+
+  /* checklist */
+  .chk{display:flex; gap:11px; align-items:flex-start; padding:9px 0; border-bottom:1px solid var(--line); cursor:pointer; line-height:1.55}
+  .chk:last-child{border-bottom:none}
+  .chk input{appearance:none; -webkit-appearance:none; width:20px; height:20px; flex:none; margin-top:1px;
+    border:1.5px solid var(--mute); border-radius:6px; cursor:pointer; position:relative; transition:.12s; background:var(--ground)}
+  .chk input:checked{background:var(--entry); border-color:var(--entry)}
+  .chk input:checked::after{content:"✓"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#0a0d08; font-size:13px; font-weight:900}
+  .chk input.warn:checked{background:var(--warn); border-color:var(--warn)}
+  .chk input.warn:checked::after{color:#fff}
+  .chk input:focus-visible{outline:2px solid var(--gold); outline-offset:2px}
+  .chk .txt{font-size:14px; color:var(--text)}
+  .chk .txt small{display:block; color:var(--mute); font-size:12px; margin-top:1px}
+  .chk .pt{margin-left:auto; flex:none; font-size:12.5px; font-weight:800; color:var(--gold-dim); font-variant-numeric:tabular-nums; padding-left:10px}
+  .chk input.warn ~ .pt{color:var(--warn)}
+
+  .grouplabel{font-size:12px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; margin:14px 0 2px}
+  .grouplabel.f{color:var(--gold)}
+  .grouplabel.e{color:var(--entry)}
+  .grouplabel.x{color:var(--warn)}
+
+  /* verdict */
+  .verdict{margin-top:14px; padding:14px 16px; border-radius:10px; font-weight:800; font-size:15.5px; display:flex; align-items:center; gap:10px; border:1px solid var(--line); background:var(--surface-2); color:var(--mute)}
+  .verdict .big{font-size:20px}
+  .verdict.go{background:rgba(63,185,80,.12); border-color:rgba(63,185,80,.4); color:var(--entry)}
+  .verdict.small{background:rgba(212,162,78,.12); border-color:var(--gold-dim); color:var(--gold)}
+  .verdict.no{background:rgba(229,72,77,.12); border-color:rgba(229,72,77,.4); color:var(--warn)}
+  .verdict .sub{display:block; font-weight:600; font-size:12.5px; color:var(--mute); margin-top:2px}
+
+  /* product picker */
+  .picker{display:inline-flex; gap:6px; background:var(--surface-2); padding:5px; border-radius:11px; border:1px solid var(--line); margin:6px 0 4px; flex-wrap:wrap}
+  .picker button{background:none; border:none; color:var(--mute); font:inherit; font-weight:800; font-size:14px; padding:8px 18px; border-radius:8px; cursor:pointer; transition:.15s}
+  .picker button.on{background:var(--surface); color:var(--pc)}
+
+  /* scorecard live number */
+  .score{font-variant-numeric:tabular-nums}
+  .scgroup{font-size:12px; font-weight:800; letter-spacing:.04em; color:var(--gold); margin:16px 0 2px; padding-top:12px; border-top:1px solid var(--line)}
+  .scgroup:first-of-type{border-top:none; padding-top:0}
+  .scgroup .cap{color:var(--mute); font-weight:600; margin-left:6px; font-size:11.5px}
+
+  /* calculator */
+  .calcrow{display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin:6px 0 4px}
+  .calcrow label{font-size:13.5px; color:var(--text); font-weight:600}
+  .calcrow input[type=number]{background:var(--ground); border:1px solid var(--line); color:var(--head); font:inherit; font-size:15px; padding:9px 12px; border-radius:8px; width:150px; font-variant-numeric:tabular-nums}
+  .calcrow input:focus{outline:2px solid var(--gold); outline-offset:1px}
+  .modes{display:inline-flex; gap:6px; background:var(--surface-2); padding:5px; border-radius:11px; border:1px solid var(--line); flex-wrap:wrap}
+  .modes button{background:none;border:none;color:var(--mute);font:inherit;font-weight:800;font-size:13.5px;padding:7px 14px;border-radius:8px;cursor:pointer}
+  .modes button.on{background:var(--surface); color:var(--gold)}
+
+  /* memo */
+  .memo{display:grid; gap:10px; margin-top:6px}
+  .memo .field{display:grid; grid-template-columns:130px 1fr; gap:12px; align-items:center}
+  .memo .field label{font-size:13px; color:var(--gold); font-weight:700}
+  .memo .field input{background:var(--ground); border:1px solid var(--line); color:var(--head); font:inherit; font-size:14px; padding:9px 12px; border-radius:8px}
+  .memo .field input:focus{outline:2px solid var(--gold); outline-offset:1px}
+  @media(max-width:560px){.memo .field{grid-template-columns:1fr; gap:3px}}
+
+  .warnbox{margin-top:10px; padding:11px 14px; border-radius:9px; background:rgba(229,72,77,.09); border:1px solid rgba(229,72,77,.3); color:#f0a3a5; font-size:13px; line-height:1.55; display:none}
+  .warnbox.show{display:block}
+</style>
+
+<div class="tabbar">
+  <button class="tab active" data-tab="playbook">📖 플레이북</button>
+  <button class="tab" data-tab="sheet">✅ 실전 매매 시트</button>
+</div>
+
+<div class="tabpanel active" id="panel-playbook">
+<button class="menubtn" id="menubtn" aria-label="목차 열기">☰ 목차</button>
+
+<div class="wrap">
+  <nav class="side" id="side">
+    <div class="brand">SUPPLY PLAYBOOK</div>
+    <div class="sub">김프로랩 『외국인 매집 3일 먼저 읽는 법』<br>저자 매매기법 정리</div>
+    <ol id="nav"></ol>
+  </nav>
+
+  <main>
+    <header class="hero">
+      <div class="kicker">저자 매매기법 실전 정리</div>
+      <h1>외국인 매집 3일 먼저 읽는 법 — 수급 매집신호 플레이북</h1>
+      <div class="meta">
+        원서 <b>김프로랩 『외국인 매집 3일 먼저 읽는 법』</b> · 프롤로그 + 1~6장 + 에필로그 (전 3,894줄)<br>
+        정리 기준 — 저자가 <b>명시한 매매기법만</b> 추출 · 원문 숫자 그대로 · 저자 미명시 항목은 그대로 표시 · 지어내지 않음
+      </div>
+      <div class="cover"><span class="dot"></span> 프롤로그~에필로그 전 소절 커버리지 검증 완료 · 빠진 장 없음</div>
+
+      <div class="thesis">
+        <span class="q">“차트는 후행 지표다 — 그것도 평균 1.7거래일 후행한다. 수급은 차트보다 평균 2.8거래일 먼저 신호가 뜬다.”</span>
+        <span class="src">— 저자가 전 장에서 반복 강조하는 핵심: 골든크로스를 본 순간 외국인은 이미 3일 전에 장바구니를 다 채웠다</span>
+      </div>
+
+      <div class="legend">
+        <div class="prod" style="--pc:var(--tqqq)">
+          <h3>외국인 신호</h3><div class="base">4대 창구 · 보유율 미분</div>
+          <div class="role">가장 선행하는 축</div>
+          <div class="char">이틀 연속 같은 방향이면 매집, 하루 치고 빠지면 차익. 모건·JP모건 동시 매수가 최강.</div>
+        </div>
+        <div class="prod" style="--pc:var(--soxl)">
+          <h3>기관 신호</h3><div class="base">연기금 · 보험 · 투신</div>
+          <div class="role">가장 무거운 축</div>
+          <div class="char">연기금 42.7거래일 보유·분기 리밸런싱. 누적 곡선 V자 바닥 다지기 + 연기금 연속 매수.</div>
+        </div>
+        <div class="prod" style="--pc:var(--upro)">
+          <h3>동시 매수</h3><div class="base">5거래일 3개 이상</div>
+          <div class="role">가장 강한 확정 축</div>
+          <div class="char">5거래일 안에 3개 이상 주체 모두 +. 4개=강 신호, 5개↑=골든(적중률 84%).</div>
+        </div>
+      </div>
+    </header>
+
+    <div id="content"></div>
+  </main>
+</div>
+</div><!-- /panel-playbook -->
+
+<div class="tabpanel" id="panel-sheet">
+  <div class="sheet">
+    <div class="kicker">Definition · 실전 적용</div>
+    <h1>실전 매매 시트 — 애매한 말을 숫자로</h1>
+    <p class="lede">책의 애매한 표현("외국인이 산다", "매수가 강하다")을 <b>컴퓨터도 이해할 수 있는 정량 규칙</b>으로 바꾸고, 매매 직전에 그대로 체크할 수 있게 만든 시트입니다. 아래 점수·판정·계산은 브라우저에서 실시간으로 돌아갑니다.</p>
+    <div class="legendbar">
+      <span><b>표기</b></span>
+      <span><span class="tag a">저자</span> 책에 숫자가 명시된 규칙</span>
+      <span><span class="tag o">운영</span> 애매한 표현을 실전용으로 수치화한 정의 — 본인 검증 후 사용</span>
+    </div>
+
+    <!-- STEP 1: Definition table -->
+    <h2><span class="step">STEP 1</span>핵심 요소 수식화 (Definition)</h2>
+    <p class="subtle">책 표현 → 정량 조건. 진입·청산·필터를 컴퓨터가 판정 가능한 형태로 정의합니다.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>책의 표현 (애매)</th><th>정량 정의 (명확)</th><th>구분</th></tr></thead>
+        <tbody id="defBody"></tbody>
+      </table>
+    </div>
+
+    <!-- STEP 2: supply scorecard -->
+    <h2><span class="step">STEP 2</span>수급 점수표 (100점 만점) <span class="tag a">저자 4-4</span></h2>
+    <p class="subtle">6개 대분류 세부 항목을 체크하면 점수가 즉시 합산됩니다. <b>70점 이상=A급(진입)</b>, 80점 이상=S급(비중 1.5배). 임계값은 본인 유리하게 해석 금지.</p>
+    <div class="card" id="scorecard"></div>
+
+    <!-- STEP 3: entry checklist -->
+    <h2><span class="step">STEP 3</span>진입 판정 체크리스트</h2>
+    <p class="subtle">신호군을 고르고, 지금 맞는 항목을 체크하면 진입 가능 여부를 판정합니다. <b>필터를 통과 못하면 진입 금지</b>가 강제됩니다.</p>
+    <div class="picker" id="picker"></div>
+    <div class="card acc" id="entryCard"></div>
+
+    <!-- STEP 4: exit rules -->
+    <h2><span class="step">STEP 4</span>청산 · 손절 규칙 (정량표) <span class="tag a">저자 5장·3-4</span></h2>
+    <p class="subtle">진입 즉시 아래 라인을 알림/조건으로 걸어두세요. 청산 신호는 가격 무관 즉시 실행 — "신호가 떴는데 안 따르면 차트쟁이로 돌아간 것."</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>단계</th><th>트리거</th><th>액션</th></tr></thead>
+        <tbody id="exitBody"></tbody>
+      </table>
+    </div>
+
+    <!-- STEP 5: split calculator -->
+    <h2><span class="step">STEP 5</span>진입 분할 계산기 <span class="tag a">저자 5-4</span></h2>
+    <p class="subtle">매집 강도 등급을 고르고 총 진입 자금을 넣으면 1·2·3차 분할 금액이 계산됩니다. 강할수록 1차를 크게. (등급별 비율은 저자 5-4 표 그대로)</p>
+    <div class="card">
+      <div class="calcrow">
+        <label>총 진입 자금(만원)</label>
+        <input type="number" id="capital" value="3000" min="0" step="100">
+        <div class="modes" id="modes"></div>
+      </div>
+      <div class="tablewrap" style="margin-top:6px">
+        <table id="calcTable">
+          <thead><tr><th>차수</th><th>비율</th><th>금액</th><th>진입 조건</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="subtle" id="splitNote" style="margin:8px 0 0"></p>
+    </div>
+
+    <!-- STEP 6: daily 30-min routine -->
+    <h2><span class="step">STEP 6</span>매일 30분 수급 루틴 <span class="tag a">저자 4-1</span></h2>
+    <p class="subtle">매매 직전 30분을 잘 쓰는 것 — 풀이 깨끗하면 매매가 깨끗해집니다. 1순위 종목 없는 날은 매매 안 함(1년 250거래일 중 60~80일).</p>
+    <div class="card">
+      <div id="routine"></div>
+      <div class="verdict" id="routineV" style="margin-top:12px"><span class="big score">0 / 6</span><span id="routineMsg">단계를 체크하세요</span></div>
+    </div>
+
+    <p class="subtle" style="margin-top:34px; border-top:1px solid var(--line); padding-top:18px">
+      ※ 이 시트의 규칙은 <b>김프로랩 『외국인 매집 3일 먼저 읽는 법』</b>에서 저자가 명시한 숫자를 그대로 옮긴 것이며, <span class="tag o">운영</span> 표시 항목만 실전 적용을 위해 수치화한 것입니다. 원문의 성과·적중률 수치는 모두 저자 개인 매매 일지/백테스트 주장값이며 독립 검증되지 않았습니다. 실제 매매 전 본인의 데이터·계좌 상황으로 반드시 검증하세요.
+    </p>
+  </div>
+</div><!-- /panel-sheet -->
+
+<script type="text/markdown" id="src">
+## 0. 저자가 반복 강조하는 핵심 원칙
+
+- **차트는 후행 지표다. 그것도 평균 1.7거래일 후행한다.** 골든크로스를 본 순간 외국인은 이미 3일 전에 장바구니를 다 채우고 던질 준비를 끝냈다는 뜻이다. (프롤로그, 1-1)
+- **수급은 차트보다 평균 2.8거래일 먼저 신호가 뜬다.** 4대 창구 성향 + 보유율 변화율 미분 + 공매도-수급 역상관 + 창구별 매매 패턴, 이 넷이 맞아떨어질 때. (프롤로그)
+- **매수 주체가 누구냐에 따라 같은 +3% 양봉의 다음 날 운명이 갈린다.** 모건스탠리가 산 +3%(들고 가는 자금)와 메릴린치가 산 +3%(단타 차익)는 다르다. (1장 도입)
+- **"하루짜리 +는 안 본다."** 진짜 매집과 단순 차익을 가르는 단 하나의 결정적 변수는 순매수의 연속성(금액 크기·거래대금 비중 아님). 이틀 연속 같은 방향이면 매집, 하루 치고 빠지면 차익. (2-1)
+- **"체결강도는 시끄러운 거, 수급강도는 무거운 거야."** 시끄러운 매매를 따라가면 시끄러운 손실, 무거운 매매를 따라가면 무거운 수익. (1-5)
+- **"안 사는 게 사는 거야. 안 사면 안 잃잖아."** 매매 안 하는 날을 만드는 게 적중률을 만든다. 1년 250거래일 중 60~80일은 진입 종목 없어 매매 안 함. (4-1)
+- **"점수표가 너 편들면 안 돼. 점수표가 너를 깎아야 진짜다."** 임계값을 본인 유리하게 해석하면 점수표가 직관 매매와 똑같아진다. (4-4)
+- **"가격은 흔들리는 깃발이고, 자금은 깃발을 흔드는 바람이야. 바람을 봐야지 깃발을 보면 늦어."** 수급 손절은 가격 무관하게 자금 흐름만 본다. (5-1)
+- **"신호가 떴는데 안 따르면, 그게 바로 차트쟁이로 돌아간 것."** 청산 신호는 가격 무관하게 즉시 실행. 첫 번째 시스템 위반이 두 번째·세 번째를 부른다. (6-2)
+- **"매매는 평소가 70%, 급변 구간이 30%다. 그런데 1년 수익률 결정은 정반대다."** 평소 잘하는 매매보다 매크로 급변 구간 안 망하는 매매가 더 비싸다. (6-5, 11년 매매의 마지막 결론)
+- **매매를 잘하는 게 아니라, 매매 직전 30분을 잘 쓰는 거다.** 매매할 종목 풀을 잘 만드는 것. 풀이 깨끗하면 매매가 깨끗해진다. (4-1, 2-5, 에필로그)
+
+## 1. 1장 — 수급의 본질: 왜 차트는 후행하고 수급은 선행하는가
+
+### 1-1. 차트 매매가 구조적으로 3일 늦는 3가지 이유
+- 차트 신호로만 진입한 종목은 평균 누적 매수 시작 대비 2.7거래일 후, 누적 매수의 73.4%가 끝난 자리에서 진입(막차).
+- 첫째, 차트는 체결된 거래만 그린다. 매수 주체(의도)를 못 보여준다.
+- 둘째, 이동평균선은 정의상 후행. 2020~2024 코스피·코스닥 일봉 골든크로스 시가 진입 5거래일 평균 수익률 +0.84%. 그런데 골든크로스 3거래일 전 외국인 누적 순매수 양수 종목만 필터링하면 +4.31%. 같은 골든크로스인데 5배 차이.
+- 셋째, 거래량은 오늘의 결과 변수지 내일의 예측 변수가 아니다. 대신 거래량을 만든 주체의 누적 매수 곡선은 미래를 본다.
+- 실전 확인법: 최근 3개월 손절 종목 5개, 진입 당일부터 거꾸로 10거래일 외국인 순매수 누적값 → 80% 확률로 음수.
+
+### 1-2. 외국인·기관·연기금의 24시간 시간차
+- 장 마감 후 다음 날 동시호가까지 약 17시간 30분 동안 의사결정이 이뤄지고, 다음 날 9시 동시호가에 한꺼번에 쏟아진다.
+- 외국인: 모건스탠리 서울지점은 뉴욕 본사 의사결정을 받음. 뉴욕 오전 9시 = 한국 오후 11시(서머타임). 외국인 순매수는 '어제 장 마감 후 결정된 의사를 오늘 집행한 결과' — 항상 하루 늦게 출력되는 결정문. 3일 연속 매수 = 3일 전부터 매일 밤 본사에서 "더 사라" 사인.
+- 기관: 오전 8시 30분 자산운용본부 회의에서 결정, 9시 집행. 운용사는 "800억까지 채우자, 5거래일 분할" 식으로 결정 → 1차 160억. 5일 누적 +800억 찍혀야 차트쟁이가 알아챔 = 이미 분할 마지막 1~2회차.
+- 분할 매수 식별: 금액의 균질성. 분할은 비슷비슷하게, 단발은 들쭉날쭉. (4일째 비슷 금액 + 변동성 1.2~1.8% → 5일째 진입)
+- 연기금: 국민연금·사학연금·공무원연금·군인공제회·행정공제회. 분기·반기 자산배분위원회, 한 번 결정 시 3~6개월 매수. 운용 800조 단위, 비중 0.1% 늘리는 데도 분할 30거래일. 발표는 다음 날 오전 8시.
+- 백테스트: 연기금 누적 순매수가 직전 60거래일 저점 대비 +20% 이상 올라온 시점부터 30거래일 후 평균 +8.74%. (단발액이 아니라 누적 곡선의 '꺾임'=미분값=가속을 봄)
+- 데이터: 세 주체 모두 +였던 날 시초가 갭상승 확률 71.3%, 두 주체만 +면 48.6%.
+
+### 1-3. 공시 수급 데이터의 발표 시점 함정 + 실시간 우회 추정법
+- 발표 시점: 오전 8시(전일 종합 외국인·기관 순매수 단순 합계) → 9시 HTS 반영 → 오후 4시 30분~5시(창구별 매매) → 다음 날 오전(공매도 잔고·연기금 세부) → 3거래일 후(5% 지분변동 공시).
+- 8시 데이터는 가장 거친 정보(합계만). 우회 추정 3가지:
+- 1) 호가창 매수 1호가 재충전 패턴: 체결돼 사라질 때마다 거의 같은 양으로 재충전. 1호가가 약 19~28초 만에 비슷한 잔량으로 5번 이상 재충전되면 분할 매수 신호. (원문 예: 4,200주가 0주 되면 19~28초 안에 4,000~4,500주로 6번 반복)
+- 2) '오후 3시 25분 5초 룰': 동시호가 직전 마지막 일반 체결. 3시 20분~3시 25분 30초(5분 30초)간 매수 1호가 잔량의 평균·분산을 봄. 분산 작으면(균일) 알고리즘 받침=분할 매수 마지막 회차. 2024년 1~10월 41개 걸러 28개가 5거래일 내 +5% 이상, 적중률 68.3%.
+- 3) 체결강도 30분 이동평균이 110~140 사이를 12회 이상 유지 = 지속적·균질적 매수. VWAP이 종가보다 아래면 매수자 이익 구간(안 던짐). VWAP 아래 종목 다음 날 갭상승 확률 64.1%, 위면 39.7%.
+
+### 1-4. HTS·MTS에 안 뜨는 진짜 매집 흔적 4곳
+- 1) 프로그램 매매 차익/비차익 분리: 차익거래(선물-현물 베이시스, 단타, 1~3거래일 청산)와 비차익거래(펀드 바스켓, 들고 갈 자금)가 섞여 '프로그램 +500억' 한 줄. KRX에서 매일 오후 6시쯤 분리 공개. 비차익 누적 5거래일 연속 + & 차익 - 종목 = 가장 깨끗한 매집 신호 중 하나. (17개 중 13개가 30거래일 내 +10% 이상)
+- 2) 공매도 잔고 vs 대차잔고 격차: 대차잔고=빌린 총량(장전 중), 공매도 잔고=실제 던진 양. 대차잔고 감소 & 가격 안 오름 = 공매도 청산 중 → 거의 무조건 오름(빌린 걸 사서 갚아야 하니까). (2023년 4월 코스닥 예: 대차잔고 17거래일 연속 감소 → 38거래일 차 +47.3%)
+- 3) 외국인 보유율 변화율의 미분값: 절대값 아니라 가속/감속. +0.03→+0.04→+0.05→+0.07=가속(매수 강화). +0.11→+0.08→+0.05→+0.02=감속(곧 끝남). 3거래일 연속 가속 종목은 향후 10거래일 내 평균 +6.8%.
+- 4) 시간외 단일가 외국인 흔적: 오후 4~6시, 거래량 정규장의 1~3%. 외국인 +5억 이상은 코스피·코스닥 통틀어 일평균 5~10개. 정규장에서 못 채운 잔여분이거나 본사 긴급 지시 = 매수 의지 강함.
+
+### 1-5. 체결강도 vs 수급강도
+- 체결강도 = 매수 체결량 ÷ 매도 체결량 × 100. 매분 단위. '누가 체결시켰는지'를 못 봄(한 방 200억=단타/큰손, 100명×2억=기관 분할, 1만명×200만원=개인 추격을 똑같이 셈).
+- 수급강도 = (외국인+기관 순매수액 ÷ 그날 거래대금) × (매수 지속 거래일 수 가중치) × (창구 균질성 점수).
+- 1항: 거래대금 대비 비중.
+- 2항 매수 지속 가중치: 1일=1, 3일 연속=1.5, 5일 연속=2.0, 8일 연속=3.0.
+- 3항 창구 균질성: 한 창구 몰림=단발, 모건·골드만·메릴·JP모건 4곳 이상 분산=펀드 자금. (구체 점수 산식은 저자 미명시)
+- 체결강도보다 평균 2.4거래일 빠름.
+- 사례: 체결강도 84(매도 우세)인데 수급강도 18.7점(평균 6.2의 3배). 외국인+기관이 거래대금의 14.3%, 6일 연속 매수(가중치 2.4), 4개 창구 분산. 진입 5거래일 뒤 +11.8%, 체결강도 174에서 청산.
+- 결합 신호: 수급강도 15점 이상 상태에서 체결강도 100 근처 5거래일 이상 유지 후 6일째 130 넘는 순간 = 매집 종료 직전, 가속 시작 직전('실탄 다 채웠다').
+
+## 2. 2장 — 외국인 수급 7단계 매집 신호 해독법
+
+원칙: 외국인 일별 순매수 +50억 이상 4,873개 표본 중 30거래일 내 +5% 이상 상승은 47.2%(절반 미만). 7개 체크포인트 다 통과=진입 후보, 5~6개=관찰, 4개 이하=버림.
+
+저자 미명시: 외국인 수급 "7단계"의 정확한 7개 항목 나열은 원문에 없다. 부제·2장 도입은 "7단계"·"7개 체크포인트"라 하지만, 본문 2장은 5개 절로 구성되고 각 절에 여러 신호가 들어 있어 저자가 어느 5+2를 7로 세는지 명시적 목록이 없다. (넘겨짚지 않음)
+
+### 2-1. 순매수 연속성
+- 다음 거래일에도 같은 방향 매수 이어졌는가. 이틀 연속 같은 방향=매집, 하루 치고 빠짐=차익. 이 하나로 70% 이상 갈림.
+- 부호 유지(들쭉날쭉해도 +): 첫날 +180억→+35억→+92억, 부호 안 뒤집힘 = 매집. 하루 만에 +→-로 뒤집힘 = 차익.
+- 보조1) 강도 균질성: 5일 연속 +라도 +180→+5→+3→+2→+1 급감은 매집 아님. +180→+96→+112→+71→+85(30~150억 사이 일정)=분할 매수 모양.
+- 보조2) 거래대금 흐름: 연속 매수 중 거래대금 줄어들면 매집(가장 깨끗). 늘어나면 단발 추격 섞임.
+- 룰: 하루 +는 후보 제외. 이틀째 +면 1차 후보군, 사흘째까지 유지면 매집 가능성 등급 상향, 5거래일 연속 +면 진입 검토. (룰 적용 후 적중률 43%→71%)
+
+### 2-2. 매집 강도 측정 공식 (시간외·블록딜·창구 3채널)
+- 채널1 시간외 단일가: 거래량 정규장의 1.4~2.8%. 외국인 +5억 이상은 일평균 7~12개. **가중치 ×5배** (시간외 +10억=정규장 +50억급). 12년치 백테스트, 처음 3배로 잡았다 5배가 정확.
+- 채널2 블록딜(시간외 대량매매, 종목당 100억 이상): 매수 측이 모건·골드만·JP모건이면 들고 가는 자금. **가중치 ×3배** (블록딜 +30억=정규장 +90억급).
+- 채널3 창구별: 매집형 창구 매수 **×2배**, 단타형 창구 매수 **×0.7배**.
+- **매집 강도 = (정규장 매수액) + (시간외×5) + (블록딜×3) + (매집형 창구 가산×2) + (단타형 창구 차감×0.7)**
+- 원문 계산 예: (매집형 +30×2) + (단타형 +24×0.7) + (시간외 +9×5) + (블록딜 +27×3) + (단발 외국계 -132×1) = +60 +16.8 +45 +81 -132 = +70.8억급. (HTS 표기는 -42억)
+- 가장 강력한 순간: HTS상 -인데 환산값 +인 종목. 반대(HTS +인데 환산 -)는 위험.
+
+### 2-3. 4대 창구별 성향
+| 창구 | 평균 보유기간 | 가중치 | 자금 성격 | 특징 |
+|---|---|---|---|---|
+| 모건스탠리 | 18.7거래일 | ×2.4 | 장기 펀드 | 5~12거래일 연속 +, 일별 균질(변동폭 30% 이내), 거래대금 줄어도 매수 |
+| JP모건 | 16.4거래일 | ×2.2 | 본사 자체+위탁 | 매수 빈도 낮음(모건의 절반), 한 번 사면 일평균 +80~150억, 8~14거래일 연속 |
+| 골드만삭스 | 11.3거래일 | ×2.0 | 매크로 타이밍 | 3~7거래일 안에 80% 채움, 강하지만 짧음, 매도 전환 시 3~5거래일 내 청산 |
+| 메릴린치(BofA) | 5.8거래일 | ×1.0(조건부) | 혼합 | 단독 매수=단타 확률 60%↑. 매집형과 동시 매수=장기 확률 70%↑ |
+- 단타형 창구: 메릴린치, CLSA, 노무라, 매리 — 평균 보유 3~7거래일.
+- 메릴: 단독 매수 시 ×0.7 깎음, 매집형과 동시 매수 시 ×1.6 가산.
+- 4대 창구가 외국인 순매수의 58~67% 차지.
+- 가장 강력: 모건스탠리 + JP모건 동시 매수(같은 5거래일 안). 47개 표본, 30거래일 내 +5%↑ 확률 78.7%, 평균 +13.4%.
+
+### 2-4. 보유율 변화율 트래킹 4단계
+- 1) 매일 장 마감 후 보유율 기록(관심 종목 30개 적당).
+- 2) 일일 변화량 = 오늘 - 어제.
+- 3) 가속도 = 오늘 변화량 - 어제 변화량. 3거래일 연속 가속=진입 1차, 5거래일 연속=강력.
+- 4) 임계 통과 종목 별도 리스트.
+- 가속 신호 최강 시점 = 가격 횡보 중. (2024년 1월 예: 5거래일 가속 + 변동폭 1.4% 이내 → 18거래일 만에 +21.7%)
+- 감속 전환(+0.07→+0.05→+0.03) = 매도 준비. 변화량 0 근처부터 청산 시작, 음수 전환 시 전부 청산.
+
+### 2-5. 보유기간 패턴 7가지 (들고 가는 종목 vs 단타용)
+- 1) 매수 후 평균 보유기간 14거래일 이상=들고 가는, 7거래일 이하=단타용.
+- 2) 12개월 누적 외국인 보유율 우상향(회귀선 기울기 양수). (기울기 절대 임계는 미명시)
+- 3) 매수·매도 사이 횡보 구간 8거래일 이상=분할 매집형, 4거래일 이하=단타형.
+- 4) 매도 전환 후 재매수까지 평균 5거래일 이내=들고 가는, 한 달 이상=단타용.
+- 5) 시가총액 안정성: 5,000억 이상 중대형주=들고 가는, 코스닥 소형주=단타용.
+- 6) 분기 말·반기 말(3/6/9/12월 마지막 5거래일 직전 1주) 매수 강도 강해짐=들고 가는.
+- 7) 신용잔고·공매도 잔고 변동성 작음=들고 가는.
+- 종합: 각 1점, 7점 만점. 5점 이상=들고 가는(매수 시 ×1.5), 3점 이하=단타용(×0.5), 4점=회색.
+- 가장 강력: 단타용 풀→들고 가는 풀로 이동하는 순간(3점→5점). 1년에 30~50개.
+
+## 3. 3장 — 기관 매집 패턴 분석과 진입 타이밍
+
+거래대금 비중: 외국인 28~34%, 기관 18~24%, 개인 나머지. 기관 주체 6개(연기금·금융투자·보험·투신·사모·은행) 중 4개 분석.
+
+### 3-1. 4대 기관 성향 비교표
+| 기관 | 평균 보유기간 | 가중치 | 자금 성격 |
+|---|---|---|---|
+| 연기금 | 42.7거래일 | ×2.6 | 분기 리밸런싱, 가장 무거움. 운용 1,200조(한국주식 170~200조) |
+| 보험 | 31.8거래일 | ×2.0 | 부채 매칭, 안정성 우선. 대형주 87%, 배당 3%↑ 선호 |
+| 투신 | 18.4거래일 | ×1.4 | 자금 흐름 연동. 코스피200 71% |
+| 금융투자 | 3.4거래일 | ×0.6 | 증권사 자기매매, 단타. 매수 후 즉시 매도전환 51% |
+- 같은 +50억 진입 시 30거래일 후: 연기금 +6.8%, 금융투자 +1.2%(5.6배 차이).
+- 연기금 특징: 보유 42.7거래일, 균질(변동폭 ±25% 이내), 분기 말 강해짐, 발표 다음 날 오전 8시(외국인보다 빠름). 룰: 연기금 7거래일 연속 + → 무조건 후보군(적용 종목 78%가 30거래일 내 +5%↑).
+- 금융투자 단독 매수는 무시(×0.6, 다른 기관과 동시일 때만 의미).
+- 가장 강력: 연기금 + 보험 동시 매수(같은 5거래일). 30거래일 내 +5%↑ 확률 81.4%, 평균 +14.7%. 여기에 외국계 매집형(모건·JP모건)까지 3중이면 적중률 87%('3중 골든크로스', 1년 12~18종목).
+
+### 3-2. 기관 누적 순매수 곡선 '바닥 다지기' 5단계
+- 1) 90거래일 누적 순매수 곡선 그리기(가격 차트 옆에). 모양 4가지 중 V자/U자를 찾음.
+- 2) 곡선 저점 확인: 지난 60거래일 최저점이 20거래일 이상 전에 찍혔으면 1차 통과.
+- 3) 최저점 이후 회복 모양: 느리고 꾸준한 V/U자('빨래 널듯이'). 저점 대비 회복률 20~30%가 진입 직전 자리.
+- 4) 같은 기간 가격: 횡보 또는 살짝 하락 = 황금 신호(압축).
+- 5) 4대 기관 분리: 연기금+보험 주도=강력, 투신+금융투자 주도=약함, 연기금 단독=중간, 금융투자 단독=무시.
+- 5단계 통과 시 30거래일 후 평균 +11.8%, 적중률 73.4%(단순 기관 누적 + 진입 54%보다 19%p↑).
+- 가장 강력: 저점이 시장 전체 폭락기에 찍힌 종목. (2022년 10월 폭락기 저점 종목들 6개월 평균 +27.3%)
+
+### 3-3. 동시 매수 vs 분산 매수
+- 정의: **5거래일 윈도우 안에 3개 이상 기관이 모두 + 부호**=동시 매수. (5거래일=운용사 5거래일 단위 10회차 분할과 맞음. 3개=우연 배제)
+- 같은 +800억이라도 5일 동시(+160억/일) vs 30일 분산(+27억/일) = 30거래일 후 A +18.4%, B +5.7%(3배).
+
+| 동시 매수 주체 수 | 등급 | 30거래일 평균 수익률 | 적중률 |
+|---|---|---|---|
+| 2개 | 약 신호 | +4.8% | 58% |
+| 3개 | 중 신호 | +9.2% | 67% |
+| 4개 | 강 신호 | +14.7% | 78% |
+| 5개 이상 | 골든 신호 | +21.4% | 84% |
+- 5개 이상은 1년 8~14종목. 발견 시 무조건 진입.
+- 가장 강력: 시장 전체 매도세인 날(코스피 -1.2%, 코스닥 -1.8% 류) 발생한 동시 매수. 적중률 86%.
+
+### 3-4. 기관 청산 분할 매도 4가지 흔적 (시간 순서)
+- 1) (D-7~D-5) 매수 강도 점진 감소: +60억→+35→+18→+5. 3거래일 연속 감속=부분 청산(30~50%), 5거래일 연속=전부 청산.
+- 2) (D-5~D-3) 시간외 매도(외국인 -10억↑) 또는 블록딜 매도(외국계·국내 기관 창구).
+- 3) (D-3~D-1) 매도 호가 잔량 두꺼워짐: 평소의 2배 이상 5분 이상 유지, 체결돼도 재충전(알고리즘 매도). "매도호가가 두꺼워지면 도망쳐라."
+- 4) (D-1~D) 누적 순매수 곡선 우상향 둔화/평탄화→우하향 꺾임. 평탄화=직전 5거래일 평균 매수액이 그 이전 5거래일보다 50%↑ 감소. 평탄화=부분 청산, 우하향 꺾임=전부 청산.
+- D=가격 정점일. 4가지 다 나타난 후 정점까지 평균 4.8거래일, 정점 대비 청산 가격 격차 평균 1.7%.
+- 분기 말 직전 5~10거래일에 흔적이 압축 발생(D-3부터 한꺼번에).
+
+### 3-5. 공매도 잔고와 기관 수급 역상관
+- 공매도 폭증 정의: 직전 30거래일 평균 대비 +20% 이상(강한 폭증 40%↑, 매우 강함 60%↑).
+
+| 기관 수급 | 공매도 잔고 | 등급 | 향후 5거래일 가격 |
+|---|---|---|---|
+| +매수 | 감소 | 안전 | +1.4% |
+| +매수 | 소폭 증가 | 중립 | +0.2% |
+| +매수 | 폭증(20%↑) | 경고 | -2.8% |
+| -매도 | 증가 | 확정 매도 | -5.1% |
+- 기관 매수 + 공매도 폭증 = 가장 무서운 함정(공매도가 맞을 확률 더 높음).
+- 청산: 공매도 +20% 시점 부분 청산 검토, +40% 시점 전부 청산.
+- 대차잔고(빌린 총량=선행 신호) vs 공매도 잔고(던진 양). 대차 +30% 증가 → 며칠 뒤 공매도 폭증 가능성.
+- 가장 강력한 매도 신호: 기관 매수 중 + 공매도 폭증 + 외국인 매집형 창구 매도 전환 3중. 적중률 88%(5거래일 내 -5%↑ 하락).
+
+## 4. 4장 — 외국인·기관 동시 매수 종목 발굴 시스템
+
+일별 약 2,400개 중 동시 매수 신호 잡히는 종목 평균 5~12개(200분의 1 압축).
+
+### 4-1. 매일 30분 루틴 (5단계, 총 40분 안팎→30분)
+- 1) (8분) 4대 기관 매수 부호 스캔: KRX 정보데이터시스템 → 투자자별 매매 동향. 4개 기관 모두 + 필터. 30~80개(거래대금 50억↑로 40~60개 압축).
+- 2) (10분) 5거래일 윈도우 동시 매수 추출: 3개 이상 동시 매수. 12~25개→중 신호 이상만 8~15개.
+- 3) (8분) 외국계 매집형 창구 교차: 모건·JP모건·골드만 + 필터. 2~7개(그날 강력 후보군, 적중률 75%↑).
+- 4) (6분) 보유율 가속도 확인: 3거래일 이상 가속 종목 가산.
+- 5) (8분) 종합 점수 계산 및 우선순위. 노트에 종목명·종합 점수·진입 후보 가격대만 적음(차트·뉴스 안 봄).
+- 종합 점수 공식: 동시 매수 등급(약1/중2/강3/골든4) + 매집형 창구 가산(모건+1, JP모건+1, 골드만+0.5) + 보유율 가속(3일+1, 5일+2) + 누적 곡선 V자/우상향+1 + 분기 말 가산(+0.5). 총점 5점↑=진입 1순위, 3~4점=관찰, 3점 미만=제외.
+- 1년 250거래일 중 60~80일은 진입 종목 없어 매매 안 함.
+
+### 4-2. 무료 도구 조합 (월 0원)
+- 키움 영웅문(PC): 외국계 창구 분리 강자. 메뉴 [0779]/[0796] 외국계 창구별, [0784] 투자자별, [0780] 시간외 단일가, [0795] 주식대차거래, [0729] 공매도 추이. (모바일 영웅문S엔 창구 분리 없음)
+- 미래에셋 M-Stock(모바일): 투자자 동향, 실시간 외국인 매매(5분 단위), 관심종목 수급 알람, 외국인 매수 상위, 연기금 매매 동향.
+- 삼성증권 mPOP(모바일): 시간외·블록딜 신속. 오후 6시쯤 시간외 외국인 +5억↑ 리스트, 블록딜 공시, 신용·공매도 잔고 추이.
+- KRX 정보데이터시스템(data.krx.co.kr, 무료·무가입): 프로그램 차익/비차익 분리, 외국인 보유율 12개월치, 공매도 통계, 공시 일정.
+- 각 도구 강점이 겹치지 않아 합치면 운용사 데스크의 80% 재현. 운용사 대비 약 8시간 늦지만 차트쟁이보다 24시간 빠름.
+
+### 4-3. 시가총액·업종·테마 가중치
+- 가중치1 거래대금 비중 = (외국인+기관 순매수액 ÷ 그날 거래대금) × 100:
+| 비중 | 강도 | 가중치 |
+|---|---|---|
+| 5% 미만 | 매우 약함 | ×0.5 |
+| 5~10% | 약함 | ×0.8 |
+| 10~20% | 보통 | ×1.0 |
+| 20~40% | 강함 | ×1.5 |
+| 40% 이상 | 매우 강함 | ×2.2 |
+- 시가총액별: 대형주(5조↑, +100억 단위 의미), 중형주(5,000억~5조, +30~80억), 소형주(5,000억 미만, +10~30억도 강한 신호). 소형주 보너스 ×1.2.
+- 가중치2 업종 ETF 동조(업종 ETF + 개별 종목 동시 매수) → ×1.4.
+- 가중치3 테마 단계: 태동기 ×0.8, 확산기 ×1.6(적기), 성숙기 ×0.6, 후퇴기 ×0.0(제외).
+- 원문 예: 거래대금 비중 38%(×2.2) × 소형주 1,800억(×1.2) × 업종 ETF 동조(×1.4) × 테마 확산기(×1.6) = ×5.91. 원본 +28억 → +165억급. 22거래일 뒤 +27.4%.
+- 가장 강력: 시가총액 작고 + 거래대금 비중 높고 + 테마 확산기(종합 ×6 이상). 1년 8~14종목, 비중 1.5~2배.
+
+### 4-4. 수급 점수표 5단계 (0~100점)
+- 6개 대분류 배점: 외국인 신호 25 / 기관 신호 25 / 창구별 가중치 15 / 누적 곡선 모양 15 / 시가총액·테마 가중치 10 / 위험 신호 차감 -10.
+- 세부 배점은 실전 매매 시트 STEP 2 점수표 참조.
+- 진입 등급:
+| 점수 | 등급 | 행동 | 30거래일 평균 | 적중률 |
+|---|---|---|---|---|
+| 80점 이상 | S급(골든) | 평소 비중 1.5배 진입 | +18.7% | 84% |
+| 70~79점 | A급(강) | 평소 비중 진입 | +11.3% | 71% |
+| 50~69점 | B급(관찰) | 주가 신호 기다림 | +5.4% | 58% |
+| 50점 미만 | C급(제외) | 진입 안 함 | +1.2% | 47% |
+- 매주 갱신해 점수 추이 추적. 점수 자체보다 추세가 더 강한 신호(60점이지만 매주 +5점 vs 75점이지만 매주 -3점 → 전자 진입).
+- 임계값은 칼같이(본인 유리하게 해석 금지).
+
+### 4-5. 공시·실적 발표 직전 수급 변화 알람
+- 1) 공시 캘린더 매핑: 분기 실적 발표일·이벤트일 미리 캘린더에 박기.
+- 2) 발표 D-7~D-1 수급 편차: 직전 30거래일 평균 일별 매수액 대비 D-7~D-1 평균이 1.8배 이상 증가 → 알람. 분기당 코스피·코스닥 12~25개, 어닝 서프라이즈 비율 70%↑.
+- 3) 임상·기술이전·계약 공시 직전(D-3~D-1) 외국인 갑작스런 + 전환(바이오).
+- 4) 컨센서스 직전 분기 대비 5%↑ 상향 + 동시 매수 신호 = 강력.
+- 가장 강력: 발표 D-1 오후 2:30~3:25 수급 급변(평소 일평균 매수액의 30%↑ 한꺼번에).
+
+## 5. 5장 — 진입·홀딩·청산 실전 매매 시스템
+
+### 5-1. 수급 기반 손절선 3가지 (+보조 1개 = 4중)
+- 1) 매집 강도 환산값이 진입 시점 대비 -50% 이하로 떨어질 때(진입 +120억이면 +60억 이하).
+- 2) 4대 기관 중 2개 이상 매도 전환.
+- 3) 외국인 보유율 변화량이 음수 전환 후 3거래일 연속.
+- 세 가지 중 하나라도 발동 → 다음 날 시초가 청산(가격 무관, +5%여도 청산, -3%여도 안 걸리면 홀딩).
+- 보조4) 진입가 대비 -8% 가격 손절선: 수급 3개 모두 + 유지인데 가격만 -8% 빠진 종목(자본 효율성 차원 청산).
+
+### 5-2. 외국인 청산 4단계 신호 (시간 순서 + 청산 비율)
+| 단계 | 신호 | 시점 | 청산 비율 |
+|---|---|---|---|
+| 1단계 | 매수액 감소 + 매도액 증가(순매수는 아직 +). 평소 매수 평균 대비 30%↑ 감소 | D-7~D-5 | 30% |
+| 2단계 | 시간외 매도 -10억↑ 또는 블록딜 매도 -50억↑ | D-5~D-3 | 추가 30% |
+| 3단계 | 모건스탠리·JP모건 등 매집형 창구 매도 전환 | D-3~D-1 | 추가 30% |
+| 4단계 | 매도 호가 잔량 두꺼워짐(2~3배) + 외국인 보유율 본격 감소 | D-1~D | 잔여 10% |
+- 룰: "모건스탠리가 던지면 무조건 청산." 모건 매도 전환 후 5거래일 평균 -4.2%, 청산가 정점 대비 -1.4%.
+- 이상적: 1~3단계에서 청산 완료(청산의 78%를 1~3단계에서 마침).
+- 4단계 압축 동시 발생(2~3거래일)=가장 위험(매크로 충격·종목 악재 직전). -8~-12% 한 번에.
+
+### 5-3. 보유 기간 결정 매트릭스
+- 1축 주도 자금(진입 직전 5거래일 매수액 최대 자금): 단기 주도(금융투자·메릴린치·CLSA·노무라) / 중기 주도(투신·골드만삭스) / 장기 주도(보험·모건스탠리·JP모건) / 최장기 주도(연기금).
+- 2축 매집 강도 등급: 약(+30~80억), 중(+80~200억), 강(+200~500억), 골든(+500억 이상).
+- 매트릭스(코스피, 단위=거래일):
+| 주도 자금 \ 매집 강도 | 약 | 중 | 강 | 골든 |
+|---|---|---|---|---|
+| 단기 주도 | 3~5일 | 5~8일 | 7~12일 | 10~15일 |
+| 중기 주도 | 5~8일 | 8~14일 | 12~20일 | 18~28일 |
+| 장기 주도 | 8~14일 | 14~25일 | 20~35일 | 30~45일 |
+| 최장기(연기금) | 14~21일 | 21~35일 | 30~50일 | 45~70일 |
+- 각 칸=평균 수익이 정점 도달하는 거래일 수.
+- 보유 중 자금 성격 바뀌면 매트릭스 갱신(단기→모건 가세 시 장기로 업그레이드, 매주 일요일 재평가).
+- 코스닥은 이 매트릭스의 약 절반(6-4 참조).
+
+### 5-4. 분할 매수·매도 비율 (수급 강도로 자동 결정)
+- 분할 매수 1차 비중:
+| 매집 강도 | 1차 | 2차 | 3차 |
+|---|---|---|---|
+| 약(+30~80억) | 30% | 40% | 30% |
+| 중(+80~200억) | 40% | 35% | 25% |
+| 강(+200~500억) | 50% | 30% | 20% |
+| 골든(+500억↑) | 70% | 20% | 10% |
+- 1차 시점: 진입 신호 다음 날 시초가. 갭상승 +3%↑면 5~10분 관찰 후, 갭하락이면 시초가 그대로.
+- 2차 시점: 1차 후 3~5거래일, 매집 강도 환산값이 +20%↑ 증가 시. 횡보/감소면 보류.
+- 3차 시점: 1차 매수가 대비 -3% 이내 하락 + 매집 강도 유지 시. -3%↑ 빠지거나 강도 하락 시 손절 점검으로.
+- 분할 매도: 외국인 청산 4단계와 1:1 매칭(1단계 30% / 2단계 추가 30% / 3단계 추가 30% / 4단계 잔여 10%).
+- 최강 분할 매수: 1차를 시초가 아닌 동시호가 마감 직전(8:50) 예상가 -1.5% 지정가. 체결 안 되면 시초가 5분 후 시장가.
+
+### 5-5. 수급 역행 매매 5가지 함정과 회피
+- 1) "이 정도면 바닥이겠지" — 회피: 누적 순매수 곡선 평탄화/우상향 전환 시점만 진입 후보(가격 낙폭 안 봄).
+- 2) "이번엔 다르겠지" 물타기 — 회피: 수급 신호 무너진 종목 추가 매수 절대 금지, 손절선 발동 시 청산 단계.
+- 3) "조금만 더 들고 있어보자" 청산 지연 — 회피: 청산 신호는 가격 무관 즉시 실행.
+- 4) "차트가 좋아 보여서" 수급 무시 — 회피: 수급 점수 50점 이하는 차트 좋아도 진입 금지.
+- 5) "내 종목이니까 다르다" 매몰비용 — 회피: 매주 일요일 종목명 가리고 '다른 사람 종목'처럼 평가, No면 청산.
+- 공통점: 모두 감정이 데이터를 이긴 매매. (손실 41개 중 33개=수급 알고도 역행, 80% 시스템 위반)
+
+## 6. 6장 — 실전 복기
+
+### 6-1. 외국인 매집 후 6개월 2배 종목 분해
+- 진입 14,200원(비중 18%=평소 1.8배), 진입 직전 5거래일: 외국인 5일 연속 +(누적 +203억), 연기금 4일 연속(+92억), 보험 3일(+47억), 모건 +52억·JP모건 +38억 동시 = 5주체 동시(골든, 적중률 84% 신호). 매집 강도 +538억(강), 보유율 5거래일 가속, 거래대금 비중 23.4%, 테마 'AI 데이터센터 전력' 확산기, 수급 점수 84점 S급.
+- 매트릭스: 골든+장기 주도=30~45일 권장. 청산은 자금 신호 우선(매트릭스=가이드, 자금 신호=룰).
+- 4개월 보유, 청산 26,800원(+88.7%, 실 수익 +82.6%). 청산 신호: 청산 1단계 부분 발생 30% 청산 → 2단계(시간외 -38억)+매도 호가 2.4배+모건 -47억(3단계)에 잔여 70% 청산.
+- 비중이 결정적: +82.6%×10%=자본 +8.26% vs 1.8배 비중=+14.87%(6.6%p 추가).
+
+### 6-2. 기관 청산 신호 무시 -30% 실패
+- 진입 22,800원(비중 12%), 수급 점수 71점 A급, 매집 강도 +280억(강), 신호 7개 중 6개 통과. 진입 정상.
+- 2개월차 손절 기준 3개 모두 발동(매집 강도 +47억<140억, 외국인+연기금 매도 전환, 보유율 3일 연속 -) → 시스템상 즉시 청산(-13.2%). 그러나 함정1(바닥이겠지)+함정2(이번엔 다르겠지)로 위반.
+- 3개월차 청산 4단계 모두 발동에도 함정3(조금만 더)로 지연. 손절 15,420원(-32.4%, 자본 -4.8%).
+- 교훈: 2개월차 청산했으면 -13.2%(자본 -1.6%). 첫 위반이 다음 위반을 부름(손실 3배).
+
+### 6-3. 2024~2025 코스피 상승 20종목 공통 6신호 (시간 순서)
+| 순서 | 신호 | 발생 종목 비율 |
+|---|---|---|
+| D-6~D-5주 | 공통1: 외국인 누적 매수 우상향 시작(가격 ±3.4% 횡보) | 90%(18/20) |
+| D-5~D-4주 | 공통4: 보유율 변화량 5거래일 이상 가속(+0.04→+0.07→+0.11) | 95%(19/20) |
+| D-4~D-3주 | 공통2: 매집형 외국계 창구 2개 이상 동시 매수 | 85%(17/20) |
+| D-3~D-2주 | 공통5: 거래대금 비중 평이 대비 1.5배 이상 증가 | 70%(14/20) |
+| D-2~D-1주 | 공통3: 연기금 5거래일 이상 연속 매수 | 80%(16/20) |
+| D-1~D주 | 공통6: 분기 말 직전 1주 매수 강도 폭증(평이 2배↑) | 65%(13/20) |
+- 평균 5.1개 발생. 4개 이상 동시 발생=폭발 종목 임계값. 진입 적기=D-3주~D-2주(4개 발생 시점, 폭발의 90% 먹음). D 시점 진입 차트쟁이는 절반만.
+
+### 6-4. 코스닥 수급 역추세 차별 전략
+- 코스피(외국인+기관 50%↑, 자금이 가격 만듦) vs 코스닥(외국인+기관 25~35%, 개인 65~75%, 개인이 가격 만듦).
+- 1) 외국인 매도 중 코스닥 소형주에서 진입 신호: 외국인 5거래일 연속 매도인데 가격 안 빠짐(개인 매수가 받아냄) = 진입 신호일 때 있음.
+- 2) 코스닥 단기 자금 비중 압도(외국인 매수의 약 60%가 메릴·CLSA·노무라, 코스피는 30~40%). 보유 기간 매트릭스 절반 단축:
+| 주도 자금 \ 매집 | 약 | 중 | 강 |
+|---|---|---|---|
+| 단기 주도 | 2~4일 | 3~6일 | 5~9일 |
+| 중기 주도 | 3~6일 | 6~10일 | 9~15일 |
+| 장기 주도 | 6~10일 | 10~16일 | 14~22일 |
+- 3) 개인 매수 강도 같이 봄: 개인 매수 비중 70%↑ 진입 절대 금지(적중률 31%, 50% 이하는 65%).
+- 4) 코스닥 동시 매수 = 외국인 매집형 창구 + 투신 조합이 최강(연기금은 코스닥 잘 안 삼). (모건+투신 11개 중 9개 +10%↑, 적중률 82%)
+- 5) 분기 말 차익실현 더 강함(평이 대비 1.8~2.4배, 코스피 1.2~1.5배).
+- 가장 강력한 코스닥 진입: 외국인 매도 종료 + 개인 매수 강도 50% 이하 + 매집형 창구 1개 매수 시작(1년 12~20개, 30거래일 +14.8%, 적중률 79%).
+
+### 6-5. 금리·환율 급변 구간 재조정 매뉴얼
+- 매뉴얼1 급변 구간 정의: 금리 급변(연준·한은 ±50bp 발표 전후 2주), 환율 급변(원달러 1주 ±2%↑), 지정학 리스크(1~3개월), 경기 충격(GDP -1%p↑ 하향).
+- 매뉴얼2 진입 비중 50% 축소(평소 10%→5%, 골든도 1.5배→1배).
+- 매뉴얼3 보유 기간 매트릭스 30% 단축(30~45일→21~32일).
+- 매뉴얼4 자금 우선순위 재조정: 강한 자금=연기금·보험·모건·JP모건. 약한 자금=금융투자·메릴·CLSA·투신(환매 압력). 급변 구간엔 연기금+보험 동시 매수만 진입 후보.
+- 매뉴얼5 청산 임계값 강화: 매집 강도 손절선 진입 시점 ×0.7(평소 0.5), 4대 기관 매도 전환 1개 이상(평소 2개), 보유율 - 부호 2거래일 연속(평소 3일).
+- 매크로 급변 인식 5사인: 연준 회의 직전 1주 / 한은 기준금리 결정 직전 1주 / 환율 1주 변동률 ±2%↑ / VIX 30 돌파 / 외국인 5거래일 누적 -1조 원↑ 순매도. 하나라도 발생 시 즉시 매크로 매뉴얼 발동(종목 신호보다 우선).
+
+## A. 부록 — 저자 명시 핵심 숫자 총정리
+
+| 항목 | 숫자 |
+|---|---|
+| 차트 후행 | 평균 1.7거래일 |
+| 수급 선행(4요소 정렬 시) | 평균 2.8거래일 |
+| 수급강도가 체결강도보다 빠름 | 2.4거래일 |
+| 매집 강도가 단순 외국인 순매수보다 빠름 | 0.9거래일 |
+| 매수 지속 가중치 | 1일=1.0 / 3일=1.5 / 5일=2.0 / 8일=3.0 |
+| 시간외 매수 가중치 | ×5배 |
+| 블록딜 매수 가중치 | ×3배 |
+| 매집형 창구 가산 / 단타형 차감 | ×2배 / ×0.7배 |
+| 모건 / JP모건 / 골드만 / 메릴 가중치 | ×2.4 / ×2.2 / ×2.0 / ×1.0(단독 ×0.7·동시 ×1.6) |
+| 4대 창구 평균 보유기간 | 모건 18.7 / JP 16.4 / 골드만 11.3 / 메릴 5.8거래일 |
+| 연기금/보험/투신/금융투자 가중치 | ×2.6 / ×2.0 / ×1.4 / ×0.6 |
+| 4대 기관 평균 보유기간 | 연기금 42.7 / 보험 31.8 / 투신 18.4 / 금융투자 3.4거래일 |
+| 보유율 가속 임계 | 3거래일 연속=1차, 5거래일 연속=강력 |
+| 동시 매수 정의 | 5거래일 윈도우 3개 이상 기관 모두 + |
+| 동시 매수 등급 수익률/적중률 | 2개 +4.8%/58% · 3개 +9.2%/67% · 4개 +14.7%/78% · 5개↑ +21.4%/84% |
+| 모건+JP 동시 | 78.7% 확률, +13.4% |
+| 연기금+보험 동시 | 81.4% 확률, +14.7% (3중이면 적중률 87%) |
+| 공매도 폭증 임계 | 직전 30거래일 평균 +20%(부분 청산) / +40%(전부 청산) / +60%(매우 강함) |
+| 거래대금 비중 가중치 | <5% ×0.5 / 5~10% ×0.8 / 10~20% ×1.0 / 20~40% ×1.5 / 40%↑ ×2.2 |
+| 업종 ETF 동조 / 소형주 보너스 | ×1.4 / ×1.2 |
+| 테마 단계 가중치 | 태동 ×0.8 / 확산 ×1.6 / 성숙 ×0.6 / 후퇴 ×0.0 |
+| 수급 점수 대분류 | 외국인25 / 기관25 / 창구15 / 누적곡선15 / 시총·테마10 / 위험 -10 = 100 |
+| 진입 등급 | 80↑ S급(1.5배) / 70~79 A급 / 50~69 B급 / <50 C급 |
+| S/A/B/C급 수익률·적중률 | +18.7%/84% · +11.3%/71% · +5.4%/58% · +1.2%/47% |
+| 손절선 3가지 | 매집 강도 진입 ×0.5 이하 / 4대 기관 2개↑ 매도 전환 / 보유율 - 3거래일 연속 |
+| 보조 가격 손절선 | 진입가 -8% |
+| 분할 매수 1차 비중 | 약 30% / 중 40% / 강 50% / 골든 70% |
+| 청산 4단계 비율 | 30% / 30% / 30% / 10% |
+| 실적 발표 D-7~D-1 수급 편차 임계 | 평상시 30일 평균 대비 1.8배 이상 |
+| 매크로 급변 시 조정 | 비중 -50% / 매트릭스 -30% / 손절선 ×0.7·1개·2일 |
+| 매크로 인식 5사인 | 연준 1주 전 / 한은 1주 전 / 환율 1주 ±2%↑ / VIX 30↑ / 외국인 5일 -1조↑ |
+| 6-3 폭발 임계 | 6공통신호 중 4개 이상 동시 발생, 진입 적기 D-3~D-2주 |
+| 코스닥 개인 매수 비중 금지선 | 70% 이상 진입 금지(적중률 31% vs 50%↓ 65%) |
+| 3거래일 연속 보유율 가속 종목 | 향후 10거래일 +6.8% |
+
+## B. 부록 — 커버리지 검증 & 넘겨짚지 않은 부분
+
+- **커버리지:** 프롤로그 + 1장 1-1~1-5, 2장 2-1~2-5, 3장 3-1~3-5, 4장 4-1~4-5, 5장 5-1~5-5, 6장 6-1~6-5, 에필로그·판권까지 전 소절 커버. 빠진 장 없음.
+- **외국인 수급 "7단계"의 정확한 7개 항목 나열은 원문 미명시** — 본문 2장은 5개 절 구성. 저자가 어느 5+2를 7로 세는지 명시적 목록 없음(넘겨짚지 않음).
+- 수급강도 공식의 "창구 균질성 점수"의 구체적 산식(만점·창구당 배점)은 미명시.
+- 매집 강도 등급 경계(약 +30~80 / 중 +80~200 / 강 +200~500 / 골든 +500억↑)와 2-2 매집 강도가 동일 스케일인지 저자가 명확히 통일하지 않음.
+- 보유기간 패턴 2번의 회귀선 기울기 임계 등 일부 수치는 부호(양/음)만 제시, 절대 임계 미명시.
+- 개별 종목명·인물명(정대표·박실장·김대표 등)은 규칙대로 기법 재료로만 사용, 옮기지 않음.
+- 원문의 성과 수치·수익률·적중률은 모두 저자 개인 매매 일지/백테스트 주장값이며 독립 검증되지 않음(그대로 인용).
+</script>
+
+<script>
+(function(){
+  const raw = document.getElementById('src').textContent;
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+
+  const lines = raw.split('\n');
+  let html = '';            // main content
+  const nav = [];           // {id,num,title}
+  let chapOpen = false;
+  let listBuf = [];
+  let tableBuf = [];
+  let secIdx = 0;
+
+  function flushList(){
+    if(listBuf.length){
+      html += '<ul>'+listBuf.map(li=>'<li>'+inline(li)+'</li>').join('')+'</ul>';
+      listBuf = [];
+    }
+  }
+  function flushTable(){
+    if(!tableBuf.length) return;
+    const rows = tableBuf.filter(r=>!/^\|[\s:|-]+\|$/.test(r.trim()));
+    let out = '<div class="tablewrap"><table>';
+    rows.forEach((r,i)=>{
+      const cells = r.split('|').slice(1,-1).map(c=>c.trim());
+      if(i===0) out += '<thead><tr>'+cells.map(c=>'<th>'+inline(c)+'</th>').join('')+'</tr></thead><tbody>';
+      else out += '<tr>'+cells.map(c=>'<td>'+inline(c)+'</td>').join('')+'</tr>';
+    });
+    out += '</tbody></table></div>';
+    html += out;
+    tableBuf = [];
+  }
+  function closeChap(){
+    if(chapOpen){ flushList(); flushTable(); html += '</div></details></section>'; chapOpen=false; }
+  }
+
+  for(let line of lines){
+    const t = line.trim();
+    if(t.startsWith('|')){ flushList(); tableBuf.push(t); continue; }
+    else if(tableBuf.length){ flushTable(); }
+
+    if(t.startsWith('## ')){
+      closeChap();
+      const title = t.slice(3);
+      const m = title.match(/^([0-9A-Z]+)\.\s*(.*)$/);
+      const num = m ? m[1] : '';
+      const label = m ? m[2] : title;
+      const id = 'c'+(secIdx++);
+      nav.push({id, num, title:label});
+      const isPrinciple = num==='0';
+      html += '<section class="chap" id="'+id+'"><details class="chap"'+(isPrinciple?' open':'')+'>'
+            + '<summary><span class="cn">'+esc(num)+'</span><h2>'+inline(label)+'</h2><span class="chev">▶</span></summary>'
+            + '<div class="chap-body'+(isPrinciple?' principles':'')+'">';
+      chapOpen = true;
+    }
+    else if(t.startsWith('### ')){
+      flushList();
+      html += '<h3 class="sec">'+inline(t.slice(4))+'</h3>';
+    }
+    else if(t.startsWith('- ')){
+      listBuf.push(t.slice(2));
+    }
+    else if(t===''){
+      flushList();
+    }
+    else {
+      flushList();
+      html += '<p>'+inline(t)+'</p>';
+    }
+  }
+  closeChap();
+
+  document.getElementById('content').innerHTML = html;
+
+  document.getElementById('nav').innerHTML = nav.map(n=>
+    '<li><a class="navlink" href="#'+n.id+'"><span class="n">'+esc(n.num)+'</span><span>'+esc(n.title)+'</span></a></li>'
+  ).join('');
+
+  // active section highlight
+  const links = [...document.querySelectorAll('.navlink')];
+  const map = {};
+  links.forEach(l=>map[l.getAttribute('href').slice(1)]=l);
+  const obs = new IntersectionObserver(entries=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        links.forEach(l=>l.classList.remove('active'));
+        const l = map[e.target.id];
+        if(l) l.classList.add('active');
+      }
+    });
+  },{rootMargin:'-10% 0px -80% 0px'});
+  nav.forEach(n=>{const el=document.getElementById(n.id); if(el) obs.observe(el);});
+
+  // clicking a nav link opens that chapter
+  links.forEach(l=>l.addEventListener('click',()=>{
+    const el = document.getElementById(l.getAttribute('href').slice(1));
+    const d = el && el.querySelector('details');
+    if(d) d.open = true;
+    document.getElementById('side').classList.remove('open');
+  }));
+
+  // mobile menu
+  const btn = document.getElementById('menubtn');
+  const side = document.getElementById('side');
+  if(btn) btn.addEventListener('click',()=>side.classList.toggle('open'));
+})();
+</script>
+
+<script>
+(function(){
+  /* ---- tab switching ---- */
+  const tabs = document.querySelectorAll('.tab');
+  tabs.forEach(t=>t.addEventListener('click',()=>{
+    tabs.forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.querySelectorAll('.tabpanel').forEach(p=>p.classList.remove('active'));
+    document.getElementById('panel-'+t.dataset.tab).classList.add('active');
+    window.scrollTo(0,0);
+  }));
+
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  /* ---- STEP 1: definitions table (PART B) ---- */
+  const DEFS = [
+    {v:'"외국인이 산다"', p:'이틀 연속 같은 방향 순매수(+부호 유지). 하루 +는 후보 제외, 이틀째 + 1차 후보, 사흘째 유지 매집 가능성, 5거래일 연속 + 진입 검토', s:'a'},
+    {v:'"매수가 강하다"', p:'매집 강도 = 정규장매수 + 시간외×5 + 블록딜×3 + 매집형창구×2 + 단타형창구×0.7', s:'a'},
+    {v:'"보유율이 오른다"', p:'일일 변화량의 가속도(오늘 변화량 - 어제 변화량)가 3거래일 연속 양수', s:'a'},
+    {v:'"지속적 매수"', p:'체결강도 30분 이동평균이 110~140 사이를 12회 이상 유지', s:'a'},
+    {v:'"매수자가 안 던진다"', p:'VWAP(거래량 가중 평균 단가)이 종가보다 아래(매수자 이익 구간)', s:'a'},
+    {v:'"호가를 받치고 있다"', p:'매수 1호가가 체결 후 약 19~28초 내 비슷한 잔량으로 5번 이상 재충전', s:'a'},
+    {v:'"동시 매수"', p:'5거래일 윈도우 안에 3개 이상 기관이 모두 + 부호', s:'a'},
+    {v:'"공매도 폭증"', p:'직전 30거래일 평균 대비 +20% 이상 증가(40%↑ 강, 60%↑ 매우 강)', s:'a'},
+    {v:'"매도 호가가 두꺼워진다"', p:'매도 호가 잔량이 평소의 2배 이상으로 커지고 5분 이상 유지(체결돼도 재충전)', s:'a'},
+    {v:'"거래대금 비중이 크다"', p:'(외국인+기관 순매수액 ÷ 그날 거래대금)×100 이 20% 이상(강), 40% 이상(매우 강)', s:'a'},
+    {v:'"매크로 급변 구간"', p:'연준·한은 ±50bp 발표 전후 2주 / 원달러 1주 ±2%↑ / VIX 30↑ / 외국인 5거래일 -1조↑ 중 하나', s:'a'},
+    {v:'"실적 발표 직전 매집"', p:'발표 D-7~D-1 평균 매수액이 직전 30거래일 평균의 1.8배 이상', s:'a'},
+    {v:'"표준 익절·손절 기간"', p:'저자 미명시 (운영 시스템 공통 규칙: +9% / -5% / 10영업일)', s:'o'}
+  ];
+  document.getElementById('defBody').innerHTML = DEFS.map(d=>{
+    const tag = d.s==='a' ? '<span class="tag a">저자</span>' : '<span class="tag o">운영</span>';
+    return '<tr><td>'+esc(d.v)+'</td><td>'+esc(d.p).replace(/×/g,'×')+'</td><td>'+tag+'</td></tr>';
+  }).join('');
+
+  /* ---- STEP 2: supply scorecard (100pt) ---- */
+  const SC = [
+    {label:'외국인 신호', cap:'25점', items:[
+      {t:'외국인 5거래일 연속 +매수', pt:8},
+      {t:'외국인 누적 30거래일 매수', pt:5},
+      {t:'보유율 변화량 3일 가속', pt:5},
+      {t:'매집 강도 환산값 +50억 이상', pt:4},
+      {t:'시간외 외국인 매수 +5억 이상', pt:3}
+    ]},
+    {label:'기관 신호', cap:'25점', items:[
+      {t:'4대 기관 중 3개 이상 동시 매수', pt:10},
+      {t:'연기금 7거래일 연속 매수', pt:8},
+      {t:'누적 순매수 곡선 V자 또는 우상향', pt:4},
+      {t:'분기 말 매수 강도 증가', pt:3}
+    ]},
+    {label:'창구별 가중치', cap:'15점', items:[
+      {t:'모건스탠리 매수', pt:5},
+      {t:'JP모건 매수', pt:4},
+      {t:'골드만삭스 매수', pt:3},
+      {t:'매집형 창구 2개 이상 동시', pt:3}
+    ]},
+    {label:'누적 곡선 모양', cap:'15점', items:[
+      {t:'60일 누적 곡선 우상향', pt:8},
+      {t:'V자 또는 U자 회복 진행 중', pt:4},
+      {t:'가격 횡보 중 곡선 우상향', pt:3}
+    ]},
+    {label:'시가총액·테마 가중치', cap:'10점', items:[
+      {t:'거래대금 비중 20% 이상 매수', pt:4},
+      {t:'테마 확산기 단계', pt:3},
+      {t:'업종 ETF 동조 매수', pt:3}
+    ]},
+    {label:'위험 신호 차감', cap:'-10점', items:[
+      {t:'공매도 잔고 30일 평균 대비 +20% 이상', pt:-4, warn:true},
+      {t:'대차잔고 7일 연속 증가', pt:-3, warn:true},
+      {t:'매도 호가 잔량 평이 대비 2배 이상', pt:-3, warn:true}
+    ]}
+  ];
+  const scCard = document.getElementById('scorecard');
+  let scHtml = '';
+  SC.forEach((g,gi)=>{
+    scHtml += '<div class="scgroup">'+esc(g.label)+'<span class="cap">'+esc(g.cap)+'</span></div>';
+    g.items.forEach((it,ii)=>{
+      const ptTxt = (it.pt>0?'+':'')+it.pt;
+      scHtml += '<label class="chk"><input type="checkbox" data-scpt="'+it.pt+'"'+(it.warn?' class="warn"':'')
+        +'><span class="txt">'+esc(it.t)+'</span><span class="pt">'+ptTxt+'</span></label>';
+    });
+  });
+  scHtml += '<div class="verdict" id="scVerdict"><span class="big score">0 점</span><span id="scMsg">항목을 체크하세요</span></div>';
+  scCard.innerHTML = scHtml;
+  const scBoxes = [...scCard.querySelectorAll('[data-scpt]')];
+  const scV = document.getElementById('scVerdict');
+  const scMsg = document.getElementById('scMsg');
+  function scUpdate(){
+    const total = scBoxes.filter(b=>b.checked).reduce((a,b)=>a+(+b.dataset.scpt),0);
+    scV.querySelector('.score').textContent = total+' 점';
+    scV.classList.remove('go','small','no');
+    if(total>=80){scV.classList.add('go'); scMsg.textContent='S급(골든) — 평소 비중 1.5배 진입 (적중률 84%)';}
+    else if(total>=70){scV.classList.add('go'); scMsg.textContent='A급(강) — 평소 비중 진입 (적중률 71%)';}
+    else if(total>=50){scV.classList.add('small'); scMsg.textContent='B급(관찰) — 주가 신호 기다림 (적중률 58%)';}
+    else {scV.classList.add('no'); scMsg.textContent='C급(제외) — 진입 안 함 (적중률 47%)';}
+  }
+  scBoxes.forEach(b=>b.addEventListener('change',scUpdate)); scUpdate();
+
+  /* ---- STEP 3: entry checklist (PART B entry_checklist) ---- */
+  const COLORS = ['--tqqq','--soxl','--upro','--gold','--entry','--soxl'];
+  const ENTRY = [
+    {group:'순매수 연속성', need:5, filter:['외국인 5거래일 연속 + 부호'],
+      conditions:['부호 유지(들쭉날쭉해도 +)','강도 균질(30~150억 사이 일정)','같은 기간 거래대금 감소'],
+      avoid:['하루짜리 +','+180→+5→+3→+2→+1 급감(빠지는 중)','다음 날 - 전환(단타 차익)'],
+      note:'저자: 이 하나로 70% 이상 갈림'},
+    {group:'동시 매수(중 신호↑)', need:3, filter:['5거래일 윈도우 3개 이상 기관 모두 +'],
+      conditions:['연기금+보험 조합 시 최강','시장 전체 매도세인 날 발생 시 적중률 86%'],
+      avoid:['금융투자 단독','2개만 동시(우연 가능)'],
+      note:'3개 중 / 4개 강 / 5개↑ 골든'},
+    {group:'외국계 매집형 창구', need:1, filter:['모건·JP모건·골드만 중 + 매수'],
+      conditions:['모건+JP모건 동시=최강(78.7%)','메릴은 매집형과 동시일 때만 인정'],
+      avoid:['메릴 단독 매수(단타 60%)','단타형(CLSA·노무라) 단독'],
+      note:'국내 동시 매수 + 외국계 매집형=적중률 75%↑'},
+    {group:'보유율 가속', need:3, filter:['일일 변화량 가속도 3거래일 연속 양수'],
+      conditions:['가격 횡보 중일 때 최강(압축)','5거래일 연속=강력'],
+      avoid:['가속 중이나 가격 이미 +5~8%(후기)','감속 전환(+0.07→+0.05→+0.03)'],
+      note:'3일 가속 종목 향후 10거래일 +6.8%'},
+    {group:'종합 점수', need:70, filter:['수급 점수표 70점 이상(A급)'], isScore:true,
+      conditions:['80점↑ S급은 비중 1.5배','점수 매주 상승 추세면 우선'],
+      avoid:['50점 미만(C급)은 차트 좋아도 금지','임계값 본인 유리 해석'],
+      note:'S/A/B/C 적중률 84/71/58/47%'},
+    {group:'6주 6공통(폭발 발굴)', need:4, filter:['6가지 공통 신호 중 4개 이상 동시 발생'],
+      conditions:['진입 적기 D-3주~D-2주','6개 다 발생 시 비중 1.5배'],
+      avoid:['3개 이하(20종목 중 1개만 폭발)','D 시점 진입(폭발 절반만)'],
+      note:'외국인누적우상향→보유율가속→매집형창구→거래대금비중→연기금연속→분기말폭증 순서'}
+  ];
+  const picker = document.getElementById('picker');
+  picker.innerHTML = ENTRY.map((e,i)=>
+    '<button data-p="'+i+'"'+(i===0?' class="on"':'')+' style="--pc:var('+COLORS[i]+')">'+esc(e.group)+'</button>'
+  ).join('');
+  const card = document.getElementById('entryCard');
+  function renderEntry(i){
+    const d = ENTRY[i];
+    card.style.setProperty('--pc','var('+COLORS[i]+')');
+    let h = '<h3><span class="tk">'+esc(d.group)+'</span> 진입 판정</h3>';
+    h += '<div class="grouplabel f">① 필터 (통과 못하면 진입 금지)</div>';
+    d.filter.forEach((c,k)=>h+=chk('f'+k,c,false));
+    if(d.isScore){
+      h += '<div class="grouplabel e">② 조건 (아래 점수 임계 '+d.need+'점 이상이면 통과)</div>';
+    } else {
+      h += '<div class="grouplabel e">② 진입 조건 ('+d.need+'개 이상 충족)</div>';
+      d.conditions.forEach((c,k)=>h+=chk('e'+k,c,false));
+    }
+    h += '<div class="grouplabel x">③ 회피 신호 (하나라도 걸리면 보류)</div>';
+    d.avoid.forEach((c,k)=>h+=chk('x'+k,c,true));
+    h += '<div class="verdict" id="enV"><span id="enMsg">항목을 체크하세요</span></div>';
+    h += '<p class="subtle" style="margin:10px 0 0">'+esc(d.note)+'</p>';
+    card.innerHTML = h;
+    card.querySelectorAll('input').forEach(b=>b.addEventListener('change',()=>evalEntry(i)));
+    evalEntry(i);
+  }
+  function chk(id,c,warn){
+    return '<label class="chk"><input type="checkbox" data-k="'+id+'"'+(warn?' class="warn"':'')
+      +'><span class="txt">'+esc(c)+'</span></label>';
+  }
+  function evalEntry(i){
+    const d = ENTRY[i];
+    const get = pre => [...card.querySelectorAll('[data-k^="'+pre+'"]')];
+    const fOk = get('f').every(b=>b.checked);
+    const eBoxes = get('e');
+    const eN = eBoxes.filter(b=>b.checked).length;
+    const eTotal = eBoxes.length;
+    const xN = get('x').filter(b=>b.checked).length;
+    const v = document.getElementById('enV'), m = document.getElementById('enMsg');
+    v.classList.remove('go','small','no');
+    if(!fOk){ v.classList.add('no'); m.innerHTML='진입 금지<span class="sub">필터 미충족 — 신호가 아직 서지 않음</span>'; return; }
+    if(xN>0){ v.classList.add('no'); m.innerHTML='보류<span class="sub">회피 신호 '+xN+'개 — 매집 아님/후기 위험, 기다리기</span>'; return; }
+    if(d.isScore){
+      v.classList.add('go'); m.innerHTML='필터 통과<span class="sub">점수표(STEP 2)에서 '+d.need+'점 이상 확인 시 진입 등급 — 회피 0</span>'; return;
+    }
+    if(eN>=d.need){ v.classList.add('go'); m.innerHTML='진입 후보<span class="sub">필터 통과 · 조건 '+eN+'/'+eTotal+' · 회피 0 → 분할 진입, 청산라인 동시 설정</span>'; }
+    else { v.classList.add('small'); m.innerHTML='대기<span class="sub">조건 '+eN+'/'+d.need+' — '+(d.need-eN)+'개 더 충족되면 진입</span>'; }
+  }
+  picker.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
+    picker.querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); renderEntry(+b.dataset.p);
+  }));
+  renderEntry(0);
+
+  /* ---- STEP 4: exit rules (PART B exit_rules) ---- */
+  const EXITS = [
+    {s:'손절선 1', t:'매집 강도 환산값이 진입 시점 대비 -50% 이하', a:'다음 날 시초가 청산(가격 무관)'},
+    {s:'손절선 2', t:'4대 기관 중 2개 이상 매도 전환', a:'다음 날 시초가 청산'},
+    {s:'손절선 3', t:'외국인 보유율 변화량 음수 전환 후 3거래일 연속', a:'다음 날 시초가 청산'},
+    {s:'손절선 4(보조)', t:'수급 3개 모두 + 유지인데 가격만 진입가 대비 -8%', a:'자본 효율성 청산'},
+    {s:'외국인 청산 1단계', t:'매수액 감소+매도액 증가(평소 매수 평균 대비 30%↑ 감소, D-7~D-5)', a:'30% 청산'},
+    {s:'외국인 청산 2단계', t:'시간외 매도 -10억↑ 또는 블록딜 매도 -50억↑ (D-5~D-3)', a:'추가 30% 청산'},
+    {s:'외국인 청산 3단계', t:'모건스탠리·JP모건 등 매집형 창구 매도 전환 (D-3~D-1)', a:'추가 30% 청산(모건 던지면 무조건)'},
+    {s:'외국인 청산 4단계', t:'매도 호가 잔량 2~3배 + 외국인 보유율 본격 감소 (D-1~D)', a:'잔여 10% 청산'},
+    {s:'3중 확정 매도', t:'기관 매수 중 + 공매도 폭증(+20%↑) + 외국인 매집형 창구 매도 전환', a:'즉시 청산(적중률 88%)'},
+    {s:'매크로 급변 강화 손절', t:'매집 강도 진입 ×0.7 이하 / 4대 기관 1개↑ 매도 전환 / 보유율 - 2거래일 연속', a:'즉시 청산, 진입 비중 50% 축소, 매트릭스 30% 단축'}
+  ];
+  document.getElementById('exitBody').innerHTML = EXITS.map(e=>
+    '<tr><td>'+esc(e.s)+'</td><td>'+esc(e.t)+'</td><td>'+esc(e.a)+'</td></tr>'
+  ).join('');
+
+  /* ---- STEP 5: split calculator (PART B position.splits) ---- */
+  const SPLITS = {
+    '약':{label:'약 (+30~80억)', rows:[
+      {n:'1차', pct:30, cond:'약 매집 등급'},
+      {n:'2차', pct:40, cond:'매집 강도 유지'},
+      {n:'3차', pct:30, cond:'1차가 대비 -3% 이내'}
+    ]},
+    '중':{label:'중 (+80~200억)', rows:[
+      {n:'1차', pct:40, cond:'중 매집 등급'},
+      {n:'2차', pct:35, cond:'매집 강도 +20%↑'},
+      {n:'3차', pct:25, cond:'1차가 대비 -3% 이내'}
+    ]},
+    '강':{label:'강 (+200~500억)', rows:[
+      {n:'1차', pct:50, cond:'강 매집 등급'},
+      {n:'2차', pct:30, cond:'매집 강도 +20%↑'},
+      {n:'3차', pct:20, cond:'1차가 대비 -3% 이내'}
+    ]},
+    '골든':{label:'골든 (+500억↑)', rows:[
+      {n:'1차', pct:70, cond:'골든 등급(거의 한 번에)'},
+      {n:'2차', pct:20, cond:'매집 강도 +20%↑'},
+      {n:'3차', pct:10, cond:'1차가 대비 -3% 이내'}
+    ]}
+  };
+  let curGrade='약';
+  const cap = document.getElementById('capital');
+  const calcBody = document.querySelector('#calcTable tbody');
+  const splitNote = document.getElementById('splitNote');
+  const modes = document.getElementById('modes');
+  const fmt = n => Math.round(n).toLocaleString('ko-KR');
+  modes.innerHTML = Object.keys(SPLITS).map((k,i)=>
+    '<button data-g="'+k+'"'+(i===0?' class="on"':'')+'>'+esc(k)+'</button>'
+  ).join('');
+  function calc(){
+    const T = Math.max(0, +cap.value||0);
+    const g = SPLITS[curGrade];
+    calcBody.innerHTML = g.rows.map(r=>
+      '<tr><td>'+esc(r.n)+'</td><td>'+r.pct+'%</td><td>'+fmt(T*r.pct/100)+'만</td><td>'+esc(r.cond)+'</td></tr>'
+    ).join('');
+    splitNote.innerHTML = '매집 강도 <b style="color:var(--gold)">'+esc(g.label)+'</b> — 강할수록 1차를 크게. '
+      + '1차는 진입 신호 다음 날 시초가(또는 8:50 동시호가 예상가 -1.5% 지정가). 골든 신호는 평소 비중 1.5~2배로 진입.';
+  }
+  cap.addEventListener('input',calc);
+  modes.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
+    modes.querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); curGrade=b.dataset.g; calc();
+  }));
+  calc();
+
+  /* ---- STEP 6: daily 30-min routine (PART B routine) ---- */
+  const ROUTINE = [
+    '1단계(8분): KRX 투자자별 매매 동향, 4대 기관 모두 + 필터, 거래대금 50억↑ → 40~60개',
+    '2단계(10분): 5거래일 윈도우 3개 이상 동시 매수 추출, 중 신호 이상만 → 8~15개',
+    '3단계(8분): 외국계 매집형 창구(모건·JP모건·골드만) + 교차 → 2~7개(적중률 75%↑)',
+    '4단계(6분): 보유율 변화율 3거래일 이상 가속 종목 가산',
+    '5단계(8분): 종합 점수 매기고 노트에 종목명·점수·진입 후보 가격대만 기록(차트·뉴스 안 봄), 5점↑=1순위',
+    '1순위 종목 없는 날은 매매 안 함(1년 250거래일 중 60~80일)'
+  ];
+  const routineBox = document.getElementById('routine');
+  routineBox.innerHTML = ROUTINE.map((r,i)=>
+    '<label class="chk"><input type="checkbox" data-rt><span class="txt">'+esc(r)+'</span></label>'
+  ).join('');
+  const rtBoxes = [...routineBox.querySelectorAll('[data-rt]')];
+  const rtV = document.getElementById('routineV');
+  const rtMsg = document.getElementById('routineMsg');
+  function rtUpdate(){
+    const n = rtBoxes.filter(b=>b.checked).length;
+    rtV.querySelector('.score').textContent = n+' / '+rtBoxes.length;
+    rtV.classList.remove('go','small','no');
+    if(n===rtBoxes.length){rtV.classList.add('go'); rtMsg.textContent='루틴 완료 — 풀이 깨끗해야 매매가 깨끗하다';}
+    else if(n>=3){rtV.classList.add('small'); rtMsg.textContent='진행 중 — 남은 단계까지 마치고 종목 확정';}
+    else {rtV.classList.add('no'); rtMsg.textContent='시작 — 순서대로 압축(2,400개 → 5~12개)';}
+  }
+  rtBoxes.forEach(b=>b.addEventListener('change',rtUpdate)); rtUpdate();
+})();
+</script>
