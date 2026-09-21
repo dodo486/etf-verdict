@@ -227,7 +227,6 @@
 <div class="tabbar">
   <button class="tab active" data-tab="playbook">📖 플레이북</button>
   <button class="tab" data-tab="sheet">✅ 실전 매매 시트</button>
-  <button class="tab" data-tab="today">📅 오늘의 자동판정</button>
 </div>
 
 <div class="tabpanel active" id="panel-playbook">
@@ -289,6 +288,84 @@
       <span><span class="tag a">저자</span> 책에 숫자가 명시된 규칙</span>
       <span><span class="tag o">운영</span> 애매한 표현을 실전용으로 수치화한 정의 — 본인 검증 후 사용</span>
     </div>
+
+    <!-- 오늘 자동판정 (엔진이 매일 화~토 08:00 자동 갱신) -->
+    <h2 style="margin-top:30px"><span class="step">TODAY</span>오늘 자동판정 <span class="tag a">엔진 자동계산</span></h2>
+    <p class="subtle" id="td-ts">데이터 로딩…</p>
+    <div class="card" id="td-score"></div>
+    <div id="td-cards"></div>
+    <p class="subtle" style="margin-bottom:6px">위 판정은 최신 세션 종가 기준 <b>자동 계산</b>이며, 장중 3항목(시초가 지지·첫 눌림 저점·30분 판별)은 직접 확인 후 최종 진입하세요. 아래 STEP 1~6은 규칙 정의와 수동 체크·계산 도구입니다.</p>
+    <script type="application/json" id="verdict-data">
+{
+  "score": 5,
+  "scorecard": [
+    {
+      "label": "나스닥100 방향",
+      "ok": true
+    },
+    {
+      "label": "S&P500 방향",
+      "ok": true
+    },
+    {
+      "label": "VIX 안정(전일 +10% 미만)",
+      "ok": true
+    },
+    {
+      "label": "10년물 안정(+0.1%p 미만)",
+      "ok": true
+    },
+    {
+      "label": "달러인덱스 안정(급강세 아님)",
+      "ok": true
+    }
+  ],
+  "verdicts": [
+    {
+      "prod": "TQQQ",
+      "color": "🔵",
+      "grade": "✅ 매수 후보",
+      "reason": "필터 통과 · 스코어 5/5 → 1차 분할 진입 준비",
+      "avoid": [],
+      "intraday": [
+        "나스닥 시초가 위 유지",
+        "첫 눌림 저점 높임",
+        "빅테크 3개 중 2개↑"
+      ],
+      "close": 72.63999938964844,
+      "ma20": 70.70800018310547,
+      "chg": 1.765203396908417
+    },
+    {
+      "prod": "SOXL",
+      "color": "🟠",
+      "grade": "✅ 매수 후보",
+      "reason": "필터 통과 · 스코어 5/5 → 1차 분할 진입 준비",
+      "avoid": [],
+      "intraday": [
+        "엔비디아 시초가 위",
+        "AMD 전일 저점 지킴",
+        "브로드컴 안 밀림"
+      ],
+      "close": 123.66999816894531,
+      "ma20": 114.00599975585938,
+      "chg": 7.707715117264565
+    },
+    {
+      "prod": "UPRO",
+      "color": "🟢",
+      "grade": "🚫 진입 금지",
+      "reason": "필터 미충족 — S&P500 20일선 위 아님(추세 없음)",
+      "avoid": [],
+      "intraday": [],
+      "close": 147.19000244140625,
+      "ma20": 148.51850204467775,
+      "chg": 0.21105497568650006
+    }
+  ],
+  "ts": "2026-09-21T22:26:24.970304+09:00"
+}
+</script>
 
     <!-- STEP 1: Definition table -->
     <h2><span class="step">STEP 1</span>핵심 요소 수식화 (Definition)</h2>
@@ -396,87 +473,6 @@
   </div>
 </div><!-- /panel-sheet -->
 
-<div class="tabpanel" id="panel-today">
-  <div class="sheet">
-    <div class="kicker">EOD 자동 계산 · 규칙 출처=저자 명시</div>
-    <h1>오늘의 자동판정</h1>
-    <p class="lede" id="td-ts">데이터 로딩…</p>
-    <div class="card" id="td-score"></div>
-    <div id="td-cards"></div>
-    <p class="subtle" style="margin-top:20px">환경 판정(최신 세션 종가 기준)입니다. 장중 3항목(시초가 지지·첫 눌림 저점·30분 판별)은 자동 계산이 안 되니 <b>31분째 직접 확인</b> 후 최종 진입하세요. 이 탭은 매일 화~토 아침에 자동 갱신됩니다.</p>
-  </div>
-  <script type="application/json" id="verdict-data">
-{
-  "score": 5,
-  "scorecard": [
-    {
-      "label": "나스닥100 방향",
-      "ok": true
-    },
-    {
-      "label": "S&P500 방향",
-      "ok": true
-    },
-    {
-      "label": "VIX 안정(전일 +10% 미만)",
-      "ok": true
-    },
-    {
-      "label": "10년물 안정(+0.1%p 미만)",
-      "ok": true
-    },
-    {
-      "label": "달러인덱스 안정(급강세 아님)",
-      "ok": true
-    }
-  ],
-  "verdicts": [
-    {
-      "prod": "TQQQ",
-      "color": "🔵",
-      "grade": "✅ 매수 후보",
-      "reason": "필터 통과 · 스코어 5/5 → 1차 분할 진입 준비",
-      "avoid": [],
-      "intraday": [
-        "나스닥 시초가 위 유지",
-        "첫 눌림 저점 높임",
-        "빅테크 3개 중 2개↑"
-      ],
-      "close": 72.63999938964844,
-      "ma20": 70.70800018310547,
-      "chg": 1.765203396908417
-    },
-    {
-      "prod": "SOXL",
-      "color": "🟠",
-      "grade": "✅ 매수 후보",
-      "reason": "필터 통과 · 스코어 5/5 → 1차 분할 진입 준비",
-      "avoid": [],
-      "intraday": [
-        "엔비디아 시초가 위",
-        "AMD 전일 저점 지킴",
-        "브로드컴 안 밀림"
-      ],
-      "close": 123.66999816894531,
-      "ma20": 114.00599975585938,
-      "chg": 7.707715117264565
-    },
-    {
-      "prod": "UPRO",
-      "color": "🟢",
-      "grade": "🚫 진입 금지",
-      "reason": "필터 미충족 — S&P500 20일선 위 아님(추세 없음)",
-      "avoid": [],
-      "intraday": [],
-      "close": 147.19000244140625,
-      "ma20": 148.51850204467775,
-      "chg": 0.21105497568650006
-    }
-  ],
-  "ts": "2026-09-21T22:26:24.970304+09:00"
-}
-</script>
-</div><!-- /panel-today -->
 
 <script type="text/markdown" id="src">
 ## 0. 저자가 반복 강조하는 핵심 원칙 (전 챕터 공통)
