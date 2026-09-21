@@ -131,6 +131,20 @@
     .legend{grid-template-columns:1fr}
   }
   @media(prefers-reduced-motion:reduce){*{transition:none!important; scroll-behavior:auto}}
+
+  /* 실시간 수집 인디케이터 */
+  .live{display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:700; padding:4px 11px; border-radius:20px; border:1px solid var(--line); vertical-align:middle}
+  .live .pulse{width:8px; height:8px; border-radius:50%; flex:none}
+  .live.on{color:var(--entry); background:rgba(63,185,80,.10); border-color:rgba(63,185,80,.35)}
+  .live.on .pulse{background:var(--entry); animation:pulse 1.4s ease-in-out infinite; box-shadow:0 0 0 0 rgba(63,185,80,.6)}
+  .live.stale{color:var(--mute); background:var(--surface-2)}
+  .live.stale .pulse{background:var(--mute)}
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(63,185,80,.55); opacity:1}
+    70%{box-shadow:0 0 0 7px rgba(63,185,80,0); opacity:.55}
+    100%{box-shadow:0 0 0 0 rgba(63,185,80,0); opacity:1}
+  }
+  @media(prefers-reduced-motion:reduce){.live.on .pulse{animation:none}}
 </style>
 
 <style>
@@ -328,7 +342,7 @@
     </div>
 
     <!-- STEP 3: entry checklist (오늘 자동판정 흡수) -->
-    <h2><span class="step">STEP 2</span>종목별 진입 판정 <span class="tag a">🤖 오늘 자동판정</span></h2>
+    <h2><span class="step">STEP 2</span>종목별 진입 판정 <span class="tag a">🤖 오늘 자동판정</span> <span class="live stale" id="liveDot" title=""><span class="pulse"></span><span id="liveTxt">데이터 확인 중</span></span></h2>
     <p class="subtle" id="td-ts">최신 세션 종가 기준 · 필터·회피 자동, 진입 조건만 장중 직접 확인</p>
     <p class="subtle" style="margin-top:0">아래 종목 칩을 누르면 상세 진입 판정이 열립니다.</p>
     <div id="td-summary"></div>
@@ -1138,6 +1152,20 @@
       const d = new Date(VD.ts);
       const tsEl = document.getElementById('td-ts');
       if(tsEl) tsEl.innerHTML = `<b>${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}</b> 기준(최신 세션 종가) · 필터·회피 자동, 진입 조건만 장중 직접 확인`;
+      // 실시간 수집 인디케이터: 장중 데이터(intraday_ts) 신선도로 라이브/정지 판정
+      (function(){
+        const dot=document.getElementById('liveDot'), txt=document.getElementById('liveTxt');
+        if(!dot) return;
+        const its = VD.intraday_ts ? new Date(VD.intraday_ts) : null;
+        const fmt = t => `${pad(t.getHours())}:${pad(t.getMinutes())}`;
+        function tick(){
+          if(!its){ dot.className='live stale'; txt.textContent='장중 대기'; dot.title='다음 미국 개장+31분에 수집'; return; }
+          const ageMin=(Date.now()-its.getTime())/60000;
+          if(ageMin <= 20){ dot.className='live on'; txt.textContent='LIVE · '+fmt(its)+' 수집'; dot.title=`장중 시세 ${Math.round(ageMin)}분 전 수집 (실시간 갱신 중)`; }
+          else { dot.className='live stale'; txt.textContent=fmt(its)+' 수집(대기)'; dot.title=`마지막 수집 ${Math.round(ageMin)}분 전 · 장 마감 또는 다음 갱신 대기`; }
+        }
+        tick(); setInterval(tick, 30000);
+      })();
       // STEP 2 스코어카드 오늘 값으로 프리필
       (VD.scorecard||[]).forEach((s,i)=>{ if(scBoxes[i]) scBoxes[i].checked = !!s.ok; });
       scUpdate();
