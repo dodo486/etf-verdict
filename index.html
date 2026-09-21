@@ -177,6 +177,7 @@
   .tag{display:inline-block; font-size:10.5px; font-weight:800; letter-spacing:.04em; padding:2px 7px; border-radius:5px; vertical-align:middle; margin-left:6px}
   .tag.a{background:rgba(212,162,78,.14); color:var(--gold); border:1px solid var(--gold-dim)}      /* 저자 명시 */
   .tag.o{background:rgba(122,129,148,.15); color:var(--mute); border:1px solid var(--line)}          /* 운영 정의 */
+  .tag.miss{background:transparent; color:#5a606e; border:1px dashed #3a4050; opacity:.85}            /* 미수집(회색) */
 
   .legendbar{display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px; color:var(--mute); margin:8px 0 0; padding:12px 14px; background:var(--surface); border:1px solid var(--line); border-radius:9px}
   .legendbar b{color:var(--text)}
@@ -1056,19 +1057,22 @@
          + (liveNow ? ' <b style="color:var(--entry)">— 지금 수집 중(깜빡임)</b>' : ' <span style="color:var(--mute)">— 개장+31분에 갱신, 그때 초록으로 깜빡입니다</span>') + '</p>';
     }
     h += '<div class="grouplabel f">① 필터 (통과 못하면 진입 금지)</div>';
-    d.filter.forEach((c,i)=>h+=chk('f'+i,c,false, vv?!!vv.filter_ok:false, vv?'eod':''));
+    d.filter.forEach((c,i)=>h+=chk('f'+i,c,false, vv?!!vv.filter_ok:false, vv?'eod':'', !!vv));
     h += '<div class="grouplabel e">② 진입 조건 ('+d.need+'개 이상 충족)</div>';
     d.entry.forEach((c,i)=>{
       const ic = ia && c.ik && ia.checks && ia.checks[c.ik];  // 이 항목이 KIS 장중 자동인가
-      if(ic && ic.auto){ h+=chk('e'+i,{t:c.t,s:(ic.label||c.s)}, false, !!ic.ok, 'intra'); }
-      else h+=chk('e'+i,c,false, false, vv?'manual':'');
+      if(c.ik){ // 장중 자동 대상 항목: 수집되면 intra, 아니면 미수집(회색)
+        h+=chk('e'+i,{t:c.t,s:(ic&&ic.label)||c.s}, false, !!(ic&&ic.ok), 'intra', !!ic);
+      } else { // 장중 수동 항목
+        h+=chk('e'+i,c,false, false, vv?'manual':'', !!ia);
+      }
     });
-    h+=chk('e_vol',{t:'거래량 전일 1.5배↑ + 종가 고점 근처',s:'저자 7-4 · EOD 자동계산'}, false, vv?!!vv.vol_ok:false, vv?'eod':'');
+    h+=chk('e_vol',{t:'거래량 전일 1.5배↑ + 종가 고점 근처',s:'저자 7-4 · EOD 자동계산'}, false, vv?!!vv.vol_ok:false, vv?'eod':'', !!vv);
     h += '<div class="grouplabel x">③ 회피 신호 (하나라도 걸리면 보류)</div>';
     d.avoid.forEach((c,i)=>{
       const ks=(c.k||'').split('|').filter(Boolean);
       const on = vv && ks.some(k=>(vv.avoid_keys||[]).includes(k));
-      h+=chk('x'+i,c,true, !!on, (vv&&c.k)?'eod':'');
+      h+=chk('x'+i,c,true, !!on, (vv&&c.k)?'eod':'', !!vv);
     });
     h += '<div class="verdict" id="enV"><span id="enMsg">항목을 체크하세요</span></div>';
     h += '<p class="subtle" style="margin:10px 0 0">'+d.note+'</p>';
@@ -1083,12 +1087,20 @@
     card.querySelectorAll('input').forEach(b=>b.addEventListener('change',()=>evalEntry(p)));
     evalEntry(p);
   }
-  function chk(id,c,warn,checked,bt){
-    // bt: 'eod'(🤖 아침수집·정적) | 'intra'(⚡ 장중 자동·KIS) | 'manual'(👁 장중 수동) | ''
+  function chk(id,c,warn,checked,bt,collected){
+    // bt: 'eod'(🤖) | 'intra'(⚡ 장중) | 'manual'(👁 장중) | ''
+    // collected: 데이터 수집됐나. 장중 항목이 미수집이면 회색 '미수집' 뱃지.
     let badge='';
-    if(bt==='eod') badge=' <span class="tag a" title="아침 EOD 수집">🤖 자동</span>';
-    else if(bt==='intra') badge=' <span class="tag o live" title="장중 실시간 수집(KIS)">⚡ 장중</span>';
-    else if(bt==='manual') badge=' <span class="tag o live" title="장중 직접 확인 항목">👁 장중</span>';
+    if(bt==='eod'){
+      badge = collected ? ' <span class="tag a" title="아침 EOD 수집됨">🤖 자동</span>'
+                        : ' <span class="tag miss" title="아직 수집 전">⚫ 미수집</span>';
+    } else if(bt==='intra'){
+      badge = collected ? ' <span class="tag o live" title="장중 실시간 수집(KIS)">⚡ 장중</span>'
+                        : ' <span class="tag miss" title="장중 데이터 아직 미수집 — 개장+31분에 채워짐">⚫ 미수집</span>';
+    } else if(bt==='manual'){
+      badge = collected ? ' <span class="tag o live" title="장중 직접 확인 항목">👁 장중</span>'
+                        : ' <span class="tag miss" title="장중 미개장 — 개장 후 직접 확인">👁 미수집</span>';
+    }
     return '<label class="chk"><input type="checkbox" data-k="'+id+'"'+(warn?' class="warn"':'')+(checked?' checked':'')
       +'><span class="txt">'+c.t+badge+(c.s?'<small>'+c.s+'</small>':'')+'</span></label>';
   }
