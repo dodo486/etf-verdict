@@ -39,6 +39,8 @@
 | `publish_pages.py` | 판정 병합 → `public/etf/index.html` |
 | `verify_etf_migration.py` | 신규 엔진 ↔ 레거시 대조검증 |
 | `verify_source_integrity.py` | **저자 원문 불변 검사**(모든 책). `run.py`가 매 발행마다 실행 |
+| `verify_coverage.py` | **커버리지 배지 검증**(모든 책) — 원문대로 구현됐나 · 규칙 출처(ref)가 맞나 · 원문에 없는 수치를 쓰지 않았나 |
+| `coverage_exempt.json` | 위 검사의 면제 목록(사유 필수) |
 | `source_baseline.json` | 위 검사의 기준 해시(커밋 대상) |
 | `paths.py` | **경로·인코딩 단일 기준점** (macOS/Windows 공용). BASE/PUBLIC/LOGS 결정, UTF-8 출력 고정 |
 | `run.py` | **스케줄 러너**(OS 중립) — `daily` / `intraday` / `publish` |

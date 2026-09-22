@@ -268,11 +268,13 @@ def verdict(prod):
     hold = idx.get("hold20", 0) if ok(idx) else 0
     hold_ok = hold >= HOLD_NEED
     if prod == "TQQQ":
-        filt = above20(idx) and hold_ok
+        filt = above20(idx) and hold_ok          # 저자 3-2 "최소 2거래일 버팀"
         filt_txt = "나스닥100 20일선 위 + 2거래일 유지"
     elif prod == "SOXL":
-        filt = above20(p) and above20(idx) and hold_ok
-        filt_txt = "SOXL·반도체지수 모두 20일선 위(스윙) + 2거래일 유지"
+        # 저자 4장은 "SOXL·반도체지수 모두 20일선 위"까지만 말한다. 2거래일 유지는
+        # SOXL에 대해 명시된 적이 없으므로 게이트로 쓰지 않는다(참고 수치로만 노출).
+        filt = above20(p) and above20(idx)
+        filt_txt = "SOXL·반도체지수 모두 20일선 위(스윙)"
     else:  # UPRO
         filt = above20(idx) and hold_ok
         filt_txt = "S&P500 20일선 위 + 2거래일 유지"
