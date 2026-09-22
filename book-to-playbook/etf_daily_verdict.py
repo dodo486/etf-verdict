@@ -88,7 +88,9 @@ def ok(v):  # 유효 데이터?
     return v and "error" not in v
 
 # ---------- 데이터 수집 ----------
-SYMS = ["^NDX","^GSPC","^SOX","TQQQ","SOXL","UPRO","^VIX","^TNX",
+# NQ=F / ES=F = 나스닥100·S&P500 선물. 저자 2-6이 '선물'을 보라고 해서 선물을 받는다.
+# (지수 ^NDX/^GSPC 는 종목 필터·판정에 계속 쓰인다)
+SYMS = ["NQ=F","ES=F","^NDX","^GSPC","^SOX","TQQQ","SOXL","UPRO","^VIX","^TNX",
         "NVDA","MSFT","AAPL","AMD","AVGO"]
 D = {s: load(s) for s in SYMS}
 
@@ -107,8 +109,10 @@ def _why_dir(sym, v):
     return f"{sym} {v['close']:,.1f} / 전일 {v['prev']:,.1f} ({v['chg']:+.2f}%)"
 
 
-sc.append(("나스닥100 방향", plus("^NDX"), _why_dir("^NDX", D["^NDX"])))
-sc.append(("S&P500 방향", plus("^GSPC"), _why_dir("^GSPC", D["^GSPC"])))
+# 저자 2-6: '나스닥 선물 / S&P500 선물 방향'. 선물을 못 받으면 지수로 대체하지 않고
+# 실패로 표시한다(대리지표를 몰래 끼워넣지 않음).
+sc.append(("나스닥 선물 방향", plus("NQ=F"), _why_dir("NQ=F 선물", D["NQ=F"])))
+sc.append(("S&P500 선물 방향", plus("ES=F"), _why_dir("ES=F 선물", D["ES=F"])))
 
 vix = D["^VIX"]
 vix_ok = ok(vix) and vix["chg"] is not None and vix["chg"] < 10

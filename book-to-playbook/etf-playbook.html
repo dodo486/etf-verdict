@@ -413,8 +413,8 @@
     <h2><span class="step">STEP 1</span>장 시작 전 스코어카드 <span class="tag a">저자 2-6</span></h2>
     <p class="subtle">5개 지표 각 양호 시 1점. <b>🤖 오늘 값으로 자동 체크됨</b> — 직접 수정하면 점수·판정이 즉시 다시 계산됩니다.</p>
     <div class="card" id="scorecard">
-      <label class="chk"><input type="checkbox" data-sc><span class="txt">나스닥100 방향 양호 <span class="tag a">🤖 자동</span><small>플러스 &amp; 고점 낮추지 않음</small><small class="scwhy"></small></span></label>
-      <label class="chk"><input type="checkbox" data-sc><span class="txt">S&amp;P500 방향 양호 <span class="tag a">🤖 자동</span><small>플러스 &amp; 고점 낮추지 않음</small><small class="scwhy"></small></span></label>
+      <label class="chk"><input type="checkbox" data-sc><span class="txt">나스닥 선물 방향 양호 <span class="tag a">🤖 자동</span><small>플러스 &amp; 고점 낮추지 않음</small><small class="scwhy"></small></span></label>
+      <label class="chk"><input type="checkbox" data-sc><span class="txt">S&amp;P500 선물 방향 양호 <span class="tag a">🤖 자동</span><small>플러스 &amp; 고점 낮추지 않음</small><small class="scwhy"></small></span></label>
       <label class="chk"><input type="checkbox" data-sc><span class="txt">VIX 안정 <span class="tag a">🤖 자동</span><small>전일 대비 +10% 미만, 급하게 안 튐</small><small class="scwhy"></small></span></label>
       <label class="chk"><input type="checkbox" data-sc><span class="txt">미국 10년물 금리 안정 <span class="tag a">🤖 자동</span><small>+0.1%p 이상 급등 아님</small><small class="scwhy"></small></span></label>
       <label class="chk"><input type="checkbox" data-sc><span class="txt">달러인덱스 안정 <span class="tag a">🤖 자동</span><small>급격한 강세 아님</small><small class="scwhy"></small></span></label>
@@ -1471,8 +1471,8 @@
       // STEP 2 스코어카드 오늘 값으로 프리필
       // 스코어카드: 체크 프리필 + 항목마다 실제 근거 수치 표기(STEP2와 같은 형식)
       const SCSRC = [
-        '📊 야후 EOD · ^NDX 지수 종가 전일비 (선물 아닌 지수) · \'고점 낮추지 않음\'은 직접 확인',
-        '📊 야후 EOD · ^GSPC 지수 종가 전일비 (선물 아닌 지수) · \'고점 낮추지 않음\'은 직접 확인',
+        '📊 야후 EOD · NQ=F 나스닥100 선물 전일비 · \'고점 낮추지 않음\'은 직접 확인',
+        '📊 야후 EOD · ES=F S&P500 선물 전일비 · \'고점 낮추지 않음\'은 직접 확인',
         '📊 야후 EOD · ^VIX 전일비',
         '📊 야후 EOD · ^TNX 전일 대비 %p',
         '📊 야후 EOD · DX-Y.NYB(실패 시 DX=F) 전일비'
