@@ -13,6 +13,8 @@ metric.type 카탈로그 (spec["metric"]["type"]):
   pct_change     전일 대비 등락률(%)                    {symbol}
   n_day_return   최근 N일 수익률(%)                     {symbol, n}
   volume_ratio   거래량 / N일평균거래량 배수            {symbol, ref?=20}
+  ma_distance    종가와 N일선의 이격도(%)               {symbol, ma?=5}
+  gap_up         당일 시가의 전일종가 대비 갭(%)         {symbol}
   upper_wick     윗꼬리 %(고점 대비 종가 하락폭)         {symbol}
   higher_low     첫 눌림 저점 높임 여부(장중 분봉)        {symbol}
   count_up       여러 심볼 중 상승 개수                  {symbols:[...], min?}
@@ -57,7 +59,7 @@ class YahooAdapter:
     source = "yahoo"
     CADENCE = "eod"
     HANDLES = {"above_ma", "pct_change", "n_day_return", "volume_ratio",
-               "upper_wick", "count_up"}
+               "upper_wick", "count_up", "ma_distance", "gap_up"}
 
     def __init__(self):
         self._cache = {}  # symbol -> parsed series (per-process)
@@ -78,7 +80,8 @@ class YahooAdapter:
         closes = [c for c in q0.get("close", []) if c is not None]
         highs = [h for h in q0.get("high", []) if h is not None]
         vols = [v for v in q0.get("volume", []) if v is not None]
-        return {"close": closes, "high": highs, "vol": vols,
+        opens = [o for o in q0.get("open", []) if o is not None]
+        return {"close": closes, "high": highs, "vol": vols, "open": opens,
                 "meta": res.get("meta", {})}
 
     def _series(self, symbol):
@@ -94,8 +97,10 @@ class YahooAdapter:
                 out = {
                     "sym": symbol, "close": c[-1], "prev": c[-2],
                     "closes": c, "highs": d["high"], "vols": d["vol"],
+                    "opens": d.get("open", []),
                     "high": d["high"][-1] if d["high"] else None,
                     "vol": d["vol"][-1] if d["vol"] else None,
+                    "open": d["open"][-1] if d.get("open") else None,
                 }
         except Exception as e:  # noqa: BLE001
             out = {"error": str(e)}
@@ -122,6 +127,10 @@ class YahooAdapter:
             return self._volume_ratio(m, s)
         if t == "upper_wick":
             return self._upper_wick(m, s)
+        if t == "ma_distance":
+            return self._ma_distance(m, s)
+        if t == "gap_up":
+            return self._gap_up(m, s)
         return {"status": "error", "source": self.source, "ok": None,
                 "reason": f"미지원 metric.type={t}", "label": t or "?"}
 
@@ -136,6 +145,37 @@ class YahooAdapter:
         return {"status": "ok", "source": self.source, "ok": bool(ok),
                 "value": s["close"],
                 "label": f"{m['symbol']} {s['close']:.2f}/{n}일선 {mv:.2f} ({gap:+.1f}%)"}
+
+    def _ma_distance(self, m, s):
+        """종가가 N일선에서 얼마나 벌어졌나(%). 저자 2-7 "5일선과 얼마나 벌어졌는지".
+
+        저자가 임계 %를 명시하지 않았으므로 min 이 없으면 ok=None(수치만 노출).
+        """
+        n = int(m.get("ma", 5))
+        mv = _ma(s["closes"], n)
+        if mv is None:
+            return {"status": "error", "source": self.source, "ok": None,
+                    "reason": f"{n}일 데이터 부족", "label": f"{m['symbol']} MA{n} 없음"}
+        dist = _pct(s["close"], mv)
+        thr = m.get("min")
+        ok = None if thr is None else (dist >= float(thr))
+        return {"status": "ok", "source": self.source, "ok": ok, "value": dist,
+                "label": f"{m['symbol']} 종가 {s['close']:.2f} / {n}일선 {mv:.2f} · 이격 {dist:+.1f}%"}
+
+    def _gap_up(self, m, s):
+        """당일 시가가 전일 종가 대비 얼마나 떴나(%). 저자 7-3 "갭상승 날".
+
+        저자가 갭 몇 %부터인지 명시하지 않았으므로 min 없으면 ok=None.
+        """
+        o, prev = s.get("open"), s.get("prev")
+        if not (o and prev):
+            return {"status": "error", "source": self.source, "ok": None,
+                    "reason": "시가/전일종가 없음", "label": f"{m['symbol']} 갭 계산 불가"}
+        gap = _pct(o, prev)
+        thr = m.get("min")
+        ok = None if thr is None else (gap >= float(thr))
+        return {"status": "ok", "source": self.source, "ok": ok, "value": gap,
+                "label": f"{m['symbol']} 시가 {o:.2f} / 전일종가 {prev:.2f} · 갭 {gap:+.1f}%"}
 
     def _pct_change(self, m, s):
         chg = _pct(s["close"], s["prev"])
@@ -219,7 +259,7 @@ class KisAdapter:
 
     source = "kis"
     CADENCE = "intraday"
-    HANDLES = {"above_open", "higher_low"}
+    HANDLES = {"above_open", "higher_low", "gap_up"}
 
     def __init__(self):
         self._mod = None
@@ -259,6 +299,8 @@ class KisAdapter:
             return self._above_open(m)
         if t == "higher_low":
             return self._higher_low(m)
+        if t == "gap_up":
+            return self._gap_up(m)
         return {"status": "error", "source": self.source, "ok": None,
                 "reason": f"미지원 metric.type={t}", "label": t or "?"}
 
@@ -278,6 +320,23 @@ class KisAdapter:
             lbl += f" · 전일比 {bpct:+.1f}%"
         return {"status": "ok", "source": self.source, "ok": opct > 0,
                 "value": opct, "label": lbl}
+
+    def _gap_up(self, m):
+        """장중 갭 — 당일 시가 vs 전일 종가(base). 저자 7-3."""
+        sym = m.get("symbol", "")
+        o = self._price(sym)
+        if not o or o.get("error") or not o.get("open") or not o.get("base"):
+            reason = (o or {}).get("error") or "빈 응답(no data)"
+            return {"status": "error", "source": self.source, "ok": None,
+                    "reason": reason, "label": f"{sym} 갭 조회 실패"}
+        gap = (o["open"] - o["base"]) / o["base"] * 100
+        thr = m.get("min")
+        ok = None if thr is None else (gap >= float(thr))
+        lbl = f"{sym} 시가 {o['open']:.2f} / 전일종가 {o['base']:.2f} · 갭 {gap:+.1f}%"
+        if o.get("last"):
+            hold = (o["last"] - o["open"]) / o["open"] * 100
+            lbl += f" · 현재가 시가比 {hold:+.1f}%"
+        return {"status": "ok", "source": self.source, "ok": ok, "value": gap, "label": lbl}
 
     def _higher_low(self, m):
         sym = m.get("symbol", "")

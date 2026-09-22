@@ -8,6 +8,7 @@
 사용: python3 verify_etf_migration.py
 종료코드 0=전부 일치, 1=불일치 존재.
 """
+import paths  # noqa: F401  (경로·UTF-8 출력 고정)
 import json
 import subprocess
 import sys
@@ -20,7 +21,8 @@ def legacy_verdicts():
     """etf_daily_verdict.py를 --json --no-send로 실행해 verdicts 파싱."""
     r = subprocess.run(
         [sys.executable, os.path.join(BASE, "etf_daily_verdict.py"), "--json", "--no-send"],
-        capture_output=True, text=True, cwd=BASE, timeout=180)
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        cwd=BASE, timeout=180, env=dict(os.environ, PYTHONIOENCODING="utf-8"))
     if r.returncode != 0:
         raise RuntimeError(f"legacy 실행 실패: {r.stderr[:400]}")
     return json.loads(r.stdout)

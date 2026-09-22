@@ -1,6 +1,6 @@
 {
   "book": "김프로랩 『미국 돈복사 ETF 투자방법』",
-  "note": "etf_daily_verdict.py STEP1 정량규칙을 data_spec로 옮긴 것. verdict_engine 대조검증용.",
+  "note": "etf_daily_verdict.py STEP1 정량규칙을 data_spec로 옮긴 것. verdict_engine 대조검증용. ma_distance(2-7)·gap_up(7-3)은 저자가 임계 %를 명시하지 않아 min 없이 수치만 노출한다(ok=null).",
   "items": [
     {"item": "나스닥100 방향(전일 대비 +)", "source": "auto", "metric": {"type": "pct_change", "symbol": "^NDX", "min": 0}, "cadence": "eod"},
     {"item": "S&P500 방향(전일 대비 +)", "source": "auto", "metric": {"type": "pct_change", "symbol": "^GSPC", "min": 0}, "cadence": "eod"},
@@ -20,6 +20,14 @@
     {"item": "TQQQ 거래량 배수", "source": "auto", "metric": {"type": "volume_ratio", "symbol": "TQQQ", "ref": 20}, "cadence": "eod"},
     {"item": "SOXL 거래량 배수", "source": "auto", "metric": {"type": "volume_ratio", "symbol": "SOXL", "ref": 20}, "cadence": "eod"},
     {"item": "UPRO 거래량 배수", "source": "auto", "metric": {"type": "volume_ratio", "symbol": "UPRO", "ref": 20}, "cadence": "eod"},
+
+    {"item": "TQQQ 5일선 이격도", "source": "auto", "metric": {"type": "ma_distance", "symbol": "TQQQ", "ma": 5}, "cadence": "eod"},
+    {"item": "SOXL 5일선 이격도", "source": "auto", "metric": {"type": "ma_distance", "symbol": "SOXL", "ma": 5}, "cadence": "eod"},
+    {"item": "UPRO 5일선 이격도", "source": "auto", "metric": {"type": "ma_distance", "symbol": "UPRO", "ma": 5}, "cadence": "eod"},
+
+    {"item": "TQQQ 갭(시가 vs 전일종가)", "source": "auto", "metric": {"type": "gap_up", "symbol": "TQQQ"}, "cadence": "eod"},
+    {"item": "SOXL 갭(시가 vs 전일종가)", "source": "auto", "metric": {"type": "gap_up", "symbol": "SOXL"}, "cadence": "eod"},
+    {"item": "UPRO 갭(시가 vs 전일종가)", "source": "auto", "metric": {"type": "gap_up", "symbol": "UPRO"}, "cadence": "eod"},
 
     {"item": "SOXL 주도주 3개 중 상승수(엔비디아·AMD·브로드컴)", "source": "auto", "metric": {"type": "count_up", "symbols": ["NVDA", "AMD", "AVGO"], "min": 2}, "cadence": "eod"},
 

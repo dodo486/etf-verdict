@@ -17,23 +17,41 @@ import json, os, sys, ssl, urllib.request, urllib.parse
 from datetime import datetime, timezone
 
 UA = {"User-Agent": "Mozilla/5.0"}
+# TLS 는 검증을 켠 상태가 기본. (ADAPTERS.md 규약: ssl.CERT_NONE 금지)
+# 일부 macOS 환경에서 루트 인증서가 없어 실패하는 사례가 있어, 그 예외가 실제로
+# 났을 때만 1회 경고와 함께 비검증으로 폴백한다(윈도우/정상 맥은 계속 검증).
 CTX = ssl.create_default_context()
-CTX.check_hostname = False
-CTX.verify_mode = ssl.CERT_NONE  # 일부 macOS 환경 인증서 이슈 회피
+_CTX_INSECURE = None
+
+
+def _insecure_ctx():
+    global _CTX_INSECURE
+    if _CTX_INSECURE is None:
+        _CTX_INSECURE = ssl.create_default_context()
+        _CTX_INSECURE.check_hostname = False
+        _CTX_INSECURE.verify_mode = ssl.CERT_NONE
+        print("[경고] TLS 인증서 검증 실패 → 비검증으로 1회 폴백합니다. "
+              "맥이면 'Install Certificates.command' 실행을 권합니다.", file=sys.stderr)
+    return _CTX_INSECURE
 
 def fetch(symbol, rng="3mo", interval="1d"):
     q = urllib.parse.quote(symbol)
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{q}?range={rng}&interval={interval}"
     req = urllib.request.Request(url, headers=UA)
-    with urllib.request.urlopen(req, timeout=20, context=CTX) as r:
-        data = json.load(r)
+    try:
+        with urllib.request.urlopen(req, timeout=20, context=CTX) as r:
+            data = json.load(r)
+    except ssl.SSLCertVerificationError:
+        with urllib.request.urlopen(req, timeout=20, context=_insecure_ctx()) as r:
+            data = json.load(r)
     res = data["chart"]["result"][0]
     q0 = res["indicators"]["quote"][0]
     closes = [c for c in q0.get("close", []) if c is not None]
     highs  = [h for h in q0.get("high",  []) if h is not None]
     vols   = [v for v in q0.get("volume",[]) if v is not None]
+    opens  = [o for o in q0.get("open",  []) if o is not None]
     meta = res.get("meta", {})
-    return {"close": closes, "high": highs, "vol": vols, "meta": meta}
+    return {"close": closes, "high": highs, "vol": vols, "open": opens, "meta": meta}
 
 def ma(xs, n):
     return sum(xs[-n:]) / n if len(xs) >= n else None
@@ -57,6 +75,7 @@ def load(symbol):
             "chg": pct(c[-1], c[-2]),
             "ret5": pct(c[-1], c[-6]) if len(c) >= 6 else None,
             "high": d["high"][-1] if d["high"] else None,
+            "open": d["open"][-1] if d.get("open") else None,
             "vol": d["vol"][-1] if d["vol"] else None,
             "vol20": ma(d["vol"], 20) if len(d["vol"]) >= 20 else None,
             "updays10": up_days(c, 10),
@@ -203,6 +222,13 @@ def verdict(prod):
         metrics["tnx"]=f"^TNX {tnx['close']:.2f} (전일 {tnx['prev']:.2f}, {tnx['close']-tnx['prev']:+.2f}%p)"
     if p.get("ret5") is not None:
         metrics["run5"]=f"최근 5일 {p['ret5']:+.1f}%"
+    # 저자 2-7 "5일선과 얼마나 벌어졌는지" — 임계는 저자 미명시이므로 수치만 노출
+    if p.get("ma5"):
+        metrics["ma5_gap"]=f"5일선 {p['ma5']:.2f} 대비 이격 {pct(p['close'], p['ma5']):+.1f}%"
+    # 저자 7-3 "갭상승 날" — 갭 %도 저자 미명시. 수치만 노출하고 판단은 사람이
+    if p.get("open") and p.get("prev"):
+        g=pct(p["open"], p["prev"])
+        metrics["gap"]=f"시가 {p['open']:.2f} / 전일종가 {p['prev']:.2f} · 갭 {g:+.1f}%"
     w=wick(p)
     if w is not None:
         metrics["wick"]=f"고점 대비 종가 {-w:+.1f}%"

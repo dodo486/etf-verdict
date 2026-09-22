@@ -71,8 +71,14 @@ resolve(metric_spec)   # 그 metric.type을 처리 가능한 첫 어댑터. 없�
 | `upper_wick` | 윗꼬리 %(고점 대비 종가 하락폭) | `symbol`, `min?` | Yahoo | eod |
 | `higher_low` | 첫 눌림에서 저점 높임 여부 | `symbol` | KIS | intraday |
 | `count_up` | 여러 심볼 중 상승 개수 | `symbols:[...]`, `min?` | Yahoo | eod |
+| `ma_distance` | 종가와 N일선의 이격도(%) | `symbol`, `ma?`(기본5), `min?` | Yahoo | eod |
+| `gap_up` | 당일 시가의 전일종가 대비 갭(%) | `symbol`, `min?` | Yahoo · KIS | eod · intraday |
 
 `min`이 있으면 그 임계값으로 `ok`(True/False)를 매기고, 없으면 `ok=None`(수치만 노출).
+
+> **임계값을 저자가 안 준 지표는 `min`을 비워 둔다.** 예: 2-7 "5일선과 얼마나 벌어졌는지",
+> 7-3 "갭상승 날" — 둘 다 %가 원문에 없다. 숫자를 지어내는 대신 수치만 자동으로 채우고
+> 판정은 사람이 하게 한다(시트에서는 체크박스 + 자동 수치 표기로 구현).
 `min` 방향: `pct_change`는 초과(`>`), 나머지는 이상(`>=`).
 
 ---
