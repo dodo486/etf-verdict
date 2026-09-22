@@ -387,6 +387,42 @@ body{padding-left:var(--rail)}
     body.split #panel-sheet{display:block; border-top:3px solid var(--gold-dim)}
   }
 
+  /* ── 반영 현황 요약표 ─────────────────────────────────────── */
+  .covsum{margin:18px 0 8px; border:1px solid var(--line); border-radius:11px;
+    background:var(--surface); overflow:hidden}
+  .covsum > summary{cursor:pointer; list-style:none; padding:13px 16px; display:flex;
+    align-items:center; gap:12px; flex-wrap:wrap; background:var(--surface-2)}
+  .covsum > summary::-webkit-details-marker{display:none}
+  .covsum > summary h3{margin:0; font-size:15px; color:var(--head); font-weight:800}
+  .covsum .tally{display:flex; gap:8px; flex-wrap:wrap; margin-left:auto}
+  .covsum .pill{font-size:12px; font-weight:800; padding:3px 10px; border-radius:20px; white-space:nowrap}
+  .pill.ref{background:rgba(63,185,80,.14); color:var(--entry); border:1px solid rgba(63,185,80,.35)}
+  .pill.gap{background:rgba(229,72,77,.14); color:var(--warn); border:1px solid rgba(229,72,77,.45)}
+  .pill.mind{background:rgba(122,129,148,.14); color:var(--mute); border:1px solid var(--line)}
+  .covsum .filters{display:flex; gap:6px; padding:10px 16px; border-bottom:1px solid var(--line); flex-wrap:wrap}
+  .covsum .filters button{background:none; border:1px solid var(--line); color:var(--mute);
+    font:inherit; font-size:12.5px; font-weight:700; padding:5px 12px; border-radius:7px; cursor:pointer}
+  .covsum .filters button.on{background:var(--surface-2); color:var(--gold); border-color:var(--gold-dim)}
+  .covsum .rows{max-height:none}
+  .covrow{display:grid; grid-template-columns:78px 1fr 132px; gap:12px; align-items:start;
+    padding:10px 16px; border-bottom:1px solid var(--line); cursor:pointer; font-size:13px}
+  .covrow:last-child{border-bottom:none}
+  .covrow:hover{background:var(--surface-2)}
+  .covrow .k{font-weight:800; color:var(--gold); font-variant-numeric:tabular-nums}
+  .covrow .ttl{color:var(--head); font-weight:700; line-height:1.45}
+  .covrow .note{display:block; color:var(--mute); font-weight:400; font-size:12.5px;
+    margin-top:3px; line-height:1.55}
+  .covrow .where{font-size:11.5px; font-weight:800; text-align:right; white-space:normal; line-height:1.5}
+  .covrow.ref .where{color:var(--entry)}
+  .covrow.gap .where{color:var(--warn)}
+  .covrow.mind .where{color:var(--mute)}
+  .covchap{padding:8px 16px; background:var(--ground); color:var(--mute);
+    font-size:11.5px; font-weight:800; letter-spacing:.05em; border-bottom:1px solid var(--line)}
+  @media(max-width:700px){
+    .covrow{grid-template-columns:60px 1fr; gap:8px}
+    .covrow .where{grid-column:2; text-align:left}
+  }
+
   .warnbox{margin-top:10px; padding:11px 14px; border-radius:9px; background:rgba(229,72,77,.09); border:1px solid rgba(229,72,77,.3); color:#f0a3a5; font-size:13px; line-height:1.55; display:none}
   .warnbox.show{display:block}
 </style>
@@ -455,6 +491,21 @@ body{padding-left:var(--rail)}
       <span><span class="covb gap">⚠ 시트 미반영</span> 넣어야 하는데 빠짐(구멍)</span>
       <span><span class="covb mind">💭 원칙·배경</span> 체크리스트 대상 아님</span>
     </div>
+    <details class="covsum" id="covsum" open>
+      <summary>
+        <h3>📋 체크리스트 반영 현황</h3>
+        <span style="font-size:12.5px;color:var(--mute)">소절별로 어디에 구현됐는지 · 행을 누르면 시트로 이동</span>
+        <span class="tally" id="covTally"></span>
+      </summary>
+      <div class="filters" id="covFilters">
+        <button data-f="all" class="on">전체</button>
+        <button data-f="gap">⚠ 미반영만</button>
+        <button data-f="reflected">✅ 반영</button>
+        <button data-f="mindset">💭 원칙</button>
+      </div>
+      <div class="rows" id="covRows"></div>
+    </details>
+
     <div id="content"></div>
   </main>
 </div>
@@ -2345,6 +2396,8 @@ body{padding-left:var(--rail)}
     bindClose();
   }
 
+  window.__jumpToSheet = jump;   // 요약표에서 재사용
+
   function bindClose(){
     var x = document.getElementById('jnx');
     if(x) x.onclick = function(){ note.classList.remove('show'); };
@@ -2377,5 +2430,90 @@ body{padding-left:var(--rail)}
   document.addEventListener('toggle', function(){ setTimeout(decorate, 0); }, true);
 
   try { if(localStorage.getItem('etf-split') === '1') setSplit(true); } catch(e){}
+})();
+</script>
+
+<script>
+/* ============================================================
+   체크리스트 반영 현황 요약표 — 소절을 하나씩 안 눌러도 전체가 보이게
+   ============================================================ */
+(function(){
+  'use strict';
+  var rowsEl = document.getElementById('covRows');
+  if(!rowsEl) return;
+
+  var COV = {};
+  try { COV = (JSON.parse(document.getElementById('coverage-data').textContent).map) || {}; } catch(e){}
+
+  var STEPNAME = {"STEP1":"STEP1 스코어카드","STEP2-filter":"STEP2 필터","STEP2-entry":"STEP2 진입",
+    "STEP2-avoid":"STEP2 회피","STEP2-exit":"STEP2 청산","STEP2-B":"STEP2-B 침체신호",
+    "STEP3":"STEP3 계산기","STEP3-B":"STEP3-B 계좌점검","STEP3-C":"STEP3-C 주간리듬",
+    "STEP4":"STEP4 메모","STEP5":"STEP5 재진입","STEP6":"STEP6 출금루틴","STEP7":"STEP7 최종5기준"};
+
+  // 소절 제목은 플레이북 원문에서 가져온다(따로 적지 않는다 — 어긋날 수 있으므로)
+  var TITLE = {};
+  (function(){
+    var raw = '';
+    try { raw = document.getElementById('src').textContent; } catch(e){ return; }
+    raw.split('\n').forEach(function(l){
+      var m = l.match(/^#{2,3}\s*([0-9]+-[0-9]+|에필로그)[.\s]\s*(.*)$/);
+      if(m) TITLE[m[1]] = (m[2] || '').replace(/\*\*/g, '').trim();
+    });
+  })();
+
+  function keyNum(k){
+    if(k === '에필로그') return [99, 99];
+    var p = k.split('-');
+    return [parseInt(p[0], 10) || 0, parseInt(p[1], 10) || 0];
+  }
+  var keys = Object.keys(COV).filter(function(k){ return k !== '0'; }).sort(function(a, b){
+    var x = keyNum(a), y = keyNum(b);
+    return x[0] - y[0] || x[1] - y[1];
+  });
+
+  var n = {reflected:0, gap:0, mindset:0};
+  keys.forEach(function(k){ var s = (COV[k]||{}).status; if(n[s] !== undefined) n[s]++; });
+  document.getElementById('covTally').innerHTML =
+      '<span class="pill ref">✅ 반영 ' + n.reflected + '</span>'
+    + '<span class="pill gap">⚠ 미반영 ' + n.gap + '</span>'
+    + '<span class="pill mind">💭 원칙 ' + n.mindset + '</span>';
+
+  function render(filter){
+    var html = '', lastChap = null;
+    keys.forEach(function(k){
+      var c = COV[k] || {};
+      if(filter !== 'all' && c.status !== filter) return;
+      var chap = k === '에필로그' ? '에필로그' : ('Chapter ' + k.split('-')[0]);
+      if(chap !== lastChap){ html += '<div class="covchap">' + chap + '</div>'; lastChap = chap; }
+      var where = c.status === 'reflected' ? (STEPNAME[c.step] || '시트 반영')
+                : c.status === 'gap' ? '⚠ 미반영'
+                : '💭 원칙·배경';
+      html += '<div class="covrow ' + (c.status === 'reflected' ? 'ref' : c.status)
+           + '" data-k="' + k + '">'
+           + '<span class="k">' + k + '</span>'
+           + '<span class="ttl">' + (TITLE[k] || '<span style="color:var(--mute);font-weight:400">플레이북 본문에 별도 소절 없음 (0장 핵심 원칙에 흡수)</span>')
+           + '<span class="note">' + (c.note || '') + '</span></span>'
+           + '<span class="where">' + where + '</span>'
+           + '</div>';
+    });
+    rowsEl.innerHTML = html || '<div style="padding:16px;color:var(--mute)">해당 항목이 없습니다.</div>';
+  }
+  render('all');
+
+  document.querySelectorAll('#covFilters button').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('#covFilters button').forEach(function(x){ x.classList.remove('on'); });
+      b.classList.add('on');
+      render(b.dataset.f);
+    });
+  });
+
+  // 행 클릭 → 시트의 구현 위치로 (검수 모드의 점프 로직 재사용)
+  rowsEl.addEventListener('click', function(e){
+    var row = e.target.closest('.covrow');
+    if(!row) return;
+    var k = row.dataset.k;
+    if(window.__jumpToSheet) window.__jumpToSheet(k, k + '. ' + (TITLE[k] || ''));
+  });
 })();
 </script>
