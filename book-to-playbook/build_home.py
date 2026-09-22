@@ -64,7 +64,7 @@ h1{{font-size:clamp(26px,4vw,38px);color:var(--head);font-weight:800;margin:10px
 </div></body></html>'''
 
 write_text(os.path.join(outdir, "index.html"), page)
-print(f"홈 생성: public/index.html ({len(manifest['books'])}권)")
+print(f"홈 생성: {os.path.join(outdir, 'index.html')} ({len(manifest['books'])}권)")
 
 # 정적 책(라이브 아님) 조립: 소스 HTML에 레일 주입 → public/slug/index.html
 # (라이브 책=etf는 publish_pages.py가 담당하므로 건너뜀)
@@ -79,4 +79,4 @@ for b in manifest["books"]:
     s = read_text(src)
     d = ensure_dir(os.path.join(outdir, slug))
     write_text(os.path.join(d, "index.html"), inject(s, slug))
-    print(f"  정적 책 조립: public/{slug}/index.html")
+    print(f"  정적 책 조립: {os.path.join(d, 'index.html')}")
