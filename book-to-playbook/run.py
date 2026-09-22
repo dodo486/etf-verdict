@@ -178,6 +178,11 @@ def main(argv):
     if not r.step("verify_source_integrity.py", required=False):
         r.say("!! 저자 원문이 바뀐 것으로 보입니다 — verify_source_integrity.py 확인 필요")
 
+    # '✅ 반영' 배지가 사실인지도 대조한다. 배지는 사람이 적은 주장이라 검증이 없으면
+    # 구현이 빠져도 ✅로 남는다(5-2 '2거래일 유지' 사고).
+    if not r.step("verify_coverage.py", required=False):
+        r.say("!! 커버리지 배지와 구현이 어긋납니다 — verify_coverage.py 확인 필요")
+
     if no_git:
         r.say("git: --no-git 지정 — 건너뜀")
     else:
