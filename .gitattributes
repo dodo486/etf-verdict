@@ -1,0 +1,7 @@
+# OS(맥/윈도우)마다 줄바꿈이 갈려 diff가 통째로 뜨는 것을 막는다.
+# 파이프라인이 생성하는 파일은 항상 LF로 고정.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary

@@ -38,7 +38,10 @@
 | `etf_intraday_verdict.py` | 개장+31분 장중 판정(KIS) |
 | `publish_pages.py` | 판정 병합 → `public/etf/index.html` |
 | `verify_etf_migration.py` | 신규 엔진 ↔ 레거시 대조검증 |
-| `run.sh` / `run_intraday.sh` | 스케줄 실행 래퍼(launchd) |
+| `paths.py` | **경로·인코딩 단일 기준점** (macOS/Windows 공용). BASE/PUBLIC/LOGS 결정, UTF-8 출력 고정 |
+| `run.py` | **스케줄 러너**(OS 중립) — `daily` / `intraday` / `publish` |
+| `run.sh` / `run_intraday.sh` / `run.cmd` | 얇은 OS 래퍼. 실제 동작은 전부 `run.py` |
+| `SETUP.md` | 설치·크레덴셜·스케줄 등록(launchd / 작업 스케줄러) |
 
 ## 새 책 추가하는 법
 
@@ -49,6 +52,17 @@
 5. **배포**: `build_home.py`(정적) 또는 `publish_pages.py`(라이브) 실행.
 
 자세한 어댑터/metric 규약은 `ADAPTERS.md` 참고.
+
+## 실행
+
+```
+python run.py daily        # EOD 판정 → 발행
+python run.py intraday     # 장중 판정 → 발행 (개장+31분)
+python run.py publish      # 재판정 없이 발행만
+```
+
+macOS·Windows 어느 쪽에서도 같은 명령으로 돈다. 설치 위치도 자유다
+(경로는 `paths.py`가 결정 — 하드코딩 없음). 스케줄 등록은 `SETUP.md` 참고.
 
 ## 크레덴셜 (커밋 안 됨)
 

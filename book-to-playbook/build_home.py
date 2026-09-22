@@ -3,10 +3,10 @@
 """books.json → public/index.html (책 선택 홈/런처). 카드 클릭 시 /slug/ 로 이동."""
 import os, json, html
 
-BASE = os.path.expanduser("~/.claude/skills/book-to-playbook")
-manifest = json.load(open(os.path.join(BASE, "books.json"), encoding="utf-8"))
-outdir = os.path.join(BASE, "public")
-os.makedirs(outdir, exist_ok=True)
+from paths import BASE, PUBLIC, ensure_dir, read_text, write_text
+
+manifest = json.loads(read_text(os.path.join(BASE, "books.json")))
+outdir = ensure_dir(PUBLIC)
 
 def esc(s): return html.escape(str(s))
 
@@ -63,7 +63,7 @@ h1{{font-size:clamp(26px,4vw,38px);color:var(--head);font-weight:800;margin:10px
 <div class="note">각 책은 저자가 명시한 매매기법만 정량화한 체크리스트입니다. <b>시세 자동판정</b>이 붙은 책은 매일 자동으로 값이 채워지고, <b>수동 체크</b> 책은 무료 데이터가 없어 직접 확인이 필요합니다.</div>
 </div></body></html>'''
 
-open(os.path.join(outdir, "index.html"), "w", encoding="utf-8").write(page)
+write_text(os.path.join(outdir, "index.html"), page)
 print(f"홈 생성: public/index.html ({len(manifest['books'])}권)")
 
 # 정적 책(라이브 아님) 조립: 소스 HTML에 레일 주입 → public/slug/index.html
@@ -76,7 +76,7 @@ for b in manifest["books"]:
     slug = b["slug"]; src = STATIC_SRC.get(slug)
     if not src or not os.path.exists(src):
         print(f"  (건너뜀: {slug} 소스 없음)"); continue
-    s = open(src, encoding="utf-8").read()
-    d = os.path.join(outdir, slug); os.makedirs(d, exist_ok=True)
-    open(os.path.join(d, "index.html"), "w", encoding="utf-8").write(inject(s, slug))
+    s = read_text(src)
+    d = ensure_dir(os.path.join(outdir, slug))
+    write_text(os.path.join(d, "index.html"), inject(s, slug))
     print(f"  정적 책 조립: public/{slug}/index.html")

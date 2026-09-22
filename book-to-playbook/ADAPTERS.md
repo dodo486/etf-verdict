@@ -8,7 +8,8 @@
 - `etf_data_spec.json` — ETF 책 규칙을 data_spec으로 옮긴 예시
 - `verify_etf_migration.py` — 신규 엔진 결과 ↔ 레거시 `etf_daily_verdict.py` 대조검증
 
-> 기존 파이프라인(`etf_daily_verdict.py` / `kis_intraday.py` / `etf_intraday_verdict.py` / `publish_pages.py` / launchd)은 **건드리지 않는다.** 이 프레임워크는 그 옆에 추가된 범용 레이어다.
+> 기존 파이프라인(`etf_daily_verdict.py` / `kis_intraday.py` / `etf_intraday_verdict.py` / `publish_pages.py`)의 **판정 로직은 건드리지 않는다.** 이 프레임워크는 그 옆에 추가된 범용 레이어다.
+> (실행 방식만 OS 중립으로 바뀌었다 — `run.py` + `paths.py`. `SETUP.md` 참고.)
 
 ---
 

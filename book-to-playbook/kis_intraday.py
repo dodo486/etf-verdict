@@ -4,6 +4,7 @@
 시세 전용: 토큰 발급 + 해외주식 현재가/분봉. 주문 API 없음.
 크레덴셜: kis.env (KIS_APP_KEY / KIS_APP_SECRET / KIS_BASE_URL)
 """
+import paths  # noqa: F401  (경로·UTF-8 출력 고정. 반드시 먼저 import)
 import os, json, ssl, time, urllib.request, urllib.parse
 from datetime import datetime, timezone
 
@@ -41,7 +42,7 @@ def get_token():
     # 캐시된 토큰 재사용(24h)
     if os.path.exists(TOKEN_PATH):
         try:
-            t=json.load(open(TOKEN_PATH))
+            t=json.load(open(TOKEN_PATH, encoding="utf-8"))
             if t.get("expires_at",0) > time.time()+300:
                 return t["access_token"]
         except Exception: pass
@@ -49,7 +50,8 @@ def get_token():
             {"grant_type":"client_credentials","appkey":APP_KEY,"appsecret":APP_SECRET}, {})
     tok=d["access_token"]
     exp=time.time()+int(d.get("expires_in",86400))
-    json.dump({"access_token":tok,"expires_at":exp}, open(TOKEN_PATH,"w"))
+    with open(TOKEN_PATH, "w", encoding="utf-8") as _f:
+        json.dump({"access_token": tok, "expires_at": exp}, _f)
     os.chmod(TOKEN_PATH,0o600)
     return tok
 

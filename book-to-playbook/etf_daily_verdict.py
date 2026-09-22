@@ -10,8 +10,9 @@ ETF 데일리 진입 환경 자동판정
 출력: 콘솔 표 + JSON(--json) + 텔레그램/ macOS 알림 푸시(가능 시)
 크레덴셜(택1):
   export TELEGRAM_BOT_TOKEN=... ; export TELEGRAM_CHAT_ID=...
-없으면 macOS 알림(osascript)으로 대체.
+없으면 데스크톱 알림으로 대체(macOS osascript / Windows 풍선 / Linux notify-send).
 """
+import paths  # noqa: F401  (경로·UTF-8 출력 고정. 반드시 먼저 import)
 import json, os, sys, ssl, urllib.request, urllib.parse
 from datetime import datetime, timezone
 
@@ -262,17 +263,34 @@ def send_telegram(msg):
     except Exception as e:
         print("[telegram 실패]", e, file=sys.stderr); return False
 
-def send_macos(msg):
+def send_desktop(msg):
+    """데스크톱 알림 — macOS/Windows/Linux 각각의 기본 수단으로. 실패해도 조용히 넘어간다."""
+    import subprocess
+    title = "ETF 진입 환경"
+    first = msg.split("\n")[1] if "\n" in msg else msg
     try:
-        import subprocess
-        title = "ETF 진입 환경"
-        first = msg.split("\n")[1] if "\n" in msg else msg
-        subprocess.run(["osascript","-e",
-            f'display notification {json.dumps(first)} with title {json.dumps(title)}'],
-            check=False)
+        if sys.platform == "darwin":
+            subprocess.run(["osascript", "-e",
+                f'display notification {json.dumps(first)} with title {json.dumps(title)}'],
+                check=False)
+        elif sys.platform == "win32":
+            # 외부 모듈(BurntToast 등) 없이 도는 최소 풍선 알림
+            ps = ("[void][System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');"
+                  "$n=New-Object System.Windows.Forms.NotifyIcon;"
+                  "$n.Icon=[System.Drawing.SystemIcons]::Information;$n.Visible=$true;"
+                  f"$n.ShowBalloonTip(10000,{json.dumps(title)},{json.dumps(first)},'Info');"
+                  "Start-Sleep -Seconds 6;$n.Dispose()")
+            subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+                           check=False, capture_output=True)
+        else:
+            subprocess.run(["notify-send", title, first], check=False)
         return True
     except Exception:
         return False
+
+
+# 이전 이름 호환
+send_macos = send_desktop
 
 def build_html():
     grade_cls = {"✅ 매수 후보":"go","🟡 소액만":"small","⛔ 보류":"no","🚫 진입 금지":"no","⚪ 관망":"","데이터오류":""}
@@ -353,17 +371,14 @@ if __name__ == "__main__":
     if "--no-send" not in sys.argv:
         sent = send_telegram(text)
         if not sent:
-            send_macos(text)
-    # HTML 대시보드 + 로그 저장
-    base = os.path.expanduser("~/.claude/skills/book-to-playbook")
+            send_desktop(text)
+    # HTML 대시보드 + 로그 저장 (경로/인코딩은 paths.py가 OS 중립으로 처리)
+    from paths import BASE as _BASE, LOGS as _LOGS, write_text as _write
     try:
-        with open(os.path.join(base, "etf-verdict.html"), "w") as f:
-            f.write(build_html())
+        _write(os.path.join(_BASE, "etf-verdict.html"), build_html())
     except Exception as e:
         print("[html 실패]", e, file=sys.stderr)
     try:
-        logdir = os.path.join(base, "logs"); os.makedirs(logdir, exist_ok=True)
-        with open(os.path.join(logdir, f"etf-{now:%Y%m%d}.txt"), "w") as f:
-            f.write(text)
+        _write(os.path.join(_LOGS, f"etf-{now:%Y%m%d}.txt"), text)
     except Exception:
         pass

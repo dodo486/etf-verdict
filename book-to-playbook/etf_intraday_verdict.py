@@ -8,6 +8,7 @@ KIS 실시간 시세로 '장중 3항목'을 모두 자동으로 채운다:
 
 출력: kis-intraday.json (아티팩트가 읽어 진입조건 체크에 반영)
 """
+import paths  # noqa: F401  (경로·UTF-8 출력 고정. 반드시 먼저 import)
 import os, json
 from datetime import datetime, timezone
 from kis_intraday import overseas_price, higher_low, APP_KEY, APP_SECRET

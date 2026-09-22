@@ -21,6 +21,7 @@ data_spec 형식(리스트 또는 {"items":[...]}):
 각 item의 뱃지 소스 매핑(아티팩트 렌더용):
   source=="yahoo" → 🤖 야후 EOD,  "kis" → ⚡ KIS 장중,  "manual" → ✋ 직접
 """
+import paths  # noqa: F401  (경로·UTF-8 출력 고정. 반드시 먼저 import)
 import json
 import os
 import sys
