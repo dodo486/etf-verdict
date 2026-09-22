@@ -59,6 +59,26 @@ def ma(xs, n):
 def pct(a, b):
     return (a - b) / b * 100 if (a is not None and b) else None
 
+def hold_above_ma(closes, n=20, look=12):
+    """종가가 N일선 위를 며칠 연속 지켰나(당일부터 거꾸로).
+
+    저자 3-2 "종가로 위에 올라서고 최소 2거래일 버티는지",
+    5-2 "그다음 2거래일 동안 20일선 다시 안 깸" 을 세기 위한 값.
+    회복일 + 이후 2거래일 = 3 이 기준.
+    """
+    cnt = 0
+    for k in range(look):
+        i = len(closes) - 1 - k
+        if i < n - 1:
+            break
+        m = sum(closes[i - n + 1:i + 1]) / n
+        if closes[i] > m:
+            cnt += 1
+        else:
+            break
+    return cnt
+
+
 def up_days(closes, n=10):
     c = closes[-(n+1):]
     return sum(1 for i in range(1, len(c)) if c[i] > c[i-1])
@@ -79,6 +99,7 @@ def load(symbol):
             "vol": d["vol"][-1] if d["vol"] else None,
             "vol20": ma(d["vol"], 20) if len(d["vol"]) >= 20 else None,
             "updays10": up_days(c, 10),
+            "hold20": hold_above_ma(c, 20),   # 20일선 위를 며칠 연속 지켰나(저자 3-2·5-2)
             "closes": c,
         }
     except Exception as e:
@@ -240,16 +261,21 @@ def verdict(prod):
         av.append(f"VIX 전일 대비 +{vix['chg']:.1f}% (추격 금지)"); akeys.append("vix")
     if tnx_jump:
         av.append(f"10년물 +{(tnx['close']-tnx['prev']):.2f}%p 급등 (기술주 예민)"); akeys.append("tnx")
-    # 필터
+    # 필터 — 저자 3-2·5-2: 20일선 위 '회복' 만으로는 부족하고 **이후 2거래일**을
+    # 지켜야 한다(규칙 근거표: "20일선 위로 회복 + 이후 2거래일 20일선 안 깸").
+    # 회복일 + 2거래일 = 연속 3거래일.
+    HOLD_NEED = 3
+    hold = idx.get("hold20", 0) if ok(idx) else 0
+    hold_ok = hold >= HOLD_NEED
     if prod == "TQQQ":
-        filt = above20(idx)
-        filt_txt = "나스닥100 20일선 위"
+        filt = above20(idx) and hold_ok
+        filt_txt = "나스닥100 20일선 위 + 2거래일 유지"
     elif prod == "SOXL":
-        filt = above20(p) and above20(idx)
-        filt_txt = "SOXL·반도체지수 모두 20일선 위(스윙)"
+        filt = above20(p) and above20(idx) and hold_ok
+        filt_txt = "SOXL·반도체지수 모두 20일선 위(스윙) + 2거래일 유지"
     else:  # UPRO
-        filt = above20(idx)
-        filt_txt = "S&P500 20일선 위"
+        filt = above20(idx) and hold_ok
+        filt_txt = "S&P500 20일선 위 + 2거래일 유지"
     # 상품별 회피
     if prod == "SOXL":
         if ok(idx) and idx["updays10"] >= 7 and p["ret5"] is not None and p["ret5"] >= 20:
@@ -317,6 +343,8 @@ def verdict(prod):
     def mil(v):
         return f"{v/1e6:.1f}M" if v else "–"
     metrics = {}
+    if ok(idx):
+        metrics["hold20"]="%s 20일선 위 %d거래일 연속 (기준 %d)" % (cfg["idx"], hold, HOLD_NEED)
     # 필터
     if prod == "SOXL":
         gp=gap(p["close"],p["ma20"]); gi=gap(idx["close"],idx["ma20"])
@@ -366,6 +394,11 @@ def verdict(prod):
             metrics["nvda_only"]=f"엔비디아 {nv:+.1f}%, AMD {am:+.1f}%, 브로드컴 {bc:+.1f}%" if (am is not None and bc is not None) else f"엔비디아 {nv:+.1f}%"
     # EOD로 자동 판정되는 진입 항목(시트가 체크박스를 자동으로 켠다)
     eod_checks = {}
+    if ok(idx):
+        eod_checks["hold20"] = {
+            "ok": bool(hold_ok),
+            "label": "%s 20일선 위 %d거래일 연속 (회복일+2거래일 = %d 필요)"
+                     % (cfg["idx"], hold, HOLD_NEED)}
     if prod == "UPRO" and BREADTH.get("ok"):
         eod_checks["breadth"] = {"ok": BREADTH["count"] >= 3, "label": BREADTH["label"]}
 
