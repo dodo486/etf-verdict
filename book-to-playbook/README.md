@@ -38,6 +38,8 @@
 | `etf_intraday_verdict.py` | 개장+31분 장중 판정(KIS) |
 | `publish_pages.py` | 판정 병합 → `public/etf/index.html` |
 | `verify_etf_migration.py` | 신규 엔진 ↔ 레거시 대조검증 |
+| `verify_source_integrity.py` | **저자 원문 불변 검사**(모든 책). `run.py`가 매 발행마다 실행 |
+| `source_baseline.json` | 위 검사의 기준 해시(커밋 대상) |
 | `paths.py` | **경로·인코딩 단일 기준점** (macOS/Windows 공용). BASE/PUBLIC/LOGS 결정, UTF-8 출력 고정 |
 | `run.py` | **스케줄 러너**(OS 중립) — `daily` / `intraday` / `publish` |
 | `run.sh` / `run_intraday.sh` / `run.cmd` | 얇은 OS 래퍼. 실제 동작은 전부 `run.py` |

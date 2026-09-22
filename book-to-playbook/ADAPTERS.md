@@ -115,6 +115,11 @@ python3 verdict_engine.py my_book_spec.json
 출력 상단에 `자동 N/총 · 수동 M`. 각 줄 뱃지(🤖/⚡/✋)로 무엇이 자동/수동인지 즉시 보인다.
 
 ### 3. 커버 안 되는 항목 처리
+
+> **원문 문구를 손대서 맞추는 선택지는 없다.** 책이 A를 보라는데 어댑터가 B밖에
+> 못 주면, A를 구하거나(새 metric.type 추가) A를 `manual`로 남긴다. 라벨을 B로
+> 바꿔 적는 것은 금지다 — `verify_source_integrity.py` 가 매 발행마다 검사한다.
+
 - **기존 metric.type로 표현 가능** → data_spec만 고치면 끝.
 - **새 계산 방식이 필요** → 해당 어댑터에 metric.type 하나 추가(카탈로그 + `fetch` 분기 + `HANDLES` 집합).
 - **무료로 원천 데이터 자체가 없음** → `source:"manual"`, `reason` 명시. 지어내지 않는다.

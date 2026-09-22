@@ -173,6 +173,11 @@ def main(argv):
     r.step("publish_pages.py")
     r.step("build_home.py", required=False)
 
+    # 저자 원문이 바뀌지 않았는지 매 발행마다 확인한다.
+    # (책 = 사양, 코드 = 구현. 구현에 맞춰 원문을 고치는 사고를 기계로 막는다)
+    if not r.step("verify_source_integrity.py", required=False):
+        r.say("!! 저자 원문이 바뀐 것으로 보입니다 — verify_source_integrity.py 확인 필요")
+
     if no_git:
         r.say("git: --no-git 지정 — 건너뜀")
     else:

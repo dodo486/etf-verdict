@@ -1,0 +1,14 @@
+{
+  "etf": {
+    "src": "17eae9ebb486a419",
+    "def_table": "5fad19ea9f60bffe",
+    "labels": "fb7d800c8bf45fec",
+    "rule_data": "6af12c1d46325671"
+  },
+  "supply": {
+    "src": "c2685c109a42b39a",
+    "def_table": "3af22dc971aa5908",
+    "labels": "4f53cda18c2baa0c",
+    "rule_data": "54fbbd90a5212f31"
+  }
+}
