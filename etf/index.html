@@ -461,6 +461,21 @@ body{padding-left:var(--rail)}
       </div>
       <div class="cover"><span class="dot"></span> 프롤로그~에필로그 전 소절 커버리지 검증 완료 · 빠진 챕터 없음</div>
 
+      <details class="covsum" id="covsum" open>
+      <summary>
+        <h3>📋 체크리스트 반영 현황</h3>
+        <span style="font-size:12.5px;color:var(--mute)">소절별로 어디에 구현됐는지 · 행을 누르면 시트로 이동</span>
+        <span class="tally" id="covTally"></span>
+      </summary>
+      <div class="filters" id="covFilters">
+        <button data-f="all" class="on">전체</button>
+        <button data-f="gap">⚠ 미반영만</button>
+        <button data-f="reflected">✅ 반영</button>
+        <button data-f="mindset">💭 원칙</button>
+      </div>
+      <div class="rows" id="covRows"></div>
+      </details>
+
       <div class="thesis">
         <span class="q">“레버리지 ETF는 시간을 사는 상품이 아니라 구간을 사는 상품이다. 돈복사는 종목이 아니라 시스템(운용 순서)에서 나온다.”</span>
         <span class="src">— 저자가 전 챕터에서 반복 강조하는 핵심</span>
@@ -485,27 +500,14 @@ body{padding-left:var(--rail)}
       </div>
     </header>
 
+
+
     <div class="covlegend" id="covlegend" style="display:none">
       <span><b>시트 반영</b></span>
       <span><span class="covb ref">✅ STEP</span> 시트에 정량 규칙으로 반영</span>
       <span><span class="covb gap">⚠ 시트 미반영</span> 넣어야 하는데 빠짐(구멍)</span>
       <span><span class="covb mind">💭 원칙·배경</span> 체크리스트 대상 아님</span>
     </div>
-    <details class="covsum" id="covsum" open>
-      <summary>
-        <h3>📋 체크리스트 반영 현황</h3>
-        <span style="font-size:12.5px;color:var(--mute)">소절별로 어디에 구현됐는지 · 행을 누르면 시트로 이동</span>
-        <span class="tally" id="covTally"></span>
-      </summary>
-      <div class="filters" id="covFilters">
-        <button data-f="all" class="on">전체</button>
-        <button data-f="gap">⚠ 미반영만</button>
-        <button data-f="reflected">✅ 반영</button>
-        <button data-f="mindset">💭 원칙</button>
-      </div>
-      <div class="rows" id="covRows"></div>
-    </details>
-
     <div id="content"></div>
   </main>
 </div>
@@ -2463,10 +2465,11 @@ body{padding-left:var(--rail)}
 
   function keyNum(k){
     if(k === '에필로그') return [99, 99];
+    if(k === '0') return [0, 0];
     var p = k.split('-');
     return [parseInt(p[0], 10) || 0, parseInt(p[1], 10) || 0];
   }
-  var keys = Object.keys(COV).filter(function(k){ return k !== '0'; }).sort(function(a, b){
+  var keys = Object.keys(COV).sort(function(a, b){
     var x = keyNum(a), y = keyNum(b);
     return x[0] - y[0] || x[1] - y[1];
   });
@@ -2483,7 +2486,9 @@ body{padding-left:var(--rail)}
     keys.forEach(function(k){
       var c = COV[k] || {};
       if(filter !== 'all' && c.status !== filter) return;
-      var chap = k === '에필로그' ? '에필로그' : ('Chapter ' + k.split('-')[0]);
+      var chap = k === '에필로그' ? '에필로그'
+               : k === '0' ? '0. 저자가 반복 강조하는 핵심 원칙'
+               : ('Chapter ' + k.split('-')[0]);
       if(chap !== lastChap){ html += '<div class="covchap">' + chap + '</div>'; lastChap = chap; }
       var where = c.status === 'reflected' ? (STEPNAME[c.step] || '시트 반영')
                 : c.status === 'gap' ? '⚠ 미반영'
