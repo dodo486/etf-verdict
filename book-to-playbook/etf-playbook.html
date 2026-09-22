@@ -413,11 +413,11 @@
     <h2><span class="step">STEP 1</span>장 시작 전 스코어카드 <span class="tag a">저자 2-6</span></h2>
     <p class="subtle">5개 지표 각 양호 시 1점. <b>🤖 오늘 값으로 자동 체크됨</b> — 직접 수정하면 점수·판정이 즉시 다시 계산됩니다.</p>
     <div class="card" id="scorecard">
-      <label class="chk"><input type="checkbox" data-sc><span class="txt">나스닥 선물 방향 양호 <small>플러스 & 고점 낮추지 않음</small></span></label>
-      <label class="chk"><input type="checkbox" data-sc><span class="txt">S&amp;P500 선물 방향 양호</span></label>
-      <label class="chk"><input type="checkbox" data-sc><span class="txt">VIX 안정 <small>전일 대비 +10% 미만, 급하게 안 튐</small></span></label>
-      <label class="chk"><input type="checkbox" data-sc><span class="txt">미국 10년물 금리 안정 <small>+0.1%p 이상 급등 아님</small></span></label>
-      <label class="chk"><input type="checkbox" data-sc><span class="txt">달러인덱스 안정 <small>급격한 강세 아님</small></span></label>
+      <label class="chk"><input type="checkbox" data-sc><span class="txt">나스닥100 방향 양호 <span class="tag a">🤖 자동</span><small>플러스 &amp; 고점 낮추지 않음</small><small class="scwhy"></small></span></label>
+      <label class="chk"><input type="checkbox" data-sc><span class="txt">S&amp;P500 방향 양호 <span class="tag a">🤖 자동</span><small>플러스 &amp; 고점 낮추지 않음</small><small class="scwhy"></small></span></label>
+      <label class="chk"><input type="checkbox" data-sc><span class="txt">VIX 안정 <span class="tag a">🤖 자동</span><small>전일 대비 +10% 미만, 급하게 안 튐</small><small class="scwhy"></small></span></label>
+      <label class="chk"><input type="checkbox" data-sc><span class="txt">미국 10년물 금리 안정 <span class="tag a">🤖 자동</span><small>+0.1%p 이상 급등 아님</small><small class="scwhy"></small></span></label>
+      <label class="chk"><input type="checkbox" data-sc><span class="txt">달러인덱스 안정 <span class="tag a">🤖 자동</span><small>급격한 강세 아님</small><small class="scwhy"></small></span></label>
       <div class="verdict" id="scVerdict"><span class="big score">0 / 5</span><span id="scMsg">지표를 체크하세요</span></div>
       <p class="subtle" style="margin:10px 0 0">SOXL 매매일 땐 여기에 <b>반도체 대표주 2개(엔비디아+브로드컴 또는 엔비디아+AMD)</b> 방향을 추가로 확인하세요.</p>
     </div>
@@ -1469,7 +1469,23 @@
         window.__intradayTs = its;  // 툴팁용
       })();
       // STEP 2 스코어카드 오늘 값으로 프리필
-      (VD.scorecard||[]).forEach((s,i)=>{ if(scBoxes[i]) scBoxes[i].checked = !!s.ok; });
+      // 스코어카드: 체크 프리필 + 항목마다 실제 근거 수치 표기(STEP2와 같은 형식)
+      const SCSRC = [
+        '📊 야후 EOD · ^NDX 지수 종가 전일비 (선물 아닌 지수) · \'고점 낮추지 않음\'은 직접 확인',
+        '📊 야후 EOD · ^GSPC 지수 종가 전일비 (선물 아닌 지수) · \'고점 낮추지 않음\'은 직접 확인',
+        '📊 야후 EOD · ^VIX 전일비',
+        '📊 야후 EOD · ^TNX 전일 대비 %p',
+        '📊 야후 EOD · DX-Y.NYB(실패 시 DX=F) 전일비'
+      ];
+      const whyEls = [...document.querySelectorAll('#scorecard .scwhy')];
+      (VD.scorecard||[]).forEach((s,i)=>{
+        if(scBoxes[i]) scBoxes[i].checked = !!s.ok;
+        if(whyEls[i]){
+          const bad = !s.why || s.why.indexOf('수집 실패') === 0;
+          whyEls[i].innerHTML = '<span style="color:var(--mute)">'+(SCSRC[i]||'')+'</span> → '
+            + '<b style="color:var(' + (bad ? '--warn' : '--text') + ')">' + (s.why || '값 없음') + '</b>';
+        }
+      });
       scUpdate();
       // STEP 3: 3종목 요약 칩 = 종목 선택 UI (클릭 시 해당 종목 상세 판정)
       const pcol = {TQQQ:'--tqqq',SOXL:'--soxl',UPRO:'--upro'};

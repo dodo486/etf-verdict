@@ -97,22 +97,44 @@ def above60(v): return ok(v) and v["ma60"] and v["close"] > v["ma60"]
 def plus(sym): return ok(D[sym]) and D[sym]["chg"] is not None and D[sym]["chg"] > 0
 
 # ---------- 스코어카드 (5점) ----------
-sc = []
-sc.append(("나스닥100 방향", plus("^NDX")))
-sc.append(("S&P500 방향", plus("^GSPC")))
+sc = []   # (라벨, 통과여부, 근거수치) — 근거는 시트가 항목 아래에 그대로 보여준다
+
+
+def _why_dir(sym, v):
+    """방향 판정의 근거: 종가 / 전일 / 등락률."""
+    if not ok(v) or v.get("chg") is None:
+        return "수집 실패 — 값 없음"
+    return f"{sym} {v['close']:,.1f} / 전일 {v['prev']:,.1f} ({v['chg']:+.2f}%)"
+
+
+sc.append(("나스닥100 방향", plus("^NDX"), _why_dir("^NDX", D["^NDX"])))
+sc.append(("S&P500 방향", plus("^GSPC"), _why_dir("^GSPC", D["^GSPC"])))
+
 vix = D["^VIX"]
-sc.append(("VIX 안정(전일 +10% 미만)", ok(vix) and vix["chg"] is not None and vix["chg"] < 10))
+vix_ok = ok(vix) and vix["chg"] is not None and vix["chg"] < 10
+sc.append(("VIX 안정(전일 +10% 미만)", vix_ok,
+           (f"^VIX {vix['close']:.2f} / 전일 {vix['prev']:.2f} ({vix['chg']:+.2f}%) · 기준 +10% 미만"
+            if (ok(vix) and vix["chg"] is not None) else "수집 실패 — 값 없음")))
+
 tnx = D["^TNX"]
 tnx_jump = ok(tnx) and tnx["chg"] is not None and (tnx["close"] - tnx["prev"]) >= 0.10
-sc.append(("10년물 안정(+0.1%p 미만)", ok(tnx) and not tnx_jump))
-# 달러인덱스: DX-Y.NYB, 실패 시 DX=F
+sc.append(("10년물 안정(+0.1%p 미만)", ok(tnx) and not tnx_jump,
+           (f"^TNX {tnx['close']:.2f}% / 전일 {tnx['prev']:.2f}% ({tnx['close']-tnx['prev']:+.2f}%p) · 기준 +0.10%p 미만"
+            if (ok(tnx) and tnx["chg"] is not None) else "수집 실패 — 값 없음")))
+
+# 달러인덱스: DX-Y.NYB, 실패 시 DX=F (무료 심볼이 불안정해 둘 다 실패할 수 있다)
 dxy = D.get("DXY")
 if dxy is None:
     dxy = load("DX-Y.NYB")
     if not ok(dxy): dxy = load("DX=F")
     D["DXY"] = dxy
-sc.append(("달러인덱스 안정(급강세 아님)", ok(dxy) and dxy["chg"] is not None and dxy["chg"] < 0.5))
-score = sum(1 for _, b in sc if b)
+dxy_ok = ok(dxy) and dxy["chg"] is not None and dxy["chg"] < 0.5
+sc.append(("달러인덱스 안정(급강세 아님)", dxy_ok,
+           (f"{dxy['sym']} {dxy['close']:,.2f} / 전일 {dxy['prev']:,.2f} ({dxy['chg']:+.2f}%) · 기준 +0.5% 미만"
+            if (ok(dxy) and dxy["chg"] is not None)
+            else "수집 실패 — 무료 달러인덱스 심볼 불안정, 직접 확인")))
+
+score = sum(1 for _, b, _w in sc if b)
 
 # ---------- 회피 신호 ----------
 def avoid_common():
@@ -255,8 +277,10 @@ def build_text():
     L = []
     L.append(f"📈 ETF 데일리 진입 환경  ({now:%Y-%m-%d %H:%M} KST)")
     L.append(f"장 시작 전 스코어카드: {score}/5  " + ("공격가능" if score>=4 else "소액" if score==3 else "관망"))
-    for lab, b in sc:
+    for lab, b, why in sc:
         L.append(f"   {'🟢' if b else '🔴'} {lab}")
+        if why:
+            L.append(f"      └ {why}")
     L.append(f"주도주: {lead_txt}")
     L.append("─"*30)
     for v in verdicts:
@@ -321,7 +345,7 @@ send_macos = send_desktop
 def build_html():
     grade_cls = {"✅ 매수 후보":"go","🟡 소액만":"small","⛔ 보류":"no","🚫 진입 금지":"no","⚪ 관망":"","데이터오류":""}
     sc_rows = "".join(
-        f'<div class="scitem"><span class="dot {"on" if b else "off"}"></span>{l}</div>' for l,b in sc)
+        f'<div class="scitem"><span class="dot {"on" if b else "off"}"></span>{l}</div>' for l,b,_w in sc)
     cards = ""
     for v in verdicts:
         if v["grade"]=="데이터오류":
@@ -390,7 +414,7 @@ h1{{font-size:22px;color:var(--head);margin:0 0 2px;font-weight:800;letter-spaci
 
 if __name__ == "__main__":
     if "--json" in sys.argv:
-        print(json.dumps({"score":score,"scorecard":[{"label":l,"ok":b} for l,b in sc],
+        print(json.dumps({"score":score,"scorecard":[{"label":l,"ok":b,"why":w} for l,b,w in sc],
                           "verdicts":verdicts,"ts":now.isoformat()}, ensure_ascii=False, indent=2))
     else:
         print(text)
