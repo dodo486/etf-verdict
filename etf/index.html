@@ -304,25 +304,31 @@ body{padding-left:var(--rail)}
   .memo .field input:focus{outline:2px solid var(--gold); outline-offset:1px}
   @media(max-width:560px){.memo .field{grid-template-columns:1fr; gap:3px}}
 
-  /* 데이터 수집 현황 스트립 (탭 바 아래, 두 탭 공통) */
-  .collect{margin:10px clamp(16px,3vw,24px) 0; padding:10px 14px; background:var(--surface);
-    border:1px solid var(--line); border-radius:10px; font-size:12.5px; color:var(--mute);
-    display:flex; flex-wrap:wrap; align-items:center; gap:8px 18px}
-  .collect .cmain{display:flex; align-items:center; gap:8px; font-size:13px}
-  .collect .cmain b{color:var(--head); font-weight:800; font-variant-numeric:tabular-nums}
-  .collect .cdot{width:8px; height:8px; border-radius:50%; background:var(--mute); flex:none}
-  .collect.fresh .cdot{background:var(--entry)}
-  .collect.stale .cdot{background:var(--gold)}
-  .collect.old   .cdot{background:var(--warn)}
-  .collect .cago{color:var(--mute)}
-  .collect.old .cago{color:var(--warn); font-weight:700}
-  .collect .csrc{display:flex; align-items:center; gap:6px; white-space:nowrap}
-  .collect .csrc b{color:var(--text); font-weight:700; font-variant-numeric:tabular-nums}
+  /* 데이터 수집 현황 스트립 — 탭 바 바로 아래에 항상 붙어 있음(두 탭 공통) */
+  .collect{position:sticky; z-index:99; top:0;            /* top 은 JS가 탭 바 높이로 보정 */
+    margin:0; padding:11px clamp(16px,3vw,24px);
+    background:var(--surface-2); border-bottom:1px solid var(--line);
+    box-shadow:0 2px 10px rgba(0,0,0,.35);
+    font-size:14px; color:var(--text);
+    display:flex; flex-wrap:wrap; align-items:center; gap:8px 22px}
+  .collect .cmain{display:flex; align-items:center; gap:9px; font-size:15px; font-weight:700; color:var(--head)}
+  .collect .cmain b{color:var(--gold); font-weight:800; font-size:16px; font-variant-numeric:tabular-nums}
+  .collect .cdot{width:11px; height:11px; border-radius:50%; background:var(--mute); flex:none}
+  .collect.fresh .cdot{background:var(--entry); box-shadow:0 0 0 4px rgba(63,185,80,.18)}
+  .collect.stale .cdot{background:var(--gold);  box-shadow:0 0 0 4px rgba(212,162,78,.18)}
+  .collect.old   .cdot{background:var(--warn);  box-shadow:0 0 0 4px rgba(229,72,77,.20)}
+  .collect .cago{color:var(--mute); font-weight:600; font-size:13.5px}
+  .collect.old .cago{color:var(--warn); font-weight:800}
+  .collect .csrc{display:flex; align-items:center; gap:7px; white-space:nowrap; font-size:13.5px; color:var(--mute)}
+  .collect .csrc b{color:var(--head); font-weight:800; font-variant-numeric:tabular-nums}
   .collect .cst{font-weight:800}
   .collect .cst.ok{color:var(--entry)}
-  .collect .cst.wait{color:var(--mute)}
+  .collect .cst.wait{color:var(--gold)}
   .collect .cst.err{color:var(--warn)}
-  @media(max-width:620px){.collect{flex-direction:column; align-items:flex-start; gap:5px}}
+  @media(max-width:760px){
+    .collect{gap:5px 14px; font-size:13px; padding:9px clamp(12px,3vw,18px)}
+    .collect .cmain{font-size:14px} .collect .cmain b{font-size:14.5px}
+  }
 
   .warnbox{margin-top:10px; padding:11px 14px; border-radius:9px; background:rgba(229,72,77,.09); border:1px solid rgba(229,72,77,.3); color:#f0a3a5; font-size:13px; line-height:1.55; display:none}
   .warnbox.show{display:block}
@@ -1962,6 +1968,14 @@ body{padding-left:var(--rail)}
       elAgo.textContent = '(' + ago(last) + ' — 오래된 값입니다)';
     }
   }
+
+  // 탭 바가 sticky(top:0)라 그 높이만큼 내려 붙어야 가려지지 않는다.
+  function fitTop(){
+    var bar = document.querySelector('.tabbar');
+    box.style.top = (bar ? bar.offsetHeight : 0) + 'px';
+  }
+  fitTop();
+  window.addEventListener('resize', fitTop);
 
   render();
   setInterval(render, 30000);   // 열어둔 채로도 상대시간이 굳지 않도록
