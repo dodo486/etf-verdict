@@ -274,6 +274,26 @@
   .memo .field input:focus{outline:2px solid var(--gold); outline-offset:1px}
   @media(max-width:560px){.memo .field{grid-template-columns:1fr; gap:3px}}
 
+  /* 데이터 수집 현황 스트립 (탭 바 아래, 두 탭 공통) */
+  .collect{margin:10px clamp(16px,3vw,24px) 0; padding:10px 14px; background:var(--surface);
+    border:1px solid var(--line); border-radius:10px; font-size:12.5px; color:var(--mute);
+    display:flex; flex-wrap:wrap; align-items:center; gap:8px 18px}
+  .collect .cmain{display:flex; align-items:center; gap:8px; font-size:13px}
+  .collect .cmain b{color:var(--head); font-weight:800; font-variant-numeric:tabular-nums}
+  .collect .cdot{width:8px; height:8px; border-radius:50%; background:var(--mute); flex:none}
+  .collect.fresh .cdot{background:var(--entry)}
+  .collect.stale .cdot{background:var(--gold)}
+  .collect.old   .cdot{background:var(--warn)}
+  .collect .cago{color:var(--mute)}
+  .collect.old .cago{color:var(--warn); font-weight:700}
+  .collect .csrc{display:flex; align-items:center; gap:6px; white-space:nowrap}
+  .collect .csrc b{color:var(--text); font-weight:700; font-variant-numeric:tabular-nums}
+  .collect .cst{font-weight:800}
+  .collect .cst.ok{color:var(--entry)}
+  .collect .cst.wait{color:var(--mute)}
+  .collect .cst.err{color:var(--warn)}
+  @media(max-width:620px){.collect{flex-direction:column; align-items:flex-start; gap:5px}}
+
   .warnbox{margin-top:10px; padding:11px 14px; border-radius:9px; background:rgba(229,72,77,.09); border:1px solid rgba(229,72,77,.3); color:#f0a3a5; font-size:13px; line-height:1.55; display:none}
   .warnbox.show{display:block}
 </style>
@@ -281,6 +301,12 @@
 <div class="tabbar">
   <button class="tab active" data-tab="playbook">📖 플레이북</button>
   <button class="tab" data-tab="sheet">✅ 실전 매매 시트</button>
+</div>
+
+<div class="collect" id="collect" title="이 페이지의 판정 숫자가 언제 수집된 것인지">
+  <span class="cmain"><span class="cdot"></span><span>마지막 데이터 수집</span> <b id="cWhen">—</b> <span class="cago" id="cAgo"></span></span>
+  <span class="csrc" id="cEod"></span>
+  <span class="csrc" id="cIntra"></span>
 </div>
 
 <div class="tabpanel active" id="panel-playbook">
@@ -1824,5 +1850,90 @@
     setTimeout(memoGuard, 0);
   }
   renderAll();
+})();
+</script>
+
+<script>
+/* ============================================================
+   데이터 수집 현황 — 전체 마지막 시점 + 소스별(야후 EOD / KIS 장중)
+   ============================================================ */
+(function(){
+  'use strict';
+  var box = document.getElementById('collect');
+  if(!box) return;
+  var VD = null;
+  try { VD = JSON.parse(document.getElementById('verdict-data').textContent); } catch(e){}
+
+  var elWhen = document.getElementById('cWhen'),
+      elAgo  = document.getElementById('cAgo'),
+      elEod  = document.getElementById('cEod'),
+      elIntra= document.getElementById('cIntra');
+
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function stamp(d){
+    var today = new Date();
+    var sameDay = d.getFullYear()===today.getFullYear() && d.getMonth()===today.getMonth() && d.getDate()===today.getDate();
+    var hm = pad(d.getHours())+':'+pad(d.getMinutes());
+    return sameDay ? ('오늘 '+hm) : (d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+hm);
+  }
+  function ago(d){
+    var s = Math.max(0, (Date.now()-d.getTime())/1000);
+    if(s < 60)    return '방금';
+    if(s < 3600)  return Math.floor(s/60)+'분 전';
+    if(s < 86400) return Math.floor(s/3600)+'시간 전';
+    return Math.floor(s/86400)+'일 전';
+  }
+
+  function render(){
+    if(!VD){
+      box.className = 'collect old';
+      elWhen.textContent = '불러오지 못함';
+      elEod.textContent = ''; elIntra.textContent = '';
+      return;
+    }
+    var eod = VD.ts ? new Date(VD.ts) : null;
+    var itr = VD.intraday_ts ? new Date(VD.intraday_ts) : null;
+    var st  = VD.intraday_state || 'pending';
+
+    // --- 소스 1: 야후 EOD ---
+    elEod.innerHTML = eod
+      ? '<span>🤖 종가·지표(야후)</span> <b>'+stamp(eod)+'</b> <span class="cst ok">수집됨</span>'
+      : '<span>🤖 종가·지표(야후)</span> <span class="cst err">없음</span>';
+
+    // --- 소스 2: KIS 장중 ---
+    var iHtml = '<span>⚡ 장중 시세(KIS)</span> ';
+    if(st === 'ok' && itr){
+      iHtml += '<b>'+stamp(itr)+'</b> <span class="cst ok">수집됨</span>';
+    } else if(st === 'error'){
+      iHtml += (itr ? '<b>'+stamp(itr)+'</b> ' : '')
+             + '<span class="cst err">수집 실패</span>'
+             + (VD.intraday_error ? ' <span style="color:var(--mute)">('+VD.intraday_error+')</span>' : '');
+    } else {
+      iHtml += (itr ? '<b>'+stamp(itr)+'</b> ' : '')
+             + '<span class="cst wait">대기 — 개장+31분에 갱신</span>';
+    }
+    elIntra.innerHTML = iHtml;
+
+    // --- 전체: 둘 중 더 최근 것 ---
+    var last = null;
+    if(eod) last = eod;
+    if(itr && st === 'ok' && (!last || itr > last)) last = itr;
+    if(!last){
+      box.className = 'collect old';
+      elWhen.textContent = '없음'; elAgo.textContent = '';
+      return;
+    }
+    elWhen.textContent = stamp(last);
+    elAgo.textContent = '(' + ago(last) + ')';
+
+    var hours = (Date.now()-last.getTime())/3600000;
+    box.className = 'collect ' + (hours <= 12 ? 'fresh' : (hours <= 36 ? 'stale' : 'old'));
+    if(hours > 36){
+      elAgo.textContent = '(' + ago(last) + ' — 오래된 값입니다)';
+    }
+  }
+
+  render();
+  setInterval(render, 30000);   // 열어둔 채로도 상대시간이 굳지 않도록
 })();
 </script>
