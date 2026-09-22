@@ -140,6 +140,77 @@ sc.append(("달러인덱스 안정(급강세 아님)", dxy_ok,
 
 score = sum(1 for _, b, _w in sc if b)
 
+# ---------- 섹터 폭 · 실적일 (저자 5-3 / 5-4 / 3-5) ----------
+# 미국 섹터는 SPDR ETF로, 실적일은 나스닥 공개 캘린더로 받는다. 실패하면 값을
+# 지어내지 않고 ok=False 로 남겨 시트가 '직접 확인'으로 표시한다.
+try:
+    import market_extras as _mx
+    SECTORS = _mx.sector_snapshot()
+    BREADTH = _mx.sector_breadth(SECTORS)        # 5-4: 섹터 5개 중 20일선 위 개수
+    DEFONLY = _mx.defensive_only(SECTORS)        # 5-3: 방어주만 살아남
+    CYCWEAK = _mx.cyclical_weak(SECTORS)         # 5-3: 금융·산업재 동시 약화
+except Exception as _e:  # noqa: BLE001
+    SECTORS, BREADTH = {}, {"ok": False, "reason": "섹터 수집 실패: %s" % _e}
+    DEFONLY = CYCWEAK = {"ok": False, "reason": "섹터 수집 실패"}
+    print("[섹터 실패]", _e, file=sys.stderr)
+
+try:
+    EARN = _mx.earnings_dday(["NVDA", "MSFT", "AAPL", "AMD", "AVGO"])
+except Exception as _e:  # noqa: BLE001
+    EARN = {}
+    print("[실적 캘린더 실패]", _e, file=sys.stderr)
+
+
+def _spx_below(ma_key):
+    g = D.get("^GSPC")
+    return bool(ok(g) and g.get(ma_key) and g["close"] < g[ma_key])
+
+
+# 5-3 "나쁜 금리 하락" — 금리 내려가는데 주식 못 오르고 금융주 약함
+def _bad_rate_drop():
+    g = D.get("^GSPC")
+    if not (ok(tnx) and ok(g)):
+        return {"ok": False, "reason": "수집 실패"}
+    rate_down = (tnx["close"] - tnx["prev"]) < 0
+    spx_down = g["chg"] is not None and g["chg"] <= 0
+    fin = SECTORS.get("금융", {}).get("ret5")
+    fin_weak = fin is not None and fin < 0
+    return {"ok": True, "flag": bool(rate_down and spx_down and fin_weak),
+            "label": "10년물 %+.2f%%p · S&P500 %+.2f%% · 금융 5일 %s"
+                     % (tnx["close"] - tnx["prev"], g["chg"] if g["chg"] is not None else 0,
+                        ("%+.1f%%" % fin) if fin is not None else "수집 실패")}
+
+
+BADRATE = _bad_rate_drop()
+
+# 5-3 침체 신호 집계 (저자 5신호 중 자동 4개 + 수동 1개)
+RECESSION = {
+    "signals": [
+        {"key": "def_only", "label": "방어주만 살아나고 기술·금융·산업재 약화",
+         "auto": DEFONLY.get("ok", False), "on": bool(DEFONLY.get("flag")),
+         "why": DEFONLY.get("label") or DEFONLY.get("reason", "")},
+        {"key": "cyc_weak", "label": "금융·산업재가 전고점서 계속 밀림(5거래일 약세)",
+         "auto": CYCWEAK.get("ok", False), "on": bool(CYCWEAK.get("flag")),
+         "why": CYCWEAK.get("label") or CYCWEAK.get("reason", "")},
+        {"key": "estimates", "label": "실적 전망 하향이 업종 전체로 퍼짐",
+         "auto": False, "on": False,
+         "why": "애널리스트 추정치는 무료 소스 없음 — 직접 확인"},
+        {"key": "bad_rate", "label": "나쁜 금리 하락(금리↓인데 주식 못 오르고 금융 약함)",
+         "auto": BADRATE.get("ok", False), "on": bool(BADRATE.get("flag")),
+         "why": BADRATE.get("label") or BADRATE.get("reason", "")},
+        {"key": "no_recover", "label": "S&P500이 20일선 깨고 반등해도 회복 못 함",
+         "auto": ok(D.get("^GSPC")), "on": _spx_below("ma20"),
+         "why": ("S&P500 %.1f / 20일선 %.1f (%s) · 60일선 %.1f (%s)" % (
+             D["^GSPC"]["close"], D["^GSPC"]["ma20"],
+             "아래" if _spx_below("ma20") else "위",
+             D["^GSPC"]["ma60"] or 0, "아래" if _spx_below("ma60") else "위"))
+             if ok(D.get("^GSPC")) and D["^GSPC"].get("ma20") else "수집 실패"},
+    ],
+    "spx_below_ma60": _spx_below("ma60"),
+}
+RECESSION["count"] = sum(1 for s in RECESSION["signals"] if s["on"])
+
+
 # ---------- 회피 신호 ----------
 def avoid_common():
     a = []
@@ -190,7 +261,21 @@ def verdict(prod):
             av.append(f"장중 고점 대비 {w:.1f}% 밀려 마감(윗꼬리)"); akeys.append("wick")
         if plus("NVDA") and not (plus("AMD") or plus("AVGO")):
             av.append("엔비디아만 강하고 AMD·브로드컴 약함"); akeys.append("nvda_only")
+    if prod == "UPRO":
+        # 저자 5-3: 금융·산업재 5거래일 약세 + 방어주만 버팀 → 30% 축소
+        if DEFONLY.get("ok") and DEFONLY.get("flag"):
+            av.append("경기침체 경계: 방어주만 살아나고 기술·금융·산업재 약화")
+            akeys.append("def_only")
+        if BADRATE.get("ok") and BADRATE.get("flag"):
+            av.append("나쁜 금리 하락(금리↓인데 S&P500 못 오르고 금융 약함)")
+            akeys.append("bad_rate")
     if prod == "TQQQ":
+        # 저자 3-5: 실적 발표 전 + 5일 이상 상승 → 노출 축소
+        _near = [(s, v) for s, v in EARN.items() if s in ("NVDA", "MSFT", "AAPL") and v[1] <= 5]
+        if _near and p["ret5"] is not None and p["ret5"] > 0:
+            _s, (_dt, _dd) = _near[0]
+            av.append(f"빅테크 실적 D-{_dd} ({_s} {_dt}) + 최근 5일 {p['ret5']:+.0f}% — 노출 축소 구간")
+            akeys.append("earnings")
         if p["ret5"] is not None and p["ret5"] >= 25:
             av.append(f"TQQQ 최근 5일 {p['ret5']:.0f}% 급등(추격 위험)"); akeys.append("run5")
         w = wick(p)
@@ -215,7 +300,11 @@ def verdict(prod):
         elif prod == "SOXL":
             intraday = ["엔비디아 시초가 위","AMD 전일 저점 지킴","브로드컴 안 밀림"]
         else:
-            intraday = ["S&P500 20일선 종가 유지","섹터 3개↑ 동반"]
+            intraday = ["S&P500 20일선 종가 유지"]
+            if BREADTH.get("ok"):
+                intraday.append("섹터 %d/5 20일선 위" % BREADTH["count"])
+            else:
+                intraday.append("섹터 3개↑ 동반")
     # 거래량 신호(EOD): 전일 대비 1.5배 이상 + 종가가 당일 고점 근처(고점 대비 -1.5% 이내)
     vol_ok = False
     if ok(p) and p.get("vol") and p.get("vol20") and p["vol20"]:
@@ -255,6 +344,16 @@ def verdict(prod):
     if p.get("open") and p.get("prev"):
         g=pct(p["open"], p["prev"])
         metrics["gap"]=f"시가 {p['open']:.2f} / 전일종가 {p['prev']:.2f} · 갭 {g:+.1f}%"
+    # 저자 5-4 섹터 폭 / 5-3 침체 / 3-5 실적일
+    if BREADTH.get("ok"):
+        metrics["breadth"]=BREADTH["label"]
+    elif BREADTH.get("reason"):
+        metrics["breadth"]=BREADTH["reason"]
+    if prod == "UPRO":
+        if DEFONLY.get("ok"): metrics["def_only"]=DEFONLY["label"]
+        if BADRATE.get("ok"): metrics["bad_rate"]=BADRATE["label"]
+    if prod == "TQQQ" and EARN:
+        metrics["earnings"]=" · ".join("%s %s(D-%d)"%(s,v[0],v[1]) for s,v in list(EARN.items())[:3])
     w=wick(p)
     if w is not None:
         metrics["wick"]=f"고점 대비 종가 {-w:+.1f}%"
@@ -265,7 +364,13 @@ def verdict(prod):
         bc=D['AVGO']['chg'] if ok(D.get('AVGO')) else None
         if nv is not None:
             metrics["nvda_only"]=f"엔비디아 {nv:+.1f}%, AMD {am:+.1f}%, 브로드컴 {bc:+.1f}%" if (am is not None and bc is not None) else f"엔비디아 {nv:+.1f}%"
+    # EOD로 자동 판정되는 진입 항목(시트가 체크박스를 자동으로 켠다)
+    eod_checks = {}
+    if prod == "UPRO" and BREADTH.get("ok"):
+        eod_checks["breadth"] = {"ok": BREADTH["count"] >= 3, "label": BREADTH["label"]}
+
     return {"prod":prod,"color":cfg["color"],"grade":grade,"reason":reason,
+            "eod_checks":eod_checks,
             "avoid":av,"avoid_keys":akeys,"filter_ok":bool(filt),"vol_ok":bool(vol_ok),"intraday":intraday,
             "metrics":metrics,
             "close":p["close"],"ma20":p["ma20"],"chg":p["chg"]}
@@ -419,7 +524,10 @@ h1{{font-size:22px;color:var(--head);margin:0 0 2px;font-weight:800;letter-spaci
 if __name__ == "__main__":
     if "--json" in sys.argv:
         print(json.dumps({"score":score,"scorecard":[{"label":l,"ok":b,"why":w} for l,b,w in sc],
-                          "verdicts":verdicts,"ts":now.isoformat()}, ensure_ascii=False, indent=2))
+                          "verdicts":verdicts,"ts":now.isoformat(),
+                          "extras":{"sectors":SECTORS,"breadth":BREADTH,
+                                    "recession":RECESSION,
+                                    "earnings":{s:{"date":v[0],"dday":v[1]} for s,v in EARN.items()}}}, ensure_ascii=False, indent=2))
     else:
         print(text)
     if "--no-send" not in sys.argv:

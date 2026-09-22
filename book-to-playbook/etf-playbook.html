@@ -454,6 +454,14 @@
       <div id="modeGap" class="note" style="display:none"></div>
     </div>
 
+    <!-- STEP 2-B: 경기침체 5신호 (저자 5-3) -->
+    <h2><span class="step">STEP 2-B</span>경기침체 5신호 — UPRO 축소 판정 <span class="tag a">저자 5-3</span></h2>
+    <p class="subtle">저자가 든 5개 신호 중 <b>자동 4개</b>는 오늘 값으로 채워집니다. 실적 전망 하향만 무료 데이터가 없어 직접 확인입니다.</p>
+    <div class="card">
+      <div id="recBox"></div>
+      <div class="verdict" id="recV"><span id="recMsg">불러오는 중</span></div>
+    </div>
+
     <!-- 내 계좌 실제 비중 점검 (저자 6-3 · 10-1 · 9-4) -->
     <h2><span class="step">STEP 3-B</span>지금 내 계좌 점검 <span class="tag a">저자 6-3·10-1·9-4</span></h2>
     <p class="subtle">현재 평가액을 넣으면 <b>3배 집중도·현금비중</b>을 계산해 저자의 경고선에 걸리는지 판정합니다. 입력값은 이 브라우저에만 저장됩니다.</p>
@@ -474,6 +482,14 @@
       </div>
       <div id="posOut" style="margin-top:12px"></div>
       <div id="posWarn"></div>
+      <div class="grouplabel f" style="margin:20px 0 2px">🔥 화력 낮추기 — UPRO/현금 이관 판정 <span class="tag a" style="text-transform:none">저자 5-5·3-5</span></div>
+      <p class="subtle" style="margin:2px 0 0">보유 수익률을 넣으면 저자 기준으로 <b>얼마를 UPRO(또는 현금)로 옮길지</b> 판정합니다.</p>
+      <div class="subgrid">
+        <div class="f2"><label>TQQQ 보유 수익률(%)</label><input type="number" id="rTQQQ" data-save step="0.1" placeholder="예: 12.5"></div>
+        <div class="f2"><label>SOXL 보유 수익률(%)</label><input type="number" id="rSOXL" data-save step="0.1" placeholder="예: 18.0"></div>
+      </div>
+      <div id="xferOut"></div>
+
     </div>
 
     <!-- 주 1회 비중조정 리듬 (저자 10-3) -->
@@ -1205,7 +1221,8 @@
         {t:'급등 4~5일째(최근 5일 급등)',k:'run5',src:'📊 야후 EOD · 최근 5일 수익률'},
         {t:'전고점 근처 윗꼬리',k:'wick',src:'📊 야후 EOD · 고가 대비 종가'},
         {t:'10년물 금리 +0.1%p 급등',k:'tnx',src:'📊 야후 EOD · ^TNX 전일비'},
-        {t:'갭상승 추격 구간 — 눌림 기다리고 금액은 1/3로',k:'gap',src:'📊 야후 EOD · 시가 vs 전일종가 (갭 기준 %는 저자 미명시)'}
+        {t:'갭상승 추격 구간 — 눌림 기다리고 금액은 1/3로',k:'gap',src:'📊 야후 EOD · 시가 vs 전일종가 (갭 기준 %는 저자 미명시)'},
+        {t:'빅테크 실적 발표 임박(D-5 이내) + 최근 5일 상승 — 노출 축소',k:'earnings',src:'📊 나스닥 실적 캘린더 · NVDA·MSFT·AAPL 다음 발표일'}
       ], note:'진입 3조건 중 2개 이상 + 필터 통과 + 회피 0 → 1차 분할 진입',
       caution:[
         {t:'뉴스 전 5거래일 이미 많이 올랐다', k:'run5', src:'📊 야후 EOD · 최근 5일 수익률'},
@@ -1218,6 +1235,8 @@
         {L:'잔량 40%', v:'추세 확인용 — 나스닥 5/10일선 지지·빅테크 유지 시만 보유'},
         {L:'가격 손절', v:'-5% 30% 축소 → <b>-6~7%에서 재판단(구조 확인)</b> → 구조 이탈 시 50% → 20일선 회복 실패 시 추가'},
         {L:'반납 손절', v:'계좌 최고 대비 40% 반납 시 익절'},
+        {L:'실적 시즌', v:'실적 발표 전 5거래일↑ 상승 + 수익 10%↑면 <b>30~50% 익절</b> · 발표 전 VIX 동반 상승이나 주도주 갈라짐이면 축소 <span style="color:var(--mute)">(저자 3-5)</span>'},
+        {L:'화력 낮추기', v:'수익 10%↑ + VIX +10%↑ 또는 전고점 윗꼬리 → <b>30%를 UPRO로</b> · 수익 15%↑ + 주도주 2개↑ 약화 → <b>50%까지</b>. 단 S&P500 20일선 아래+VIX 튐이면 UPRO 말고 <b>현금</b> <span style="color:var(--mute)">(저자 5-5)</span>'},
         {L:'시간 손절', v:'단타 3거래일 / 스윙 5~8일 · 20거래일 내 재판단'}
       ]},
     SOXL:{ v:'--soxl', need:2,
@@ -1245,6 +1264,7 @@
         {L:'잔량 40%', v:'추세 확인용 — 대표주 3개 중 2개↑ 유지 시만 보유'},
         {L:'가격 손절', v:'-5% 30% 축소 → <b>-6~7%에서 절반 축소(가장 거친 종목)</b> → 구조 이탈 시 전량 재검토'},
         {L:'반납 손절', v:'최고 수익 대비 30% 반납=경고 / 50%=축소 · 계좌 최고 대비 40% 반납 시 익절'},
+        {L:'화력 낮추기', v:'수익 10%↑ + VIX +10%↑ 또는 전고점 윗꼬리 → <b>30%를 UPRO로</b> · 수익 15%↑ + 대표주 2개↑ 약화 → <b>50%까지</b>. 시장 약세면 UPRO 말고 <b>현금</b> <span style="color:var(--mute)">(저자 5-5)</span>'},
         {L:'시간 손절', v:'단타 3거래일 / 스윙 5~8일 / 20일 내 재판단'}
       ]},
     UPRO:{ v:'--upro', need:3,
@@ -1252,10 +1272,11 @@
       entry:[
         {t:'UPRO 시초가 위 유지', ik:'open_hold', src:'📡 KIS 실시간 · 시가 vs 현재가'},
         {t:'눌림에도 저점 높임', ik:'pullback', src:'📡 KIS 분봉 · 전반부 저점 vs 후반부 저점'},
-        {t:'섹터 5개 중 3개↑ 동반(기술 외 금융·산업재·헬스케어·소비재)', src:'✋ 직접 · 업종 데이터(무료 없음)'}
+        {t:'섹터 5개 중 3개↑ 동반(기술·금융·산업재·헬스케어·소비재)', ek:'breadth', src:'📊 야후 EOD · SPDR 섹터 ETF(XLK·XLF·XLI·XLV·XLY) 20일선 위 개수'}
       ],
       avoid:[
-        {t:'방어주만 살아나고 경기민감(기술·금융·산업재) 약화',src:'✋ 직접 · 업종 데이터'},
+        {t:'방어주만 살아나고 경기민감(기술·금융·산업재) 약화',k:'def_only',src:'📊 야후 EOD · 방어(XLP·XLU·XLV) vs 경기민감(XLK·XLF·XLI) 5일 수익률'},
+        {t:'나쁜 금리 하락 — 금리↓인데 주식 못 오르고 금융주 약함',k:'bad_rate',src:'📊 야후 EOD · ^TNX·^GSPC·XLF'},
         {t:'60일선 아래에서 20일선만 회복(반등 시도)',src:'✋ 직접 · 지수 60일선'},
         {t:'VIX 튐 + 달러 강세 동시',src:'✋ 직접 · VIX·달러'},
         {t:'갭상승 추격 구간 — 눌림 기다리고 금액은 1/3로',k:'gap',src:'📊 야후 EOD · 시가 vs 전일종가 (갭 기준 %는 저자 미명시)'}
@@ -1270,6 +1291,7 @@
         {L:'2차 익절', v:'+15~20% → 추가 30% 매도'},
         {L:'잔량 40%', v:'추세 확인용 — S&P500 20일선·업종 폭 유지 시만 보유'},
         {L:'가격 손절', v:'-5% 30% 축소 → 구조 이탈 시 50% → 20일선 회복 실패 시 추가'},
+        {L:'침체 축소', v:'금융·산업재 5거래일↑ 약세 + 방어주만 버팀 → <b>보유금액 30% 축소</b> · 20일선 아래 동시면 30% 축소, <b>60일선까지 위협</b>받으면 <b>추가 30%</b> <span style="color:var(--mute)">(저자 5-3)</span>'},
         {L:'반납 손절', v:'계좌 최고 대비 40% 반납 시 익절'},
         {L:'시간 손절', v:'스윙 5~8일 · 20거래일 내 재판단'}
       ]}
@@ -1301,9 +1323,13 @@
     h += '<div class="grouplabel f">① 필터 (통과 못하면 진입 금지)</div>';
     d.filter.forEach((c,i)=>h+=chk('f'+i,{t:c.t,src:c.src,live:mt.filter}, false, vv?!!vv.filter_ok:false, 'eod', vv?'ok':'pending'));
     h += '<div class="grouplabel e">② 진입 조건 ('+d.need+'개 이상 충족)</div>';
+    const ec = (vv && vv.eod_checks) || {};   // EOD로 자동 판정되는 진입 항목
     d.entry.forEach((c,i)=>{
       const ic = ia && c.ik && ia.checks && ia.checks[c.ik];  // KIS 장중 자동 대상
-      if(c.ik){
+      if(c.ek){                                 // 야후 EOD 자동(예: 섹터 폭)
+        const e = ec[c.ek];
+        h+=chk('e'+i,{t:c.t, src:c.src, live:(e&&e.label)}, false, !!(e&&e.ok), 'eod', e?'ok':'pending');
+      } else if(c.ik){
         let st = istate;
         if(ic && ic.status==='error') st='error';
         else if(ic) st='ok';
@@ -1965,5 +1991,136 @@
 
   render();
   setInterval(render, 30000);   // 열어둔 채로도 상대시간이 굳지 않도록
+})();
+</script>
+
+<script>
+/* ============================================================
+   5-3 경기침체 5신호 렌더 · 5-5/3-5 화력 낮추기(UPRO·현금 이관) 판정
+   ============================================================ */
+(function(){
+  'use strict';
+  var VD = null;
+  try { VD = JSON.parse(document.getElementById('verdict-data').textContent); } catch(e){}
+  var EX = (VD && VD.extras) || {};
+
+  /* ---- 5-3: 경기침체 5신호 ---- */
+  (function(){
+    var box = document.getElementById('recBox'), v = document.getElementById('recV'),
+        msg = document.getElementById('recMsg');
+    if(!box) return;
+    var rec = EX.recession;
+    if(!rec || !rec.signals){
+      box.innerHTML = '<p class="subtle" style="margin:0">판정 데이터에 침체 신호가 없습니다(엔진 재실행 필요).</p>';
+      v.classList.add('no'); msg.textContent = '데이터 없음';
+      return;
+    }
+    box.innerHTML = rec.signals.map(function(s){
+      var badge = s.auto
+        ? (s.on ? '<span class="tag err">🔴 걸림</span>' : '<span class="tag a">🤖 자동</span>')
+        : '<span class="tag o">✋ 직접</span>';
+      return '<div class="gatestep"><div style="font-size:14px;color:var('
+        + (s.on ? '--warn' : '--text') + ')">' + (s.on ? '⚠ ' : '· ') + s.label + ' ' + badge
+        + '</div><small style="display:block;color:var(--mute);margin-top:2px">' + (s.why || '') + '</small></div>';
+    }).join('');
+
+    var n = rec.count || 0;
+    v.classList.remove('go','small','no');
+    if(n >= 2){
+      v.classList.add('no');
+      msg.innerHTML = '⚠ 침체 신호 ' + n + '개<span class="sub">저자 5-3: 금융·산업재 약세 + 방어주만 버팀 → <b>보유금액 30% 축소</b>'
+        + (rec.spx_below_ma60 ? ' · <b>S&P500이 60일선까지 위협 → 추가 30% 축소</b>' : '') + '</span>';
+    } else if(n === 1){
+      v.classList.add('small');
+      msg.innerHTML = '🟡 침체 신호 1개<span class="sub">아직 축소 트리거는 아닙니다. 금융·산업재가 5거래일 이상 약해지는지 보세요</span>';
+    } else {
+      v.classList.add('go');
+      msg.innerHTML = '✅ 침체 신호 없음<span class="sub">경기민감 업종이 버티는 중 — UPRO 축소 사유 아님</span>';
+    }
+  })();
+
+  /* ---- 5-5 + 3-5: 화력 낮추기 ---- */
+  (function(){
+    var out = document.getElementById('xferOut');
+    if(!out) return;
+    var els = {TQQQ: document.getElementById('rTQQQ'), SOXL: document.getElementById('rSOXL')};
+    var hold = {TQQQ: document.getElementById('hTQQQ'), SOXL: document.getElementById('hSOXL')};
+
+    function num(el){ var v = parseFloat(el && el.value); return isFinite(v) ? v : null; }
+    function fmt(n){ return Math.round(n).toLocaleString('ko-KR'); }
+    function vFor(p){ return (VD && VD.verdicts) ? VD.verdicts.find(function(x){ return x.prod === p; }) : null; }
+
+    // 시장 전체 약세? (저자 5-5: S&P500 20일선 아래 + VIX 튐 → UPRO 말고 현금)
+    function marketWeak(){
+      var u = vFor('UPRO');
+      var below = !!(u && u.close && u.ma20 && u.close < u.ma20);
+      var vixJump = false;
+      (VD && VD.verdicts || []).forEach(function(x){
+        if((x.avoid_keys||[]).indexOf('vix') >= 0) vixJump = true;
+      });
+      return {weak: below || vixJump, below: below, vixJump: vixJump};
+    }
+
+    function judge(p){
+      var r = num(els[p]);
+      if(r === null) return null;
+      var vv = vFor(p) || {};
+      var keys = vv.avoid_keys || [];
+      var vixJump = keys.indexOf('vix') >= 0;
+      var wick = keys.indexOf('wick') >= 0;
+      var leadersWeak = keys.indexOf('nvda_only') >= 0;   // 주도주 갈라짐(엔비디아만 강함)
+      var earnings = keys.indexOf('earnings') >= 0;
+
+      var pct = 0, why = [];
+      if(r >= 15 && leadersWeak){ pct = 50; why.push('수익 15%↑ + 주도주 약화'); }
+      else if(r >= 10 && (vixJump || wick)){
+        pct = 30; why.push('수익 10%↑ + ' + (vixJump ? 'VIX +10%↑' : '전고점 윗꼬리'));
+      }
+      // 3-5: 실적 발표 임박 + 수익 10%↑ → 30~50% 익절/축소
+      var earnNote = '';
+      if(earnings && r >= 10){
+        pct = Math.max(pct, 30);
+        earnNote = ' · 실적 발표 임박(3-5) → 30~50% 익절 검토';
+      }
+      var amt = num(hold[p]);
+      return {prod: p, ret: r, pct: pct, why: why.join(' + '), earnNote: earnNote, amt: amt};
+    }
+
+    function render(){
+      var rows = ['TQQQ','SOXL'].map(judge).filter(Boolean);
+      if(!rows.length){
+        out.innerHTML = '<p class="subtle" style="margin:10px 0 0">보유 수익률을 넣으면 이관 판정이 나옵니다.</p>';
+        return;
+      }
+      var mw = marketWeak();
+      var dest = mw.weak ? '현금' : 'UPRO';
+      var html = '';
+      rows.forEach(function(x){
+        if(!x.pct){
+          html += '<div class="note">· <b>' + x.prod + '</b> 수익 ' + x.ret.toFixed(1)
+               + '% — 이관 기준 미달 (수익 10%↑ + VIX/윗꼬리, 또는 15%↑ + 주도주 약화)</div>';
+          return;
+        }
+        var amtTxt = (x.amt ? ' → <b>' + fmt(x.amt * x.pct / 100) + '만</b>' : '');
+        html += '<div class="note ' + (x.pct >= 50 ? 'bad' : 'warn') + '">🔥 <b>' + x.prod + '</b> 수익 '
+             + x.ret.toFixed(1) + '% · ' + x.why + x.earnNote
+             + ' → <b>' + x.pct + '%를 ' + dest + '으로</b>' + amtTxt + '</div>';
+      });
+      if(mw.weak){
+        html += '<div class="note bad">🚨 시장 전체 약세('
+             + [mw.below ? 'S&P500 20일선 아래' : '', mw.vixJump ? 'VIX +10%↑' : ''].filter(Boolean).join(' · ')
+             + ') — 저자 5-5: <b>UPRO도 대피소가 아닙니다. 현금을 늘리세요.</b></div>';
+      } else {
+        html += '<div class="note">줄인 금액을 전부 UPRO에 넣지 않습니다 — 저자 예시는 일부만 UPRO, 나머지는 현금.</div>';
+      }
+      out.innerHTML = html;
+    }
+
+    ['TQQQ','SOXL'].forEach(function(p){
+      if(els[p]) els[p].addEventListener('input', render);
+      if(hold[p]) hold[p].addEventListener('input', render);
+    });
+    render();
+  })();
 })();
 </script>
