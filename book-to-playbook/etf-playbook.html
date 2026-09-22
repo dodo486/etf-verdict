@@ -300,6 +300,60 @@
     .collect .cmain{font-size:14px} .collect .cmain b{font-size:14.5px}
   }
 
+  /* ── 검수 모드: 플레이북 ↔ 시트 좌우 분할 ───────────────────────── */
+  .splitbtn{background:none; border:1px solid var(--line); color:var(--mute); font:inherit;
+    font-size:13px; font-weight:700; padding:6px 12px; border-radius:8px; cursor:pointer;
+    margin-left:auto; align-self:center}
+  .splitbtn:hover{color:var(--gold); border-color:var(--gold-dim)}
+  .splitbtn.on{background:rgba(212,162,78,.14); color:var(--gold); border-color:var(--gold-dim)}
+
+  body.split #panel-playbook, body.split #panel-sheet{
+    display:block; position:fixed; top:var(--splittop,96px); bottom:0;
+    overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch}
+  /* 좌우 폭: 책 레일(--rail)을 뺀 나머지를 정확히 반씩. 계산이 틀리면 한쪽이 가린다 */
+  body.split #panel-playbook{left:var(--rail); width:calc((100% - var(--rail)) / 2);
+    border-right:2px solid var(--line)}
+  body.split #panel-sheet{right:0; width:calc((100% - var(--rail)) / 2)}
+  body.split #panel-playbook nav.side{display:none}        /* 좁으니 목차는 접는다 */
+  body.split #panel-playbook .wrap{grid-template-columns:minmax(0,1fr); max-width:none}
+  body.split #panel-playbook main{padding:0 22px 120px}
+  body.split #panel-playbook header.hero{padding:22px 0 18px}
+  body.split .sheet{max-width:none; padding:22px 22px 120px}
+  body.split .menubtn{display:none}
+
+  /* 소절 제목 = 시트로 가는 버튼 */
+  .jumpable{cursor:pointer}
+  .jumpable:hover{color:var(--gold)}
+  .jumpto{display:none; font-size:11px; font-weight:800; color:var(--gold);
+    border:1px solid var(--gold-dim); border-radius:6px; padding:2px 7px; margin-left:8px;
+    white-space:nowrap; vertical-align:middle}
+  body.split .jumpto{display:inline-block}
+  .jumpto.none{color:var(--mute); border-color:var(--line)}
+
+  /* 점프 대상 강조 */
+  @keyframes jumpflash{
+    0%{box-shadow:0 0 0 3px var(--gold), 0 0 22px rgba(212,162,78,.55)}
+    100%{box-shadow:0 0 0 3px rgba(212,162,78,0), 0 0 22px rgba(212,162,78,0)}
+  }
+  .jump-hit{border-radius:10px; animation:jumpflash 2s ease-out}
+  @media(prefers-reduced-motion:reduce){.jump-hit{animation:none; outline:3px solid var(--gold)}}
+
+  /* 매핑 설명 띠 */
+  .jumpnote{position:fixed; left:var(--rail); right:0; bottom:0; z-index:300;
+    background:var(--surface-2); border-top:2px solid var(--gold-dim);
+    padding:11px clamp(14px,3vw,24px); font-size:13px; color:var(--text); line-height:1.6;
+    box-shadow:0 -6px 20px rgba(0,0,0,.45); display:none}
+  .jumpnote.show{display:block}
+  .jumpnote b{color:var(--gold)}
+  .jumpnote .x{float:right; cursor:pointer; color:var(--mute); font-weight:800; padding:0 4px}
+  .jumpnote .x:hover{color:var(--head)}
+
+  @media(max-width:900px){
+    body.split #panel-playbook, body.split #panel-sheet{position:static; width:auto; border:none}
+    body.split #panel-playbook{display:block}
+    body.split #panel-sheet{display:block; border-top:3px solid var(--gold-dim)}
+  }
+
   .warnbox{margin-top:10px; padding:11px 14px; border-radius:9px; background:rgba(229,72,77,.09); border:1px solid rgba(229,72,77,.3); color:#f0a3a5; font-size:13px; line-height:1.55; display:none}
   .warnbox.show{display:block}
 </style>
@@ -307,6 +361,7 @@
 <div class="tabbar">
   <button class="tab active" data-tab="playbook">📖 플레이북</button>
   <button class="tab" data-tab="sheet">✅ 실전 매매 시트</button>
+  <button class="splitbtn" id="splitbtn" title="플레이북과 시트를 나란히 놓고, 소절을 클릭해 구현 위치를 확인합니다">⇄ 나란히 검수</button>
 </div>
 
 <div class="collect" id="collect" title="이 페이지의 판정 숫자가 언제 수집된 것인지">
@@ -314,6 +369,8 @@
   <span class="csrc" id="cEod"></span>
   <span class="csrc" id="cIntra"></span>
 </div>
+
+<div class="jumpnote" id="jumpnote"></div>
 
 <div class="tabpanel active" id="panel-playbook">
 <button class="menubtn" id="menubtn" aria-label="목차 열기">☰ 목차</button>
@@ -410,7 +467,7 @@
     </details>
 
     <!-- STEP 1: pre-market scorecard -->
-    <h2><span class="step">STEP 1</span>장 시작 전 스코어카드 <span class="tag a">저자 2-6</span></h2>
+    <h2 id="sheet-step1"><span class="step">STEP 1</span>장 시작 전 스코어카드 <span class="tag a">저자 2-6</span></h2>
     <p class="subtle">5개 지표 각 양호 시 1점. <b>🤖 오늘 값으로 자동 체크됨</b> — 직접 수정하면 점수·판정이 즉시 다시 계산됩니다.</p>
     <div class="card" id="scorecard">
       <label class="chk"><input type="checkbox" data-sc><span class="txt">나스닥 선물 방향 양호 <span class="tag a">🤖 자동</span><small>플러스 &amp; 고점 낮추지 않음</small><small class="scwhy"></small></span></label>
@@ -423,7 +480,7 @@
     </div>
 
     <!-- STEP 3: entry checklist (오늘 자동판정 흡수) -->
-    <h2><span class="step">STEP 2</span>종목별 진입 판정 <span class="tag a">🤖 오늘 자동판정</span></h2>
+    <h2 id="sheet-step2"><span class="step">STEP 2</span>종목별 진입 판정 <span class="tag a">🤖 오늘 자동판정</span></h2>
     <p class="subtle" id="td-ts">최신 세션 종가 기준 · 필터·회피 자동, 진입 조건만 장중 직접 확인</p>
     <p class="subtle" style="margin-top:0">아래 종목 칩을 누르면 상세 진입 판정이 열립니다.</p>
     <div id="td-summary"></div>
@@ -431,7 +488,7 @@
     <p class="subtle" style="margin-top:8px">💡 각 종목 판정 카드 아래에 <b>매수 즉시 걸어둘 청산·손절 라인</b>이 함께 표시됩니다. 전체 계좌 손실선(-5% 신규중단 · -8% 노출 절반축소 · -12% 재설계)은 공통.</p>
 
     <!-- STEP 4: position calculator -->
-    <h2><span class="step">STEP 3</span>비중 · 분할 계산기 <span class="tag a">저자 6-2·3-4</span></h2>
+    <h2 id="sheet-step3"><span class="step">STEP 3</span>비중 · 분할 계산기 <span class="tag a">저자 6-2·3-4</span></h2>
     <p class="subtle">총 투자금과 모드를 넣으면 종목별 배분·현금·3분할 금액이 계산됩니다. (배분비율은 저자의 5,000만 원 예시 기준)</p>
     <div class="card">
       <div class="calcrow">
@@ -455,7 +512,7 @@
     </div>
 
     <!-- STEP 2-B: 경기침체 5신호 (저자 5-3) -->
-    <h2><span class="step">STEP 2-B</span>경기침체 5신호 — UPRO 축소 판정 <span class="tag a">저자 5-3</span></h2>
+    <h2 id="sheet-step2b"><span class="step">STEP 2-B</span>경기침체 5신호 — UPRO 축소 판정 <span class="tag a">저자 5-3</span></h2>
     <p class="subtle">저자가 든 5개 신호 중 <b>자동 4개</b>는 오늘 값으로 채워집니다. 실적 전망 하향만 무료 데이터가 없어 직접 확인입니다.</p>
     <div class="card">
       <div id="recBox"></div>
@@ -463,7 +520,7 @@
     </div>
 
     <!-- 내 계좌 실제 비중 점검 (저자 6-3 · 10-1 · 9-4) -->
-    <h2><span class="step">STEP 3-B</span>지금 내 계좌 점검 <span class="tag a">저자 6-3·10-1·9-4</span></h2>
+    <h2 id="sheet-step3b"><span class="step">STEP 3-B</span>지금 내 계좌 점검 <span class="tag a">저자 6-3·10-1·9-4</span></h2>
     <p class="subtle">현재 평가액을 넣으면 <b>3배 집중도·현금비중</b>을 계산해 저자의 경고선에 걸리는지 판정합니다. 입력값은 이 브라우저에만 저장됩니다.</p>
     <div class="card">
       <div class="subgrid">
@@ -493,7 +550,7 @@
     </div>
 
     <!-- 주 1회 비중조정 리듬 (저자 10-3) -->
-    <h2><span class="step">STEP 3-C</span>비중조정은 주 1회 <span class="tag a">저자 10-3</span></h2>
+    <h2 id="sheet-step3c"><span class="step">STEP 3-C</span>비중조정은 주 1회 <span class="tag a">저자 10-3</span></h2>
     <p class="subtle">전체 비중 조정은 <b>토요일 또는 월요일 장전 30분</b>에만. 주중에는 손절·익절 실행만 하고 비중은 건드리지 않습니다.</p>
     <div class="card">
       <div id="weekOut" class="note">아직 기록 없음 — 첫 비중조정을 끝내면 아래 버튼을 누르세요.</div>
@@ -504,7 +561,7 @@
     </div>
 
     <!-- STEP 5: pre-trade memo -->
-    <h2><span class="step">STEP 4</span>매수 전 5줄 메모 <span class="tag a">저자 10-2</span></h2>
+    <h2 id="sheet-step4"><span class="step">STEP 4</span>매수 전 5줄 메모 <span class="tag a">저자 10-2</span></h2>
     <p class="subtle">다섯 칸을 다 못 채우면 준비 안 된 매매입니다. 특히 <b>줄일 자리·판단 기간</b>이 비면 매수 금지.</p>
     <div class="card">
       <div class="calcrow" style="margin:0 0 14px">
@@ -534,7 +591,7 @@
     </div>
 
     <!-- STEP 5: 폭락 후 재진입 게이트 (저자 9-3 · 9-5) -->
-    <h2><span class="step">STEP 5</span>폭락 후 재진입 게이트 <span class="tag a">저자 9-3·9-5</span></h2>
+    <h2 id="sheet-step5"><span class="step">STEP 5</span>폭락 후 재진입 게이트 <span class="tag a">저자 9-3·9-5</span></h2>
     <p class="subtle">평시 진입(STEP 2)과 <b>다른 체크리스트</b>입니다. 폭락·급락 뒤 다시 들어갈 때만 사용하며, <b>순서대로</b> 통과해야 합니다. 첫 바닥은 사지 않습니다.</p>
     <div class="card">
       <div id="gate">
@@ -562,7 +619,7 @@
     </div>
 
     <!-- STEP 6: 실현 · 세금 · 출금 루틴 (저자 8-2 · 8-3 · 10-4) -->
-    <h2><span class="step">STEP 6</span>팔고 난 뒤 — 세금·출금 분리 <span class="tag a">저자 8-2·8-3·10-4</span></h2>
+    <h2 id="sheet-step6"><span class="step">STEP 6</span>팔고 난 뒤 — 세금·출금 분리 <span class="tag a">저자 8-2·8-3·10-4</span></h2>
     <p class="subtle">"벌었다고 다 내 돈이 아니다." 실현수익에서 <b>세금 예상분과 출금분을 먼저 떼고</b> 남은 것만 다음 매매 자금입니다.</p>
     <div class="card">
       <div class="subgrid">
@@ -591,7 +648,7 @@
     </div>
 
     <!-- STEP 7: 나만의 최종 5기준 (에필로그) -->
-    <h2><span class="step">STEP 7</span>나만의 최종 기준 5개 <span class="tag a">저자 에필로그</span></h2>
+    <h2 id="sheet-step7"><span class="step">STEP 7</span>나만의 최종 기준 5개 <span class="tag a">저자 에필로그</span></h2>
     <p class="subtle">저자가 책을 덮기 전 직접 쓰라고 한 다섯 문장입니다. <b>여기가 비어 있으면 위의 모든 판정은 남의 기준</b>입니다.</p>
     <div class="card">
       <div class="memo" id="final5">
@@ -2122,5 +2179,158 @@
     });
     render();
   })();
+})();
+</script>
+
+<script>
+/* ============================================================
+   검수 모드 — 플레이북 소절 ↔ 실전 시트 구현 위치 대조
+   ============================================================ */
+(function(){
+  'use strict';
+  var btn = document.getElementById('splitbtn');
+  var note = document.getElementById('jumpnote');
+  if(!btn) return;
+
+  var COV = {};
+  try { COV = (JSON.parse(document.getElementById('coverage-data').textContent).map) || {}; } catch(e){}
+
+  // 커버리지의 step → 시트 앵커. 일부 소절은 실제 구현 위치가 달라 따로 지정한다.
+  var STEP2ANCHOR = {
+    'STEP1':'sheet-step1', 'STEP2-filter':'sheet-step2', 'STEP2-entry':'sheet-step2',
+    'STEP2-avoid':'sheet-step2', 'STEP2-exit':'sheet-step2', 'STEP3':'sheet-step3',
+    'STEP3-B':'sheet-step3b', 'STEP3-C':'sheet-step3c', 'STEP4':'sheet-step4',
+    'STEP5':'sheet-step5', 'STEP6':'sheet-step6', 'STEP7':'sheet-step7'
+  };
+  var OVERRIDE = { '5-3':'sheet-step2b', '5-5':'sheet-step3b' };
+  // 장 번호 → 그 장이 다루는 종목(시트 STEP2 칩을 맞춰 연다)
+  var CHAP_PROD = { '3':'TQQQ', '4':'SOXL', '5':'UPRO' };
+
+  function anchorFor(key){
+    if(OVERRIDE[key]) return OVERRIDE[key];
+    var c = COV[key];
+    if(!c) return null;
+    if(c.status === 'mindset') return null;
+    return STEP2ANCHOR[c.step] || null;
+  }
+
+  /* ---- 분할 모드 토글 ---- */
+  function fitTop(){
+    var bar = document.querySelector('.tabbar'), col = document.getElementById('collect');
+    var t = (bar ? bar.offsetHeight : 0) + (col ? col.offsetHeight : 0);
+    document.documentElement.style.setProperty('--splittop', t + 'px');
+  }
+  function setSplit(on){
+    document.body.classList.toggle('split', on);
+    btn.classList.toggle('on', on);
+    btn.textContent = on ? '⇄ 나란히 검수 끄기' : '⇄ 나란히 검수';
+    if(on){
+      // 두 패널을 동시에 보여야 하므로 탭 활성 상태를 둘 다 켠다
+      document.getElementById('panel-playbook').classList.add('active');
+      document.getElementById('panel-sheet').classList.add('active');
+      fitTop();
+    } else {
+      note.classList.remove('show');
+      // 탭 버튼이 가리키는 패널만 남긴다
+      var act = document.querySelector('.tab.active');
+      var want = act ? act.dataset.tab : 'playbook';
+      ['playbook','sheet'].forEach(function(k){
+        document.getElementById('panel-'+k).classList.toggle('active', k === want);
+      });
+    }
+    try { localStorage.setItem('etf-split', on ? '1' : '0'); } catch(e){}
+  }
+  btn.addEventListener('click', function(){ setSplit(!document.body.classList.contains('split')); });
+  window.addEventListener('resize', function(){ if(document.body.classList.contains('split')) fitTop(); });
+
+  /* ---- 소절 → 시트 점프 ---- */
+  function flash(el){
+    el.classList.remove('jump-hit');
+    void el.offsetWidth;            // 리플로우로 애니메이션 재시작
+    el.classList.add('jump-hit');
+    setTimeout(function(){ el.classList.remove('jump-hit'); }, 2200);
+  }
+
+  function jump(key, title){
+    var id = anchorFor(key);
+    var c = COV[key] || {};
+    var pane = document.getElementById('panel-sheet');
+
+    if(!id){
+      note.innerHTML = '<span class="x" id="jnx">✕</span><b>' + (title || key) + '</b> — '
+        + (c.status === 'mindset'
+            ? '체크리스트 대상이 아닌 <b>원칙·배경</b>입니다. ' + (c.note || '')
+            : '연결된 시트 위치가 없습니다.');
+      note.classList.add('show');
+      bindClose();
+      return;
+    }
+    var target = document.getElementById(id);
+    if(!target){ return; }
+
+    // STEP2는 종목별 카드 — 해당 장의 종목을 먼저 연다
+    var m = String(key).match(/^(\d+)-/);
+    var prod = m && CHAP_PROD[m[1]];
+    if(id === 'sheet-step2' && prod){
+      var chip = document.querySelector('.td-chip[data-jump="' + prod + '"]');
+      if(chip) chip.click();
+    }
+
+    if(!document.body.classList.contains('split')){
+      // 단일 탭 모드면 시트 탭으로 전환
+      var sheetTab = document.querySelector('.tab[data-tab="sheet"]');
+      if(sheetTab) sheetTab.click();
+    }
+
+    setTimeout(function(){
+      if(document.body.classList.contains('split') && pane){
+        pane.scrollTop = target.offsetTop - 12;
+      } else {
+        target.scrollIntoView({behavior:'smooth', block:'start'});
+      }
+      flash(target.nextElementSibling && target.nextElementSibling.classList.contains('card')
+            ? target.nextElementSibling : target);
+    }, 60);
+
+    var st = c.status === 'reflected' ? '✅ 반영' : (c.status === 'gap' ? '⚠ 미반영' : '💭 원칙');
+    note.innerHTML = '<span class="x" id="jnx">✕</span><b>' + (title || key) + '</b> → <b>'
+      + (target.textContent || '').trim().slice(0, 40) + '</b> &nbsp;' + st
+      + '<br><span style="color:var(--mute)">' + (c.note || '') + '</span>';
+    note.classList.add('show');
+    bindClose();
+  }
+
+  function bindClose(){
+    var x = document.getElementById('jnx');
+    if(x) x.onclick = function(){ note.classList.remove('show'); };
+  }
+
+  /* ---- 플레이북 소절 제목에 점프 버튼 달기 ---- */
+  function decorate(){
+    var heads = document.querySelectorAll('#content h3, #content h2');
+    Array.prototype.forEach.call(heads, function(h){
+      if(h.dataset.jumpReady) return;
+      var t = (h.textContent || '').trim();
+      var m = t.match(/^\s*([0-9]+-[0-9]+|에필로그)/);
+      if(!m) return;
+      var key = m[1];
+      h.dataset.jumpReady = '1';
+      h.classList.add('jumpable');
+      var id = anchorFor(key);
+      var tag = document.createElement('span');
+      tag.className = 'jumpto' + (id ? '' : ' none');
+      tag.textContent = id ? '시트에서 보기 →' : '원칙(시트 없음)';
+      h.appendChild(tag);
+      h.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        jump(key, t.replace(/시트에서 보기 →|원칙\(시트 없음\)/, '').trim().slice(0, 40));
+      });
+    });
+  }
+  decorate();
+  // 챕터를 펼칠 때 새로 그려지는 소절에도 붙인다
+  document.addEventListener('toggle', function(){ setTimeout(decorate, 0); }, true);
+
+  try { if(localStorage.getItem('etf-split') === '1') setSplit(true); } catch(e){}
 })();
 </script>
