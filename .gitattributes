@@ -2,6 +2,10 @@
 # 파이프라인이 생성하는 파일은 항상 LF로 고정.
 * text=auto eol=lf
 
+# 단, 윈도우 배치는 CRLF 유지 (cmd.exe 가 LF-only 파일에서 오동작할 수 있음)
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
 *.png binary
 *.jpg binary
 *.ico binary
