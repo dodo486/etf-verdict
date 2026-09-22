@@ -301,11 +301,14 @@
   }
 
   /* ── 검수 모드: 플레이북 ↔ 시트 좌우 분할 ───────────────────────── */
-  .splitbtn{background:none; border:1px solid var(--line); color:var(--mute); font:inherit;
-    font-size:13px; font-weight:700; padding:6px 12px; border-radius:8px; cursor:pointer;
-    margin-left:auto; align-self:center}
-  .splitbtn:hover{color:var(--gold); border-color:var(--gold-dim)}
-  .splitbtn.on{background:rgba(212,162,78,.14); color:var(--gold); border-color:var(--gold-dim)}
+  .splitbtn{background:linear-gradient(180deg,#e0b463,#c9973f); border:1px solid #f0cd8a;
+    color:#1a1205; font:inherit; font-size:13.5px; font-weight:800; padding:7px 15px;
+    border-radius:8px; cursor:pointer; margin-left:auto; align-self:center;
+    box-shadow:0 2px 10px rgba(212,162,78,.35); white-space:nowrap}
+  .splitbtn:hover{filter:brightness(1.1)}
+  .splitbtn:focus-visible{outline:2px solid var(--head); outline-offset:2px}
+  .splitbtn.on{background:var(--surface); color:var(--gold); border-color:var(--gold-dim); box-shadow:none}
+  @media(max-width:560px){.splitbtn{font-size:12px; padding:6px 10px}}
 
   body.split #panel-playbook, body.split #panel-sheet{
     display:block; position:fixed; top:var(--splittop,96px); bottom:0;
