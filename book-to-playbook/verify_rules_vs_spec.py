@@ -54,6 +54,8 @@ from paths import BASE
 
 import book_source
 from verify_coverage import TOKEN_RE, norm   # 토큰 정의는 하나뿐이어야 한다
+# 면제 형식·분류도 하나뿐이어야 한다(복붙하면 두 검사기의 면제 기준이 갈라진다)
+from verify_coverage import exempt_entries, exempt_help
 
 EXEMPT = os.path.join(BASE, "coverage_exempt.json")
 
@@ -117,9 +119,19 @@ def load_exempt():
 
 
 def exempt_of(slug, bucket):
-    """coverage_exempt.json 과 **같은 방식** — 사유가 비면 면제되지 않는다."""
-    d = (load_exempt().get(slug, {}) or {}).get(bucket, {}) or {}
-    return {k: v for k, v in d.items() if isinstance(v, str) and v.strip()}
+    """coverage_exempt.json 과 **같은 방식** — 분류(kind)가 허용 목록 밖이거나
+    사유(why)가 비면 면제되지 않는다. 옛 문자열 형식도 인정하지 않는다."""
+    return exempt_entries((load_exempt().get(slug, {}) or {}).get(bucket))[0]
+
+
+def exempt_rejected(slug):
+    """이 검사기가 읽는 두 버킷에서 **인정되지 않은** 면제 목록."""
+    out = []
+    for bucket in ("_rules_vs_spec", "_rules_vs_spec_spec"):
+        d = (load_exempt().get(slug, {}) or {}).get(bucket)
+        for tok, why in exempt_entries(d)[1]:
+            out.append(("%s / %s" % (bucket, tok), why))
+    return out
 
 
 def spec_items(spec):
@@ -418,6 +430,15 @@ def main(argv):
         print("%s — 규칙 %d개(ref 있는 것만, %s) · spec 항목 %d개(%s)"
               % (slug, len(rules), rel(rp), len(items), rel(sp)))
 
+        # ---- 면제부터 검사한다 — 인정되지 않는 면제는 위반으로 센다
+        rej = exempt_rejected(slug)
+        if rej:
+            print("  [면제] 인정되지 않는 면제 %d건" % len(rej))
+            for where, why in rej:
+                print("    ✗ %-52s %s" % (where[:52], why))
+            print(exempt_help())
+        bad += len(rej)
+
         # ---- 빈 입력으로 '이상 없음'을 내지 않는다
         if not rules or not items:
             print("  ✗ 입력이 비었습니다(규칙 %d · spec %d) — 이 검사는 돌지 않았습니다."
@@ -465,7 +486,9 @@ def main(argv):
         print("  ① 수집요청을 규칙에 맞춘다(데이터를 구할 수 있으면 구한다)")
         print("  ② 못 구하면 source:\"manual\" + reason 으로 **미구현이라고 적는다**")
         print("  ③ 규칙이 아닌 숫자라면 coverage_exempt.json 의 "
-              "`_rules_vs_spec` / `_rules_vs_spec_spec` 에 **사유를 적어** 면제한다")
+              "`_rules_vs_spec` / `_rules_vs_spec_spec` 에 "
+              "**분류(kind)와 사유(why)를 적어** 면제한다")
+        print(exempt_help())
         print("규칙 문구(저자 문구)를 spec 에 맞춰 고치는 건 선택지가 아니다.")
     if blocked:
         print("-" * 74)

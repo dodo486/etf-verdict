@@ -60,7 +60,14 @@ body{{padding-left:var(--rail)}}
     m2 = re.search(r'<body[^>]*>', html, re.I)
     if m2:
         return html[:m2.end()] + "\n" + rail + html[m2.end():]
-    return rail + html
+
+    # <body> 가 없는 자체완결 문서(이 리포의 책 페이지)는 charset 선언 **뒤에**
+    # 넣는다. 맨 앞에 붙이면 <meta charset> 이 브라우저의 1024바이트 스니핑 창
+    # 밖으로 밀려, charset 헤더를 안 보내는 서버나 file:// 에서 한글이 깨진다.
+    m3 = re.search(r'<meta\s+charset=[^>]*>', html, re.I)
+    if m3:
+        return html[:m3.end()] + "\n" + rail + html[m3.end():]
+    return '<meta charset="utf-8">\n' + rail + html
 
 if __name__ == "__main__":
     import sys

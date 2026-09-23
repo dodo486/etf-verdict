@@ -33,8 +33,10 @@ coverage-data 에 `status:"reflected"` 라고 써넣으면 그대로 ✅가 찍�
 반대로 **안 보이면 거의 확실히 빠진 것**이다. 즉 이 검사는 거짓 ✅를 잡는 용도다.
 
 숫자를 안 쓰고 구현한 항목, 저자 예시 금액처럼 규칙이 아닌 숫자는 오탐이 된다.
-그런 건 `coverage_exempt.json` 에 **이유를 적어** 면제한다. 침묵으로 넘기지 못하게
-이유 문자열을 필수로 받는다.
+그런 건 `coverage_exempt.json` 에 **분류(kind)와 사유(why)를 적어** 면제한다.
+사유만 받던 시절엔 "저자 조건과 구현이 다르다"가 면제로 덮였다 — 그래서 분류를
+강제하고, 허용 분류(설명·예시·표기차이·단위·UI) 밖이면 면제로 인정하지 않는다.
+**'구현이 다름'은 분류가 아니다.** 그건 gap 으로 내리거나 구현할 일이다.
 
 ## 사용
 
@@ -339,6 +341,87 @@ def load_exempt():
     return {}
 
 
+# ---------------------------------------------------------------- 면제 분류
+# 면제는 **검사를 끄는 스위치**다. 사유를 받는 것만으로는 부족했다 — 사유가
+# 타당한지를 아무도 안 봤고, 실제로 "저자 조건과 구현이 다르다"가 면제로 덮여
+# 있었다(3-1·4-1·7-1·7-5. 전부 저자의 시간 조건이 수익률 등으로 대체된 모양).
+# 그래서 사유에 **분류를 강제한다.** 분류는 아래 다섯뿐이고 '구현이 다름'은
+# 없다 — 그건 면제가 아니라 gap 이거나 구현 대상이다.
+EXEMPT_KINDS = {
+    "설명": "규칙이 아니라 설명·심리 경고 문장에 나온 숫자",
+    "예시": "저자가 든 사례 수치(임계값 아님)",
+    "표기차이": "같은 값의 다른 표기(10거래일↔10일, %p↔%포인트)",
+    "단위": "소요시간·항목 개수 등 판정 임계값이 아닌 수치",
+    "UI": "매매 규칙이 아닌 화면 코드",
+}
+
+EXEMPT_FORM = '"<토큰>": {"kind": "<분류>", "why": "<사유>"}'
+
+
+def exempt_help():
+    """면제가 거부됐을 때 보여줄 안내문."""
+    lines = ["  면제 형식: %s" % EXEMPT_FORM, "  허용 분류는 다섯뿐입니다."]
+    lines += ["    · %-4s %s" % (k, v) for k, v in EXEMPT_KINDS.items()]
+    lines.append("  '구현이 다름'은 허용 분류가 **아닙니다** — 저자 조건과 구현이 다르면")
+    lines.append("  면제가 아니라 status 를 gap 으로 내리거나 구현할 것.")
+    return "\n".join(lines)
+
+
+def exempt_entries(bucket):
+    """{토큰: {kind, why}} 에서 **유효한 면제만** 추린다. (유효, 거부목록) 반환.
+
+    옛 문자열 형식({토큰: "사유"})은 분류가 없으므로 면제로 인정하지 않는다.
+    """
+    valid, bad = {}, []
+    for tok, v in (bucket or {}).items():
+        if isinstance(v, str):
+            bad.append((tok, "옛 문자열 형식(분류 없음) — %s 로 바꿀 것" % EXEMPT_FORM))
+            continue
+        if not isinstance(v, dict):
+            bad.append((tok, "형식이 잘못됨 — %s 이어야 함" % EXEMPT_FORM))
+            continue
+        kind = v.get("kind")
+        kind = kind.strip() if isinstance(kind, str) else ""
+        why = v.get("why")
+        why = why.strip() if isinstance(why, str) else ""
+        if not kind:
+            bad.append((tok, "kind 없음"))
+        elif kind not in EXEMPT_KINDS:
+            bad.append((tok, "허용 분류가 아님: '%s'" % kind))
+        elif not why:
+            bad.append((tok, "why 가 비어 있음(분류 '%s')" % kind))
+        else:
+            valid[tok] = v
+    return valid, bad
+
+
+def exempt_bucket(slug, key):
+    """책 slug 의 버킷 하나 — 유효한 면제만 돌려준다(거부분은 audit_exempt 가 보고)."""
+    return exempt_entries((load_exempt().get(slug, {}) or {}).get(key))[0]
+
+
+def audit_exempt():
+    """면제 파일 전수 검사 — reflected 가 아닌 소절의 면제까지 전부 본다.
+
+    소절 status 가 gap 이면 그 면제는 지금 쓰이지 않지만, 형식이 깨진 채
+    남아 있다가 나중에 조용히 되살아나는 걸 막는다.
+    """
+    out = []
+    for slug, buckets in (load_exempt() or {}).items():
+        if slug.startswith("_"):          # _README
+            continue
+        if not isinstance(buckets, dict):
+            out.append((slug, "(책)", "면제 목록이 dict 가 아님"))
+            continue
+        for key, bucket in buckets.items():
+            if not isinstance(bucket, dict):
+                out.append((slug, key, "버킷이 dict 가 아님"))
+                continue
+            for tok, why in exempt_entries(bucket)[1]:
+                out.append((slug, "%s / %s" % (key, tok), why))
+    return out
+
+
 def analyze(slug, path, rules=None):
     html = io.open(path, encoding="utf-8").read()
     m = re.search(r'<script type="application/json" id="coverage-data">\s*(\{.*?\})\s*</script>',
@@ -351,7 +434,7 @@ def analyze(slug, path, rules=None):
         return None
     secs = split_sections(ms.group(1))
     scopes = sheet_scopes(html, rules)
-    ex = load_exempt().get(slug, {})
+    ex = load_exempt().get(slug, {}) or {}
 
     rows = []
     for key, c in cov.items():
@@ -380,7 +463,8 @@ def analyze(slug, path, rules=None):
             rows.append({"key": key, "err": "step=%s 의 구현 범위를 못 찾음" % c.get("step")})
             continue
         miss = [t for t in toks if t not in scope]
-        exs = ex.get(key, {})
+        # 분류가 없거나 허용 목록 밖인 면제는 **면제로 치지 않는다**
+        exs = exempt_entries(ex.get(key))[0]
         unresolved = [t for t in miss if t not in exs]
         rows.append({"key": key, "step": c.get("step"), "tokens": toks,
                      "miss": miss, "unresolved": unresolved, "exempt": exs})
@@ -417,7 +501,7 @@ def reverse_audit(slug, path, rules=None):
 
     book_bare = norm(re.sub(r"[+-](?=\d)", "", ms.group(1)))
 
-    ex = (load_exempt().get(slug, {}) or {}).get("_sheet", {})
+    ex = exempt_bucket(slug, "_sheet")
     seen, out = set(), []
     for t in TOKEN_RE.findall(rule_text):
         t = norm(t[0] if isinstance(t, tuple) else t)
@@ -549,7 +633,7 @@ def attribution_audit(slug, path, rules=None):
                 out.append(norm(piece))
         return out
 
-    ex = (load_exempt().get(slug, {}) or {}).get("_attribution", {})
+    ex = exempt_bucket(slug, "_attribution")
 
     out = []
     for prod, items in product_rules(html, rules).items():
@@ -579,6 +663,20 @@ def main(argv):
 
     pages = book_pages()
     total_bad, out_list = 0, {}
+    from verify_source_integrity import report_stale  # noqa: PLC0415
+    if report_stale(pages):
+        total_bad += 1
+
+    # ---- 면제 자체를 먼저 검사한다. 면제는 검사를 끄는 스위치이므로
+    #      '사유가 적혀 있다'가 아니라 '분류가 타당하다'까지 봐야 한다.
+    exbad = audit_exempt()
+    if exbad and not show:
+        print("coverage_exempt.json — 인정되지 않는 면제 %d건" % len(exbad))
+        for slug, where, why in exbad:
+            print("  ✗ %-8s %-46s %s" % (slug, where[:46], why))
+        print(exempt_help())
+        print("")
+    total_bad += len(exbad)
 
     for slug, path in sorted(pages.items()):
         rules = load_rules(slug)
@@ -641,18 +739,21 @@ def main(argv):
                 continue
             print("  ⚠ %-6s [%s] 구현에서 안 보이는 수치: %s"
                   % (r["key"], r.get("step"), ", ".join(r["unresolved"])))
-            out_list[slug][r["key"]] = {t: "" for t in r["unresolved"]}
+            out_list[slug][r["key"]] = {
+                t: {"kind": "", "why": ""} for t in r["unresolved"]}
 
     if listing:
-        print("\n--- coverage_exempt.json 양식 (사유를 채워 넣으세요) ---")
+        print("\n--- coverage_exempt.json 양식 (분류와 사유를 채워 넣으세요) ---")
         print(json.dumps(out_list, ensure_ascii=False, indent=2))
+        print(exempt_help())
         return 0
 
     if total_bad:
         print("\n" + "=" * 70)
         print("'✅ 반영'이라고 적혀 있는데 구현 범위에서 그 수치가 안 보이는 소절이 있습니다.")
         print("  ① 구현한다  ② status 를 gap 으로 내린다")
-        print("  ③ 규칙이 아닌 숫자라면 coverage_exempt.json 에 **사유를 적어** 면제한다")
+        print("  ③ 규칙이 아닌 숫자라면 coverage_exempt.json 에 **분류와 사유를 적어** 면제한다")
+        print(exempt_help())
         print("=" * 70)
         return 1
 

@@ -67,6 +67,39 @@ def book_pages():
     return out
 
 
+# ------------------------------------------------------------ 낡은 배포본
+def stale_pages(pages):
+    """배포본이 작업본보다 오래된 책 목록 -> [(slug, 검사대상, 작업본)]."""
+    out = []
+    for slug, path in sorted(pages.items()):
+        src = os.path.join(BASE, "%s-playbook.html" % slug)
+        if path == src or not os.path.exists(src):
+            continue
+        try:
+            if os.path.getmtime(path) < os.path.getmtime(src):
+                out.append((slug, path, src))
+        except OSError:
+            pass
+    return out
+
+
+def report_stale(pages):
+    """낡은 배포본이 있으면 밝히고 True(=실패) 를 돌려준다.
+
+    통과로 찍으면 어제 페이지를 검사하고 '이상 없음'이라고 말하는 게 된다.
+    """
+    bad = stale_pages(pages)
+    if not bad:
+        return False
+    print("")
+    print("낡은 배포본을 검사했습니다 — 이 결과는 지금 작업본의 상태가 아닙니다.")
+    for slug, path, src in bad:
+        print("  ! %-8s 검사 대상  %s" % (slug, path))
+        print("           작업본이 더 최신  %s" % src)
+    print("  발행하거나(python run.py publish), 작업본을 직접 보려면")
+    print("  BOOK_TO_PLAYBOOK_PUBLIC 을 없는 경로로 지정해 다시 돌리세요.")
+    return True
+
 # ---------------------------------------------------------------- 규칙 파일
 def rules_path(slug):
     return os.path.join(BASE, "books", slug, "rules.json")
@@ -244,6 +277,7 @@ def main(argv):
     if not pages:
         print("검사할 책 페이지를 찾지 못했습니다.", file=sys.stderr)
         return 2
+    stale = report_stale(pages)
 
     if show:
         p = pages.get(show)
@@ -298,6 +332,10 @@ def main(argv):
                      ", ".join(sorted(parts["rule_data"])) or "없음",
                      nlab, parts.get("rule_source")))
 
+    if accept and stale:
+        print("\n낡은 배포본을 기준으로 박을 수 없습니다. 발행 후 다시 --accept 하세요.")
+        return 1
+
     if accept:
         save_baseline(cur)
         print("\n기준 갱신 완료 → %s" % os.path.basename(BASELINE))
@@ -326,6 +364,9 @@ def main(argv):
 
     if new:
         print("\n새 책 %s 의 기준이 없습니다. --accept 로 등록하세요." % ", ".join(new))
+        return 1
+
+    if stale:
         return 1
 
     print("\n전부 통과 — 저자 원문 무결.")
