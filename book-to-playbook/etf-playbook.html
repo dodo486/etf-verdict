@@ -2706,7 +2706,11 @@
       var checks = document.querySelectorAll('#panel-sheet [id="chk-' + key + '"], #panel-sheet [id^="chk-' + key + '-"]');
       var scrollTo = checks.length ? checks[0] : target;      // 개별 항목 우선, 없으면 STEP 제목
       if(document.body.classList.contains('split') && pane){
-        pane.scrollTop = scrollTo.offsetTop - 12;
+        // offsetTop 은 offsetParent(여기선 positioned 된 entryCard) 기준이라
+        // pane 스크롤에 그대로 쓰면 항상 맨 위(STEP 제목)로 튄다.
+        // pane 뷰포트 대비 실제 위치로 계산해 정확한 항목으로 스크롤한다.
+        var pr = pane.getBoundingClientRect(), er = scrollTo.getBoundingClientRect();
+        pane.scrollTo({top: pane.scrollTop + (er.top - pr.top) - 12, behavior:'smooth'});
       } else {
         scrollTo.scrollIntoView({behavior:'smooth', block:'start'});
       }
