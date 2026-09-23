@@ -137,6 +137,32 @@ def _const_blocks(html):
     return out
 
 
+def strip_provenance(o):
+    """해시 대상에서 규칙의 `ref`(출처 주장)만 걷어낸다. 저자 문구는 그대로 둔다.
+
+    **왜 빼나.** 해시가 지키는 것은 *저자의 말*이다. `ref` 는 저자의 말이 아니라
+    "이 규칙의 근거가 어느 소절인가"라는 **우리가 붙인 메타데이터**이고, 계약 2를
+    채우는 동안 40개 규칙에 하나씩 보강된다. 그걸 해시에 넣어 두면 ref 를 한 개
+    달 때마다 "저자 원문이 바뀜"으로 실패하고 `--accept` 를 요구한다.
+    `--accept` 가 일상이 되는 순간 이 보호는 **무의미해진다** — 진짜 원문 수정도
+    같은 줄에 섞여 지나간다.
+
+    역할이 겹치기도 한다. `ref` 의 진위는 해시가 아니라 `verify_coverage.py` 의
+    4단 검사(ref 존재 · 소절 실존 · 종목 장 일치 · 수치 토큰 일치)가 **매번 실증**한다.
+    해시는 "안 바뀌었나"만 보므로 틀린 ref 를 고정해 봐야 틀린 채로 지킬 뿐이다.
+
+    걷어내는 범위는 **규칙 dict(라벨 `t` 를 가진 것)의 `ref` 키 하나뿐**이다.
+    `{"type":"volume_ratio","ref":20}` 처럼 `ref` 가 수치 파라미터인 자리는
+    저자 문구를 정량화한 값이므로 그대로 해시한다.
+    """
+    if isinstance(o, dict):
+        drop = {"ref"} if isinstance(o.get("t"), str) else set()
+        return {k: strip_provenance(v) for k, v in o.items() if k not in drop}
+    if isinstance(o, list):
+        return [strip_provenance(v) for v in o]
+    return o
+
+
 def extract(html, slug=None):
     """저자 문구에 해당하는 조각만 뽑아 dict로."""
     parts = {}
@@ -167,11 +193,13 @@ def extract(html, slug=None):
     #    HTML 안 JS 상수만 보던 코드를 그대로 두면 분리된 책은 해시 대상이 0개가 되고,
     #    그 상태로 --accept 하면 "지킬 게 없음"이 기준으로 박힌다 = 보호 상실.
     #    그래서 파일이 있으면 **파일을** 해시한다(HTML 사본의 일치는 inject_rules --check 몫).
+    #    단 `ref`(출처 주장)는 해시 대상이 아니다 — strip_provenance 주석 참고.
     rules = load_rules(slug)
     if rules is not None:
-        parts["rule_data"] = {k: json.dumps(v, ensure_ascii=False, sort_keys=True)
+        parts["rule_data"] = {k: json.dumps(strip_provenance(v),
+                                            ensure_ascii=False, sort_keys=True)
                               for k, v in rules.items()}
-        parts["rule_source"] = "books/%s/rules.json" % slug
+        parts["rule_source"] = "books/%s/rules.json (ref 제외)" % slug
     else:
         parts["rule_data"] = _const_blocks(html)
         parts["rule_source"] = "HTML 안 JS 상수"
