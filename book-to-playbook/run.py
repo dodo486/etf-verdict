@@ -160,7 +160,7 @@ def publish_git(r, do_push=True):
 # logs/verify-history.jsonl — 발행마다 한 줄. 숫자는 verify_contract.py /
 # verify_rules_vs_spec.py 가 --json 으로 이미 계산해 낸 것을 그대로 옮긴다.
 # 여기서 다시 세지 않는다 — 두 곳의 셈이 갈리면 그게 오늘 하루 종일 잡은 실패 양식이다.
-HISTORY_FIELDS = ("gap", "violations", "exempt", "leaks")  # 악화(값 증가)를 감시하는 항목
+HISTORY_FIELDS = ("gap", "violations", "exempt", "leaks", "fabrications")  # 악화(값 증가)를 감시하는 항목
 
 
 def verify_json_stats(script):
@@ -205,11 +205,15 @@ def record_verify_history(r, mode):
     """
     contract_stats = verify_json_stats("verify_contract.py")      # {slug: {reflected,gap,mindset,rules,ref_missing,spec_items,exempt,leaks}}
     rvs_stats = verify_json_stats("verify_rules_vs_spec.py")      # {slug: violations|null}
+    fab_stats = verify_json_stats("verify_source_fabrication.py")  # {slug: {claims,orphans,ungrounded,fabrications}|null 값들}
 
     books = {}
-    for slug in set(contract_stats) | set(rvs_stats):
+    for slug in set(contract_stats) | set(rvs_stats) | set(fab_stats):
         entry = dict(contract_stats.get(slug) or {})
         entry["violations"] = rvs_stats.get(slug)
+        # 창작 검사 숫자(fabrications 등)를 그대로 옮긴다. 검사 불가 책은 None 이 담겨
+        # 온다 — 0(돌았고 없음)과 구분된다. 여기서 다시 세지 않는다.
+        entry.update(fab_stats.get(slug) or {})
         books[slug] = entry
 
     prev_books = (load_last_history() or {}).get("books") or {}
@@ -270,7 +274,7 @@ def main(argv):
     r.step("publish_pages.py")
     r.step("build_home.py", required=False)
 
-    # ---- 검사 4종 — 반드시 여기(publish/build_home 직후 · git 커밋/푸시 이전)에서 돈다.
+    # ---- 검사 5종 — 반드시 여기(publish/build_home 직후 · git 커밋/푸시 이전)에서 돈다.
     #
     # 왜 이 위치인가: 검사기 넷은 모두 PUBLIC/<slug>/index.html(방금 위에서 새로 쓴
     # 배포본)을 작업본보다 **우선** 읽는다.
@@ -281,12 +285,13 @@ def main(argv):
     #     안 나간다. 그래서 publish_pages/build_home 다음 · publish_git 이전인
     #     지금 위치가 유일하게 맞다.
     #
-    # 넷의 순서(사람이 읽는 로그 기준, 판정에는 영향 없음 — 서로 독립):
-    #   원문 무결(있는 그대로인가) → 커버리지(반영 주장이 맞는가)
-    #   → 계약(형식을 갖췄는가) → 규칙↔수집(층 사이가 맞는가)
+    # 다섯의 순서(사람이 읽는 로그 기준, 판정에는 영향 없음 — 서로 독립):
+    #   원문 무결(있는 그대로인가) → 원문 창작(플레이북이 저자에게 없는 걸 안 돌렸나)
+    #   → 커버리지(반영 주장이 맞는가) → 계약(형식을 갖췄는가) → 규칙↔수집(층 사이가 맞는가)
+    # 원문 창작은 입력(책→플레이북) 쪽 근거 검사라 원문 무결 바로 뒤에 온다.
     # 앞이 깨지면 뒤의 결과도 그 위에서 흔들리므로, 좁은 것부터 넓은 것 순.
-    checks = ["verify_source_integrity.py", "verify_coverage.py",
-              "verify_contract.py", "verify_rules_vs_spec.py"]
+    checks = ["verify_source_integrity.py", "verify_source_fabrication.py",
+              "verify_coverage.py", "verify_contract.py", "verify_rules_vs_spec.py"]
     codes = {}
     for script in checks:
         code, out, err = r.verify(script)
@@ -304,6 +309,10 @@ def main(argv):
     blocking = []
     if codes["verify_source_integrity.py"] != 0:
         blocking.append("verify_source_integrity.py — 저자 원문이 바뀜")
+    if codes["verify_source_fabrication.py"] == 1:
+        blocking.append("verify_source_fabrication.py — 플레이북이 책에 없는 걸 지어냄(창작)")
+    elif codes["verify_source_fabrication.py"] == 2:
+        r.say("!! verify_source_fabrication.py: 검사 불가(경고) — 발행은 막지 않음")
     if codes["verify_coverage.py"] != 0:
         blocking.append("verify_coverage.py — 커버리지 배지가 거짓")
     if codes["verify_contract.py"] == 1:

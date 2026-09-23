@@ -110,6 +110,68 @@ python verify_contract.py      # 책별·조항별 충족/미충족 표, 미충�
 
 '미적용'을 '통과'로 적는 순간 검증층은 다시 거짓이 된다. 못 본 것은 못 봤다고 적는다.
 
+## 검증 게이트 자기수정 루프 (새 책 표준 절차)
+
+새 책 하나를 "책 넣으면 완주"로 끌고 가는 표준 절차. **저작(1~4단계)은 LLM이 하고,
+게이트(5단계)는 결정론적 검사기가 한다** — 이 분리를 절대 흐리지 않는다. 검사기를
+느슨하게 만들어 통과시키는 것은 이 루프의 목적을 정면으로 배반한다.
+
+```
+1) 자르기    원문 → 소절 단위 + 고유 키 (N-n · 프롤로그 · 에필로그)
+             → #src(플레이북 마크다운) / books/<slug>/source_index.json
+             (book_source.py --write 가 소절키·제목·줄범위·해시·정량토큰을 산출)
+2) 추출      각 소절 → 저자 매매규칙, books/<slug>/rules.json (t=라벨).
+             규칙마다 ref(소절 키). 라벨의 정량 토큰은 그 ref 소절 원문에서 나온
+             토큰이어야 한다(창작 금지). 근거 소절을 못 대는 규칙은 넣지 않는다.
+3) 분류      모든 소절 전수 → reflected / gap / mindset
+             → 책 HTML 의 coverage-data 블록(#src 소절 키 전부를 map 에 담는다)
+4) 수집요청  각 규칙 → books/<slug>/data_spec.json 항목(+같은 ref).
+             자동 데이터 가능하면 source 지정, 불가면 source:"manual" + reason.
+             (규칙 자체는 저자 주장이므로 manual 로 찍지 않는다 — manual 은
+              '데이터 수집이 수동'이라는 뜻이지 '저자가 말한 적 없다'가 아니다.)
+5) 게이트    5검사를 --json 으로 그 책 slug 기준 실행:
+             verify_source_integrity · verify_source_fabrication · verify_coverage
+             · verify_contract · verify_rules_vs_spec
+6) 수리      실패를 읽고 산출물을 고쳐 5 재실행 (아래 수리 매핑):
+7) 수렴      그 책의 blocking(코드1) = 0 까지. 남는 건 전부 '수동/미구현'으로 표시된
+             warning(코드2) 뿐이어야 한다.
+```
+
+### 수리 매핑 — 어느 검사 실패 → 어느 산출물을 고치나
+
+| 검사 실패 | 실패 뜻 | 고칠 산출물 |
+|---|---|---|
+| `verify_source_fabrication` **창작** (orphan/ungrounded) | 규칙 ref 가 없거나·없는 소절을 가리키거나·규칙 토큰이 그 소절 원문 토큰에 없음 | `rules.json` — 올바른 ref 를 찾아 달거나, **근거가 없으면 그 규칙을 삭제**(창작이었던 것). 원문은 손대지 않는다 |
+| `verify_coverage` **미분류/거짓배지** | 소절이 map 에 없거나·reflected 주장의 토큰이 시트 구현 범위에 없음 | `coverage-data` — 분류를 채우거나, reflected→gap 로 배지 정정 |
+| `verify_rules_vs_spec` **위반** | 규칙 ref 에 짝지을 spec 항목이 없거나(nospec)·규칙 토큰을 spec 이 못 담거나(cond)·spec 파라미터가 원문에 없음(param, 창작) | `data_spec.json` — 규칙 ref 마다 spec 항목을 만들고 규칙 토큰을 담는다 |
+| `verify_contract` **미충족** | 계약 1~4 중 형식이 빔 | 해당 산출물을 계약 형식으로 채운다(source_index / rules.json+ref / coverage-data / data_spec+ref) · HTML 안 규칙 리터럴(누출)은 `id="rules"` JSON 안으로 이동 |
+| `verify_source_integrity` **실패** | 저자 원문(#src·def_table·labels·rule_data)이 바뀜 | **원문을 되돌린다.** 절대 원문을 고쳐 검사에 맞추지 않는다. 의도한 신규 등록만 `--accept` 로 기준 갱신 |
+
+**절대원칙(재확인).** 책 = 사양, 코드 = 구현. **통과하려고 #src/원문을 고치지 않는다.**
+어긋나면 ①구현을 원문에 맞추거나 ②`source:"manual"` + `reason` 으로 미구현/수동 표시.
+그 둘뿐이다.
+
+### 책별 게이트 규칙 — 전역 종료코드가 아니라 그 slug 의 --json 결과로 판정
+
+`run.py` 의 전역 종료코드는 **다른 책**의 실패로도 빨개진다(예: etf 에 무관한 고아 규칙
+4개가 있으면 전역이 빨갛다). 그러니 새 책을 게이트할 때는 **전역 exit 이 아니라 각
+검사의 `--json` 결과에서 그 slug 의 값만** 본다:
+
+```
+python verify_source_fabrication.py --json   # {slug:{claims,orphans,ungrounded,fabrications}}
+python verify_contract.py --json             # {slug:{reflected,gap,mindset,rules,ref_missing,spec_items,leaks,...}}
+python verify_rules_vs_spec.py --json        # {slug: 위반수|null}
+```
+
+그 slug 에 대해 blocking = 0 의 정의:
+- fabrication: `fabrications == 0` **이고** `claims > 0` (규칙이 실제로 근거를 대고 있음.
+  값이 null 이면 '검사 불가' — 통과 아님)
+- contract: `leaks == 0` 이고 계약 1~4 충족(값이 null 이 아님)
+- rules_vs_spec: 위반수 `== 0` (null 은 '검사 불가' — 통과 아님)
+- coverage / source_integrity: 그 책 항목에 미해결·불일치 0
+
+null(검사 불가)은 통과가 아니다. 계약 구조를 못 채운 것이다.
+
 ## 입력
 - 정제된 텍스트(.md) 있음 → 바로 STEP 1
 - 스캔 PDF만 있음 → 먼저 이미지화→OCR→청킹(jhts/jhts2 파이프라인 재사용) 후 STEP 1
@@ -157,4 +219,5 @@ Artifact 도구로 HTML 게시(같은 책은 같은 file_path→같은 URL 재�
 - `templates/example-etf.html` — 디자인/구조 기준 템플릿(ETF 완성본)
 - `etf_daily_verdict.py` / `run.sh` / `telegram.env.example` — 데일리 엔진
 - `verify_contract.py` — 책 계약 4조 검사(절대 규칙 3). 못 채운 책은 등록 불가
+- `verify_source_fabrication.py` — 구간① 창작 검사. 플레이북이 책에 없는 저자 주장을 지어내지 않았나(정량 토큰이 ref 소절 원문에 근거하나)
 - `logs/` — 판정 로그

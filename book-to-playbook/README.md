@@ -77,6 +77,7 @@
 | `publish_pages.py` | 판정 병합 → `public/etf/index.html` |
 | `verify_etf_migration.py` | 신규 엔진 ↔ 레거시 대조검증 |
 | `verify_source_integrity.py` | **저자 원문 불변 검사**(모든 책). `run.py`가 매 발행마다 실행 |
+| `verify_source_fabrication.py` | **구간① 창작 검사**(모든 책) — 플레이북의 저자-귀속 규칙이 실존 소절(`ref`)에 근거하나 · 그 정량 토큰이 원문 소절에 실제로 있나(없으면 창작) |
 | `verify_coverage.py` | **커버리지 배지 검증**(모든 책) — 원문대로 구현됐나 · 규칙 출처(ref)가 맞나 · 원문에 없는 수치를 쓰지 않았나 |
 | `verify_contract.py` | **책 계약 4조 검사**(모든 책) — 소절 키 · 규칙 `ref` · 커버리지 전수 · spec `ref`. 못 채운 책은 등록 불가 |
 | `coverage_exempt.json` | 위 검사의 면제 목록(사유 필수) |
