@@ -1,0 +1,20 @@
+{
+  "_comment": [
+    "책 원문(저작권물)은 이 리포에 두지 않는다. 여기엔 '어디에 있는가'만 적는다.",
+    "리포에 남는 건 books/<slug>/source_index.json — 소절 키·해시·토큰·줄범위뿐이고 본문은 없다.",
+    "덮어쓰기: BOOK_RAW_DIR(디렉터리 전체) / BOOK_SOURCE_ETF·BOOK_SOURCE_SUPPLY(파일 하나)."
+  ],
+  "raw_dir": "D:/jhts2/data/raw",
+  "sources": {
+    "etf": {
+      "file": "미국-돈복사-ETF-투자방법.md",
+      "chapter_style": "Chapter",
+      "has_toc": false
+    },
+    "supply": {
+      "file": "외국인-매집-3일-먼저-읽는-법.md",
+      "chapter_style": "장",
+      "has_toc": true
+    }
+  }
+}
