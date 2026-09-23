@@ -324,7 +324,7 @@ def verdict(prod):
     intraday = []
     if filt and not av and score >= 3:
         if prod == "TQQQ":
-            intraday = ["나스닥 시초가 위 유지","첫 눌림 저점 높임","빅테크 3개 중 2개↑"]
+            intraday = ["나스닥 시초가 위 유지","첫 눌림 저점 높임","빅테크 7종목 중 3개↑"]
         elif prod == "SOXL":
             intraday = ["엔비디아 시초가 위","AMD 전일 저점 지킴","브로드컴 안 밀림"]
         else:
