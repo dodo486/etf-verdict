@@ -44,9 +44,13 @@ import os
 import re
 import sys
 import unicodedata
+from collections import Counter
 
 import paths
 from paths import BASE, PUBLIC
+# 면제 분류(kind/why 검증)는 verify_coverage 가 유일한 기준이다 — 여기서 다시 만들면
+# 두 검사기의 면제 기준이 갈라진다. --json 통계(exempt 총수)만 그 판정을 빌려 쓴다.
+from verify_coverage import exempt_entries, EXEMPT
 
 KEY_RE = re.compile(r"^(?:[0-9]+-[0-9]+|프롤로그|에필로그)$")
 HEAD_RE = re.compile(r"^#{2,3}\s*([0-9]+-[0-9]+|프롤로그|에필로그)[.\s]", re.M)
@@ -238,7 +242,81 @@ def c4(slug):
     return True, "%s: %d항목 전부 ref 있음" % (os.path.basename(p), len(items))
 
 
+# ---------------------------------------------------------------- --json 통계
+# 판정(통과/미충족)은 위 c1~c4/c_leak 이 이미 끝낸 일이다. 여기서는 그 판정이
+# 이미 읽은 같은 소스(coverage-data 맵 · rules.json · data_spec.json ·
+# coverage_exempt.json)를 다시 열어 **개수만 센다** — 새 판정 기준을 만들지 않는다.
+# run.py 가 logs/verify-history.jsonl 에 남기는 추이 숫자의 출처가 이것이다.
+def coverage_counts(html_path):
+    """c3 이 읽는 커버리지 맵과 같은 것을 다시 열어 상태별 개수만 센다."""
+    if not html_path or not os.path.exists(html_path):
+        return None
+    html = io.open(html_path, encoding="utf-8").read()
+    m = re.search(r'<script type="application/json" id="coverage-data">\s*(\{.*?\})\s*</script>',
+                  html, re.S)
+    if not m:
+        return None
+    cov = json.loads(m.group(1)).get("map", {})
+    c = Counter(v.get("status") for v in cov.values())
+    return {"reflected": c.get("reflected", 0), "gap": c.get("gap", 0),
+            "mindset": c.get("mindset", 0)}
+
+
+def rules_counts(slug):
+    """c2 이 읽는 rules.json 과 같은 것을 다시 열어 규칙 수·ref 미기재 수만 센다."""
+    p = os.path.join(BASE, "books", slug, "rules.json")
+    if not os.path.exists(p):
+        return None
+    rules = list(iter_rules(load_json(p)))
+    miss = [r for r in rules if not r.get("ref")]
+    return {"rules": len(rules), "ref_missing": len(miss)}
+
+
+def spec_item_count(slug):
+    """c4 이 읽는 data_spec 과 같은 것을 다시 열어 항목 수만 센다."""
+    cands = [os.path.join(BASE, "books", slug, "data_spec.json"),
+             os.path.join(BASE, "%s_data_spec.json" % slug)]
+    p = next((c for c in cands if os.path.exists(c)), None)
+    if not p:
+        return None
+    d = load_json(p)
+    items = d.get("items", []) if isinstance(d, dict) else d
+    return len(items)
+
+
+def exempt_count(slug):
+    """coverage_exempt.json 에서 이 책의 **유효한**(분류·사유 통과) 면제 총수(모든 버킷 합).
+
+    유효성 판정은 verify_coverage.exempt_entries 를 그대로 쓴다 — 여기서 새로
+    분류 규칙을 만들지 않는다.
+    """
+    if not os.path.exists(EXEMPT):
+        return 0
+    buckets = load_json(EXEMPT).get(slug, {}) or {}
+    if not isinstance(buckets, dict):
+        return 0
+    total = 0
+    for _key, bucket in buckets.items():
+        valid, _bad = exempt_entries(bucket)
+        total += len(valid)
+    return total
+
+
+def book_stats(slug, html_path):
+    cc = coverage_counts(html_path) or {}
+    rc = rules_counts(slug) or {}
+    status, _note, hits = c_leak(slug)
+    return {
+        "reflected": cc.get("reflected"), "gap": cc.get("gap"), "mindset": cc.get("mindset"),
+        "rules": rc.get("rules"), "ref_missing": rc.get("ref_missing"),
+        "spec_items": spec_item_count(slug),
+        "exempt": exempt_count(slug),
+        "leaks": len(hits) if status is not None else None,
+    }
+
+
 def main(argv):
+    json_mode = "--json" in argv
     books = load_json(os.path.join(BASE, "books.json")).get("books", [])
     rows, bad = [], 0
     for b in books:
@@ -248,53 +326,69 @@ def main(argv):
         rows.append((slug, res))
         bad += sum(1 for ok, _ in res if not ok)
 
-    print("책 계약 검사 — 계약을 못 채우는 책은 검사를 건너뛰는 게 아니라 등록이 안 된다.\n")
-    print("%-8s %s" % ("책", "  ".join(pad(c, 16) for c in CONTRACTS)))
-    print("-" * 78)
-    for slug, res in rows:
-        print("%-8s %s" % (slug, "  ".join(pad("✅ 충족" if ok else "❌ 미충족", 16)
-                                           for ok, _ in res)))
-    for slug, res in rows:
-        miss = [(CONTRACTS[i], d) for i, (ok, d) in enumerate(res) if not ok]
-        if miss:
-            print("\n%s — 미충족 %d조" % (slug, len(miss)))
-            for name, why in miss:
-                print("  ❌ %s %s" % (pad(name, 14), why))
+    if not json_mode:
+        print("책 계약 검사 — 계약을 못 채우는 책은 검사를 건너뛰는 게 아니라 등록이 안 된다.\n")
+        print("%-8s %s" % ("책", "  ".join(pad(c, 16) for c in CONTRACTS)))
+        print("-" * 78)
+        for slug, res in rows:
+            print("%-8s %s" % (slug, "  ".join(pad("✅ 충족" if ok else "❌ 미충족", 16)
+                                               for ok, _ in res)))
+        for slug, res in rows:
+            miss = [(CONTRACTS[i], d) for i, (ok, d) in enumerate(res) if not ok]
+            if miss:
+                print("\n%s — 미충족 %d조" % (slug, len(miss)))
+                for name, why in miss:
+                    print("  ❌ %s %s" % (pad(name, 14), why))
 
-    # ---- 규칙 누출 검사(계약2 보충) — "JSON에 있다"가 아니라 "JSON 밖에 없다"를 본다.
-    print("\n" + "-" * 78)
-    print("규칙 누출 검사(계약2 보충) — id=\"rules\" JSON 밖에 규칙 리터럴(`{t:'...'}`)이 "
-          "있으면 실패.")
+        # ---- 규칙 누출 검사(계약2 보충) — "JSON에 있다"가 아니라 "JSON 밖에 없다"를 본다.
+        print("\n" + "-" * 78)
+        print("규칙 누출 검사(계약2 보충) — id=\"rules\" JSON 밖에 규칙 리터럴(`{t:'...'}`)이 "
+              "있으면 실패.")
+
     leakbad = 0
     for b in books:
         slug = b["slug"]
         ok, note, hits = c_leak(slug)
-        mark = "✅ 없음  " if ok else ("❌ 유출  " if ok is False else "· 미적용 ")
-        print("  %-8s %s %s" % (slug, mark, note))
-        for line, t in hits[:20]:
-            print("      %5d행  %s" % (line, t[:80]))
-        if len(hits) > 20:
-            print("      … 외 %d건 더" % (len(hits) - 20))
+        if not json_mode:
+            mark = "✅ 없음  " if ok else ("❌ 유출  " if ok is False else "· 미적용 ")
+            print("  %-8s %s %s" % (slug, mark, note))
+            for line, t in hits[:20]:
+                print("      %5d행  %s" % (line, t[:80]))
+            if len(hits) > 20:
+                print("      … 외 %d건 더" % (len(hits) - 20))
         if ok is False:
             leakbad += 1
     bad += leakbad
+    # 계약 미충족(경고) 과 규칙 누출(발행 정지) 을 분리해서 센다 — 판정 자체(무엇이
+    # 미충족/유출인가)는 위에서 이미 끝났고, 아래는 그 결과를 두 등급으로 나눠
+    # **보고**만 다르게 한다. 등급 기준(할 일 2): 거짓(누출)=정지, 미충족(경고)=통과시키되 표시.
+    contract_bad = bad - leakbad
 
-    if bad:
+    if json_mode:
+        stats = {b["slug"]: book_stats(b["slug"], book_html(b["slug"])) for b in books}
+        print(json.dumps(stats, ensure_ascii=False))
+    elif bad:
         print("\n" + "=" * 70)
-        if bad - leakbad:
-            print("계약 미충족 %d건. 책을 계약에 맞춰라 — 검사를 느슨하게 만들지 말 것."
-                  % (bad - leakbad))
+        if contract_bad:
+            print("계약 미충족 %d건(경고 — 발행은 막지 않음). 책을 계약에 맞춰라 — "
+                  "검사를 느슨하게 만들지 말 것." % contract_bad)
             print("  계약1: books/<slug>/source_index.json 에 소절 키")
             print("  계약2: books/<slug>/rules.json — 규칙마다 ref (HTML 안 JS 리터럴은 위반)")
             print("  계약3: coverage-data 가 소절 전수를 reflected/gap/mindset 으로 분류")
             print("  계약4: data_spec 항목마다 ref")
         if leakbad:
-            print("규칙 누출 %d건. 위에 찍힌 문구를 books/<slug>/rules.json 으로 옮기고 "
-                  "렌더 코드는 그 JSON을 읽게 고쳐라." % leakbad)
+            print("규칙 누출 %d건(발행 정지). 위에 찍힌 문구를 books/<slug>/rules.json 으로 "
+                  "옮기고 렌더 코드는 그 JSON을 읽게 고쳐라." % leakbad)
         print("=" * 70)
-        return 1
+    else:
+        print("\n전부 통과 — 모든 책이 계약 4조를 충족하고, 규칙 누출도 없다.")
 
-    print("\n전부 통과 — 모든 책이 계약 4조를 충족하고, 규칙 누출도 없다.")
+    # 종료코드: 0=전부 통과 · 1=규칙 누출 있음(발행 정지, 거짓이 새 나간 것)
+    #          · 2=계약 미충족만 있음(경고, 아직 못 채운 것 — 발행은 막지 않음)
+    if leakbad:
+        return 1
+    if contract_bad:
+        return 2
     return 0
 
 

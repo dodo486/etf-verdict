@@ -388,10 +388,18 @@ def main(argv):
     if "--show" in argv:
         i = argv.index("--show")
         show = argv[i + 1] if i + 1 < len(argv) else None
+    json_mode = "--json" in argv
+
+    def out(msg=""):
+        if not json_mode:
+            print(msg)
 
     bad = 0            # 위반
     blocked = 0        # 검사 불가 — '통과'가 아니다
     skipped_checks = []
+    # --json 통계: 책마다 위반 건수. None = 이 책은 검사 자체가 안 돌았다(검사 불가) —
+    # 0 과 다르다. 0 은 "돌았고 위반 없음", None 은 "안 돌았다".
+    book_violations = {}
 
     for book in books():
         slug = book["slug"]
@@ -404,8 +412,9 @@ def main(argv):
         if sp is None:
             why.append("data_spec 없음(계약4 미충족)")
         if why:
-            print("· %-8s 검사 불가 — %s" % (slug, " · ".join(why)))
+            out("· %-8s 검사 불가 — %s" % (slug, " · ".join(why)))
             blocked += 1
+            book_violations[slug] = None
             continue
 
         rules_doc = load_json(rp)
@@ -417,8 +426,8 @@ def main(argv):
             sections = book_source.load_sections(slug)
         except Exception as e:                       # 원문이 손에 없는 경우
             sections = None
-            print("· %-8s 원문 본문 없음(%s) — 검사2(창작)는 돌 수 없음"
-                  % (slug, type(e).__name__))
+            out("· %-8s 원문 본문 없음(%s) — 검사2(창작)는 돌 수 없음"
+                % (slug, type(e).__name__))
 
         if show:
             if sections is None:
@@ -427,33 +436,37 @@ def main(argv):
             show_ref(slug, show, rules, items, sections)
             continue
 
-        print("%s — 규칙 %d개(ref 있는 것만, %s) · spec 항목 %d개(%s)"
-              % (slug, len(rules), rel(rp), len(items), rel(sp)))
+        out("%s — 규칙 %d개(ref 있는 것만, %s) · spec 항목 %d개(%s)"
+            % (slug, len(rules), rel(rp), len(items), rel(sp)))
 
         # ---- 면제부터 검사한다 — 인정되지 않는 면제는 위반으로 센다
         rej = exempt_rejected(slug)
         if rej:
-            print("  [면제] 인정되지 않는 면제 %d건" % len(rej))
+            out("  [면제] 인정되지 않는 면제 %d건" % len(rej))
             for where, why in rej:
-                print("    ✗ %-52s %s" % (where[:52], why))
-            print(exempt_help())
+                out("    ✗ %-52s %s" % (where[:52], why))
+            if not json_mode:
+                print(exempt_help())
         bad += len(rej)
+        book_bad = len(rej)
 
         # ---- 빈 입력으로 '이상 없음'을 내지 않는다
         if not rules or not items:
-            print("  ✗ 입력이 비었습니다(규칙 %d · spec %d) — 이 검사는 돌지 않았습니다."
-                  % (len(rules), len(items)))
+            out("  ✗ 입력이 비었습니다(규칙 %d · spec %d) — 이 검사는 돌지 않았습니다."
+                % (len(rules), len(items)))
             blocked += 1
+            book_violations[slug] = None
             continue
 
         # ---- 검사 1 — 누락
         miss = check_missing(slug, rules, items, sections)
-        print("  [검사1 누락] 규칙 %d개 중 문제 %d개" % (len(rules), len(miss)))
+        out("  [검사1 누락] 규칙 %d개 중 문제 %d개" % (len(rules), len(miss)))
         for m in miss:
             mark = "✗" if m["kind"] == "ref" else "⚠"
-            print("    %s %-58s %s" % (mark, m["rule"]["text"][:58], m["why"]))
-            print("      └ 규칙 위치: %s" % m["rule"]["path"])
+            out("    %s %-58s %s" % (mark, m["rule"]["text"][:58], m["why"]))
+            out("      └ 규칙 위치: %s" % m["rule"]["path"])
         bad += len(miss)
+        book_bad += len(miss)
 
         # ---- 검사 2 — 창작
         if sections is None:
@@ -461,41 +474,55 @@ def main(argv):
         else:
             inv = check_invention(slug, items, sections)
             auton = len([i for i in items if i.get("source") != "manual"])
-            print("  [검사2 창작] 자동 spec %d개 중 원문에 없는 수치 %d개"
-                  % (auton, len(inv)))
+            out("  [검사2 창작] 자동 spec %d개 중 원문에 없는 수치 %d개"
+                % (auton, len(inv)))
             for x in inv:
-                print("    ⚠ %-40s %s" % ((x["item"].get("item") or "?")[:40], x["why"]))
+                out("    ⚠ %-40s %s" % ((x["item"].get("item") or "?")[:40], x["why"]))
             bad += len(inv)
+            book_bad += len(inv)
+
+        book_violations[slug] = book_bad
 
         # ---- 못 보는 것 — 통과로 찍지 않는다
         for name, reason in unapplied(book):
-            print("  [미적용]    %s — %s" % (name, reason))
+            out("  [미적용]    %s — %s" % (name, reason))
             skipped_checks.append((slug, name, reason))
 
     if show:
         return 0
 
-    print("\n" + "=" * 74)
-    print("위반 %d건 · 검사 불가 %d권 · 미적용 검사 %d건"
-          % (bad, blocked, len(skipped_checks)))
-    for slug, name, reason in skipped_checks:
-        print("  · %-8s %s — %s" % (slug, name, reason))
+    if json_mode:
+        print(json.dumps(book_violations, ensure_ascii=False))
+    else:
+        print("\n" + "=" * 74)
+        print("위반 %d건 · 검사 불가 %d권 · 미적용 검사 %d건"
+              % (bad, blocked, len(skipped_checks)))
+        for slug, name, reason in skipped_checks:
+            print("  · %-8s %s — %s" % (slug, name, reason))
+        if bad:
+            print("-" * 74)
+            print("처리 방법은 셋뿐이다.")
+            print("  ① 수집요청을 규칙에 맞춘다(데이터를 구할 수 있으면 구한다)")
+            print("  ② 못 구하면 source:\"manual\" + reason 으로 **미구현이라고 적는다**")
+            print("  ③ 규칙이 아닌 숫자라면 coverage_exempt.json 의 "
+                  "`_rules_vs_spec` / `_rules_vs_spec_spec` 에 "
+                  "**분류(kind)와 사유(why)를 적어** 면제한다")
+            print(exempt_help())
+            print("규칙 문구(저자 문구)를 spec 에 맞춰 고치는 건 선택지가 아니다.")
+        if blocked:
+            print("-" * 74)
+            print("'검사 불가'는 통과가 아니다. 계약 2·4 를 채우기 전까지 이 책은 "
+                  "검증되지 않은 상태다.")
+        print("=" * 74)
+
+    # 종료코드: 0=전부 통과 · 1=위반 있음(발행 정지, 누락·창작은 거짓이다)
+    #          · 2=위반은 없고 검사 불가만 있음(경고 — 아직 계약을 못 채워 검사를
+    #            못 돌린 것뿐, 발행은 막지 않음)
     if bad:
-        print("-" * 74)
-        print("처리 방법은 셋뿐이다.")
-        print("  ① 수집요청을 규칙에 맞춘다(데이터를 구할 수 있으면 구한다)")
-        print("  ② 못 구하면 source:\"manual\" + reason 으로 **미구현이라고 적는다**")
-        print("  ③ 규칙이 아닌 숫자라면 coverage_exempt.json 의 "
-              "`_rules_vs_spec` / `_rules_vs_spec_spec` 에 "
-              "**분류(kind)와 사유(why)를 적어** 면제한다")
-        print(exempt_help())
-        print("규칙 문구(저자 문구)를 spec 에 맞춰 고치는 건 선택지가 아니다.")
+        return 1
     if blocked:
-        print("-" * 74)
-        print("'검사 불가'는 통과가 아니다. 계약 2·4 를 채우기 전까지 이 책은 "
-              "검증되지 않은 상태다.")
-    print("=" * 74)
-    return 1 if (bad or blocked) else 0
+        return 2
+    return 0
 
 
 if __name__ == "__main__":
