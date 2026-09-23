@@ -526,7 +526,7 @@ body{padding-left:var(--rail)}
     </div>
 
     <script type="application/json" id="verdict-data">
-{"score": 4, "scorecard": [{"label": "나스닥 선물 방향", "ok": false, "why": "NQ=F 선물 31,022.0 / 전일 31,028.2 (-0.02%)"}, {"label": "S&P500 선물 방향", "ok": true, "why": "ES=F 선물 7,836.0 / 전일 7,832.1 (+0.05%)"}, {"label": "VIX 안정(전일 +10% 미만)", "ok": true, "why": "^VIX 14.16 / 전일 14.21 (-0.35%) · 기준 +10% 미만"}, {"label": "10년물 안정(+0.1%p 미만)", "ok": true, "why": "^TNX 4.97% / 전일 4.96% (+0.00%p) · 기준 +0.10%p 미만"}, {"label": "달러인덱스 안정(급강세 아님)", "ok": true, "why": "DX-Y.NYB 100.88 / 전일 100.60 (+0.28%) · 기준 +0.5% 미만"}], "verdicts": [{"prod": "TQQQ", "color": "🔵", "grade": "✅ 매수 후보", "reason": "필터 통과 · 스코어 4/5 → 1차 분할 진입 준비", "eod_checks": {"hold20": {"ok": true, "label": "^NDX 20일선 위 3거래일 연속 (회복일+2거래일 = 3 필요)"}}, "avoid": [], "avoid_keys": [], "filter_ok": true, "vol_ok": false, "intraday": ["나스닥 시초가 위 유지", "첫 눌림 저점 높임", "빅테크 7종목 중 3개↑"], "metrics": {"hold20": "^NDX 20일선 위 3거래일 연속 (기준 3)", "filter": "나스닥100 30482.3/20일선 29361.0 (+3.8%)", "vol": "거래량 55.0M/20일평균 47.5M (1.16배), 고점比 -0.7%", "vix": "^VIX 14.2 (전일比 -0.3%)", "tnx": "^TNX 4.97 (전일 4.96, +0.00%p)", "run5": "최근 5일 +13.9%", "ma5_gap": "5일선 71.75 대비 이격 +10.0%", "gap": "시가 74.83 / 전일종가 72.64 · 갭 +3.0%", "breadth": "섹터 1/5 20일선 위 (기술)", "earnings": "AAPL 2026-10-29(D-36) · AMD 2026-11-03(D-41) · MSFT 2026-11-04(D-42)", "wick": "고점 대비 종가 -0.7%"}, "close": 78.91000366210938, "ma20": 71.09500045776367, "chg": 8.631613883733657, "intraday_auto": {"status": "ok", "last": 80.83, "open": null, "base": 78.91242799960949, "checks": {"open_hold": {"auto": true, "status": "error", "reason": "당일 시가 미제공(직접 확인)", "label": "현재 80.83 / 전일 78.91 (전일比 +2.4%)"}, "leaders": {"auto": true, "ok": true, "label": "2/3↑ · 엔비디아 +0.7%, MS -0.7%, 애플 +0.2%"}, "pullback": {"auto": true, "ok": false, "label": "저점 80.82→80.75 (이탈)"}}}}, {"prod": "SOXL", "color": "🟠", "grade": "⛔ 보류", "reason": "회피 신호 1개 — 과열/위험, 눌림 대기", "eod_checks": {"hold20": {"ok": true, "label": "^SOX 20일선 위 3거래일 연속 (회복일+2거래일 = 3 필요)"}}, "avoid": ["과열: 반도체 10일중 8일↑ + SOXL 5일 40%↑"], "avoid_keys": ["overheat"], "filter_ok": true, "vol_ok": false, "intraday": [], "metrics": {"hold20": "^SOX 20일선 위 3거래일 연속 (기준 3)", "filter": "SOXL 141.93/20일선 115.07 (+23.3%), ^SOX +7.2%", "vol": "거래량 62.5M/20일평균 56.7M (1.10배), 고점比 -1.4%", "vix": "^VIX 14.2 (전일比 -0.3%)", "tnx": "^TNX 4.97 (전일 4.96, +0.00%p)", "run5": "최근 5일 +40.3%", "ma5_gap": "5일선 117.34 대비 이격 +21.0%", "gap": "시가 132.07 / 전일종가 123.67 · 갭 +6.8%", "breadth": "섹터 1/5 20일선 위 (기술)", "wick": "고점 대비 종가 -1.4%", "overheat": "^SOX 10일중 8일↑ · SOXL 5일 +40%", "nvda_only": "엔비디아 +2.3%, AMD +9.9%, 브로드컴 +1.4%"}, "close": 141.92999267578125, "ma20": 115.07249946594239, "chg": 14.765096447960643, "intraday_auto": {"status": "ok", "last": 151.95, "open": null, "base": 141.83702044245308, "checks": {"open_hold": {"auto": true, "status": "error", "reason": "당일 시가 미제공(직접 확인)", "label": "현재 151.95 / 전일 141.84 (전일比 +7.1%)"}, "leaders": {"auto": true, "ok": true, "label": "3/3↑ · 엔비디아 +0.7%, AMD +1.3%, 브로드컴 +0.5%"}, "pullback": {"auto": true, "ok": true, "label": "저점 150.54→151.40 (높임 ✓)"}}}}, {"prod": "UPRO", "color": "🟢", "grade": "🚫 진입 금지", "reason": "필터 미충족 — S&P500 20일선 위 + 2거래일 유지 아님(추세 없음)", "eod_checks": {"hold20": {"ok": false, "label": "^GSPC 20일선 위 1거래일 연속 (회복일+2거래일 = 3 필요)"}, "breadth": {"ok": false, "label": "섹터 1/5 20일선 위 (기술)"}}, "avoid": [], "avoid_keys": [], "filter_ok": false, "vol_ok": false, "intraday": [], "metrics": {"hold20": "^GSPC 20일선 위 1거래일 연속 (기준 3)", "filter": "S&P500 7764.7/20일선 7663.4 (+1.3%)", "vol": "거래량 2.1M/20일평균 1.8M (1.16배), 고점比 -0.5%", "vix": "^VIX 14.2 (전일比 -0.3%)", "tnx": "^TNX 4.97 (전일 4.96, +0.00%p)", "run5": "최근 5일 +5.5%", "ma5_gap": "5일선 146.84 대비 이격 +4.9%", "gap": "시가 149.89 / 전일종가 147.19 · 갭 +1.8%", "breadth": "섹터 1/5 20일선 위 (기술)", "def_only": "경기민감 5일 +1.3% (기술 +5.7·금융 -2.0·산업재 +0.0) / 방어 5일 -1.7%", "bad_rate": "10년물 +0.00%p · S&P500 +1.49% · 금융 5일 -2.0%", "wick": "고점 대비 종가 -0.5%"}, "close": 154.07000732421875, "ma20": 148.72800216674804, "chg": 4.674233826139998, "intraday_auto": {"status": "ok", "last": 154.01, "open": null, "base": 154.07162865146057, "checks": {"open_hold": {"auto": true, "status": "error", "reason": "당일 시가 미제공(직접 확인)", "label": "현재 154.01 / 전일 154.07 (전일比 -0.0%)"}, "pullback": {"auto": true, "ok": false, "label": "저점 154.56→153.99 (이탈)"}}}}], "ts": "2026-09-23T19:46:52.500101+09:00", "extras": {"sectors": {"기술": {"sym": "XLK", "close": 194.85000610351562, "ma20": 185.95050048828125, "above": true, "gap20": 4.785954107069063, "ret5": 5.735840782633133}, "금융": {"sym": "XLF", "close": 55.900001525878906, "ma20": 57.296500015258786, "above": false, "gap20": -2.4373190142643524, "ret5": -1.9814085176312193}, "산업재": {"sym": "XLI", "close": 169.97999572753906, "ma20": 173.47549896240236, "above": false, "gap20": -2.0149838194850096, "ret5": 0.029425677580776494}, "헬스케어": {"sym": "XLV", "close": 169.00999450683594, "ma20": 170.01299896240235, "above": false, "gap20": -0.5899575101244006, "ret5": 0.751114460110842}, "소비재": {"sym": "XLY", "close": 112.2300033569336, "ma20": 114.1919994354248, "above": false, "gap20": -1.7181554646485662, "ret5": -0.54939754148927}, "필수소비재": {"sym": "XLP", "close": 81.91999816894531, "ma20": 84.47999954223633, "above": false, "gap20": -3.030304672304273, "ret5": -2.9613836226303643}, "유틸리티": {"sym": "XLU", "close": 40.65999984741211, "ma20": 42.436499786376956, "above": false, "gap20": -4.186254634354038, "ret5": -2.7737920991799405}}, "breadth": {"ok": true, "count": 1, "total": 5, "above": ["기술"], "below": ["금융", "산업재", "헬스케어", "소비재"], "label": "섹터 1/5 20일선 위 (기술)"}, "recession": {"signals": [{"key": "def_only", "label": "방어주만 살아나고 기술·금융·산업재 약화", "auto": true, "on": false, "why": "경기민감 5일 +1.3% (기술 +5.7·금융 -2.0·산업재 +0.0) / 방어 5일 -1.7%"}, {"key": "cyc_weak", "label": "금융·산업재가 전고점서 계속 밀림(5거래일 약세)", "auto": true, "on": false, "why": "금융 5일 -2.0% · 산업재 5일 +0.0%"}, {"key": "estimates", "label": "실적 전망 하향이 업종 전체로 퍼짐", "auto": false, "on": false, "why": "애널리스트 추정치는 무료 소스 없음 — 직접 확인"}, {"key": "bad_rate", "label": "나쁜 금리 하락(금리↓인데 주식 못 오르고 금융 약함)", "auto": true, "on": false, "why": "10년물 +0.00%p · S&P500 +1.49% · 금융 5일 -2.0%"}, {"key": "no_recover", "label": "S&P500이 20일선 깨고 반등해도 회복 못 함", "auto": true, "on": false, "why": "S&P500 7764.7 / 20일선 7663.4 (위) · 60일선 7599.2 (위)"}], "spx_below_ma60": false, "count": 0}, "earnings": {"AAPL": {"date": "2026-10-29", "dday": 36}, "AMD": {"date": "2026-11-03", "dday": 41}, "MSFT": {"date": "2026-11-04", "dday": 42}}}, "intraday_ts": "2026-09-23T18:43:24.485165+09:00", "intraday_state": "ok"}
+{"score": 4, "scorecard": [{"label": "나스닥 선물 방향", "ok": false, "why": "NQ=F 선물 31,020.5 / 전일 31,029.8 (-0.03%)"}, {"label": "S&P500 선물 방향", "ok": true, "why": "ES=F 선물 7,835.2 / 전일 7,832.1 (+0.04%)"}, {"label": "VIX 안정(전일 +10% 미만)", "ok": true, "why": "^VIX 14.17 / 전일 14.21 (-0.28%) · 기준 +10% 미만"}, {"label": "10년물 안정(+0.1%p 미만)", "ok": true, "why": "^TNX 4.97% / 전일 4.96% (+0.00%p) · 기준 +0.10%p 미만"}, {"label": "달러인덱스 안정(급강세 아님)", "ok": true, "why": "DX-Y.NYB 100.86 / 전일 100.60 (+0.26%) · 기준 +0.5% 미만"}], "verdicts": [{"prod": "TQQQ", "color": "🔵", "grade": "✅ 매수 후보", "reason": "필터 통과 · 스코어 4/5 → 1차 분할 진입 준비", "eod_checks": {"hold20": {"ok": true, "label": "^NDX 20일선 위 3거래일 연속 (회복일+2거래일 = 3 필요)"}}, "avoid": [], "avoid_keys": [], "filter_ok": true, "vol_ok": false, "intraday": ["나스닥 시초가 위 유지", "첫 눌림 저점 높임", "빅테크 7종목 중 3개↑"], "metrics": {"hold20": "^NDX 20일선 위 3거래일 연속 (기준 3)", "filter": "나스닥100 30482.3/20일선 29361.0 (+3.8%)", "vol": "거래량 55.0M/20일평균 47.5M (1.16배), 고점比 -0.7%", "vix": "^VIX 14.2 (전일比 -0.3%)", "tnx": "^TNX 4.97 (전일 4.96, +0.00%p)", "run5": "최근 5일 +13.9%", "ma5_gap": "5일선 71.75 대비 이격 +10.0%", "gap": "시가 74.83 / 전일종가 72.64 · 갭 +3.0%", "breadth": "섹터 1/5 20일선 위 (기술)", "earnings": "AAPL 2026-10-29(D-36) · AMD 2026-11-03(D-41) · MSFT 2026-11-04(D-42)", "wick": "고점 대비 종가 -0.7%"}, "close": 78.91000366210938, "ma20": 71.09500045776367, "chg": 8.631613883733657, "intraday_auto": {"status": "ok", "last": 80.83, "open": null, "base": 78.91242799960949, "checks": {"open_hold": {"auto": true, "status": "error", "reason": "당일 시가 미제공(직접 확인)", "label": "현재 80.83 / 전일 78.91 (전일比 +2.4%)"}, "leaders": {"auto": true, "ok": true, "label": "2/3↑ · 엔비디아 +0.7%, MS -0.7%, 애플 +0.2%"}, "pullback": {"auto": true, "ok": false, "label": "저점 80.82→80.75 (이탈)"}}}}, {"prod": "SOXL", "color": "🟠", "grade": "⛔ 보류", "reason": "회피 신호 1개 — 과열/위험, 눌림 대기", "eod_checks": {"hold20": {"ok": true, "label": "^SOX 20일선 위 3거래일 연속 (회복일+2거래일 = 3 필요)"}}, "avoid": ["과열: 반도체 10일중 8일↑ + SOXL 5일 40%↑"], "avoid_keys": ["overheat"], "filter_ok": true, "vol_ok": false, "intraday": [], "metrics": {"hold20": "^SOX 20일선 위 3거래일 연속 (기준 3)", "filter": "SOXL 141.93/20일선 115.07 (+23.3%), ^SOX +7.2%", "vol": "거래량 62.5M/20일평균 56.7M (1.10배), 고점比 -1.4%", "vix": "^VIX 14.2 (전일比 -0.3%)", "tnx": "^TNX 4.97 (전일 4.96, +0.00%p)", "run5": "최근 5일 +40.3%", "ma5_gap": "5일선 117.34 대비 이격 +21.0%", "gap": "시가 132.07 / 전일종가 123.67 · 갭 +6.8%", "breadth": "섹터 1/5 20일선 위 (기술)", "wick": "고점 대비 종가 -1.4%", "overheat": "^SOX 10일중 8일↑ · SOXL 5일 +40%", "nvda_only": "엔비디아 +2.3%, AMD +9.9%, 브로드컴 +1.4%"}, "close": 141.92999267578125, "ma20": 115.07249946594239, "chg": 14.765096447960643, "intraday_auto": {"status": "ok", "last": 151.95, "open": null, "base": 141.83702044245308, "checks": {"open_hold": {"auto": true, "status": "error", "reason": "당일 시가 미제공(직접 확인)", "label": "현재 151.95 / 전일 141.84 (전일比 +7.1%)"}, "leaders": {"auto": true, "ok": true, "label": "3/3↑ · 엔비디아 +0.7%, AMD +1.3%, 브로드컴 +0.5%"}, "pullback": {"auto": true, "ok": true, "label": "저점 150.54→151.40 (높임 ✓)"}}}}, {"prod": "UPRO", "color": "🟢", "grade": "🚫 진입 금지", "reason": "필터 미충족 — S&P500 20일선 위 + 2거래일 유지 아님(추세 없음)", "eod_checks": {"hold20": {"ok": false, "label": "^GSPC 20일선 위 1거래일 연속 (회복일+2거래일 = 3 필요)"}, "breadth": {"ok": false, "label": "섹터 1/5 20일선 위 (기술)"}}, "avoid": [], "avoid_keys": [], "filter_ok": false, "vol_ok": false, "intraday": [], "metrics": {"hold20": "^GSPC 20일선 위 1거래일 연속 (기준 3)", "filter": "S&P500 7764.7/20일선 7663.4 (+1.3%)", "vol": "거래량 2.1M/20일평균 1.8M (1.16배), 고점比 -0.5%", "vix": "^VIX 14.2 (전일比 -0.3%)", "tnx": "^TNX 4.97 (전일 4.96, +0.00%p)", "run5": "최근 5일 +5.5%", "ma5_gap": "5일선 146.84 대비 이격 +4.9%", "gap": "시가 149.89 / 전일종가 147.19 · 갭 +1.8%", "breadth": "섹터 1/5 20일선 위 (기술)", "def_only": "경기민감 5일 +1.3% (기술 +5.7·금융 -2.0·산업재 +0.0) / 방어 5일 -1.7%", "bad_rate": "10년물 +0.00%p · S&P500 +1.49% · 금융 5일 -2.0%", "wick": "고점 대비 종가 -0.5%"}, "close": 154.07000732421875, "ma20": 148.72800216674804, "chg": 4.674233826139998, "intraday_auto": {"status": "ok", "last": 154.01, "open": null, "base": 154.07162865146057, "checks": {"open_hold": {"auto": true, "status": "error", "reason": "당일 시가 미제공(직접 확인)", "label": "현재 154.01 / 전일 154.07 (전일比 -0.0%)"}, "pullback": {"auto": true, "ok": false, "label": "저점 154.56→153.99 (이탈)"}}}}], "ts": "2026-09-23T20:02:54.184605+09:00", "extras": {"sectors": {"기술": {"sym": "XLK", "close": 194.85000610351562, "ma20": 185.95050048828125, "above": true, "gap20": 4.785954107069063, "ret5": 5.735840782633133}, "금융": {"sym": "XLF", "close": 55.900001525878906, "ma20": 57.296500015258786, "above": false, "gap20": -2.4373190142643524, "ret5": -1.9814085176312193}, "산업재": {"sym": "XLI", "close": 169.97999572753906, "ma20": 173.47549896240236, "above": false, "gap20": -2.0149838194850096, "ret5": 0.029425677580776494}, "헬스케어": {"sym": "XLV", "close": 169.00999450683594, "ma20": 170.01299896240235, "above": false, "gap20": -0.5899575101244006, "ret5": 0.751114460110842}, "소비재": {"sym": "XLY", "close": 112.2300033569336, "ma20": 114.1919994354248, "above": false, "gap20": -1.7181554646485662, "ret5": -0.54939754148927}, "필수소비재": {"sym": "XLP", "close": 81.91999816894531, "ma20": 84.47999954223633, "above": false, "gap20": -3.030304672304273, "ret5": -2.9613836226303643}, "유틸리티": {"sym": "XLU", "close": 40.65999984741211, "ma20": 42.436499786376956, "above": false, "gap20": -4.186254634354038, "ret5": -2.7737920991799405}}, "breadth": {"ok": true, "count": 1, "total": 5, "above": ["기술"], "below": ["금융", "산업재", "헬스케어", "소비재"], "label": "섹터 1/5 20일선 위 (기술)"}, "recession": {"signals": [{"key": "def_only", "label": "방어주만 살아나고 기술·금융·산업재 약화", "auto": true, "on": false, "why": "경기민감 5일 +1.3% (기술 +5.7·금융 -2.0·산업재 +0.0) / 방어 5일 -1.7%"}, {"key": "cyc_weak", "label": "금융·산업재가 전고점서 계속 밀림(5거래일 약세)", "auto": true, "on": false, "why": "금융 5일 -2.0% · 산업재 5일 +0.0%"}, {"key": "estimates", "label": "실적 전망 하향이 업종 전체로 퍼짐", "auto": false, "on": false, "why": "애널리스트 추정치는 무료 소스 없음 — 직접 확인"}, {"key": "bad_rate", "label": "나쁜 금리 하락(금리↓인데 주식 못 오르고 금융 약함)", "auto": true, "on": false, "why": "10년물 +0.00%p · S&P500 +1.49% · 금융 5일 -2.0%"}, {"key": "no_recover", "label": "S&P500이 20일선 깨고 반등해도 회복 못 함", "auto": true, "on": false, "why": "S&P500 7764.7 / 20일선 7663.4 (위) · 60일선 7599.2 (위)"}], "spx_below_ma60": false, "count": 0}, "earnings": {"AAPL": {"date": "2026-10-29", "dday": 36}, "AMD": {"date": "2026-11-03", "dday": 41}, "MSFT": {"date": "2026-11-04", "dday": 42}}}, "intraday_ts": "2026-09-23T18:43:24.485165+09:00", "intraday_state": "ok"}
 </script>
 
     <!-- STEP 1: Definition table -->
@@ -1220,19 +1220,19 @@ body{padding-left:var(--rail)}
           "t": "TQQQ 시초가 위 유지 (나스닥 방향)",
           "ref": "7-2",
           "ik": "open_hold",
-          "src": "📡 KIS 실시간 · 시가 vs 현재가"
+          "src": "👁 장중 직접 · 시가 대비 현재가 (개장 후 HTS에서 확인)"
         },
         {
           "t": "빅테크 3개 이상 같은 방향 (엔비디아·MS·애플·아마존·메타·구글·테슬라 중)",
           "ref": "2-1",
           "ik": "leaders",
-          "src": "📡 KIS 실시간 · NVDA·MSFT·AAPL·AMZN·META·GOOGL·TSLA 등락"
+          "src": "👁 장중 직접 · NVDA·MSFT·AAPL·AMZN·META·GOOGL·TSLA 등락 (HTS에서 확인)"
         },
         {
           "t": "장 초반 첫 눌림에서 저점을 높임",
           "ref": "7-2",
           "ik": "pullback",
-          "src": "📡 KIS 분봉 · 전반부 저점 vs 후반부 저점"
+          "src": "👁 장중 직접 · 전반부 저점 vs 후반부 저점 (개장 30분 분봉 확인)"
         }
       ],
       "avoid": [
@@ -1342,19 +1342,19 @@ body{padding-left:var(--rail)}
           "t": "SOXL 시초가 위 유지",
           "ref": "7-2",
           "ik": "open_hold",
-          "src": "📡 KIS 실시간 · 시가 vs 현재가"
+          "src": "👁 장중 직접 · 시가 대비 현재가 (개장 후 HTS에서 확인)"
         },
         {
           "t": "대표주 2개↑ (엔비디아·AMD·브로드컴)",
           "ref": "4-2",
           "ik": "leaders",
-          "src": "📡 KIS 실시간 · NVDA·AMD·AVGO 등락"
+          "src": "👁 장중 직접 · NVDA·AMD·AVGO 등락 (HTS에서 확인)"
         },
         {
           "t": "첫 눌림에서 저점 높임",
           "ref": "7-2",
           "ik": "pullback",
-          "src": "📡 KIS 분봉 · 전반부 저점 vs 후반부 저점"
+          "src": "👁 장중 직접 · 전반부 저점 vs 후반부 저점 (개장 30분 분봉 확인)"
         },
         {
           "t": "(참고) 반도체지수 20일선 위 2거래일 유지",
@@ -1466,13 +1466,13 @@ body{padding-left:var(--rail)}
           "t": "UPRO 시초가 위 유지",
           "ref": "7-2",
           "ik": "open_hold",
-          "src": "📡 KIS 실시간 · 시가 vs 현재가"
+          "src": "👁 장중 직접 · 시가 대비 현재가 (개장 후 HTS에서 확인)"
         },
         {
           "t": "눌림에도 저점 높임",
           "ref": "7-2",
           "ik": "pullback",
-          "src": "📡 KIS 분봉 · 전반부 저점 vs 후반부 저점"
+          "src": "👁 장중 직접 · 전반부 저점 vs 후반부 저점 (개장 30분 분봉 확인)"
         },
         {
           "t": "섹터 5개 중 3개↑ 동반(기술·금융·산업재·헬스케어·소비재)",
@@ -1772,7 +1772,9 @@ body{padding-left:var(--rail)}
   scBoxes.forEach(b=>b.addEventListener('change',scUpdate)); scUpdate();
 
   /* ---- STEP 3: entry checklist ---- */
-  const VD = (function(){ try { return JSON.parse(document.getElementById('verdict-data').textContent); } catch(e){ return null; } })();
+  // VD 는 #verdict-data 를 다시 읽어 갱신 가능(라이브 모드에서 서버 폴링이 값을 갈아끼운다).
+  function readVD(){ try { return JSON.parse(document.getElementById('verdict-data').textContent); } catch(e){ return null; } }
+  let VD = readVD();
   const gradeCls = g => g.includes('매수 후보') ? 'go' : (g.includes('소액') ? 'small' : (g.includes('보류')||g.includes('금지') ? 'no' : ''));
   const RULES = JSON.parse(document.getElementById('rules').textContent);
   const DATA = RULES.DATA;
@@ -1790,7 +1792,7 @@ body{padding-left:var(--rail)}
       const side = vv.close>vv.ma20?'위':'아래';
       h += '<p class="subtle" style="margin:6px 0 2px">종가 <b style="color:var(--head)">'+vv.close.toFixed(2)+'</b> / 20일선 '+vv.ma20.toFixed(2)+' ('+side+') · 당일 '+(vv.chg>=0?'+':'')+vv.chg.toFixed(1)+'%</p>';
     }
-    const ia = vv && vv.intraday_auto;  // 장중 자동판정(KIS)
+    const ia = vv && vv.intraday_auto;  // 장중 자동판정
     const istate = (VD && VD.intraday_state) || 'pending';  // ok / pending / error
     if(vv){
       const liveNow = document.body.classList.contains('intraday-live');
@@ -1815,7 +1817,7 @@ body{padding-left:var(--rail)}
     h += '<div class="grouplabel e">② 진입 조건 ('+d.need+'개 이상 충족)</div>';
     const ec = (vv && vv.eod_checks) || {};   // EOD로 자동 판정되는 진입 항목
     d.entry.forEach((c,i)=>{
-      const ic = ia && c.ik && ia.checks && ia.checks[c.ik];  // KIS 장중 자동 대상
+      const ic = ia && c.ik && ia.checks && ia.checks[c.ik];  // 장중 자동판정 대상
       if(c.ek){                                 // 야후 EOD 자동(예: 섹터 폭)
         const e = ec[c.ek];
         h+=chk('e'+i,{t:c.t, src:c.src, ref:c.ref, live:(e&&e.label)}, false, !!(e&&e.ok), 'eod', e?'ok':'pending');
@@ -1867,9 +1869,9 @@ body{padding-left:var(--rail)}
       badge = (state==='ok') ? ' <span class="tag a" title="아침 EOD 수집됨">🤖 자동</span>'
                              : ' <span class="tag miss" title="아직 수집 전">⚫ 대기</span>';
     } else if(bt==='intra'){
-      if(state==='ok') badge=' <span class="tag o live" title="장중 실시간 수집(KIS)">⚡ 장중</span>';
-      else if(state==='error') badge=' <span class="tag err" title="KIS 수집 실패 — 조치 필요">🔴 수집실패</span>';
-      else badge=' <span class="tag miss" title="개장+31분에 채워짐">⚫ 대기</span>';
+      if(state==='ok') badge=' <span class="tag o live" title="장중 실시간 수집">⚡ 장중</span>';
+      else if(state==='error') badge=' <span class="tag err" title="장중 수집 실패 — 조치 필요">🔴 수집실패</span>';
+      else badge=' <span class="tag miss" title="장중 직접 확인 항목(무료 실시간 소스 없음)">⚫ 대기</span>';
     } else if(bt==='manual'){
       // 데이터 수집 대상이 아닌 사람 판단 항목 — 깜빡이지 않는 정적 표시
       badge=' <span class="tag o" title="무료 데이터 없음 · HTS에서 직접 확인">✋ 직접</span>';
@@ -1972,8 +1974,11 @@ body{padding-left:var(--rail)}
   }
   memoInputs.forEach(i=>i.addEventListener('input',memoUpdate)); memoUpdate();
 
-  /* ---- 오늘 자동판정: STEP2 스코어카드 프리필 + STEP3 요약 스트립/시각 ---- */
-  try {
+  /* ---- 오늘 자동판정: STEP2 스코어카드 프리필 + STEP3 요약 스트립/시각 ----
+     applyVerdict() 로 감싸 라이브 갱신 때 다시 부를 수 있게 한다. */
+  function applyVerdict(){
+   VD = readVD();   // 라이브 폴링이 #verdict-data 를 갈아끼웠으면 새 값으로
+   try {
     if(VD){
       const pad = n => String(n).padStart(2,'0');
       const d = new Date(VD.ts);
@@ -2015,11 +2020,16 @@ body{padding-left:var(--rail)}
         const p = el.dataset.jump;
         setActive(p); curP=p; renderEntry(p);
       }));
-      setActive('TQQQ');
+      setActive(curP);
+      renderEntry(curP);   // 현재 선택된 종목 상세 판정도 새 값으로 다시 그림
     }
-  } catch(e){
+   } catch(e){
     var el=document.getElementById('td-ts'); if(el) el.textContent='판정 데이터를 불러오지 못했습니다: '+e.message;
+   }
   }
+  applyVerdict();
+  // 라이브 모듈이 새 판정을 받으면 이 훅으로 스코어카드·요약칩·진입판정을 다시 그린다.
+  window.__applyVerdict = applyVerdict;
 })();
 </script>
 
@@ -2389,14 +2399,15 @@ body{padding-left:var(--rail)}
 
 <script>
 /* ============================================================
-   데이터 수집 현황 — 전체 마지막 시점 + 소스별(야후 EOD / KIS 장중)
+   데이터 수집 현황 — 소스(야후 marketdata) + 갱신 모드(실시간 폴링 / 정적 스냅샷)
    ============================================================ */
 (function(){
   'use strict';
   var box = document.getElementById('collect');
   if(!box) return;
   var VD = null;
-  try { VD = JSON.parse(document.getElementById('verdict-data').textContent); } catch(e){}
+  function reloadVD(){ try { VD = JSON.parse(document.getElementById('verdict-data').textContent); } catch(e){ VD = null; } }
+  reloadVD();
 
   var elWhen = document.getElementById('cWhen'),
       elAgo  = document.getElementById('cAgo'),
@@ -2418,6 +2429,7 @@ body{padding-left:var(--rail)}
     return Math.floor(s/86400)+'일 전';
   }
 
+  function hms(d){ return pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()); }
   function render(){
     if(!VD){
       box.className = 'collect old';
@@ -2426,43 +2438,44 @@ body{padding-left:var(--rail)}
       return;
     }
     var eod = VD.ts ? new Date(VD.ts) : null;
-    var itr = VD.intraday_ts ? new Date(VD.intraday_ts) : null;
-    var st  = VD.intraday_state || 'pending';
+    // 라이브 모드 = 로컬 실시간 서버가 /api/verdict 를 제공(정직한 소스/신선도 표기).
+    // 정적(GitHub Pages) 모드 = 빌드 때 구운 스냅샷.
+    var live = !!(window.__liveMode || VD.live);
+    var src  = VD.source || '야후(marketdata)';
 
-    // --- 소스 1: 야후 EOD ---
+    // --- 소스 1: 종가·지표(야후 marketdata) ---
     elEod.innerHTML = eod
-      ? '<span>🤖 종가·지표(야후)</span> <b>'+stamp(eod)+'</b> <span class="cst ok">수집됨</span>'
-      : '<span>🤖 종가·지표(야후)</span> <span class="cst err">없음</span>';
+      ? '<span>🤖 종가·지표('+src+')</span> <b>'+stamp(eod)+'</b> <span class="cst ok">수집됨</span>'
+      : '<span>🤖 종가·지표('+src+')</span> <span class="cst err">없음</span>';
 
-    // --- 소스 2: KIS 장중 ---
-    var iHtml = '<span>⚡ 장중 시세(KIS)</span> ';
-    if(st === 'ok' && itr){
-      iHtml += '<b>'+stamp(itr)+'</b> <span class="cst ok">수집됨</span>';
-    } else if(st === 'error'){
-      iHtml += (itr ? '<b>'+stamp(itr)+'</b> ' : '')
-             + '<span class="cst err">수집 실패</span>'
-             + (VD.intraday_error ? ' <span style="color:var(--mute)">('+VD.intraday_error+')</span>' : '');
+    // --- 소스 2: 갱신 모드(라이브 폴링 vs 정적 스냅샷) ---
+    //     (M2 에서 KIS 장중 자동수집은 제거됨 — 더 이상 'KIS' 라벨을 쓰지 않는다)
+    var iHtml;
+    if(live){
+      iHtml = '<span>🟢 실시간 · '+src+'</span> '
+            + (eod ? '<b>갱신 '+hms(eod)+'</b> ' : '')
+            + '<span class="cst ok">폴링 중</span>';
     } else {
-      iHtml += (itr ? '<b>'+stamp(itr)+'</b> ' : '')
-             + '<span class="cst wait">대기 — 개장+31분에 갱신</span>';
+      iHtml = '<span>⏸ 스냅샷 · '+src+'</span> '
+            + (eod ? '<b>빌드 '+stamp(eod)+'</b> ' : '')
+            + '<span class="cst wait">정적 페이지</span>';
     }
     elIntra.innerHTML = iHtml;
 
-    // --- 전체: 둘 중 더 최근 것 ---
-    var last = null;
-    if(eod) last = eod;
-    if(itr && st === 'ok' && (!last || itr > last)) last = itr;
+    // --- 전체: EOD 기준 시각 ---
+    var last = eod;
     if(!last){
       box.className = 'collect old';
       elWhen.textContent = '없음'; elAgo.textContent = '';
       return;
     }
-    elWhen.textContent = stamp(last);
+    elWhen.textContent = live ? ('실시간 · 갱신 '+hms(last)) : stamp(last);
     elAgo.textContent = '(' + ago(last) + ')';
 
     var hours = (Date.now()-last.getTime())/3600000;
-    box.className = 'collect ' + (hours <= 12 ? 'fresh' : (hours <= 36 ? 'stale' : 'old'));
-    if(hours > 36){
+    // 라이브 모드는 방금 받은 값이므로 항상 fresh.
+    box.className = 'collect ' + (live ? 'fresh' : (hours <= 12 ? 'fresh' : (hours <= 36 ? 'stale' : 'old')));
+    if(!live && hours > 36){
       elAgo.textContent = '(' + ago(last) + ' — 오래된 값입니다)';
     }
   }
@@ -2477,6 +2490,8 @@ body{padding-left:var(--rail)}
 
   render();
   setInterval(render, 30000);   // 열어둔 채로도 상대시간이 굳지 않도록
+  // 라이브 폴링이 새 판정을 받으면 소스를 다시 읽어 신선도 라벨을 갱신한다.
+  window.addEventListener('verdict:updated', function(){ reloadVD(); render(); });
 })();
 </script>
 
@@ -2486,6 +2501,7 @@ body{padding-left:var(--rail)}
    ============================================================ */
 (function(){
   'use strict';
+  function renderRecession(){
   var VD = null;
   try { VD = JSON.parse(document.getElementById('verdict-data').textContent); } catch(e){}
   var EX = (VD && VD.extras) || {};
@@ -2608,6 +2624,10 @@ body{padding-left:var(--rail)}
     });
     render();
   })();
+  }
+  renderRecession();
+  // 라이브 폴링이 새 판정을 받으면 침체 5신호·화력 판정도 새 extras 로 다시 그린다.
+  window.addEventListener('verdict:updated', renderRecession);
 })();
 </script>
 
@@ -2862,6 +2882,78 @@ body{padding-left:var(--rail)}
     if(!row) return;
     var k = row.dataset.k;
     if(window.__jumpToSheet) window.__jumpToSheet(k, k + '. ' + (TITLE[k] || ''));
+  });
+})();
+</script>
+
+<script>
+/* ============================================================
+   라이브 모드(점진적 향상) — 로컬 실시간 서버가 있으면 값이 살아 움직인다.
+
+   · GitHub Pages(정적)로 열면 /api/verdict 가 없으니 fetch 가 실패한다
+     → 아무 일도 일어나지 않고 구워진 스냅샷 그대로(에러/콘솔 스팸 없음).
+   · 로컬 서버(python3 serve.py)로 열면 /api/verdict 가 응답한다
+     → 15초마다 폴링(또는 /events SSE 수신)해 #verdict-data 를 갈아끼우고
+       스코어카드·요약칩·진입판정·침체신호·신선도 라벨을 다시 그린다.
+   ============================================================ */
+(function(){
+  'use strict';
+  var POLL_MS = 15000;
+  var VD_EL = document.getElementById('verdict-data');
+  if(!VD_EL) return;
+
+  function applyData(data){
+    if(!data || data.error || !data.verdicts) return false;
+    try {
+      VD_EL.textContent = JSON.stringify(data);
+    } catch(e){ return false; }
+    // 각 패널을 새 값으로 다시 그린다.
+    if(window.__applyVerdict) { try { window.__applyVerdict(); } catch(e){} }
+    window.dispatchEvent(new CustomEvent('verdict:updated'));
+    return true;
+  }
+
+  function fetchVerdict(){
+    return fetch('/api/verdict', {cache:'no-store'})
+      .then(function(r){ if(!r.ok) throw new Error('http '+r.status); return r.json(); });
+  }
+
+  // 1) 라이브 엔드포인트 탐지 — 실패하면 조용히 정적 스냅샷 유지.
+  fetchVerdict().then(function(data){
+    if(!(data && data.verdicts)) return;   // 응답은 왔지만 판정이 없으면 스냅샷 유지
+    window.__liveMode = true;
+    document.body.classList.add('live-mode');
+    applyData(data);
+
+    // 2) 갱신 구독: SSE 가 되면 tick 마다, 안 되면 폴링.
+    var polling = null;
+    function startPolling(){
+      if(polling) return;
+      polling = setInterval(function(){
+        fetchVerdict().then(applyData).catch(function(){});
+      }, POLL_MS);
+    }
+    var usingSSE = false;
+    if('EventSource' in window){
+      try {
+        var es = new EventSource('/events');
+        es.onmessage = function(){
+          usingSSE = true;
+          // tick 을 받으면 최신 판정을 한 번 당겨 다시 그린다.
+          fetchVerdict().then(applyData).catch(function(){});
+        };
+        es.onerror = function(){
+          // SSE 끊기면 폴링으로 폴백(서버가 살아 있는 한).
+          if(!usingSSE){ try{ es.close(); }catch(e){} startPolling(); }
+        };
+        // SSE 가 5초 안에 한 번도 안 열리면 폴링 병행(안전망).
+        setTimeout(function(){ if(!usingSSE) startPolling(); }, 5000);
+      } catch(e){ startPolling(); }
+    } else {
+      startPolling();
+    }
+  }).catch(function(){
+    // 정적 페이지(서버 없음) — 아무 것도 하지 않는다. 스냅샷 그대로.
   });
 })();
 </script>
