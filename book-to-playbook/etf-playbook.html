@@ -1189,19 +1189,19 @@
           "t": "TQQQ 시초가 위 유지 (나스닥 방향)",
           "ref": "7-2",
           "ik": "open_hold",
-          "src": "📡 KIS 실시간 · 시가 vs 현재가"
+          "src": "👁 장중 직접 · 시가 대비 현재가 (개장 후 HTS에서 확인)"
         },
         {
           "t": "빅테크 3개 이상 같은 방향 (엔비디아·MS·애플·아마존·메타·구글·테슬라 중)",
           "ref": "2-1",
           "ik": "leaders",
-          "src": "📡 KIS 실시간 · NVDA·MSFT·AAPL·AMZN·META·GOOGL·TSLA 등락"
+          "src": "👁 장중 직접 · NVDA·MSFT·AAPL·AMZN·META·GOOGL·TSLA 등락 (HTS에서 확인)"
         },
         {
           "t": "장 초반 첫 눌림에서 저점을 높임",
           "ref": "7-2",
           "ik": "pullback",
-          "src": "📡 KIS 분봉 · 전반부 저점 vs 후반부 저점"
+          "src": "👁 장중 직접 · 전반부 저점 vs 후반부 저점 (개장 30분 분봉 확인)"
         }
       ],
       "avoid": [
@@ -1311,19 +1311,19 @@
           "t": "SOXL 시초가 위 유지",
           "ref": "7-2",
           "ik": "open_hold",
-          "src": "📡 KIS 실시간 · 시가 vs 현재가"
+          "src": "👁 장중 직접 · 시가 대비 현재가 (개장 후 HTS에서 확인)"
         },
         {
           "t": "대표주 2개↑ (엔비디아·AMD·브로드컴)",
           "ref": "4-2",
           "ik": "leaders",
-          "src": "📡 KIS 실시간 · NVDA·AMD·AVGO 등락"
+          "src": "👁 장중 직접 · NVDA·AMD·AVGO 등락 (HTS에서 확인)"
         },
         {
           "t": "첫 눌림에서 저점 높임",
           "ref": "7-2",
           "ik": "pullback",
-          "src": "📡 KIS 분봉 · 전반부 저점 vs 후반부 저점"
+          "src": "👁 장중 직접 · 전반부 저점 vs 후반부 저점 (개장 30분 분봉 확인)"
         },
         {
           "t": "(참고) 반도체지수 20일선 위 2거래일 유지",
@@ -1435,13 +1435,13 @@
           "t": "UPRO 시초가 위 유지",
           "ref": "7-2",
           "ik": "open_hold",
-          "src": "📡 KIS 실시간 · 시가 vs 현재가"
+          "src": "👁 장중 직접 · 시가 대비 현재가 (개장 후 HTS에서 확인)"
         },
         {
           "t": "눌림에도 저점 높임",
           "ref": "7-2",
           "ik": "pullback",
-          "src": "📡 KIS 분봉 · 전반부 저점 vs 후반부 저점"
+          "src": "👁 장중 직접 · 전반부 저점 vs 후반부 저점 (개장 30분 분봉 확인)"
         },
         {
           "t": "섹터 5개 중 3개↑ 동반(기술·금융·산업재·헬스케어·소비재)",
@@ -1741,7 +1741,9 @@
   scBoxes.forEach(b=>b.addEventListener('change',scUpdate)); scUpdate();
 
   /* ---- STEP 3: entry checklist ---- */
-  const VD = (function(){ try { return JSON.parse(document.getElementById('verdict-data').textContent); } catch(e){ return null; } })();
+  // VD 는 #verdict-data 를 다시 읽어 갱신 가능(라이브 모드에서 서버 폴링이 값을 갈아끼운다).
+  function readVD(){ try { return JSON.parse(document.getElementById('verdict-data').textContent); } catch(e){ return null; } }
+  let VD = readVD();
   const gradeCls = g => g.includes('매수 후보') ? 'go' : (g.includes('소액') ? 'small' : (g.includes('보류')||g.includes('금지') ? 'no' : ''));
   const RULES = JSON.parse(document.getElementById('rules').textContent);
   const DATA = RULES.DATA;
@@ -1759,7 +1761,7 @@
       const side = vv.close>vv.ma20?'위':'아래';
       h += '<p class="subtle" style="margin:6px 0 2px">종가 <b style="color:var(--head)">'+vv.close.toFixed(2)+'</b> / 20일선 '+vv.ma20.toFixed(2)+' ('+side+') · 당일 '+(vv.chg>=0?'+':'')+vv.chg.toFixed(1)+'%</p>';
     }
-    const ia = vv && vv.intraday_auto;  // 장중 자동판정(KIS)
+    const ia = vv && vv.intraday_auto;  // 장중 자동판정
     const istate = (VD && VD.intraday_state) || 'pending';  // ok / pending / error
     if(vv){
       const liveNow = document.body.classList.contains('intraday-live');
@@ -1784,7 +1786,7 @@
     h += '<div class="grouplabel e">② 진입 조건 ('+d.need+'개 이상 충족)</div>';
     const ec = (vv && vv.eod_checks) || {};   // EOD로 자동 판정되는 진입 항목
     d.entry.forEach((c,i)=>{
-      const ic = ia && c.ik && ia.checks && ia.checks[c.ik];  // KIS 장중 자동 대상
+      const ic = ia && c.ik && ia.checks && ia.checks[c.ik];  // 장중 자동판정 대상
       if(c.ek){                                 // 야후 EOD 자동(예: 섹터 폭)
         const e = ec[c.ek];
         h+=chk('e'+i,{t:c.t, src:c.src, ref:c.ref, live:(e&&e.label)}, false, !!(e&&e.ok), 'eod', e?'ok':'pending');
@@ -1836,9 +1838,9 @@
       badge = (state==='ok') ? ' <span class="tag a" title="아침 EOD 수집됨">🤖 자동</span>'
                              : ' <span class="tag miss" title="아직 수집 전">⚫ 대기</span>';
     } else if(bt==='intra'){
-      if(state==='ok') badge=' <span class="tag o live" title="장중 실시간 수집(KIS)">⚡ 장중</span>';
-      else if(state==='error') badge=' <span class="tag err" title="KIS 수집 실패 — 조치 필요">🔴 수집실패</span>';
-      else badge=' <span class="tag miss" title="개장+31분에 채워짐">⚫ 대기</span>';
+      if(state==='ok') badge=' <span class="tag o live" title="장중 실시간 수집">⚡ 장중</span>';
+      else if(state==='error') badge=' <span class="tag err" title="장중 수집 실패 — 조치 필요">🔴 수집실패</span>';
+      else badge=' <span class="tag miss" title="장중 직접 확인 항목(무료 실시간 소스 없음)">⚫ 대기</span>';
     } else if(bt==='manual'){
       // 데이터 수집 대상이 아닌 사람 판단 항목 — 깜빡이지 않는 정적 표시
       badge=' <span class="tag o" title="무료 데이터 없음 · HTS에서 직접 확인">✋ 직접</span>';
@@ -1941,8 +1943,11 @@
   }
   memoInputs.forEach(i=>i.addEventListener('input',memoUpdate)); memoUpdate();
 
-  /* ---- 오늘 자동판정: STEP2 스코어카드 프리필 + STEP3 요약 스트립/시각 ---- */
-  try {
+  /* ---- 오늘 자동판정: STEP2 스코어카드 프리필 + STEP3 요약 스트립/시각 ----
+     applyVerdict() 로 감싸 라이브 갱신 때 다시 부를 수 있게 한다. */
+  function applyVerdict(){
+   VD = readVD();   // 라이브 폴링이 #verdict-data 를 갈아끼웠으면 새 값으로
+   try {
     if(VD){
       const pad = n => String(n).padStart(2,'0');
       const d = new Date(VD.ts);
@@ -1984,11 +1989,16 @@
         const p = el.dataset.jump;
         setActive(p); curP=p; renderEntry(p);
       }));
-      setActive('TQQQ');
+      setActive(curP);
+      renderEntry(curP);   // 현재 선택된 종목 상세 판정도 새 값으로 다시 그림
     }
-  } catch(e){
+   } catch(e){
     var el=document.getElementById('td-ts'); if(el) el.textContent='판정 데이터를 불러오지 못했습니다: '+e.message;
+   }
   }
+  applyVerdict();
+  // 라이브 모듈이 새 판정을 받으면 이 훅으로 스코어카드·요약칩·진입판정을 다시 그린다.
+  window.__applyVerdict = applyVerdict;
 })();
 </script>
 
@@ -2358,14 +2368,15 @@
 
 <script>
 /* ============================================================
-   데이터 수집 현황 — 전체 마지막 시점 + 소스별(야후 EOD / KIS 장중)
+   데이터 수집 현황 — 소스(야후 marketdata) + 갱신 모드(실시간 폴링 / 정적 스냅샷)
    ============================================================ */
 (function(){
   'use strict';
   var box = document.getElementById('collect');
   if(!box) return;
   var VD = null;
-  try { VD = JSON.parse(document.getElementById('verdict-data').textContent); } catch(e){}
+  function reloadVD(){ try { VD = JSON.parse(document.getElementById('verdict-data').textContent); } catch(e){ VD = null; } }
+  reloadVD();
 
   var elWhen = document.getElementById('cWhen'),
       elAgo  = document.getElementById('cAgo'),
@@ -2387,6 +2398,7 @@
     return Math.floor(s/86400)+'일 전';
   }
 
+  function hms(d){ return pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()); }
   function render(){
     if(!VD){
       box.className = 'collect old';
@@ -2395,43 +2407,44 @@
       return;
     }
     var eod = VD.ts ? new Date(VD.ts) : null;
-    var itr = VD.intraday_ts ? new Date(VD.intraday_ts) : null;
-    var st  = VD.intraday_state || 'pending';
+    // 라이브 모드 = 로컬 실시간 서버가 /api/verdict 를 제공(정직한 소스/신선도 표기).
+    // 정적(GitHub Pages) 모드 = 빌드 때 구운 스냅샷.
+    var live = !!(window.__liveMode || VD.live);
+    var src  = VD.source || '야후(marketdata)';
 
-    // --- 소스 1: 야후 EOD ---
+    // --- 소스 1: 종가·지표(야후 marketdata) ---
     elEod.innerHTML = eod
-      ? '<span>🤖 종가·지표(야후)</span> <b>'+stamp(eod)+'</b> <span class="cst ok">수집됨</span>'
-      : '<span>🤖 종가·지표(야후)</span> <span class="cst err">없음</span>';
+      ? '<span>🤖 종가·지표('+src+')</span> <b>'+stamp(eod)+'</b> <span class="cst ok">수집됨</span>'
+      : '<span>🤖 종가·지표('+src+')</span> <span class="cst err">없음</span>';
 
-    // --- 소스 2: KIS 장중 ---
-    var iHtml = '<span>⚡ 장중 시세(KIS)</span> ';
-    if(st === 'ok' && itr){
-      iHtml += '<b>'+stamp(itr)+'</b> <span class="cst ok">수집됨</span>';
-    } else if(st === 'error'){
-      iHtml += (itr ? '<b>'+stamp(itr)+'</b> ' : '')
-             + '<span class="cst err">수집 실패</span>'
-             + (VD.intraday_error ? ' <span style="color:var(--mute)">('+VD.intraday_error+')</span>' : '');
+    // --- 소스 2: 갱신 모드(라이브 폴링 vs 정적 스냅샷) ---
+    //     (M2 에서 KIS 장중 자동수집은 제거됨 — 더 이상 'KIS' 라벨을 쓰지 않는다)
+    var iHtml;
+    if(live){
+      iHtml = '<span>🟢 실시간 · '+src+'</span> '
+            + (eod ? '<b>갱신 '+hms(eod)+'</b> ' : '')
+            + '<span class="cst ok">폴링 중</span>';
     } else {
-      iHtml += (itr ? '<b>'+stamp(itr)+'</b> ' : '')
-             + '<span class="cst wait">대기 — 개장+31분에 갱신</span>';
+      iHtml = '<span>⏸ 스냅샷 · '+src+'</span> '
+            + (eod ? '<b>빌드 '+stamp(eod)+'</b> ' : '')
+            + '<span class="cst wait">정적 페이지</span>';
     }
     elIntra.innerHTML = iHtml;
 
-    // --- 전체: 둘 중 더 최근 것 ---
-    var last = null;
-    if(eod) last = eod;
-    if(itr && st === 'ok' && (!last || itr > last)) last = itr;
+    // --- 전체: EOD 기준 시각 ---
+    var last = eod;
     if(!last){
       box.className = 'collect old';
       elWhen.textContent = '없음'; elAgo.textContent = '';
       return;
     }
-    elWhen.textContent = stamp(last);
+    elWhen.textContent = live ? ('실시간 · 갱신 '+hms(last)) : stamp(last);
     elAgo.textContent = '(' + ago(last) + ')';
 
     var hours = (Date.now()-last.getTime())/3600000;
-    box.className = 'collect ' + (hours <= 12 ? 'fresh' : (hours <= 36 ? 'stale' : 'old'));
-    if(hours > 36){
+    // 라이브 모드는 방금 받은 값이므로 항상 fresh.
+    box.className = 'collect ' + (live ? 'fresh' : (hours <= 12 ? 'fresh' : (hours <= 36 ? 'stale' : 'old')));
+    if(!live && hours > 36){
       elAgo.textContent = '(' + ago(last) + ' — 오래된 값입니다)';
     }
   }
@@ -2446,6 +2459,8 @@
 
   render();
   setInterval(render, 30000);   // 열어둔 채로도 상대시간이 굳지 않도록
+  // 라이브 폴링이 새 판정을 받으면 소스를 다시 읽어 신선도 라벨을 갱신한다.
+  window.addEventListener('verdict:updated', function(){ reloadVD(); render(); });
 })();
 </script>
 
@@ -2455,6 +2470,7 @@
    ============================================================ */
 (function(){
   'use strict';
+  function renderRecession(){
   var VD = null;
   try { VD = JSON.parse(document.getElementById('verdict-data').textContent); } catch(e){}
   var EX = (VD && VD.extras) || {};
@@ -2577,6 +2593,10 @@
     });
     render();
   })();
+  }
+  renderRecession();
+  // 라이브 폴링이 새 판정을 받으면 침체 5신호·화력 판정도 새 extras 로 다시 그린다.
+  window.addEventListener('verdict:updated', renderRecession);
 })();
 </script>
 
@@ -2831,6 +2851,78 @@
     if(!row) return;
     var k = row.dataset.k;
     if(window.__jumpToSheet) window.__jumpToSheet(k, k + '. ' + (TITLE[k] || ''));
+  });
+})();
+</script>
+
+<script>
+/* ============================================================
+   라이브 모드(점진적 향상) — 로컬 실시간 서버가 있으면 값이 살아 움직인다.
+
+   · GitHub Pages(정적)로 열면 /api/verdict 가 없으니 fetch 가 실패한다
+     → 아무 일도 일어나지 않고 구워진 스냅샷 그대로(에러/콘솔 스팸 없음).
+   · 로컬 서버(python3 serve.py)로 열면 /api/verdict 가 응답한다
+     → 15초마다 폴링(또는 /events SSE 수신)해 #verdict-data 를 갈아끼우고
+       스코어카드·요약칩·진입판정·침체신호·신선도 라벨을 다시 그린다.
+   ============================================================ */
+(function(){
+  'use strict';
+  var POLL_MS = 15000;
+  var VD_EL = document.getElementById('verdict-data');
+  if(!VD_EL) return;
+
+  function applyData(data){
+    if(!data || data.error || !data.verdicts) return false;
+    try {
+      VD_EL.textContent = JSON.stringify(data);
+    } catch(e){ return false; }
+    // 각 패널을 새 값으로 다시 그린다.
+    if(window.__applyVerdict) { try { window.__applyVerdict(); } catch(e){} }
+    window.dispatchEvent(new CustomEvent('verdict:updated'));
+    return true;
+  }
+
+  function fetchVerdict(){
+    return fetch('/api/verdict', {cache:'no-store'})
+      .then(function(r){ if(!r.ok) throw new Error('http '+r.status); return r.json(); });
+  }
+
+  // 1) 라이브 엔드포인트 탐지 — 실패하면 조용히 정적 스냅샷 유지.
+  fetchVerdict().then(function(data){
+    if(!(data && data.verdicts)) return;   // 응답은 왔지만 판정이 없으면 스냅샷 유지
+    window.__liveMode = true;
+    document.body.classList.add('live-mode');
+    applyData(data);
+
+    // 2) 갱신 구독: SSE 가 되면 tick 마다, 안 되면 폴링.
+    var polling = null;
+    function startPolling(){
+      if(polling) return;
+      polling = setInterval(function(){
+        fetchVerdict().then(applyData).catch(function(){});
+      }, POLL_MS);
+    }
+    var usingSSE = false;
+    if('EventSource' in window){
+      try {
+        var es = new EventSource('/events');
+        es.onmessage = function(){
+          usingSSE = true;
+          // tick 을 받으면 최신 판정을 한 번 당겨 다시 그린다.
+          fetchVerdict().then(applyData).catch(function(){});
+        };
+        es.onerror = function(){
+          // SSE 끊기면 폴링으로 폴백(서버가 살아 있는 한).
+          if(!usingSSE){ try{ es.close(); }catch(e){} startPolling(); }
+        };
+        // SSE 가 5초 안에 한 번도 안 열리면 폴링 병행(안전망).
+        setTimeout(function(){ if(!usingSSE) startPolling(); }, 5000);
+      } catch(e){ startPolling(); }
+    } else {
+      startPolling();
+    }
+  }).catch(function(){
+    // 정적 페이지(서버 없음) — 아무 것도 하지 않는다. 스냅샷 그대로.
   });
 })();
 </script>
