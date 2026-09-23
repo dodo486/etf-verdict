@@ -1748,8 +1748,10 @@
   const card = document.getElementById('entryCard');
   let curP = 'TQQQ';
   function vFor(p){ return (VD && VD.verdicts) ? VD.verdicts.find(x=>x.prod===p) : null; }
+  let _chkRefSeen = {};   // 이 카드 렌더 동안 같은 ref 가 몇 번째인지 — 앵커 충돌 방지
   function renderEntry(p){
     const d = DATA[p], vv = vFor(p);
+    _chkRefSeen = {};
     card.style.setProperty('--pc','var('+d.v+')');
     let h = '<div style="display:flex;justify-content:space-between;align-items:center"><h3><span class="tk">'+p+'</span> 진입 판정</h3>'
           + (vv?'<span class="verdict '+gradeCls(vv.grade)+'" style="margin:0;padding:4px 11px;font-size:13.5px">'+vv.grade+'</span>':'') + '</div>';
@@ -1774,9 +1776,9 @@
     d.filter.forEach((c,i)=>{
       if(c.ek){                                  // 항목별 자동 판정(예: 2거래일 유지)
         const e = ecf[c.ek];
-        h+=chk('f'+i,{t:c.t, src:c.src, live:(e&&e.label)}, false, !!(e&&e.ok), 'eod', e?'ok':'pending');
+        h+=chk('f'+i,{t:c.t, src:c.src, ref:c.ref, live:(e&&e.label)}, false, !!(e&&e.ok), 'eod', e?'ok':'pending');
       } else {
-        h+=chk('f'+i,{t:c.t,src:c.src,live:mt.filter}, false, vv?!!vv.filter_ok:false, 'eod', vv?'ok':'pending');
+        h+=chk('f'+i,{t:c.t,src:c.src,ref:c.ref,live:mt.filter}, false, vv?!!vv.filter_ok:false, 'eod', vv?'ok':'pending');
       }
     });
     h += '<div class="grouplabel e">② 진입 조건 ('+d.need+'개 이상 충족)</div>';
@@ -1785,31 +1787,31 @@
       const ic = ia && c.ik && ia.checks && ia.checks[c.ik];  // KIS 장중 자동 대상
       if(c.ek){                                 // 야후 EOD 자동(예: 섹터 폭)
         const e = ec[c.ek];
-        h+=chk('e'+i,{t:c.t, src:c.src, live:(e&&e.label)}, false, !!(e&&e.ok), 'eod', e?'ok':'pending');
+        h+=chk('e'+i,{t:c.t, src:c.src, ref:c.ref, live:(e&&e.label)}, false, !!(e&&e.ok), 'eod', e?'ok':'pending');
       } else if(c.ik){
         let st = istate;
         if(ic && ic.status==='error') st='error';
         else if(ic) st='ok';
         else if(istate!=='error') st='pending';
         // 수집된 값(live)이 있으면 출처 뒤에 붙임
-        h+=chk('e'+i,{t:c.t, src:c.src, live:(ic&&ic.label)}, false, !!(ic&&ic.ok), 'intra', st);
+        h+=chk('e'+i,{t:c.t, src:c.src, ref:c.ref, live:(ic&&ic.label)}, false, !!(ic&&ic.ok), 'intra', st);
       } else {
         h+=chk('e'+i,c,false, false, 'manual', (istate==='ok')?'ok':'pending');
       }
     });
-    h+=chk('e_vol',{t:DATA.COMMON.entry[0].t, src:DATA.COMMON.entry[0].src, live:mt.vol}, false, vv?!!vv.vol_ok:false, 'eod', vv?'ok':'pending');
+    h+=chk('e_vol',{t:DATA.COMMON.entry[0].t, src:DATA.COMMON.entry[0].src, ref:DATA.COMMON.entry[0].ref, live:mt.vol}, false, vv?!!vv.vol_ok:false, 'eod', vv?'ok':'pending');
     h += '<div class="grouplabel x">③ 회피 신호 (하나라도 걸리면 보류)</div>';
     d.avoid.forEach((c,i)=>{
       const ks=(c.k||'').split('|').filter(Boolean);
       const on = vv && ks.some(k=>(vv.avoid_keys||[]).includes(k));
       // 이 회피 항목의 대표 지표 수치(첫 키 기준)
       const mkey = ks[0];
-      h+=chk('x'+i,{t:c.t,src:c.src,live:mkey?mt[mkey]:undefined},true, !!on, (vv&&c.k)?'eod':'', vv?'ok':'pending');
+      h+=chk('x'+i,{t:c.t,src:c.src,ref:c.ref,live:mkey?mt[mkey]:undefined},true, !!on, (vv&&c.k)?'eod':'', vv?'ok':'pending');
     });
     if(d.caution){
       h += '<div class="grouplabel" style="color:var(--gold)">④ 호재·뉴스 되돌림 체크 <span class="tag a" style="text-transform:none">저자 2-7</span> — 3개 중 2개 불편하면 조심 신호</div>';
       d.caution.forEach((c,i)=>{
-        h+=chk('c'+i,{t:c.t, src:c.src, live:c.k?mt[c.k]:undefined}, true, false, (vv&&c.k)?'eod':'', vv?'ok':'pending');
+        h+=chk('c'+i,{t:c.t, src:c.src, ref:c.ref, live:c.k?mt[c.k]:undefined}, true, false, (vv&&c.k)?'eod':'', vv?'ok':'pending');
       });
       h += '<div class="note" id="cauNote" style="margin-top:8px"></div>';
     }
@@ -1846,7 +1848,13 @@
     const srcTxt = c.src || c.s;
     if(srcTxt) small += '<span style="color:var(--mute)">'+srcTxt+'</span>';
     if(c.live) small += (small?' → ':'')+'<b style="color:var(--text)">'+c.live+'</b>';
-    return '<label class="chk"><input type="checkbox" data-k="'+id+'"'+(warn?' class="warn"':'')+(checked?' checked':'')
+    // 소절 ref 로 개별 판정 항목에 안정적 앵커를 심는다(chk-<ref>). 같은 ref 가 여러 항목이면 chk-<ref>-<n>.
+    let anchor = '';
+    if(c.ref){
+      const n = (_chkRefSeen[c.ref] = (_chkRefSeen[c.ref]||0) + 1);
+      anchor = ' id="chk-' + c.ref + (n>1 ? '-'+n : '') + '"';
+    }
+    return '<label class="chk"'+anchor+'><input type="checkbox" data-k="'+id+'"'+(warn?' class="warn"':'')+(checked?' checked':'')
       +'><span class="txt">'+c.t+badge+(small?'<small>'+small+'</small>':'')+'</span></label>';
   }
   function evalEntry(p){
@@ -2672,18 +2680,30 @@
       if(sheetTab) sheetTab.click();
     }
 
+    // 이 소절 ref 로 심어둔 개별 판정 항목(chk-<ref>[-n])을 찾는다 — 있으면 큰 제목이 아니라 그 항목을 가리킨다.
+    var hitLabel = null;
     setTimeout(function(){
+      var checks = document.querySelectorAll('#panel-sheet [id="chk-' + key + '"], #panel-sheet [id^="chk-' + key + '-"]');
+      var scrollTo = checks.length ? checks[0] : target;      // 개별 항목 우선, 없으면 STEP 제목
       if(document.body.classList.contains('split') && pane){
-        pane.scrollTop = target.offsetTop - 12;
+        pane.scrollTop = scrollTo.offsetTop - 12;
       } else {
-        target.scrollIntoView({behavior:'smooth', block:'start'});
+        scrollTo.scrollIntoView({behavior:'smooth', block:'start'});
       }
-      flash(target.nextElementSibling && target.nextElementSibling.classList.contains('card')
-            ? target.nextElementSibling : target);
+      if(checks.length){
+        // 같은 ref 를 공유하는 항목이 여럿이면 전부 하이라이트
+        Array.prototype.forEach.call(checks, flash);
+        hitLabel = (checks[0].querySelector('.txt') || checks[0]).textContent;
+        var lab = document.getElementById('jhit');
+        if(lab) lab.textContent = (hitLabel || '').trim().slice(0, 40);
+      } else {
+        flash(target.nextElementSibling && target.nextElementSibling.classList.contains('card')
+              ? target.nextElementSibling : target);
+      }
     }, 60);
 
     var st = c.status === 'reflected' ? '✅ 반영' : (c.status === 'gap' ? '⚠ 미반영' : '💭 원칙');
-    note.innerHTML = '<span class="x" id="jnx">✕</span><b>' + (title || key) + '</b> → <b>'
+    note.innerHTML = '<span class="x" id="jnx">✕</span><b>' + (title || key) + '</b> → <b id="jhit">'
       + (target.textContent || '').trim().slice(0, 40) + '</b> &nbsp;' + st
       + '<br><span style="color:var(--mute)">' + (c.note || '') + '</span>';
     note.classList.add('show');
