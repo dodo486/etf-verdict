@@ -15,6 +15,16 @@ outd = ensure_dir(os.path.join(PUBLIC, "etf"))   # ETF 책은 /etf/ 서브경로
 html = read_text(src)
 data = json.loads(read_text(js))
 
+# 규칙 사본 드리프트 게이트 — JSON(단일 진실)과 HTML 사본이 갈라졌으면 발행 중단.
+# (여기서 막지 않으면 배포본만 옛 규칙을 들고 돌아다닌다)
+from inject_rules import gate as _rules_gate
+_ok, _lines = _rules_gate(html, "etf")
+for _l in _lines:
+    print(_l, file=sys.stderr if not _ok else sys.stdout)
+if not _ok:
+    print("규칙 드리프트 — 발행을 멈춥니다.", file=sys.stderr)
+    sys.exit(1)
+
 # 장중 자동판정 병합 + 수집상태 판정(ok / pending(대기) / error(실패))
 # data.intraday_state = 전체 상태, 각 verdict.intraday_auto엔 종목/체크별 status 포함
 intraday_state = "pending"  # 기본: 아직 안 걷힘

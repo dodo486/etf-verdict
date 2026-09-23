@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """books.json → public/index.html (책 선택 홈/런처). 카드 클릭 시 /slug/ 로 이동."""
-import os, json, html
+import os, sys, json, html
 
 from paths import BASE, PUBLIC, ensure_dir, read_text, write_text
 
@@ -69,6 +69,7 @@ print(f"홈 생성: {os.path.join(outdir, 'index.html')} ({len(manifest['books']
 # 정적 책(라이브 아님) 조립: 소스 HTML에 레일 주입 → public/slug/index.html
 # (라이브 책=etf는 publish_pages.py가 담당하므로 건너뜀)
 from inject_nav import inject
+from inject_rules import gate as rules_gate
 STATIC_SRC = {"supply": os.path.join(BASE, "supply-playbook.html")}
 for b in manifest["books"]:
     if b.get("live"):
@@ -77,6 +78,13 @@ for b in manifest["books"]:
     if not src or not os.path.exists(src):
         print(f"  (건너뜀: {slug} 소스 없음)"); continue
     s = read_text(src)
+    # 규칙 사본 드리프트 게이트 — 갈라진 채로 내보내지 않는다(분리 전 책은 '미적용'으로 보고)
+    ok, lines = rules_gate(s, slug)
+    for l in lines:
+        print(f"  {l}")
+    if not ok:
+        print("  규칙 드리프트 — 발행을 멈춥니다.", file=sys.stderr)
+        sys.exit(1)
     d = ensure_dir(os.path.join(outdir, slug))
     write_text(os.path.join(d, "index.html"), inject(s, slug))
     print(f"  정적 책 조립: {os.path.join(d, 'index.html')}")

@@ -67,6 +67,40 @@ def book_pages():
     return out
 
 
+# ---------------------------------------------------------------- 규칙 파일
+def rules_path(slug):
+    return os.path.join(BASE, "books", slug, "rules.json")
+
+
+def load_rules(slug):
+    """`books/<slug>/rules.json` 이 있으면 그 구조. 없으면 None(→ HTML 리터럴 폴백)."""
+    if not slug:
+        return None
+    p = rules_path(slug)
+    if not os.path.exists(p):
+        return None
+    return json.loads(io.open(p, encoding="utf-8").read())
+
+
+def rule_labels(rules):
+    """규칙(라벨 `t` 를 가진 dict)을 중첩 어디에 있든 훑는다 — 몇 개를 지키는지 세려고."""
+    out = []
+
+    def walk(o):
+        if isinstance(o, dict):
+            if isinstance(o.get("t"), str):
+                out.append(o)
+                return
+            for v in o.values():
+                walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+
+    walk(rules or {})
+    return out
+
+
 # ---------------------------------------------------------------- 원문 블록 추출
 def _const_blocks(html):
     """`const NAME = [...]` / `{...}` 중 대문자 상수만 뽑는다.
@@ -103,7 +137,7 @@ def _const_blocks(html):
     return out
 
 
-def extract(html):
+def extract(html, slug=None):
     """저자 문구에 해당하는 조각만 뽑아 dict로."""
     parts = {}
 
@@ -128,15 +162,27 @@ def extract(html):
             clean.append(t)
     parts["labels"] = clean
 
-    # 4) 규칙 데이터 — JS 상수에 담긴 필터·진입·회피·청산·정의·루틴 문구
-    #    (체크리스트를 JS로 그리는 책은 여기가 원문이다)
-    parts["rule_data"] = _const_blocks(html)
+    # 4) 규칙 데이터 — 필터·진입·회피·청산·정의·루틴 문구
+    #    규칙이 `books/<slug>/rules.json` 으로 분리된 책은 **저자 문구가 그 파일에 산다.**
+    #    HTML 안 JS 상수만 보던 코드를 그대로 두면 분리된 책은 해시 대상이 0개가 되고,
+    #    그 상태로 --accept 하면 "지킬 게 없음"이 기준으로 박힌다 = 보호 상실.
+    #    그래서 파일이 있으면 **파일을** 해시한다(HTML 사본의 일치는 inject_rules --check 몫).
+    rules = load_rules(slug)
+    if rules is not None:
+        parts["rule_data"] = {k: json.dumps(v, ensure_ascii=False, sort_keys=True)
+                              for k, v in rules.items()}
+        parts["rule_source"] = "books/%s/rules.json" % slug
+    else:
+        parts["rule_data"] = _const_blocks(html)
+        parts["rule_source"] = "HTML 안 JS 상수"
     return parts
 
 
 def digest(parts):
     h = {}
     for k, v in parts.items():
+        if k == "rule_source":      # 어디서 읽었는지는 표시용 — 저자 문구가 아니다
+            continue
         blob = (json.dumps(v, ensure_ascii=False, sort_keys=True)
                 if isinstance(v, (list, dict)) else v)
         h[k] = hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
@@ -156,7 +202,7 @@ def save_baseline(data):
 
 
 NAMES = {"src": "플레이북 본문(#src)", "def_table": "규칙 근거표",
-         "labels": "체크 항목 라벨", "rule_data": "규칙 데이터(JS 상수)"}
+         "labels": "체크 항목 라벨", "rule_data": "규칙 데이터"}
 
 
 def main(argv):
@@ -176,39 +222,68 @@ def main(argv):
         if not p:
             print("그런 책이 없습니다: %s (있는 책: %s)" % (show, ", ".join(pages)))
             return 2
-        parts = extract(io.open(p, encoding="utf-8").read())
+        parts = extract(io.open(p, encoding="utf-8").read(), show)
         print("%s — 정적 라벨 %d개" % (show, len(parts["labels"])))
         for t in parts["labels"]:
             print("  ·", t[:150])
-        print("%s — 규칙 데이터(JS 상수) %d개" % (show, len(parts["rule_data"])))
+        print("%s — 규칙 데이터 %d개 (출처: %s)"
+              % (show, len(parts["rule_data"]), parts.get("rule_source")))
         for k, v in sorted(parts["rule_data"].items()):
             print("  · %-8s %d자  %s" % (k, len(v), v[:110]))
+        labs = rule_labels(load_rules(show))
+        if labs:
+            nref = sum(1 for r in labs if r.get("ref"))
+            print("%s — 해시로 지키는 규칙 문구 %d개 (ref 있음 %d · 없음 %d)"
+                  % (show, len(labs), nref, len(labs) - nref))
+            for r in labs:
+                print("  · %-8s %s" % (("ref=" + r["ref"]) if r.get("ref") else "ref없음",
+                                       r["t"][:120]))
         return 0
 
     base = load_baseline()
     cur, bad, new = {}, [], []
 
     for slug, path in sorted(pages.items()):
-        parts = extract(io.open(path, encoding="utf-8").read())
+        parts = extract(io.open(path, encoding="utf-8").read(), slug)
         d = digest(parts)
+        rl = load_rules(slug)
+        nlab = "%d" % len(rule_labels(rl)) if rl is not None else "세지 않음(분리 전)"
         cur[slug] = d
         old = base.get(slug)
         if old is None:
             new.append(slug)
             print("· %-8s 기준 없음 — 새 책 (--accept 로 등록)" % slug)
             continue
+        if not parts["rule_data"]:
+            # 해시 대상이 0개면 지키는 게 없다는 뜻이다. 통과로 찍으면 보호 상실이 조용히 지나간다.
+            bad.append((slug, ["rule_data"], parts, old, d))
+            print("✗ %-8s 규칙 데이터가 0개 — 지킬 원문이 없습니다(보호 상실). "
+                  "books/%s/rules.json 이 있어야 합니다." % (slug, slug))
+            continue
         diff = [k for k in d if old.get(k) != d[k]]
         if diff:
             bad.append((slug, diff, parts, old, d))
             print("✗ %-8s 원문이 바뀜: %s" % (slug, ", ".join(NAMES.get(k, k) for k in diff)))
         else:
-            print("✓ %-8s 원문 그대로 — 라벨 %d · 규칙데이터 %d(%s)"
+            print("✓ %-8s 원문 그대로 — 라벨 %d · 규칙데이터 %d(%s) · 규칙문구 %s · 출처 %s"
                   % (slug, len(parts["labels"]), len(parts["rule_data"]),
-                     ", ".join(sorted(parts["rule_data"])) or "없음"))
+                     ", ".join(sorted(parts["rule_data"])) or "없음",
+                     nlab, parts.get("rule_source")))
 
     if accept:
         save_baseline(cur)
         print("\n기준 갱신 완료 → %s" % os.path.basename(BASELINE))
+        for slug in sorted(pages):
+            # 무엇을 기준으로 박았는지 남긴다. 0개를 조용히 박으면 그게 보호 상실이다.
+            rl = load_rules(slug)
+            if rl is not None:
+                print("  · %-8s books/%s/rules.json 의 규칙 문구 %d개를 기준으로 고정"
+                      % (slug, slug, len(rule_labels(rl))))
+            else:
+                nblk = len(extract(io.open(pages[slug], encoding="utf-8").read(),
+                                   slug)["rule_data"])
+                print("  · %-8s HTML 안 JS 상수 %d덩이를 기준으로 고정 (규칙 분리 전)"
+                      % (slug, nblk))
         print("원문을 **의도적으로** 고친 경우에만 이 커밋이 정당합니다.")
         return 0
 
