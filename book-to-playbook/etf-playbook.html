@@ -1531,6 +1531,15 @@
           "v": "스윙 5~8일 · 20거래일 내 재판단"
         }
       ]
+    },
+    "COMMON": {
+      "entry": [
+        {
+          "t": "거래량 전일 1.5배↑ + 종가 고점 근처",
+          "ref": "7-4",
+          "src": "📊 야후 EOD · 당일 거래량 vs 전일 거래량(저자 7-4 '전일보다 1.5배' — 신규 판정엔진 volume_ratio 기준. 레거시 vol_ok(etf_daily_verdict.py)는 20일 평균 대비로 계산해 라벨과 불일치, 수정은 범위 밖)"
+        }
+      ]
     }
   },
   "MODES": {
@@ -1788,7 +1797,7 @@
         h+=chk('e'+i,c,false, false, 'manual', (istate==='ok')?'ok':'pending');
       }
     });
-    h+=chk('e_vol',{t:'거래량 전일 1.5배↑ + 종가 고점 근처',src:'📊 야후 EOD · 당일 거래량 vs 20일 평균',live:mt.vol}, false, vv?!!vv.vol_ok:false, 'eod', vv?'ok':'pending');
+    h+=chk('e_vol',{t:DATA.COMMON.entry[0].t, src:DATA.COMMON.entry[0].src, live:mt.vol}, false, vv?!!vv.vol_ok:false, 'eod', vv?'ok':'pending');
     h += '<div class="grouplabel x">③ 회피 신호 (하나라도 걸리면 보류)</div>';
     d.avoid.forEach((c,i)=>{
       const ks=(c.k||'').split('|').filter(Boolean);

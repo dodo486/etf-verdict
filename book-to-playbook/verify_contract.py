@@ -156,6 +156,72 @@ def c3(html_path):
     return True, note
 
 
+
+# ---------------------------------------------------------------- 규칙 누출 검사
+# 계약 2 보충 — "규칙은 JSON 파일로 존재한다"를 "JSON 파일 **안에만** 존재한다"로
+# 좁힌다. 41번째 규칙 사고(2026-09-23, etf e_vol): 렌더링 코드 안에 규칙 리터럴이
+# `{t:'...'}` 로 직접 박혀 있으면 c2()의 rules.json 검사는 그 존재를 전혀 모른다
+# — 계약2를 충족한 책도 그 안 어딘가에 파일로 안 나온 규칙을 여전히 숨길 수 있다.
+#
+# id="rules" 블록(파일의 사본, inject_rules.py 가 주입) · #src 마크다운(저자 본문,
+# 규칙 근거표 등에 "책의 표현"이 그대로 인용됨) · coverage-data 블록(커버리지 노트)은
+# 규칙 리터럴이 보여도 유출이 아니다 — 그 세 곳을 지운 사본에서만 찾는다.
+LEAK_EXCLUDE_RE = [
+    re.compile(r'<script type="application/json" id="rules">.*?</script>', re.S),
+    re.compile(r'<script type="text/markdown" id="src">.*?</script>', re.S),
+    re.compile(r'<script type="application/json" id="coverage-data">.*?</script>', re.S),
+]
+# 규칙 리터럴 = 라벨 키 `t` 를 가진 객체. JS 한따옴표(`t:'...'`)와 JSON 겹따옴표
+# (`"t": "..."`) 둘 다 잡는다. 앞에 word/quote 문자가 오면(`amount:`, `cnt:` 등)
+# `t` 로 끝나는 다른 키와 헷갈리므로 그 경계를 앞에서 막는다.
+RULE_LIT_RE = re.compile(
+    r"(?:(?<![\w'\"])t\s*:\s*'((?:\\.|[^'\\])*)'"
+    r"|\"t\"\s*:\s*\"((?:\\.|[^\"\\])*)\")"
+)
+
+
+def _blank(m):
+    """블록 내용을 공백으로 지우되 줄바꿈은 남긴다 — 이후 찾는 줄 번호가 밀리지 않게."""
+    return re.sub(r"[^\n]", " ", m.group(0))
+
+
+def leak_scan_text(slug):
+    """유출 탐지용 사본 — id=rules·#src·coverage-data 를 지운 책 HTML 전체."""
+    hp = book_html(slug)
+    if not hp:
+        return None
+    html = io.open(hp, encoding="utf-8").read()
+    for pat in LEAK_EXCLUDE_RE:
+        html = pat.sub(_blank, html)
+    return html
+
+
+def rule_leaks(slug):
+    """[(줄번호, 문구)] — 위 세 블록 밖에서 발견된 규칙 리터럴 전부."""
+    text = leak_scan_text(slug)
+    if text is None:
+        return None
+    out = []
+    for m in RULE_LIT_RE.finditer(text):
+        t = m.group(1) if m.group(1) is not None else m.group(2)
+        line = text.count("\n", 0, m.start()) + 1
+        out.append((line, t))
+    return out
+
+
+def c_leak(slug):
+    """(status, note, hits). status: True=유출 없음 · False=유출 있음 ·
+    None=이 책은 아직 규칙 분리 전이라 검사 대상이 아님(통과로 찍지 않는다)."""
+    if not os.path.exists(os.path.join(BASE, "books", slug, "rules.json")):
+        return None, "규칙 분리 전(rules.json 없음) — 미적용(통과 아님)", []
+    hits = rule_leaks(slug)
+    if hits is None:
+        return False, "책 HTML 을 못 찾음", []
+    if hits:
+        return False, "%d건 — id=\"rules\" JSON 밖에서 규칙 리터럴 발견" % len(hits), hits
+    return True, "유출 0건 — 규칙 리터럴이 전부 id=\"rules\" JSON 안에만 있음", []
+
+
 def c4(slug):
     cands = [os.path.join(BASE, "books", slug, "data_spec.json"),
              os.path.join(BASE, "%s_data_spec.json" % slug)]   # 과도기 경로
@@ -195,17 +261,40 @@ def main(argv):
             for name, why in miss:
                 print("  ❌ %s %s" % (pad(name, 14), why))
 
+    # ---- 규칙 누출 검사(계약2 보충) — "JSON에 있다"가 아니라 "JSON 밖에 없다"를 본다.
+    print("\n" + "-" * 78)
+    print("규칙 누출 검사(계약2 보충) — id=\"rules\" JSON 밖에 규칙 리터럴(`{t:'...'}`)이 "
+          "있으면 실패.")
+    leakbad = 0
+    for b in books:
+        slug = b["slug"]
+        ok, note, hits = c_leak(slug)
+        mark = "✅ 없음  " if ok else ("❌ 유출  " if ok is False else "· 미적용 ")
+        print("  %-8s %s %s" % (slug, mark, note))
+        for line, t in hits[:20]:
+            print("      %5d행  %s" % (line, t[:80]))
+        if len(hits) > 20:
+            print("      … 외 %d건 더" % (len(hits) - 20))
+        if ok is False:
+            leakbad += 1
+    bad += leakbad
+
     if bad:
         print("\n" + "=" * 70)
-        print("계약 미충족 %d건. 책을 계약에 맞춰라 — 검사를 느슨하게 만들지 말 것." % bad)
-        print("  계약1: books/<slug>/source_index.json 에 소절 키")
-        print("  계약2: books/<slug>/rules.json — 규칙마다 ref (HTML 안 JS 리터럴은 위반)")
-        print("  계약3: coverage-data 가 소절 전수를 reflected/gap/mindset 으로 분류")
-        print("  계약4: data_spec 항목마다 ref")
+        if bad - leakbad:
+            print("계약 미충족 %d건. 책을 계약에 맞춰라 — 검사를 느슨하게 만들지 말 것."
+                  % (bad - leakbad))
+            print("  계약1: books/<slug>/source_index.json 에 소절 키")
+            print("  계약2: books/<slug>/rules.json — 규칙마다 ref (HTML 안 JS 리터럴은 위반)")
+            print("  계약3: coverage-data 가 소절 전수를 reflected/gap/mindset 으로 분류")
+            print("  계약4: data_spec 항목마다 ref")
+        if leakbad:
+            print("규칙 누출 %d건. 위에 찍힌 문구를 books/<slug>/rules.json 으로 옮기고 "
+                  "렌더 코드는 그 JSON을 읽게 고쳐라." % leakbad)
         print("=" * 70)
         return 1
 
-    print("\n전부 통과 — 모든 책이 계약 4조를 충족한다.")
+    print("\n전부 통과 — 모든 책이 계약 4조를 충족하고, 규칙 누출도 없다.")
     return 0
 
 
