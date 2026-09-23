@@ -3,7 +3,7 @@
 """
 ETF 데일리 진입 환경 자동판정
 - 김프로랩 『미국 돈복사 ETF 투자방법』 STEP1 정량규칙을 코드로 옮김
-- 무인증 공개 소스(Yahoo Finance chart API)만 사용, 외부 의존성 없음(urllib)
+- 시세는 직접 수집하지 않고 전부 jhts.marketdata(md_feed.py 창구)에서 받는다.
 - 최신 EOD 기준으로 다음 세션 진입 '환경'을 판정 (필터/스코어카드/회피).
   장중 패턴 3종(시초가 지지·첫 눌림 저점·30분 판별)은 자동 불가 → '장중 확인'으로 표시.
 
@@ -16,104 +16,48 @@ import paths  # noqa: F401  (경로·UTF-8 출력 고정. 반드시 먼저 impor
 import json, os, sys, ssl, urllib.request, urllib.parse
 from datetime import datetime, timezone
 
+import md_feed  # 시세 창구 — 야후/urllib 자체수집을 대체
+
+# 텔레그램 전송용 TLS 컨텍스트(시세와 무관, 알림 전송에만 사용)
 UA = {"User-Agent": "Mozilla/5.0"}
-# TLS 는 검증을 켠 상태가 기본. (ADAPTERS.md 규약: ssl.CERT_NONE 금지)
-# 일부 macOS 환경에서 루트 인증서가 없어 실패하는 사례가 있어, 그 예외가 실제로
-# 났을 때만 1회 경고와 함께 비검증으로 폴백한다(윈도우/정상 맥은 계속 검증).
 CTX = ssl.create_default_context()
-_CTX_INSECURE = None
 
-
-def _insecure_ctx():
-    global _CTX_INSECURE
-    if _CTX_INSECURE is None:
-        _CTX_INSECURE = ssl.create_default_context()
-        _CTX_INSECURE.check_hostname = False
-        _CTX_INSECURE.verify_mode = ssl.CERT_NONE
-        print("[경고] TLS 인증서 검증 실패 → 비검증으로 1회 폴백합니다. "
-              "맥이면 'Install Certificates.command' 실행을 권합니다.", file=sys.stderr)
-    return _CTX_INSECURE
-
-def fetch(symbol, rng="3mo", interval="1d"):
-    q = urllib.parse.quote(symbol)
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{q}?range={rng}&interval={interval}"
-    req = urllib.request.Request(url, headers=UA)
-    try:
-        with urllib.request.urlopen(req, timeout=20, context=CTX) as r:
-            data = json.load(r)
-    except ssl.SSLCertVerificationError:
-        with urllib.request.urlopen(req, timeout=20, context=_insecure_ctx()) as r:
-            data = json.load(r)
-    res = data["chart"]["result"][0]
-    q0 = res["indicators"]["quote"][0]
-    closes = [c for c in q0.get("close", []) if c is not None]
-    highs  = [h for h in q0.get("high",  []) if h is not None]
-    vols   = [v for v in q0.get("volume",[]) if v is not None]
-    opens  = [o for o in q0.get("open",  []) if o is not None]
-    meta = res.get("meta", {})
-    return {"close": closes, "high": highs, "vol": vols, "open": opens, "meta": meta}
-
-def ma(xs, n):
-    return sum(xs[-n:]) / n if len(xs) >= n else None
 
 def pct(a, b):
     return (a - b) / b * 100 if (a is not None and b) else None
 
-def hold_above_ma(closes, n=20, look=12):
-    """종가가 N일선 위를 며칠 연속 지켰나(당일부터 거꾸로).
-
-    저자 3-2 "종가로 위에 올라서고 최소 2거래일 버티는지",
-    5-2 "그다음 2거래일 동안 20일선 다시 안 깸" 을 세기 위한 값.
-    회복일 + 이후 2거래일 = 3 이 기준.
-    """
-    cnt = 0
-    for k in range(look):
-        i = len(closes) - 1 - k
-        if i < n - 1:
-            break
-        m = sum(closes[i - n + 1:i + 1]) / n
-        if closes[i] > m:
-            cnt += 1
-        else:
-            break
-    return cnt
-
-
-def up_days(closes, n=10):
-    c = closes[-(n+1):]
-    return sum(1 for i in range(1, len(c)) if c[i] > c[i-1])
-
-def load(symbol):
-    try:
-        d = fetch(symbol)
-        c = d["close"]
-        if len(c) < 21:
-            return None
-        return {
-            "sym": symbol, "close": c[-1], "prev": c[-2],
-            "ma5": ma(c, 5), "ma20": ma(c, 20), "ma60": ma(c, 60),
-            "chg": pct(c[-1], c[-2]),
-            "ret5": pct(c[-1], c[-6]) if len(c) >= 6 else None,
-            "high": d["high"][-1] if d["high"] else None,
-            "open": d["open"][-1] if d.get("open") else None,
-            "vol": d["vol"][-1] if d["vol"] else None,
-            "vol20": ma(d["vol"], 20) if len(d["vol"]) >= 20 else None,
-            "updays10": up_days(c, 10),
-            "hold20": hold_above_ma(c, 20),   # 20일선 위를 며칠 연속 지켰나(저자 3-2·5-2)
-            "closes": c,
-        }
-    except Exception as e:
-        return {"sym": symbol, "error": str(e)}
 
 def ok(v):  # 유효 데이터?
     return v and "error" not in v
 
-# ---------- 데이터 수집 ----------
+# ---------- 데이터 수집 (md_feed 경유) ----------
 # NQ=F / ES=F = 나스닥100·S&P500 선물. 저자 2-6이 '선물'을 보라고 해서 선물을 받는다.
 # (지수 ^NDX/^GSPC 는 종목 필터·판정에 계속 쓰인다)
-SYMS = ["NQ=F","ES=F","^NDX","^GSPC","^SOX","TQQQ","SOXL","UPRO","^VIX","^TNX",
-        "NVDA","MSFT","AAPL","AMD","AVGO"]
-D = {s: load(s) for s in SYMS}
+#   · 일봉 필요(MA20/MA60·거래량·연속유지) → md_feed.series()
+#   · 방향만 필요(선물·^VIX·^TNX) → 선물=quote 스냅샷, 지수=index 스냅샷
+SERIES_SYMS = ["^NDX", "^GSPC", "^SOX", "TQQQ", "SOXL", "UPRO",
+               "NVDA", "MSFT", "AAPL", "AMD", "AVGO"]
+FUTURES_SYMS = ["NQ=F", "ES=F"]
+INDEX_SNAP_SYMS = ["^VIX", "^TNX"]
+
+
+def _snap_to_d(sym, snap):
+    """md_feed 스냅샷({price,prev,chg,...}) → 판정 코드가 기대하는 D[sym] 형태.
+
+    일봉 없이 방향만 쓰는 심볼(선물·^VIX·^TNX)용. 옛 load() 가 채우던 키 중
+    close/prev/chg 만 채운다(이 심볼들엔 MA/거래량/hold20 을 쓰지 않는다)."""
+    if not snap or snap.get("price") is None:
+        return {"sym": sym, "error": "시세 조회 실패"}
+    return {"sym": sym, "close": snap["price"], "prev": snap.get("prev"),
+            "chg": snap.get("chg")}
+
+
+D = {s: md_feed.series(s) for s in SERIES_SYMS}
+_fut = md_feed.quote_snapshot(FUTURES_SYMS)
+for s in FUTURES_SYMS:
+    D[s] = _snap_to_d(s, _fut.get(s))
+for s in INDEX_SNAP_SYMS:
+    D[s] = _snap_to_d(s, md_feed.index_snapshot(s))
 
 def above20(v): return ok(v) and v["ma20"] and v["close"] > v["ma20"]
 def above60(v): return ok(v) and v["ma60"] and v["close"] > v["ma60"]
@@ -147,11 +91,12 @@ sc.append(("10년물 안정(+0.1%p 미만)", ok(tnx) and not tnx_jump,
            (f"^TNX {tnx['close']:.2f}% / 전일 {tnx['prev']:.2f}% ({tnx['close']-tnx['prev']:+.2f}%p) · 기준 +0.10%p 미만"
             if (ok(tnx) and tnx["chg"] is not None) else "수집 실패 — 값 없음")))
 
-# 달러인덱스: DX-Y.NYB, 실패 시 DX=F (무료 심볼이 불안정해 둘 다 실패할 수 있다)
+# 달러인덱스: DX-Y.NYB, 실패 시 DX=F (심볼이 불안정해 둘 다 실패할 수 있다)
 dxy = D.get("DXY")
 if dxy is None:
-    dxy = load("DX-Y.NYB")
-    if not ok(dxy): dxy = load("DX=F")
+    dxy = _snap_to_d("DX-Y.NYB", md_feed.index_snapshot("DX-Y.NYB"))
+    if not ok(dxy):
+        dxy = _snap_to_d("DX=F", md_feed.index_snapshot("DX=F"))
     D["DXY"] = dxy
 dxy_ok = ok(dxy) and dxy["chg"] is not None and dxy["chg"] < 0.5
 sc.append(("달러인덱스 안정(급강세 아님)", dxy_ok,
@@ -165,18 +110,17 @@ score = sum(1 for _, b, _w in sc if b)
 # 미국 섹터는 SPDR ETF로, 실적일은 나스닥 공개 캘린더로 받는다. 실패하면 값을
 # 지어내지 않고 ok=False 로 남겨 시트가 '직접 확인'으로 표시한다.
 try:
-    import market_extras as _mx
-    SECTORS = _mx.sector_snapshot()
-    BREADTH = _mx.sector_breadth(SECTORS)        # 5-4: 섹터 5개 중 20일선 위 개수
-    DEFONLY = _mx.defensive_only(SECTORS)        # 5-3: 방어주만 살아남
-    CYCWEAK = _mx.cyclical_weak(SECTORS)         # 5-3: 금융·산업재 동시 약화
+    SECTORS = md_feed.sector_snapshot()
+    BREADTH = md_feed.sector_breadth(SECTORS)        # 5-4: 섹터 5개 중 20일선 위 개수
+    DEFONLY = md_feed.defensive_only(SECTORS)        # 5-3: 방어주만 살아남
+    CYCWEAK = md_feed.cyclical_weak(SECTORS)         # 5-3: 금융·산업재 동시 약화
 except Exception as _e:  # noqa: BLE001
     SECTORS, BREADTH = {}, {"ok": False, "reason": "섹터 수집 실패: %s" % _e}
     DEFONLY = CYCWEAK = {"ok": False, "reason": "섹터 수집 실패"}
     print("[섹터 실패]", _e, file=sys.stderr)
 
 try:
-    EARN = _mx.earnings_dday(["NVDA", "MSFT", "AAPL", "AMD", "AVGO"])
+    EARN = md_feed.earnings_dday(["NVDA", "MSFT", "AAPL", "AMD", "AVGO"])
 except Exception as _e:  # noqa: BLE001
     EARN = {}
     print("[실적 캘린더 실패]", _e, file=sys.stderr)
