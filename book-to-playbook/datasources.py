@@ -12,12 +12,29 @@ metric.type 카탈로그 (spec["metric"]["type"]):
   above_open     심볼 현재가가 당일 시가 위인가(장중)   {symbol}
   pct_change     전일 대비 등락률(%)                    {symbol}
   n_day_return   최근 N일 수익률(%)                     {symbol, n}
-  volume_ratio   거래량 / N일평균거래량 배수            {symbol, ref?=20}
+  volume_ratio   거래량 / 기준거래량 배수               {symbol, base?=1(전일), min?}
+                 base=1(기본)이면 전일 대비, 2 이상이면 그 기간 평균 대비.
+                 저자 7-4 "오늘 거래량이 전일보다 1.5배 이상 늘었는지" — 기본이 전일 대비인 이유.
   ma_distance    종가와 N일선의 이격도(%)               {symbol, ma?=5}
   gap_up         당일 시가의 전일종가 대비 갭(%)         {symbol}
   upper_wick     윗꼬리 %(고점 대비 종가 하락폭)         {symbol}
   higher_low     첫 눌림 저점 높임 여부(장중 분봉)        {symbol}
   count_up       여러 심볼 중 상승 개수                  {symbols:[...], min?}
+  hold_above_ma  N일선 회복 후 며칠 더 지켰나            {symbol, ma, days?=2, }
+                 저자 3-2·5-2 "회복 후 그다음 2거래일 동안 다시 안 깸". days=회복일 다음
+                 추가로 지켜야 할 거래일 수(총 need = days+1).
+  count_above_ma 여러 심볼 중 N일선 위 개수              {symbols:[...], ma?=20, min?}
+                 저자 5-1 "섹터 ETF 흐름을 5개만 같이 보십시오… 3개 이상이 플러스".
+  count_up_days  최근 N거래일 중 상승일 개수             {symbol, n?=10, min?}
+                 저자 2-3 "최근 10거래일 중 반도체 지수가 7일 이상 올랐다면".
+  defensive_only 방어(XLP·XLU·XLV) 강세 + 경기민감(XLK·XLF·XLI) 약세 동시(5일)  {}
+                 저자 5-3 "방어주만 살아나고 경기민감(기술·금융·산업재) 약화".
+  bad_rate_drop  나쁜 금리 하락(10년물↓ + S&P500 못오름 + XLF 5일 약세) 동시    {}
+                 저자 5-3 "금리↓인데 주식 못 오르고 금융주 약함".
+  earnings_dday  심볼들의 다음 실적 발표일까지 D-day     {symbols:[...], min?}
+                 저자 3-5 "빅테크 실적 발표 임박". 나스닥 공개 캘린더(market_extras.py
+                 재사용, NasdaqEarningsAdapter). 저자가 D-n 임계를 명시하지 않아
+                 min 없으면 ok=None(수치만 노출).
 
 반환 결과 dict (fetch)의 공통 키:
   ok      bool|None   판정 통과 여부(임계값 있으면), 없으면 None
@@ -50,6 +67,13 @@ def _pct(a, b):
     return (a - b) / b * 100 if (a is not None and b) else None
 
 
+def _n_day_pct(closes, n):
+    """최근 n거래일 수익률(%). 데이터 부족하면 None."""
+    if len(closes) < n + 1:
+        return None
+    return _pct(closes[-1], closes[-(n + 1)])
+
+
 # ----------------------------------------------------------------------------
 # YahooAdapter — 무료 EOD/일봉 (미국주식/지수/VIX/금리/달러)
 # ----------------------------------------------------------------------------
@@ -59,7 +83,13 @@ class YahooAdapter:
     source = "yahoo"
     CADENCE = "eod"
     HANDLES = {"above_ma", "pct_change", "n_day_return", "volume_ratio",
-               "upper_wick", "count_up", "ma_distance", "gap_up"}
+               "upper_wick", "count_up", "ma_distance", "gap_up",
+               "hold_above_ma", "count_above_ma", "defensive_only", "bad_rate_drop",
+               "count_up_days"}
+
+    # 저자 5-3 매핑: 경기민감(기술·금융·산업재) vs 방어(필수소비재·유틸리티·헬스케어)
+    CYCLICAL_ETF = ["XLK", "XLF", "XLI"]
+    DEFENSIVE_ETF = ["XLP", "XLU", "XLV"]
 
     def __init__(self):
         self._cache = {}  # symbol -> parsed series (per-process)
@@ -113,6 +143,12 @@ class YahooAdapter:
         t = m.get("type")
         if t == "count_up":
             return self._count_up(m)
+        if t == "count_above_ma":
+            return self._count_above_ma(m)
+        if t == "defensive_only":
+            return self._defensive_only(m)
+        if t == "bad_rate_drop":
+            return self._bad_rate_drop(m)
         s = self._series(m.get("symbol", ""))
         if "error" in s:
             return {"status": "error", "source": self.source, "ok": None,
@@ -131,6 +167,10 @@ class YahooAdapter:
             return self._ma_distance(m, s)
         if t == "gap_up":
             return self._gap_up(m, s)
+        if t == "hold_above_ma":
+            return self._hold_above_ma(m, s)
+        if t == "count_up_days":
+            return self._count_up_days(m, s)
         return {"status": "error", "source": self.source, "ok": None,
                 "reason": f"미지원 metric.type={t}", "label": t or "?"}
 
@@ -200,20 +240,144 @@ class YahooAdapter:
                 "label": f"{m['symbol']} 최근 {n}일 {ret:+.1f}%"}
 
     def _volume_ratio(self, m, s):
-        ref = int(m.get("ref", 20))
+        """거래량 배수. base=1(기본)이면 전일 대비, 2 이상이면 그 기간 평균 대비.
+
+        저자 7-4 "오늘 거래량이 전일보다 1.5배 이상 늘었는지"(같은 소절에 두 번 나옴) —
+        20일 평균은 원문 어디에도 없다. 그래서 기본값을 전일 대비(base=1)로 둔다.
+        `ref`는 옛 필드명 호환용으로만 남긴다(신규 항목은 `base`를 쓴다).
+        """
         vols = s["vols"]
-        avg = _ma(vols, ref) if len(vols) >= ref else None
-        if not (s.get("vol") and avg):
+        base = int(m.get("base", m.get("ref", 1)))
+        if base <= 1:
+            denom = vols[-2] if len(vols) >= 2 else None
+            base_txt = "전일"
+        else:
+            denom = _ma(vols[:-1], base) if len(vols) >= base + 1 else None
+            base_txt = f"{base}일평균"
+        if not (s.get("vol") and denom):
             return {"status": "error", "source": self.source, "ok": None,
                     "reason": "거래량 데이터 부족", "label": f"{m['symbol']} 거래량 없음"}
-        ratio = s["vol"] / avg
+        ratio = s["vol"] / denom
         thr = m.get("min")
         ok = None if thr is None else (ratio >= float(thr))
 
         def mil(v):
             return f"{v/1e6:.1f}M" if v else "–"
         return {"status": "ok", "source": self.source, "ok": ok, "value": ratio,
-                "label": f"{m['symbol']} 거래량 {mil(s['vol'])}/{ref}일평균 {mil(avg)} ({ratio:.2f}배)"}
+                "label": f"{m['symbol']} 거래량 {mil(s['vol'])}/{base_txt} {mil(denom)} ({ratio:.2f}배)"}
+
+    def _hold_above_ma(self, m, s):
+        """N일선을 회복한 뒤 며칠을 더 지켰나(연속). 저자 3-2·5-2
+        "20일선 위로 회복 + 그다음 2거래일 동안 20일선을 다시 깨지 않는 것".
+
+        need = days(추가 거래일) + 1(회복일 자체). 종가 기준으로 오늘부터 거꾸로 센다
+        (etf_daily_verdict.py의 hold_above_ma()/HOLD_NEED 로직과 동일).
+        """
+        n = int(m.get("ma", 20))
+        days = int(m.get("days", 2))
+        need = days + 1
+        closes = s["closes"]
+        cnt = 0
+        look = need + 20
+        for k in range(look):
+            i = len(closes) - 1 - k
+            if i < n - 1:
+                break
+            mv = sum(closes[i - n + 1:i + 1]) / n
+            if closes[i] > mv:
+                cnt += 1
+            else:
+                break
+        ok = cnt >= need
+        return {"status": "ok", "source": self.source, "ok": bool(ok), "value": cnt,
+                "label": f"{m['symbol']} {n}일선 위 {cnt}거래일 연속 "
+                         f"(회복일+{days}거래일={need} 필요)"}
+
+    def _count_up_days(self, m, s):
+        """최근 n거래일 중 상승일(전일比 플러스) 개수. 저자 2-3
+        "최근 10거래일 중 반도체 지수가 7일 이상 올랐다면" — etf_daily_verdict.py
+        up_days() 와 같은 정의(당일 포함 최근 n개 캔들 중 전일 대비 상승한 날 수)."""
+        n = int(m.get("n", 10))
+        closes = s["closes"][-(n + 1):]
+        if len(closes) < 2:
+            return {"status": "error", "source": self.source, "ok": None,
+                    "reason": f"{n}일 데이터 부족", "label": f"{m['symbol']} 상승일수 없음"}
+        up = sum(1 for i in range(1, len(closes)) if closes[i] > closes[i - 1])
+        thr = m.get("min")
+        ok = None if thr is None else (up >= int(thr))
+        return {"status": "ok", "source": self.source, "ok": ok, "value": up,
+                "label": f"{m['symbol']} 최근 {n}거래일 중 {up}일 상승"}
+
+    def _count_above_ma(self, m):
+        """여러 심볼 중 N일선 위 개수. 저자 5-1 섹터 폭(기술·금융·산업재·헬스케어·소비재)."""
+        syms = m.get("symbols", [])
+        n = int(m.get("ma", 20))
+        parts = []
+        above = 0
+        n_ok = 0
+        for sym in syms:
+            s = self._series(sym)
+            if "error" in s:
+                parts.append(f"{sym} 실패")
+                continue
+            mv = _ma(s["closes"], n)
+            if mv is None:
+                parts.append(f"{sym} {n}일 데이터 부족")
+                continue
+            n_ok += 1
+            up = s["close"] > mv
+            if up:
+                above += 1
+            parts.append(f"{sym} {'위' if up else '아래'}")
+        if n_ok == 0:
+            return {"status": "error", "source": self.source, "ok": None,
+                    "reason": "전 심볼 조회 실패", "label": "count_above_ma 실패"}
+        thr = m.get("min")
+        ok = None if thr is None else (above >= int(thr))
+        return {"status": "ok", "source": self.source, "ok": ok, "value": above,
+                "label": f"{above}/{len(syms)} {n}일선 위 · " + ", ".join(parts)}
+
+    def _defensive_only(self, m):
+        """방어(XLP·XLU·XLV) 5일 수익률 평균 > 0 AND 경기민감(XLK·XLF·XLI) 평균 < 0.
+
+        저자 5-3 "방어주만 살아나고 경기민감(기술·금융·산업재) 약화"."""
+        cyc = [_n_day_pct(self._series(sym).get("closes", []), 5)
+               if "error" not in self._series(sym) else None
+               for sym in self.CYCLICAL_ETF]
+        dfn = [_n_day_pct(self._series(sym).get("closes", []), 5)
+               if "error" not in self._series(sym) else None
+               for sym in self.DEFENSIVE_ETF]
+        if any(v is None for v in cyc + dfn):
+            return {"status": "error", "source": self.source, "ok": None,
+                    "reason": "섹터 ETF 조회 실패", "label": "방어주 판정 불가"}
+        c = sum(cyc) / len(cyc)
+        d = sum(dfn) / len(dfn)
+        flag = (d > 0) and (c < 0)
+        return {"status": "ok", "source": self.source, "ok": bool(flag), "value": d - c,
+                "label": "경기민감(XLK·XLF·XLI) 5일 %+.1f%% / 방어(XLP·XLU·XLV) 5일 %+.1f%%"
+                         % (c, d)}
+
+    def _bad_rate_drop(self, m):
+        """나쁜 금리 하락 — 10년물↓ + S&P500 못오름 + 금융주(XLF) 5일 약세 동시.
+
+        저자 5-3 "금리↓인데 주식 못 오르고 금융주 약함". etf_daily_verdict.py
+        _bad_rate_drop() 과 같은 정의."""
+        tnx = self._series("^TNX")
+        gspc = self._series("^GSPC")
+        xlf = self._series("XLF")
+        if "error" in tnx or "error" in gspc or "error" in xlf:
+            return {"status": "error", "source": self.source, "ok": None,
+                    "reason": "금리/지수/금융주 조회 실패", "label": "나쁜 금리 하락 판정 불가"}
+        rate_chg = tnx["close"] - tnx["prev"]
+        spx_chg = _pct(gspc["close"], gspc["prev"])
+        fin5 = _n_day_pct(xlf["closes"], 5)
+        if spx_chg is None or fin5 is None:
+            return {"status": "error", "source": self.source, "ok": None,
+                    "reason": "데이터 부족", "label": "나쁜 금리 하락 판정 불가"}
+        flag = (rate_chg < 0) and (spx_chg <= 0) and (fin5 < 0)
+        return {"status": "ok", "source": self.source, "ok": bool(flag), "value": rate_chg,
+                "label": "^TNX %+.2f%%p · S&P500 %+.1f%% · XLF 5일 %+.1f%%"
+                         % (rate_chg, spx_chg, fin5)}
 
     def _upper_wick(self, m, s):
         hi, cl = s.get("high"), s.get("close")
@@ -349,6 +513,50 @@ class KisAdapter:
 
 
 # ----------------------------------------------------------------------------
+# NasdaqEarningsAdapter — 나스닥 공개 실적 캘린더(market_extras.py 재사용)
+# ----------------------------------------------------------------------------
+class NasdaqEarningsAdapter:
+    """빅테크 다음 실적 발표일 D-day. 저자 3-5 "빅테크 실적 발표 임박".
+
+    market_extras.py(이미 이 리포에 있는 무료 나스닥 캘린더 수집기)를 그대로
+    재사용한다 — 새로 만들지 않는다. 실패(네트워크·모듈 없음)하면 error 로
+    정직하게 남긴다."""
+
+    source = "nasdaq"
+    CADENCE = "eod"
+    HANDLES = {"earnings_dday"}
+
+    def capabilities(self):
+        return set(self.HANDLES)
+
+    def fetch(self, spec):
+        m = spec.get("metric", {})
+        if m.get("type") != "earnings_dday":
+            return {"status": "error", "source": self.source, "ok": None,
+                    "reason": f"미지원 metric.type={m.get('type')}", "label": "?"}
+        try:
+            import market_extras  # noqa: PLC0415
+        except Exception as e:  # noqa: BLE001
+            return {"status": "error", "source": self.source, "ok": None,
+                    "reason": f"market_extras 로드 실패: {e}", "label": "실적 캘린더 불가"}
+        syms = m.get("symbols", [])
+        try:
+            dd = market_extras.earnings_dday(syms)
+        except Exception as e:  # noqa: BLE001
+            return {"status": "error", "source": self.source, "ok": None,
+                    "reason": f"실적 캘린더 조회 실패: {e}", "label": "실적 캘린더 실패"}
+        if not dd:
+            return {"status": "ok", "source": self.source, "ok": None, "value": None,
+                    "label": "조회 범위 내 예정 실적 없음"}
+        near = sorted(dd.items(), key=lambda kv: kv[1][1])
+        _s0, (_dt0, d0) = near[0]
+        thr = m.get("min")  # 저자가 D-n 임계를 명시하지 않아 min 없으면 ok=None
+        ok = None if thr is None else (d0 <= int(thr))
+        label = " · ".join(f"{s} {dt}(D-{d})" for s, (dt, d) in near[:3])
+        return {"status": "ok", "source": self.source, "ok": ok, "value": d0, "label": label}
+
+
+# ----------------------------------------------------------------------------
 # ManualAdapter — 폴백. 무료 데이터로 커버 안 되는 항목은 정직하게 "수동".
 # ----------------------------------------------------------------------------
 class ManualAdapter:
@@ -369,10 +577,11 @@ class ManualAdapter:
 # ----------------------------------------------------------------------------
 _YAHOO = YahooAdapter()
 _KIS = KisAdapter()
+_NASDAQ = NasdaqEarningsAdapter()
 _MANUAL = ManualAdapter()
 
-# 우선순위: 자동 소스 먼저(야후 EOD → KIS 장중), 마지막은 항상 manual 폴백.
-ADAPTERS = [_YAHOO, _KIS, _MANUAL]
+# 우선순위: 자동 소스 먼저(야후 EOD → KIS 장중 → 나스닥 캘린더), 마지막은 항상 manual 폴백.
+ADAPTERS = [_YAHOO, _KIS, _NASDAQ, _MANUAL]
 
 
 def resolve(metric_spec):

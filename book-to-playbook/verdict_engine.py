@@ -19,7 +19,8 @@ data_spec 형식(리스트 또는 {"items":[...]}):
    "coverage": {"auto": n, "manual": m, "total": t}}
 
 각 item의 뱃지 소스 매핑(아티팩트 렌더용):
-  source=="yahoo" → 🤖 야후 EOD,  "kis" → ⚡ KIS 장중,  "manual" → ✋ 직접
+  source=="yahoo" → 🤖 야후 EOD,  "kis" → ⚡ KIS 장중,
+  "nasdaq" → 🗞 나스닥 캘린더,  "manual" → ✋ 직접
 """
 import paths  # noqa: F401  (경로·UTF-8 출력 고정. 반드시 먼저 import)
 import json
@@ -91,7 +92,8 @@ def _fmt(r):
             "manual": {None: "✋"}, "error": {None: "⚠"}}
     st = r["status"]
     sym = icon.get(st, {}).get(r["ok"], "·")
-    badge = {"yahoo": "🤖야후EOD", "kis": "⚡KIS장중", "manual": "✋직접"}.get(r["source"], "?")
+    badge = {"yahoo": "🤖야후EOD", "kis": "⚡KIS장중", "nasdaq": "🗞나스닥캘린더",
+              "manual": "✋직접"}.get(r["source"], "?")
     lab = r.get("label") or r.get("reason") or ""
     return f"  {sym} [{badge}] {r['item']}: {lab}"
 

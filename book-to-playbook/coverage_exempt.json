@@ -1,6 +1,10 @@
 {
-  "_README": "verify_coverage.py 면제 목록. 소절키 → {토큰: 사유}. 사유가 비면 면제되지 않는다. '규칙이 아닌 숫자'(설명·예시·표기차이)만 여기 넣는다. 구현이 빠진 것은 면제가 아니라 status를 gap으로 내리거나 구현할 것.",
+  "_README": "verify_coverage.py 면제 목록. 소절키 → {토큰: 사유}. 사유가 비면 면제되지 않는다. '규칙이 아닌 숫자'(설명·예시·표기차이)만 여기 넣는다. 구현이 빠진 것은 면제가 아니라 status를 gap으로 내리거나 구현할 것. `_rules_vs_spec`/`_rules_vs_spec_spec` 은 verify_rules_vs_spec.py 전용 버킷(③칸: 체크리스트 ↔ 수집요청).",
   "etf": {
+    "_rules_vs_spec_spec": {
+      "나스닥 선물 방향(전일 대비 +)::metric.min=0": "저자 2-6은 '나스닥 선물이 전일 종가 대비 플러스인지 마이너스인지'라며 부호(방향)만 말한다. metric.min=0은 그 부호를 True/False로 바꾸는 판정 인코딩일 뿐 원문의 수치가 아니다.",
+      "S&P500 선물 방향(전일 대비 +)::metric.min=0": "저자 2-6은 '두 번째는 S&P500 선물입니다... 전일 종가 위에서 버티고'라며 부호(방향)만 말한다. metric.min=0은 그 부호를 True/False로 바꾸는 판정 인코딩일 뿐 원문의 수치가 아니다."
+    },
     "_sheet": {
       "-80%": "UI 코드. IntersectionObserver rootMargin('-10% 0px -80% 0px') — 목차 하이라이트용이며 매매 규칙 아님"
     },

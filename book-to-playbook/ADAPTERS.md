@@ -43,18 +43,19 @@ class SomeAdapter:
 **레지스트리 & resolve** (`datasources.py`):
 
 ```python
-ADAPTERS = [YahooAdapter(), KisAdapter(), ManualAdapter()]  # 우선순위 순
+ADAPTERS = [YahooAdapter(), KisAdapter(), NasdaqEarningsAdapter(), ManualAdapter()]  # 우선순위 순
 
 resolve(metric_spec)   # 그 metric.type을 처리 가능한 첫 어댑터. 없으면 ManualAdapter.
 ```
 
-자동 소스(야후 EOD → KIS 장중)를 먼저 시도하고, **아무도 못 하면 항상 ManualAdapter로 폴백**한다. `source:"manual"`로 명시된 항목도 ManualAdapter가 처리한다.
+자동 소스(야후 EOD → KIS 장중 → 나스닥 실적 캘린더)를 먼저 시도하고, **아무도 못 하면 항상 ManualAdapter로 폴백**한다. `source:"manual"`로 명시된 항목도 ManualAdapter가 처리한다.
 
 ### 뱃지 매핑 (아티팩트 렌더용)
 | source | 뱃지 |
 |--------|------|
 | `yahoo` | 🤖 야후 EOD |
 | `kis` | ⚡ KIS 장중 |
+| `nasdaq` | 🗞 나스닥 캘린더 |
 | `manual` | ✋ 직접 |
 
 ---
@@ -67,14 +68,24 @@ resolve(metric_spec)   # 그 metric.type을 처리 가능한 첫 어댑터. 없�
 | `above_open` | 현재가가 당일 시가 위인가 | `symbol` | KIS | intraday |
 | `pct_change` | 전일 대비 등락률(%) | `symbol`, `min?` | Yahoo | eod |
 | `n_day_return` | 최근 N일 수익률(%) | `symbol`, `n`, `min?` | Yahoo | eod |
-| `volume_ratio` | 거래량 / N일평균 배수 | `symbol`, `ref?`(기본20), `min?` | Yahoo | eod |
+| `volume_ratio` | 거래량 / 기준거래량 배수 | `symbol`, `base?`(기본1=전일, 2 이상이면 그 기간 평균), `min?` | Yahoo | eod |
 | `upper_wick` | 윗꼬리 %(고점 대비 종가 하락폭) | `symbol`, `min?` | Yahoo | eod |
 | `higher_low` | 첫 눌림에서 저점 높임 여부 | `symbol` | KIS | intraday |
 | `count_up` | 여러 심볼 중 상승 개수 | `symbols:[...]`, `min?` | Yahoo | eod |
 | `ma_distance` | 종가와 N일선의 이격도(%) | `symbol`, `ma?`(기본5), `min?` | Yahoo | eod |
 | `gap_up` | 당일 시가의 전일종가 대비 갭(%) | `symbol`, `min?` | Yahoo · KIS | eod · intraday |
+| `hold_above_ma` | N일선 회복 후 며칠 더 지켰나 | `symbol`, `ma`, `days?`(기본2) | Yahoo | eod |
+| `count_above_ma` | 여러 심볼 중 N일선 위 개수 | `symbols:[...]`, `ma?`(기본20), `min?` | Yahoo | eod |
+| `count_up_days` | 최근 N거래일 중 상승일 개수 | `symbol`, `n?`(기본10), `min?` | Yahoo | eod |
+| `defensive_only` | 방어(XLP·XLU·XLV) 강세 + 경기민감(XLK·XLF·XLI) 약세 동시(5일) | (없음, 고정 섹터) | Yahoo | eod |
+| `bad_rate_drop` | 나쁜 금리 하락(10년물↓ + S&P500 못오름 + XLF 5일 약세) | (없음, 고정 심볼) | Yahoo | eod |
+| `earnings_dday` | 심볼들 중 가장 가까운 다음 실적 발표 D-day | `symbols:[...]`, `min?` | NasdaqEarnings | eod |
 
 `min`이 있으면 그 임계값으로 `ok`(True/False)를 매기고, 없으면 `ok=None`(수치만 노출).
+
+> `volume_ratio`의 `base`: 저자 7-4 "오늘 거래량이 전일보다 1.5배 이상 늘었는지"(같은
+> 소절에 두 번 나옴) — 20일 평균은 원문에 없다. 그래서 기본값이 20일 평균이 아니라
+> **전일 대비(base=1)** 다. 옛 필드명 `ref`도 하위호환으로 계속 읽는다.
 
 > **임계값을 저자가 안 준 지표는 `min`을 비워 둔다.** 예: 2-7 "5일선과 얼마나 벌어졌는지",
 > 7-3 "갭상승 날" — 둘 다 %가 원문에 없다. 숫자를 지어내는 대신 수치만 자동으로 채우고
