@@ -525,7 +525,7 @@
     <!-- STEP 1: pre-market scorecard -->
     <h2 id="sheet-step1"><span class="step">STEP 1</span>장 시작 전 스코어카드 <span class="tag a">저자 2-6</span></h2>
     <p class="subtle">5개 지표 각 양호 시 1점. <b>🤖 오늘 값으로 자동 체크됨</b> — 직접 수정하면 점수·판정이 즉시 다시 계산됩니다.</p>
-    <div class="card" id="scorecard">
+    <div class="card" id="scorecard" data-ref="2-6">
       <label class="chk"><input type="checkbox" data-sc><span class="txt">나스닥 선물 방향 양호 <span class="tag a">🤖 자동</span><small>플러스 &amp; 고점 낮추지 않음</small><small class="scwhy"></small></span></label>
       <label class="chk"><input type="checkbox" data-sc><span class="txt">S&amp;P500 선물 방향 양호 <span class="tag a">🤖 자동</span><small>플러스 &amp; 고점 낮추지 않음</small><small class="scwhy"></small></span></label>
       <label class="chk"><input type="checkbox" data-sc><span class="txt">VIX 안정 <span class="tag a">🤖 자동</span><small>전일 대비 +10% 미만, 급하게 안 튐</small><small class="scwhy"></small></span></label>
@@ -546,7 +546,7 @@
     <!-- STEP 4: position calculator -->
     <h2 id="sheet-step3"><span class="step">STEP 3</span>비중 · 분할 계산기 <span class="tag a">저자 6-2·3-4</span></h2>
     <p class="subtle">총 투자금과 모드를 넣으면 종목별 배분·현금·3분할 금액이 계산됩니다. (배분비율은 저자의 5,000만 원 예시 기준)</p>
-    <div class="card">
+    <div class="card" data-ref="3-3 3-4 6-1 6-2 10-5">
       <div class="calcrow">
         <label>총 투자금(만원)</label>
         <input type="number" id="capital" value="5000" min="0" step="100">
@@ -578,7 +578,7 @@
     <!-- 내 계좌 실제 비중 점검 (저자 6-3 · 10-1 · 9-4) -->
     <h2 id="sheet-step3b"><span class="step">STEP 3-B</span>지금 내 계좌 점검 <span class="tag a">저자 6-3·10-1·9-4</span></h2>
     <p class="subtle">현재 평가액을 넣으면 <b>3배 집중도·현금비중</b>을 계산해 저자의 경고선에 걸리는지 판정합니다. 입력값은 이 브라우저에만 저장됩니다.</p>
-    <div class="card">
+    <div class="card" data-ref="6-3 9-4">
       <div class="subgrid">
         <div class="f2"><label>TQQQ 평가액(만원)</label><input type="number" id="hTQQQ" data-save min="0" step="10" placeholder="0"></div>
         <div class="f2"><label>SOXL 평가액(만원)</label><input type="number" id="hSOXL" data-save min="0" step="10" placeholder="0"></div>
@@ -595,7 +595,7 @@
       </div>
       <div id="posOut" style="margin-top:12px"></div>
       <div id="posWarn"></div>
-      <div class="grouplabel f" style="margin:20px 0 2px">🔥 화력 낮추기 — UPRO/현금 이관 판정 <span class="tag a" style="text-transform:none">저자 5-5·3-5</span></div>
+      <div class="grouplabel f" style="margin:20px 0 2px" data-ref="5-5">🔥 화력 낮추기 — UPRO/현금 이관 판정 <span class="tag a" style="text-transform:none">저자 5-5·3-5</span></div>
       <p class="subtle" style="margin:2px 0 0">보유 수익률을 넣으면 저자 기준으로 <b>얼마를 UPRO(또는 현금)로 옮길지</b> 판정합니다.</p>
       <div class="subgrid">
         <div class="f2"><label>TQQQ 보유 수익률(%)</label><input type="number" id="rTQQQ" data-save step="0.1" placeholder="예: 12.5"></div>
@@ -608,7 +608,7 @@
     <!-- 주 1회 비중조정 리듬 (저자 10-3) -->
     <h2 id="sheet-step3c"><span class="step">STEP 3-C</span>비중조정은 주 1회 <span class="tag a">저자 10-3</span></h2>
     <p class="subtle">전체 비중 조정은 <b>토요일 또는 월요일 장전 30분</b>에만. 주중에는 손절·익절 실행만 하고 비중은 건드리지 않습니다.</p>
-    <div class="card">
+    <div class="card" data-ref="10-3">
       <div id="weekOut" class="note">아직 기록 없음 — 첫 비중조정을 끝내면 아래 버튼을 누르세요.</div>
       <div class="calcrow" style="margin-top:12px">
         <div class="pick"><button id="weekDone" type="button">오늘 비중조정 완료로 기록</button><button id="weekClear" type="button">기록 지우기</button></div>
@@ -628,14 +628,14 @@
         </div>
       </div>
       <div id="ttypeOut" class="note bad" style="margin:0 0 12px">⚠ 매수 전에 <b>단타냐 스윙이냐</b>를 먼저 정하세요. 이걸 안 정하면 손절선도 보유기간도 정할 수 없습니다.</div>
-      <div class="memo" id="memo">
+      <div class="memo" id="memo" data-ref="10-2">
         <div class="field"><label>① 매수 이유</label><input data-req placeholder="예: 나스닥100 20일선 위 2거래일 버팀, 빅테크 3개 중 2개 시초가 위"></div>
         <div class="field"><label>② 매수 금액</label><input data-req placeholder="예: 1차 750만원 (총 3,000만원 계획의 25%)"></div>
         <div class="field"><label>③ 줄일 자리</label><input data-req placeholder="예: 20일선 종가 이탈 시 / -5%에서 30% 축소"></div>
         <div class="field"><label>④ 판단 기간</label><input data-req placeholder="예: 스윙 5~8거래일, 20일 내 재판단"></div>
         <div class="field"><label>⑤ 환율 상태</label><input data-req placeholder="예: 현재 1,380 / 20일평균 1,355 (+25원 → 1차만 환전)"></div>
       </div>
-      <div class="grouplabel f" style="margin:18px 0 2px">💱 환전 판정 <span class="tag a" style="text-transform:none">저자 8-1·8-5</span></div>
+      <div class="grouplabel f" style="margin:18px 0 2px" data-ref="8-5">💱 환전 판정 <span class="tag a" style="text-transform:none">저자 8-1·8-5</span></div>
       <p class="subtle" style="margin:2px 0 0">환전 타이밍과 매수 타이밍은 <b>따로</b> 봅니다. 두 숫자만 넣으면 이번에 몇 칸까지 환전할지 판정합니다.</p>
       <div class="subgrid">
         <div class="f2"><label>현재 원/달러</label><input type="number" id="fxNow" data-save min="0" step="1" placeholder="1380"></div>
@@ -650,7 +650,7 @@
     <h2 id="sheet-step5"><span class="step">STEP 5</span>폭락 후 재진입 게이트 <span class="tag a">저자 9-3·9-5</span></h2>
     <p class="subtle">평시 진입(STEP 2)과 <b>다른 체크리스트</b>입니다. 폭락·급락 뒤 다시 들어갈 때만 사용하며, <b>순서대로</b> 통과해야 합니다. 첫 바닥은 사지 않습니다.</p>
     <div class="card">
-      <div id="gate">
+      <div id="gate" data-ref="9-5">
         <div class="gatestep">
           <label class="chk" style="border:none;padding:0"><input type="checkbox" id="g1" data-save><span class="txt">① 공포 진정 — VIX가 고점을 꺾고 2일 연속 낮아짐<small>급락 중 VIX가 계속 높아지는 동안은 반등이 아니라 중간 쉼</small></span></label>
           <span class="when" id="g1w"></span>
@@ -659,7 +659,7 @@
           <label class="chk" style="border:none;padding:0"><input type="checkbox" id="g2" data-save><span class="txt">② 20일선 회복 — 지수 종가가 20일선 위로 복귀<small>장중 회복은 인정하지 않음. 종가 기준</small></span></label>
           <span class="when" id="g2w"></span>
         </div>
-        <div class="gatestep">
+        <div class="gatestep" data-ref="9-3">
           <label class="chk" style="border:none;padding:0"><input type="checkbox" id="g3" data-save><span class="txt">③ 눌림 지지 — 회복 후 눌림에서 저점을 높이고 전고점 재도전<small>첫날 급등 → 둘째날 저점 지지 → 셋째날 전고점 재도전, 3거래일 확인</small></span></label>
           <span class="when" id="g3w"></span>
         </div>
@@ -678,14 +678,14 @@
     <h2 id="sheet-step6"><span class="step">STEP 6</span>팔고 난 뒤 — 세금·출금 분리 <span class="tag a">저자 8-2·8-3·10-4</span></h2>
     <p class="subtle">"벌었다고 다 내 돈이 아니다." 실현수익에서 <b>세금 예상분과 출금분을 먼저 떼고</b> 남은 것만 다음 매매 자금입니다.</p>
     <div class="card">
-      <div class="subgrid">
+      <div class="subgrid" data-ref="8-3">
         <div class="f2"><label>이번 실현수익(만원)</label><input type="number" id="rPnl" data-save step="10" placeholder="0"></div>
         <div class="f2"><label>세율(%) <span title="저자가 숫자를 명시하지 않아 직접 입력">✋</span></label><input type="number" id="rTax" data-save min="0" max="100" step="0.1" placeholder="22"></div>
       </div>
       <div id="wdOut" style="margin-top:12px"></div>
       <p class="subtle" style="margin:10px 0 0">출금 분리율 — 실현수익의 <b>30%</b>, 한 달 실현이 <b>1,000만원을 넘으면 40%</b>를 계좌 밖으로 뺍니다. 손실 매매도 똑같이 기록합니다.</p>
 
-      <div class="grouplabel f" style="margin:20px 0 2px">📒 두 장부 — 달러수익 vs 원화수익 <span class="tag a" style="text-transform:none">저자 8-2</span></div>
+      <div class="grouplabel f" style="margin:20px 0 2px" data-ref="8-2">📒 두 장부 — 달러수익 vs 원화수익 <span class="tag a" style="text-transform:none">저자 8-2</span></div>
       <p class="subtle" style="margin:2px 0 0">같은 매매도 달러로는 벌고 원화로는 잃을 수 있습니다. 네 숫자를 남깁니다.</p>
       <div class="subgrid">
         <div class="f2"><label>매수가($)</label><input type="number" id="jBuy" data-save min="0" step="0.01" placeholder="78.91"></div>
@@ -695,7 +695,7 @@
       </div>
       <div id="jOut" class="note">네 숫자를 넣으면 달러수익률·원화수익률이 갈라져 보입니다.</div>
 
-      <div class="grouplabel f" style="margin:20px 0 2px">😴 수익 직후 휴식 <span class="tag a" style="text-transform:none">저자 10-4</span></div>
+      <div class="grouplabel f" style="margin:20px 0 2px" data-ref="10-4">😴 수익 직후 휴식 <span class="tag a" style="text-transform:none">저자 10-4</span></div>
       <p class="subtle" style="margin:2px 0 0">수익을 확정한 직후 2거래일은 신규 진입을 쉽니다. 가장 자신 있을 때가 가장 크게 잃는 구간입니다.</p>
       <div id="restOut" class="note">기록 없음</div>
       <div class="calcrow" style="margin-top:10px">
@@ -707,7 +707,7 @@
     <h2 id="sheet-step7"><span class="step">STEP 7</span>나만의 최종 기준 5개 <span class="tag a">저자 에필로그</span></h2>
     <p class="subtle">저자가 책을 덮기 전 직접 쓰라고 한 다섯 문장입니다. <b>여기가 비어 있으면 위의 모든 판정은 남의 기준</b>입니다.</p>
     <div class="card">
-      <div class="memo" id="final5">
+      <div class="memo" id="final5" data-ref="에필로그">
         <div class="field"><label>① TQQQ를 살 조건</label><input id="f5a" data-save data-f5 placeholder="예: 나스닥100 20일선 위 2거래일 + 빅테크 2개↑ + 회피 0"></div>
         <div class="field"><label>② SOXL을 절대 추격 안 할 조건</label><input id="f5b" data-save data-f5 placeholder="예: 반도체 10일 중 7일↑ 또는 SOXL 5일 20%↑면 무조건 쉰다"></div>
         <div class="field"><label>③ UPRO로 낮출 조건</label><input id="f5c" data-save data-f5 placeholder="예: 수익 10%↑ 상태에서 VIX +10% 또는 윗꼬리 → 30% 이관"></div>
@@ -2613,6 +2613,36 @@
   var COV = {};
   try { COV = (JSON.parse(document.getElementById('coverage-data').textContent).map) || {}; } catch(e){}
 
+  // 개별 판정 항목(precise anchor)이 있는 소절 집합을 미리 만든다.
+  //   ① rules.json 의 ref (STEP2 진입카드 chk-<ref> 로 렌더됨 — 종목 칩을 눌러야 DOM 에 뜨므로 규칙에서 직접 수집)
+  //   ② 시트 정적 블록의 data-ref (스코어카드·계산기·게이트 등 — 항상 DOM 에 있음)
+  // 개별 판정 항목(precise anchor)의 두 갈래를 따로 모은다 — "도달 가능성"이 다르기 때문.
+  //   REF_STEP2: rules.json ref → chk-<ref> 는 STEP2 진입카드 안에만 렌더된다.
+  //              그러니 그 소절이 STEP2 로 점프할 때만 실제로 도달한다(2-5처럼 STEP1 로 가는 소절은 도달 불가).
+  //   STATIC:    시트 정적 블록의 data-ref → 그 STEP 위치에 늘 존재하므로 항상 도달 가능.
+  var REF_STEP2 = {};
+  var REF_PROD = {};   // ref → 그 항목이 사는 종목(STEP2 카드에서 어느 칩을 열어야 chk-<ref> 가 뜨는지)
+  var STATIC_REF = {};
+  try {
+    var _rules = JSON.parse(document.getElementById('rules').textContent);
+    var _data = (_rules && _rules.DATA) || {};
+    Object.keys(_data).forEach(function(prod){
+      var cfg = _data[prod]; if(!cfg || typeof cfg !== 'object') return;
+      ['filter','entry','avoid','caution'].forEach(function(grp){
+        (cfg[grp] || []).forEach(function(c){
+          if(c && c.ref){ REF_STEP2[c.ref] = 1; if(!REF_PROD[c.ref] && prod !== 'COMMON') REF_PROD[c.ref] = prod; }
+        });
+      });
+    });
+  } catch(e){}
+  Array.prototype.forEach.call(document.querySelectorAll('#panel-sheet [data-ref]'), function(el){
+    (el.getAttribute('data-ref') || '').split(/\s+/).forEach(function(k){ if(k) STATIC_REF[k] = 1; });
+  });
+  // 헤딩 태그·판정용: 이 소절이 클릭했을 때 실제로 개별 항목에 도달하는가?
+  //   jump 이 REF_PROD 칩을 늘 열고 chk 탐색은 시트 전체를 훑으므로,
+  //   rules ref(REF_STEP2)든 정적 data-ref(STATIC_REF)든 항상 도달 가능.
+  function hasPrecise(key){ return !!(STATIC_REF[key] || REF_STEP2[key]); }
+
   // 커버리지의 step → 시트 앵커. 일부 소절은 실제 구현 위치가 달라 따로 지정한다.
   var STEP2ANCHOR = {
     'STEP1':'sheet-step1', 'STEP2-filter':'sheet-step2', 'STEP2-entry':'sheet-step2',
@@ -2686,10 +2716,13 @@
     var target = document.getElementById(id);
     if(!target){ return; }
 
-    // STEP2는 종목별 카드 — 해당 장의 종목을 먼저 연다
+    // STEP2 진입카드는 종목별 — 이 소절의 chk-<ref> 가 사는 종목 칩을 먼저 연다.
+    //   jump 의 chk 탐색은 시트 전체를 훑으므로(특정 STEP 만이 아님), 그 항목이 어느 STEP 으로
+    //   분류됐든(예: 3-2 는 STEP3 계산기로 분류되지만 chk-3-2 는 TQQQ STEP2 필터에 있다)
+    //   해당 종목 카드가 렌더돼 있어야 도달한다. 그래서 STEP2 여부와 무관하게 항상 연다.
     var m = String(key).match(/^(\d+)-/);
-    var prod = m && CHAP_PROD[m[1]];
-    if(id === 'sheet-step2' && prod){
+    var prod = REF_PROD[key] || (m && CHAP_PROD[m[1]]);
+    if(prod){
       var chip = document.querySelector('.td-chip[data-jump="' + prod + '"]');
       if(chip) chip.click();
     }
@@ -2700,26 +2733,26 @@
       if(sheetTab) sheetTab.click();
     }
 
-    // 이 소절 ref 로 심어둔 개별 판정 항목(chk-<ref>[-n])을 찾는다 — 있으면 큰 제목이 아니라 그 항목을 가리킨다.
-    var hitLabel = null;
+    // 이 소절 ref 로 심어둔 개별 판정 항목을 찾는다 — 있으면 큰 제목이 아니라 그 항목을 가리킨다.
+    //   ① STEP2 진입카드: chk() 가 붙인 id="chk-<ref>"[-n]  (book-agnostic, rules.json ref)
+    //   ② 그 외 STEP(스코어카드·계산기·게이트 등): 해당 시트 블록에 심은 data-ref="<key>"
+    //      (정적 HTML이라 id 충돌 없이, 한 블록이 여러 소절을 겸하면 data-ref="a b" 로 나열)
+    var checks = document.querySelectorAll(
+      '#panel-sheet [id="chk-' + key + '"], #panel-sheet [id^="chk-' + key + '-"], ' +
+      '#panel-sheet [data-ref~="' + key + '"]');
+    var hasChk = checks.length > 0;
+
     setTimeout(function(){
-      var checks = document.querySelectorAll('#panel-sheet [id="chk-' + key + '"], #panel-sheet [id^="chk-' + key + '-"]');
-      var scrollTo = checks.length ? checks[0] : target;      // 개별 항목 우선, 없으면 STEP 제목
+      var scrollTo = hasChk ? checks[0] : target;      // 개별 항목 우선, 없으면 STEP 제목
       if(document.body.classList.contains('split') && pane){
-        // offsetTop 은 offsetParent(여기선 positioned 된 entryCard) 기준이라
-        // pane 스크롤에 그대로 쓰면 항상 맨 위(STEP 제목)로 튄다.
-        // pane 뷰포트 대비 실제 위치로 계산해 정확한 항목으로 스크롤한다.
+        // pane 뷰포트 대비 실제 위치로 계산해 정확한 항목으로 스크롤한다(offsetParent 기준 아님).
         var pr = pane.getBoundingClientRect(), er = scrollTo.getBoundingClientRect();
         pane.scrollTo({top: pane.scrollTop + (er.top - pr.top) - 12, behavior:'smooth'});
       } else {
         scrollTo.scrollIntoView({behavior:'smooth', block:'start'});
       }
-      if(checks.length){
-        // 같은 ref 를 공유하는 항목이 여럿이면 전부 하이라이트
-        Array.prototype.forEach.call(checks, flash);
-        hitLabel = (checks[0].querySelector('.txt') || checks[0]).textContent;
-        var lab = document.getElementById('jhit');
-        if(lab) lab.textContent = (hitLabel || '').trim().slice(0, 40);
+      if(hasChk){
+        Array.prototype.forEach.call(checks, flash);   // 같은 소절을 공유하는 항목 전부 하이라이트
       } else {
         flash(target.nextElementSibling && target.nextElementSibling.classList.contains('card')
               ? target.nextElementSibling : target);
@@ -2727,8 +2760,19 @@
     }, 60);
 
     var st = c.status === 'reflected' ? '✅ 반영' : (c.status === 'gap' ? '⚠ 미반영' : '💭 원칙');
+    var hitTxt = hasChk
+      ? ((checks[0].querySelector('.txt') || checks[0]).textContent || '').trim().slice(0, 40)
+      : (target.textContent || '').trim().slice(0, 40);
+    // 개별 판정 항목이 없으면 "STEP 전체로 갔다"는 걸 정직하게 알린다(고장난 점프가 아님).
+    var fbNote = '';
+    if(!hasChk){
+      fbNote = '<br><span style="color:var(--warn)">⚠ 이 소절은 개별 판정 항목이 없습니다 — '
+             + (c.status === 'gap'
+                 ? 'STEP 전체에 해당(시트 미반영 부분 있음)'
+                 : 'STEP 전체에 걸쳐 반영') + '</span>';
+    }
     note.innerHTML = '<span class="x" id="jnx">✕</span><b>' + (title || key) + '</b> → <b id="jhit">'
-      + (target.textContent || '').trim().slice(0, 40) + '</b> &nbsp;' + st
+      + hitTxt + '</b> &nbsp;' + st + fbNote
       + '<br><span style="color:var(--mute)">' + (c.note || '') + '</span>';
     note.classList.add('show');
     bindClose();
@@ -2753,13 +2797,14 @@
       h.dataset.jumpReady = '1';
       h.classList.add('jumpable');
       var id = anchorFor(key);
+      var precise = id && hasPrecise(key);   // 개별 판정 항목이 있으면 그 항목으로, 없으면 STEP 전체로
       var tag = document.createElement('span');
       tag.className = 'jumpto' + (id ? '' : ' none');
-      tag.textContent = id ? '시트에서 보기 →' : '원칙(시트 없음)';
+      tag.textContent = !id ? '원칙(시트 없음)' : (precise ? '시트에서 보기 →' : 'STEP 전체 보기 →');
       h.appendChild(tag);
       h.addEventListener('click', function(ev){
         ev.stopPropagation();
-        jump(key, t.replace(/시트에서 보기 →|원칙\(시트 없음\)/, '').trim().slice(0, 40));
+        jump(key, t.replace(/시트에서 보기 →|STEP 전체 보기 →|원칙\(시트 없음\)/, '').trim().slice(0, 40));
       });
     });
   }
