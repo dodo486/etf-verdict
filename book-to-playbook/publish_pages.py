@@ -62,6 +62,13 @@ if not pat.search(html):
     print("verdict-data 블록을 찾지 못함", file=sys.stderr); sys.exit(1)
 html = pat.sub(lambda m: m.group(1) + "\n" + data_str + "\n" + m.group(3), html)
 
+# 책-무관 검수 모드 UI JS 주입 (SSOT = ui/review-ui.js — 버그는 거기서 한 번 고치면 모든 책에 전파)
+try:
+    from inject_ui import inject as _inject_ui
+    html = _inject_ui(html)
+except Exception as e:
+    print("검수 UI 주입 실패(무시):", e, file=sys.stderr)
+
 # 책 전환 사이드 레일 주입
 try:
     from inject_nav import inject
