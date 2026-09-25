@@ -95,43 +95,56 @@ def check(slug, product=None):
                     rows.append((prod, g, c.get("ref"), c.get("_label"), mark, why))
     return rows
 
+def book_slugs():
+    """books.json 에 등록된 전 책 slug. 인자 없이 돌릴 때 대상(ETF 기본값 하드코딩 제거)."""
+    return [b["slug"] for b in load("books.json").get("books", [])]
+
 def main():
+    from collections import Counter
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    slug = args[0] if args else "etf"
     product = None
     if "--product" in sys.argv:
         product = sys.argv[sys.argv.index("--product") + 1]
     as_json = "--json" in sys.argv
+    slugs = args if args else book_slugs()   # 인자 있으면 그 책, 없으면 전 책(책 하드코딩 없음)
 
-    rows = check(slug, product)
     ICON = {"auto": "🤖", "todo": "🚧", "manual": "✋", "unset": "❌", "bad": "❌"}
-    from collections import Counter
-    tally = Counter(r[4] for r in rows)
+    results, total_block = {}, 0
+    for slug in slugs:
+        if not os.path.exists(os.path.join(BASE, rules_path(slug))):
+            results[slug] = None
+            if not as_json:
+                print("· %-8s rules.json 없음 — 구간③ 검사 대상 아님" % slug)
+            continue
+        rows = check(slug, product)
+        tally = Counter(r[4] for r in rows)
+        blocking = tally.get("unset", 0) + tally.get("bad", 0)
+        total_block += blocking
+        results[slug] = {"slug": slug, "product": product, "tally": dict(tally),
+                         "rows": [{"prod": r[0], "grp": r[1], "ref": r[2], "label": r[3],
+                                   "mark": r[4], "why": r[5]} for r in rows]}
+        if as_json:
+            continue
+        title = "%s%s 구간③ 자동수집 커버리지" % (slug, (" / " + product) if product else "")
+        print("=" * 66); print(title); print("=" * 66)
+        print("🤖 자동 %d · 🚧 미구현(데이터O·로직X) %d · ✋ 직접(데이터X) %d · ❌ 미결선 %d"
+              % (tally.get("auto", 0), tally.get("todo", 0), tally.get("manual", 0),
+                 tally.get("unset", 0) + tally.get("bad", 0)))
+        for want, head in (("todo", "🚧 미구현 — 데이터는 jhts 에 있으니 로직 구현(✋직접 금지)"),
+                           ("unset", "❌ 미결선 — mtype 선언 필요(자동인지 무데이터인지 시스템이 판정하게)"),
+                           ("bad", "❌ 미등록 mtype")):
+            sub = [r for r in rows if r[4] == want]
+            if sub:
+                print("\n[%s]" % head)
+                for r in sub:
+                    print("   %s [%s/%s] %s  — %s" % (ICON[r[4]], r[0], r[2], r[3], r[5]))
+        print("\n%s" % ("통과 — 미결선 0" if blocking == 0
+                        else "미결선 %d건(블로킹) · 미구현 %d건(경고)" % (blocking, tally.get("todo", 0))))
 
     if as_json:
-        print(json.dumps({"slug": slug, "product": product,
-                          "tally": dict(tally),
-                          "rows": [{"prod": r[0], "grp": r[1], "ref": r[2], "label": r[3], "mark": r[4], "why": r[5]} for r in rows]},
-                         ensure_ascii=False))
-        return
-
-    title = "%s%s 구간③ 자동수집 커버리지" % (slug, (" / " + product) if product else "")
-    print("=" * 66)
-    print(title)
-    print("=" * 66)
-    print("🤖 자동 %d · 🚧 미구현(데이터O·로직X) %d · ✋ 직접(데이터X) %d · ❌ 미결선 %d"
-          % (tally.get("auto", 0), tally.get("todo", 0), tally.get("manual", 0), tally.get("unset", 0) + tally.get("bad", 0)))
-    for want, head in (("todo", "🚧 미구현 — 데이터는 jhts 에 있으니 로직 구현(✋직접 금지)"),
-                       ("unset", "❌ 미결선 — mtype 선언 필요(자동인지 무데이터인지 시스템이 판정하게)"),
-                       ("bad", "❌ 미등록 mtype")):
-        sub = [r for r in rows if r[4] == want]
-        if sub:
-            print("\n[%s]" % head)
-            for r in sub:
-                print("   %s [%s/%s] %s  — %s" % (ICON[r[4]], r[0], r[2], r[3], r[5]))
-    blocking = tally.get("unset", 0) + tally.get("bad", 0)
-    print("\n%s" % ("통과 — 미결선 0" if blocking == 0 else "미결선 %d건(블로킹) · 미구현 %d건(경고)" % (blocking, tally.get("todo", 0))))
-    sys.exit(1 if blocking else 0)
+        # 단일 slug 인자면 옛 평면 형식 유지, 여러 책이면 {slug: payload}
+        print(json.dumps(results[slugs[0]] if len(slugs) == 1 else results, ensure_ascii=False))
+    sys.exit(1 if total_block else 0)
 
 if __name__ == "__main__":
     main()

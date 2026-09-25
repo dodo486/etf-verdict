@@ -2816,12 +2816,7 @@
     'STEP3-B':'sheet-step3b', 'STEP3-C':'sheet-step3c', 'STEP4':'sheet-step4',
     'STEP5':'sheet-step5', 'STEP6':'sheet-step6', 'STEP7':'sheet-step7'
   };
-  var OVERRIDE = { '5-5':'sheet-step3b' };   // 5-3 은 경기침체 전용 패널 삭제로 STEP2 카드(카운트-그룹)로 자연 라우팅
-  // 장 번호 → 그 장이 다루는 종목(시트 STEP2 칩을 맞춰 연다)
-  var CHAP_PROD = { '3':'TQQQ', '4':'SOXL', '5':'UPRO' };
-
   function anchorFor(key){
-    if(OVERRIDE[key]) return OVERRIDE[key];
     var c = COV[key];
     if(!c) return null;
     if(c.status === 'mindset') return null;
@@ -2886,8 +2881,7 @@
     //   jump 의 chk 탐색은 시트 전체를 훑으므로(특정 STEP 만이 아님), 그 항목이 어느 STEP 으로
     //   분류됐든(예: 3-2 는 STEP3 계산기로 분류되지만 chk-3-2 는 TQQQ STEP2 필터에 있다)
     //   해당 종목 카드가 렌더돼 있어야 도달한다. 그래서 STEP2 여부와 무관하게 항상 연다.
-    var m = String(key).match(/^(\d+)-/);
-    var prod = REF_PROD[key] || (m && CHAP_PROD[m[1]]);
+    var prod = REF_PROD[key];   // ref→종목은 rules.json 에서만 파생(책 하드코딩 없음). 없으면 칩을 안 연다 — 그런 소절의 착지 대상은 칩 밖 정적 블록뿐이다.
     if(prod){
       var chip = document.querySelector('.td-chip[data-jump="' + prod + '"]');
       if(chip) chip.click();
@@ -3074,14 +3068,22 @@
     + '<span class="pill gap">⚠ 미반영 ' + n.gap + '</span>'
     + '<span class="pill mind">💭 원칙 ' + n.mindset + '</span>';
 
+  // 장 헤더 라벨은 그 책이 #src 에 쓴 제 헤딩에서 뽑는다(책-무관: 'Chapter'/'N장' 등 문구를 코드가 정하지 않음).
+  var CHAP_TITLE = {};
+  try {
+    document.getElementById('src').textContent.split('\n').forEach(function(l){
+      var mm = l.match(/^##\s+([0-9A-Za-z가-힣]+)\.\s*(.*)$/);
+      if(mm){ CHAP_TITLE[mm[1]] = (mm[1] + '. ' + mm[2]).trim(); }
+    });
+  } catch(e){}
+
   function render(filter){
     var html = '', lastChap = null;
     keys.forEach(function(k){
       var c = COV[k] || {};
       if(filter !== 'all' && c.status !== filter) return;
-      var chap = k === '에필로그' ? '에필로그'
-               : k === '0' ? '0. 저자가 반복 강조하는 핵심 원칙'
-               : ('Chapter ' + k.split('-')[0]);
+      var chapKey = k === '에필로그' ? '에필로그' : k.split('-')[0];
+      var chap = CHAP_TITLE[chapKey] || (chapKey === '에필로그' ? '에필로그' : chapKey + '장');
       if(chap !== lastChap){ html += '<div class="covchap">' + chap + '</div>'; lastChap = chap; }
       var where = c.status === 'reflected' ? (STEPNAME[c.step] || '시트 반영')
                 : c.status === 'gap' ? '⚠ 미반영'

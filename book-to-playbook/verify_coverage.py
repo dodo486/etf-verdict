@@ -109,6 +109,18 @@ def book_pages():
     return out
 
 
+def book_axis(slug):
+    """books.json 의 verify.attribution_axis (종목→장 매핑)을 읽는다. 없으면 None —
+    그 책에서는 오귀속·장-스코프 검사를 '미적용'으로 본다(통과로 찍지 않는다).
+    검사기를 책마다 고치지 않기 위해, 책별로 갈리는 축은 코드가 아니라 설정에서 온다.
+    verify_rules_vs_spec.py 의 unapplied() 와 같은 원칙."""
+    man = json.loads(io.open(os.path.join(BASE, "books.json"), encoding="utf-8").read())
+    for b in man.get("books", []):
+        if b.get("slug") == slug:
+            return (b.get("verify") or {}).get("attribution_axis") or None
+    return None
+
+
 def split_sections(src):
     """플레이북 마크다운 → {소절키: 본문}"""
     out, key, buf = {}, None, []
@@ -435,6 +447,8 @@ def analyze(slug, path, rules=None):
     secs = split_sections(ms.group(1))
     scopes = sheet_scopes(html, rules)
     ex = load_exempt().get(slug, {}) or {}
+    # 종목→장 축(설정)에서 장→종목 역맵을 만든다. 축 없는 책은 장-스코프 좁히기를 건너뛴다.
+    chap_to_prod = {c: p for p, c in (book_axis(slug) or {}).items()}
 
     rows = []
     for key, c in cov.items():
@@ -451,9 +465,10 @@ def analyze(slug, path, rules=None):
                 toks.append(t)
         step = c.get("step", "")
         scope_txt = scopes.get(step, "")
-        # 3장=TQQQ · 4장=SOXL · 5장=UPRO — 그 장의 소절은 해당 종목 블록만 본다
+        # 축(books.json verify.attribution_axis)이 있으면 그 장의 소절은 해당 종목 블록만 본다.
+        # 축 없는 책은 prod=None → 일반 step 범위로 검사(장-스코프 미적용).
         chap = key.split("-")[0]
-        prod = {"3": "TQQQ", "4": "SOXL", "5": "UPRO"}.get(chap)
+        prod = chap_to_prod.get(chap)
         if prod and step.startswith("STEP2"):
             pt = (scopes.get("_prod") or {}).get(prod)
             if pt:
@@ -541,7 +556,7 @@ def provenance_audit(slug, path, rules=None):
 
     secs, chap_of, key, buf, cur = {}, {}, None, [], None
     for line in src.split("\n"):
-        mc = re.match(r"^##\s+(\d+)\.\s*Chapter", line)
+        mc = re.match(r"^##\s+(\d+)\.", line)   # `## N.` 장 헤딩(책-무관: 'Chapter'/'N장' 등 제목 문구 불문)
         if mc:
             cur = mc.group(1)
         elif re.match(r"^##\s", line):
@@ -558,7 +573,7 @@ def provenance_audit(slug, path, rules=None):
         secs[key] = "\n".join(buf)
     nsecs = {k: norm(t) for k, t in secs.items()}
 
-    OWN = {"TQQQ": "3", "SOXL": "4", "UPRO": "5"}
+    OWN = book_axis(slug) or {}   # 종목→장 축(설정). 없으면 오귀속(다른 장 끌어옴) 검사는 미적용.
     out = []
     for prod, items in product_rules(html, rules).items():
         banned = {c for p, c in OWN.items() if p != prod}
@@ -605,10 +620,10 @@ def attribution_audit(slug, path, rules=None):
         return None
     src = ms.group(1)
 
-    # 장별로 자른다. 3장=TQQQ · 4장=SOXL · 5장=UPRO, 나머지는 공통
+    # 장별로 자른다(축은 books.json 설정에서 온다). 나머지는 공통.
     chaps, cur = {}, None
     for line in src.split("\n"):
-        m = re.match(r"^##\s+(\d+)\.\s*Chapter", line)
+        m = re.match(r"^##\s+(\d+)\.", line)   # `## N.` 장 헤딩(책-무관)
         if m:
             cur = m.group(1)
             chaps[cur] = []
@@ -617,7 +632,7 @@ def attribution_audit(slug, path, rules=None):
             chaps.setdefault(cur, [])
         elif cur:
             chaps[cur].append(line)
-    OWN = {"TQQQ": "3", "SOXL": "4", "UPRO": "5"}
+    OWN = book_axis(slug) or {}   # 종목→장 축(설정). 없으면 다른 장 제외 없이 전 범위 허용.
 
     def allowed_sentences(prod):
         skip = {v for k, v in OWN.items() if k != prod}
@@ -705,6 +720,11 @@ def main(argv):
         if nrules == 0:
             print("  ✗ 규칙을 한 개도 못 읽었습니다 — 출처·오귀속 검사가 돌 수 없는 상태입니다.")
             total_bad += 1
+        # 축(종목↔장) 설정이 없는 책은 오귀속/장-스코프 검사를 '미적용'으로 정직히 밝힌다.
+        # 못 본 것을 통과로 찍지 않는다(SKILL 절대규칙3).
+        if book_axis(slug) is None:
+            print("  · 오귀속/장-스코프 검사 미적용 — books.json 의 %s.verify.attribution_axis 없음"
+                  % slug)
 
         # 출처 검사 — ref 가 가리키는 소절이 맞는지(오귀속·잘못된 출처 탐지)
         prov = provenance_audit(slug, path, rules) or []
