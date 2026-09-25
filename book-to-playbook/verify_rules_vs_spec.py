@@ -140,6 +140,34 @@ def spec_items(spec):
     return spec if isinstance(spec, list) else []
 
 
+def sheet_sections(rules):
+    """시트(rules.json) 규칙 라벨을 ref별로 묶는다 — ③ 검사2(창작)의 대조 대상.
+
+    구간③의 바로 앞 구간은 시트다. spec 의 수치가 지어낸 것인지 볼 때
+    원문 본문으로 직행하지 않고, 그 수치를 요구한 시트 규칙(같은 ref)에 있는지 본다.
+    ①②가 통과했다면 시트 수치는 이미 원문까지 전이 보장되므로 원문 본문이 필요 없다.
+    """
+    secs = {}
+    for r in rules:
+        ref = r.get("ref")
+        if isinstance(ref, str):
+            secs.setdefault(ref, []).append(r.get("text", ""))
+    return {k: " · ".join(v) for k, v in secs.items()}
+
+
+def source_keys(slug):
+    """계약1 소절 키 집합(커밋된 source_index.json) — 원문 '본문' 없이도 소절 존재를 판정.
+
+    ref 가 실존 소절을 가리키는지 확인하는 데엔 키만 있으면 된다. 저작권 본문은 필요 없다.
+    """
+    p = os.path.join(BASE, "books", slug, "source_index.json")
+    try:
+        secs = (load_json(p).get("sections") or {})
+        return set(secs.keys()) if isinstance(secs, dict) else None
+    except Exception:
+        return None
+
+
 # ---------------------------------------------------------------- 공통 추출
 def numbers_of(obj):
     """구조 안의 모든 수 — 숫자 리터럴과 문자열 속 숫자 둘 다."""
@@ -313,8 +341,13 @@ def in_body_bare(body, val):
     return val in numbers_of(body)
 
 
-def check_invention(slug, items, sections):
-    """spec 의 정량 파라미터가 그 ref 소절 원문에 실제로 있는가."""
+def check_invention(slug, items, sheet_secs, valid_keys):
+    """spec 의 정량 파라미터가 그 ref 를 요구한 **시트 규칙**에 실제로 있는가.
+
+    구간③의 바로 앞 구간은 시트다. 원문 본문으로 직행하지 않는다 —
+    ①②가 통과했다면 시트 수치는 원문까지 전이 보장되므로, spec 이 시트에 없는
+    수치를 넣었다면 그건 ③ 단계에서 지어낸 것이다.
+    """
     ex = exempt_of(slug, "_rules_vs_spec_spec")
     out = []
     for it in items:
@@ -323,11 +356,11 @@ def check_invention(slug, items, sections):
             continue                       # 계약 4 미충족은 verify_contract 의 일
         if it.get("source") == "manual":
             continue                       # 수동 항목엔 자동 판정 수치가 없다
-        body = sections.get(ref)
-        if body is None:
+        if valid_keys is not None and ref not in valid_keys:
             out.append({"kind": "ref", "item": it,
                         "why": "없는 소절을 가리킴: %s" % ref})
             continue
+        body = sheet_secs.get(ref, "")     # 그 ref 를 쓴 시트 규칙 라벨 묶음
         for path, key, val in metric_params(it):
             k = "%s::%s=%s" % (it.get("item", "?"), path, fmt_num(val))
             if ex.get(k):
@@ -335,12 +368,12 @@ def check_invention(slug, items, sections):
             if key in PERIOD_KEYS:
                 if in_body_with_unit(body, val, PERIOD_UNITS):
                     continue
-                why = ("%s=%s — %s 본문에 '%s일'·'%s거래일'·'%s일선' 어디에도 없음"
+                why = ("%s=%s — %s 시트 규칙에 '%s일'·'%s거래일'·'%s일선' 어디에도 없음(③에서 지어냄)"
                        % (path, fmt_num(val), ref, fmt_num(val), fmt_num(val), fmt_num(val)))
             else:
                 if in_body_bare(body, val):
                     continue
-                why = ("%s=%s — %s 본문에 그 수치가 없음(단위 미상이라 숫자만 대조)"
+                why = ("%s=%s — %s 시트 규칙에 그 수치가 없음(③에서 지어냄, 단위 미상이라 숫자만 대조)"
                        % (path, fmt_num(val), ref))
             out.append({"kind": "param", "item": it, "param": path,
                         "val": val, "why": why})
@@ -422,18 +455,12 @@ def main(argv):
         rules = walk_rules(rules_doc, skip)
         items = spec_items(load_json(sp))
 
-        try:
-            sections = book_source.load_sections(slug)
-        except Exception as e:                       # 원문이 손에 없는 경우
-            sections = None
-            out("· %-8s 원문 본문 없음(%s) — 검사2(창작)는 돌 수 없음"
-                % (slug, type(e).__name__))
+        # 바로 앞 구간(시트)만 본다: 규칙 라벨을 ref별로 묶고, 소절 존재는 커밋된 키로.
+        sheet_secs = sheet_sections(rules)
+        valid_keys = source_keys(slug)
 
         if show:
-            if sections is None:
-                print("본문이 없어 상세를 보여줄 수 없습니다.")
-                return 2
-            show_ref(slug, show, rules, items, sections)
+            show_ref(slug, show, rules, items, sheet_secs)
             continue
 
         out("%s — 규칙 %d개(ref 있는 것만, %s) · spec 항목 %d개(%s)"
@@ -459,7 +486,7 @@ def main(argv):
             continue
 
         # ---- 검사 1 — 누락
-        miss = check_missing(slug, rules, items, sections)
+        miss = check_missing(slug, rules, items, valid_keys)
         out("  [검사1 누락] 규칙 %d개 중 문제 %d개" % (len(rules), len(miss)))
         for m in miss:
             mark = "✗" if m["kind"] == "ref" else "⚠"
@@ -468,18 +495,15 @@ def main(argv):
         bad += len(miss)
         book_bad += len(miss)
 
-        # ---- 검사 2 — 창작
-        if sections is None:
-            skipped_checks.append((slug, "검사2 창작", "원문 본문 없음"))
-        else:
-            inv = check_invention(slug, items, sections)
-            auton = len([i for i in items if i.get("source") != "manual"])
-            out("  [검사2 창작] 자동 spec %d개 중 원문에 없는 수치 %d개"
-                % (auton, len(inv)))
-            for x in inv:
-                out("    ⚠ %-40s %s" % ((x["item"].get("item") or "?")[:40], x["why"]))
-            bad += len(inv)
-            book_bad += len(inv)
+        # ---- 검사 2 — 창작 (원문 본문 없이 항상 돈다: 시트 대조)
+        inv = check_invention(slug, items, sheet_secs, valid_keys)
+        auton = len([i for i in items if i.get("source") != "manual"])
+        out("  [검사2 창작] 자동 spec %d개 중 시트에 없는 수치 %d개"
+            % (auton, len(inv)))
+        for x in inv:
+            out("    ⚠ %-40s %s" % ((x["item"].get("item") or "?")[:40], x["why"]))
+        bad += len(inv)
+        book_bad += len(inv)
 
         book_violations[slug] = book_bad
 
