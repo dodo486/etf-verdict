@@ -36,9 +36,12 @@ COMPOSITE_TYPES = {"defensive_only", "bad_rate_drop", "count_above_ma"}  # 복�
 IDX = {"TQQQ": "^NDX", "SOXL": "^SOX", "UPRO": "^GSPC"}   # 종목 → 대표 지수
 # 회피 규칙의 엔진키(k) → 지표 type. "이 규칙은 이 지표로 판정한다"의 사람 판단.
 K2TYPE = {"run5": "n_day_return", "wick": "upper_wick", "tnx": "pct_change",
-          "usd_str": "dxy_change", "vol_sell": "volume_ratio", "nvda_only": "count_up",
+          "usd_str": "dxy_change", "vol_sell": "volume_ratio",
           "gap": "gap_up", "vix": "pct_change", "earnings": "earnings_dday",
           "overheat": "count_up_days"}
+# 강도/개수 지표 = 진입·게이트용(많을수록 좋음). 회피 트리거로 쓰면 방향이 거꾸로다.
+# (예: nvda_only '주도주 약화'는 count_up>=2 발화가 아니라 그 반대 — 전용 divergence 지표 필요)
+STRENGTH_TYPES = GATE_TYPES | {"count_up", "count_above_ma"}
 
 
 def _label_symbol(t, prod):
@@ -138,7 +141,7 @@ def resolve(rule, group, prod, cands):
     # 3) 회피 — 트리거 지표(문턱 있는 것) 우선, 심볼로 좁힘
     if group == "avoid":
         want = _label_symbol(t, prod) or prod
-        trig = [m for m in cands if m.get("type") not in GATE_TYPES]
+        trig = [m for m in cands if m.get("type") not in STRENGTH_TYPES]
         cand2 = [m for m in trig if m.get("symbol") in (want, IDX.get(prod), prod)] or trig
         if len(cand2) == 1:
             return cand2[0], "회피 트리거 @%s" % cand2[0].get("symbol")
@@ -157,9 +160,11 @@ def resolve(rule, group, prod, cands):
                 return hit, "이격→ma_distance @%s" % prod
         return None, None   # '많이 올랐다'·'30분' 등은 전용지표 미비 → 수동
 
-    # 5) 마지막 안전망 — 후보가 딱 하나면 그것으로(개수형 count_up 등)
+    # 5) 마지막 안전망 — 후보가 딱 하나면 그것으로. 단 회피에 강도지표(방향 반대)는 금지.
     non_empty = [m for m in cands if m.get("type")]
     if len(non_empty) == 1:
+        if group == "avoid" and non_empty[0].get("type") in STRENGTH_TYPES:
+            return None, None   # 회피에 강도지표는 안 됨 → 전용 divergence 지표 필요(모호로 flag)
         return non_empty[0], "단일 후보→%s" % non_empty[0].get("type")
     return None, None
 
@@ -190,16 +195,20 @@ def bind(rule, group, by_ref, report, path, prod):
     cands = by_ref.get(ref, [])
     cands = [m for m in cands if m]   # 빈 {} 제거
     label = " › ".join(str(x) for x in path) + " :: " + (rule.get("t") or "")[:30]
+    # resolve 를 manual 판정보다 먼저 시도한다. 데이터가 있어 자동 판정 가능한데
+    # '판정엔진 미구현'이라며 manual 로 둔 규칙(예: 60일선 아래)은 자동으로 승격한다
+    # — SKILL 원칙: 데이터 있는 미구현은 ✋직접이 아니라 🚧 해야 할 일.
+    picked, how = resolve(rule, group, prod, cands) if ref else (None, None)
+    if picked is not None:
+        below = picked.pop("_below", False)
+        rule["metric"] = to_inline_resolved(picked, group, below)
+        note = "  (%s%s)" % (how, ", manual→auto 승격" if rule.get("source") == "manual" else "")
+        report["bound"].append(label + note)
+        return
     if rule.get("source") == "manual" or not ref:
         rule["metric"] = {"type": "manual", "role": "trigger" if group == "avoid" else "gate",
                           "source": "manual", "reason": rule.get("reason") or "수동/미선언"}
         report["manual"].append(label)
-        return
-    picked, how = resolve(rule, group, prod, cands)
-    if picked is not None:
-        below = picked.pop("_below", False)
-        rule["metric"] = to_inline_resolved(picked, group, below)
-        report["bound"].append("%s  (%s)" % (label, how))
         return
     if not cands:
         rule["metric"] = {"type": "manual", "role": "trigger" if group == "avoid" else "gate",

@@ -199,7 +199,80 @@ def gap_up(m):
             "text": "시가 %.2f / 전일종가 %.2f · 갭 %+.1f%%" % (op, prev, g)}
 
 
-# 선언 type → 계산기. (여기 없는 type = 아직 미구현/복합/장중 — 상위가 '미구현'으로 표시)
+def count_up(m):
+    """심볼 목록 중 상승(전일比 +) 개수. min 이상이면 pass. (주도주 N개 동반 등)"""
+    syms = m.get("symbols") or []
+    up = n = 0
+    for s in syms:
+        d = _dir(s)
+        if d and d.get("chg") is not None:
+            n += 1
+            if d["chg"] > 0:
+                up += 1
+    if n == 0:
+        return {"value": None, "pass": None, "text": "심볼 수집 실패"}
+    return {"value": up, "pass": _pass_min(up, m), "text": "%d/%d개 상승" % (up, n)}
+
+
+def count_above_ma(m):
+    """심볼 목록 중 N일선 위 개수. min 이상이면 pass. (섹터 몇 개 위 등)"""
+    syms, ma = m.get("symbols") or [], m.get("ma", 20)
+    cnt = n = 0
+    for s in syms:
+        d = _series(s)
+        mav = _num(d, "ma%d" % ma)
+        if mav and _num(d, "close") is not None:
+            n += 1
+            if d["close"] > mav:
+                cnt += 1
+    if n == 0:
+        return {"value": None, "pass": None, "text": "%d일선 데이터 없음" % ma}
+    return {"value": cnt, "pass": _pass_min(cnt, m), "text": "%d/%d개 %d일선 위" % (cnt, n, ma)}
+
+
+# --- 섹터 기반 복합 신호 (md_feed 가 섹터 스냅샷을 준다 — 엔진과 같은 데이터원) ---
+_SECTOR = None
+
+
+def _sectors():
+    global _SECTOR
+    if _SECTOR is None:
+        try:
+            _SECTOR = md_feed.sector_snapshot()
+        except Exception:
+            _SECTOR = {}
+    return _SECTOR
+
+
+def defensive_only(m):
+    """방어주만 살아나고 기술·금융·산업재 약화(경기침체 신호). md_feed 위임."""
+    try:
+        r = md_feed.defensive_only(_sectors())
+    except Exception as e:  # noqa: BLE001
+        return {"value": None, "pass": None, "text": "섹터 수집 실패: %s" % e}
+    if not r.get("ok"):
+        return {"value": None, "pass": None, "text": r.get("reason", "섹터 수집 실패")}
+    return {"value": bool(r.get("flag")), "pass": bool(r.get("flag")),
+            "text": r.get("label") or "방어주 편중"}
+
+
+def bad_rate_drop(m):
+    """나쁜 금리 하락: 금리↓ + S&P 못 오름 + 금융 약함(엔진 _bad_rate_drop 과 동일 공식)."""
+    tnx, g, sec = _dir("^TNX"), _dir("^GSPC"), _sectors()
+    if not tnx or not g or tnx.get("prev") is None:
+        return {"value": None, "pass": None, "text": "수집 실패"}
+    rate_down = (tnx["close"] - tnx["prev"]) < 0
+    spx_down = g.get("chg") is not None and g["chg"] <= 0
+    fin = (sec.get("금융") or {}).get("ret5")
+    fin_weak = fin is not None and fin < 0
+    flag = bool(rate_down and spx_down and fin_weak)
+    return {"value": flag, "pass": flag,
+            "text": "금리 %+.2f%%p · S&P %+.1f%% · 금융5일 %s" % (
+                tnx["close"] - tnx["prev"], g.get("chg") or 0,
+                ("%+.1f%%" % fin) if fin is not None else "?")}
+
+
+# 선언 type → 계산기. (여기 없는 type = 아직 미구현/장중 — 상위가 '미구현'으로 표시)
 CALC = {
     "pct_change": pct_change,
     "dxy_change": dxy_change,
@@ -211,6 +284,10 @@ CALC = {
     "volume_ratio": volume_ratio,
     "count_up_days": count_up_days,
     "gap_up": gap_up,
+    "count_up": count_up,
+    "count_above_ma": count_above_ma,
+    "defensive_only": defensive_only,
+    "bad_rate_drop": bad_rate_drop,
 }
 
 

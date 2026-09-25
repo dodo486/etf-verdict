@@ -567,10 +567,12 @@
        "source": "manual",
        "mtype": "news_sentiment",
        "metric": {
-        "type": "manual",
+        "type": "volume_ratio",
         "role": "trigger",
-        "source": "manual",
-        "reason": "수동/미선언"
+        "op": ">=",
+        "source": "auto",
+        "symbol": "SOXL",
+        "threshold": 1.7
        }
       },
       {
@@ -627,18 +629,20 @@
        "bkey": "엔비디아만 좋고 나머지 약하면",
        "src": "📊 야후 EOD · NVDA·AMD·AVGO",
        "k": "nvda_only",
-       "metric": {
-        "type": "count_up",
-        "role": "trigger",
-        "op": ">=",
-        "source": "auto",
-        "symbols": [
-         "NVDA",
-         "AMD",
-         "AVGO"
-        ],
-        "threshold": 2
-       }
+       "metric_candidates": [
+        {
+         "type": "count_up",
+         "role": "trigger",
+         "op": ">=",
+         "source": "auto",
+         "symbols": [
+          "NVDA",
+          "AMD",
+          "AVGO"
+         ],
+         "threshold": 2
+        }
+       ]
       },
       {
        "t": "대표주 6개 중 4개 미만만 같은 방향(1~2개만 끌면 조심)",
@@ -664,10 +668,12 @@
        "mtype": "prev_low_break",
        "k": "leader_break",
        "metric": {
-        "type": "manual",
+        "type": "volume_ratio",
         "role": "trigger",
-        "source": "manual",
-        "reason": "수동/미선언"
+        "op": ">=",
+        "source": "auto",
+        "symbol": "SOXL",
+        "threshold": 1.7
        }
       }
      ],
@@ -1004,10 +1010,13 @@
      "src": "✋ 직접 · 회복 후 재눌림이 20일선 근처에서 버티는지 (판정엔진 미구현)",
      "bkey": "20일선 근처에서 버팀",
      "metric": {
-      "type": "manual",
+      "type": "hold_above_ma",
       "role": "gate",
-      "source": "manual",
-      "reason": "수동/미선언"
+      "op": "above",
+      "source": "auto",
+      "symbol": "^GSPC",
+      "ma": 20,
+      "days": 2
      }
     }
    ],
@@ -1099,10 +1108,13 @@
      "src": "✋ 직접 · 지수 60일선 위/아래 (판정엔진 미구현)",
      "bkey": "60일선 아래 첫 반등",
      "metric": {
-      "type": "manual",
+      "type": "above_ma",
       "role": "trigger",
-      "source": "manual",
-      "reason": "수동/미선언"
+      "op": "below",
+      "source": "auto",
+      "symbol": "^GSPC",
+      "ma": 60,
+      "threshold": 0
      }
     },
     {
@@ -1127,10 +1139,12 @@
      "source": "manual",
      "k": "usd_str",
      "metric": {
-      "type": "manual",
+      "type": "dxy_change",
       "role": "trigger",
-      "source": "manual",
-      "reason": "수동/미선언"
+      "op": ">=",
+      "source": "auto",
+      "symbol": "DX-Y.NYB",
+      "_todo": "문턱(threshold) 미선언 — 저자 숫자 확인 필요"
      }
     },
     {
