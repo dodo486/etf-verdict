@@ -56,6 +56,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 
 # 이름 → ui/<name>.js. 대상 HTML 에 그 이름의 센티넬 구간이 있을 때만 처리한다.
 REGIONS = {
+    "playbook-ui": os.path.join(BASE, "ui", "playbook-ui.js"),
     "review-ui": os.path.join(BASE, "ui", "review-ui.js"),
     "checklist-ui": os.path.join(BASE, "ui", "checklist-ui.js"),
 }

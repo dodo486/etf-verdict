@@ -89,6 +89,7 @@ def series(symbol):
     if len(closes) < 21:
         return {"sym": symbol, "error": "시세 데이터 부족" if cs else "시세 조회 실패"}
     highs = [c.high for c in cs if c.high is not None]
+    lows = [c.low for c in cs if c.low is not None]
     opens = [c.open for c in cs if c.open is not None]
     vols = [c.volume for c in cs if c.volume is not None]
     return {
@@ -97,6 +98,8 @@ def series(symbol):
         "chg": _pct(closes[-1], closes[-2]),
         "ret5": _pct(closes[-1], closes[-6]) if len(closes) >= 6 else None,
         "high": highs[-1] if highs else None,
+        "low": lows[-1] if lows else None,
+        "prevlow": lows[-2] if len(lows) >= 2 else None,
         "open": opens[-1] if opens else None,
         "vol": vols[-1] if vols else None,
         "vol20": _ma(vols, 20) if len(vols) >= 20 else None,

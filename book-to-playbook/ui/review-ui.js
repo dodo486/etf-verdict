@@ -187,6 +187,52 @@
 
   window.__jumpToSheet = jump;   // 요약표에서 재사용
 
+  /* ---- 역방향: 체크리스트 항목 → 플레이북 원문 소절 ---- */
+  //   시트에서 "이건 저자 어디 말이지?"를 바로 확인하게, ref 로 플레이북 소절(h3)로 점프한다.
+  //   소절이 접힌 챕터 안이면 펼치고, split 이면 플레이북 pane 을, 단일탭이면 플레이북 탭으로 전환해 스크롤.
+  function jumpToPlaybook(key, bkey){
+    if(!key) return;
+    var heads = document.querySelectorAll('#content h3.sec, #content h3');
+    var head = null;
+    for(var i=0;i<heads.length;i++){
+      var m = (heads[i].textContent || '').match(/^\s*([0-9]+-[0-9]+|에필로그)/);
+      if(m && m[1] === String(key)){ head = heads[i]; break; }
+    }
+    if(!head) return;   // 원문에 별도 소절이 없으면(예: 0장 흡수) 조용히 넘어간다
+    var det = head.closest('details'); if(det && !det.open){ det.open = true; }
+    // 소제목(h3)이 아니라 **그 규칙 줄(bullet)** 로 착지한다 — 소절 안(다음 h3 전까지)에서
+    //   bkey 를 담은 li 를 찾는다(정방향 점프와 같은 기준). 못 찾으면 소절 제목으로 폴백.
+    var target = head;
+    if(bkey){
+      var el = head.nextElementSibling;
+      while(el && el.tagName !== 'H3'){
+        if(el.textContent && el.textContent.indexOf(bkey) >= 0){
+          if(el.tagName === 'LI'){ target = el; break; }
+          var lis = el.querySelectorAll ? el.querySelectorAll('li') : [];
+          var hit = null;
+          for(var j=0;j<lis.length;j++){ if((lis[j].textContent||'').indexOf(bkey) >= 0){ hit = lis[j]; break; } }
+          target = hit || el; break;
+        }
+        el = el.nextElementSibling;
+      }
+    }
+    var pane = document.getElementById('panel-playbook');
+    if(!document.body.classList.contains('split')){
+      var pbTab = document.querySelector('.tab[data-tab="playbook"]');
+      if(pbTab) pbTab.click();
+    }
+    setTimeout(function(){
+      if(document.body.classList.contains('split') && pane){
+        var pr = pane.getBoundingClientRect(), er = target.getBoundingClientRect();
+        pane.scrollTo({top: pane.scrollTop + (er.top - pr.top) - 60, behavior:'smooth'});
+      } else {
+        target.scrollIntoView({behavior:'smooth', block:'center'});
+      }
+      flash(target);
+    }, 60);
+  }
+  window.__jumpToPlaybook = jumpToPlaybook;
+
   function bindClose(){
     var x = document.getElementById('jnx');
     if(x) x.onclick = function(){ note.classList.remove('show'); };

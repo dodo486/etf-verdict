@@ -99,6 +99,32 @@ def render_page():
     이미 들어 있어(정적 스냅샷과 동일 파일) 이후엔 스스로 갱신한다.
     """
     html = open(PAGE_SRC, encoding="utf-8").read()
+    # 발행 파이프라인과 동일하게 조립한다 — #rules(체크리스트 데이터)·공유 UI(ui/*.js)·
+    # 좌측 책 레일(nav)을 여기서 얹는다. 특히 rules 를 주입하지 않으면 페이지에 구워진
+    # 옛 #rules 사본(드리프트)이 서빙돼 최신 books/etf/rules.json 의 병합·수정이 안 보인다.
+    try:
+        from inject_rules import inject as _inject_rules
+        html = _inject_rules(html, "etf")
+    except Exception:
+        pass
+    try:
+        from inject_ui import inject as _inject_ui
+        html = _inject_ui(html)
+    except Exception:
+        pass
+    # 지표 레지스트리 주입 — 체크리스트가 mtype 으로 🤖자동/🚧미구현/✋직접을 구분해 보이게 한다.
+    try:
+        import re as _re
+        _reg = open(os.path.join(BASE, "metric_registry.json"), encoding="utf-8").read()
+        html = _re.sub(r'(<script type="application/json" id="metric-registry">).*?(</script>)',
+                       lambda m: m.group(1) + _reg + m.group(2), html, count=1, flags=_re.S)
+    except Exception:
+        pass
+    try:
+        import inject_nav
+        html = inject_nav.inject(html, "etf")
+    except Exception:
+        pass
     try:
         data, _ = compute_verdict()
         blob = json.dumps(data, ensure_ascii=False)

@@ -30,6 +30,16 @@
   const gradeCls = g => g.includes('매수 후보') ? 'go' : (g.includes('소액') ? 'small' : (g.includes('보류')||g.includes('금지') ? 'no' : ''));
   const RULES = JSON.parse(document.getElementById('rules').textContent);
   const DATA = RULES.DATA;
+  // 지표 레지스트리 — 조건의 mtype 으로 🤖자동/🚧미구현/✋직접을 파생한다(게이트와 같은 기준, 주제 모름).
+  const REG = (function(){ try { return JSON.parse(document.getElementById('metric-registry').textContent) || {}; } catch(e){ return {}; } })();
+  const _AUTO = REG.auto_types || {}, _NODATA = REG.no_data_types || {};
+  //   반환: 'auto'(값 표시) | 'todo'(🚧 데이터O·로직X) | 'manual'(✋ 데이터 없음)
+  function clsOf(k, mtype){
+    if(k) return 'auto';
+    if(mtype && _AUTO[mtype]) return _AUTO[mtype].impl ? 'auto' : 'todo';
+    if(mtype && _NODATA[mtype]) return 'manual';
+    return 'manual';   // 미선언은 보수적으로 직접 취급(게이트가 별도로 미결선 잡음)
+  }
   // 종목 키는 rules.json 에서 파생한다(책무관) — 특정 티커를 코드에 박지 않는다.
   const PRODS = Object.keys(DATA).filter(function(k){ return k !== 'COMMON'; });
   const card = document.getElementById('entryCard');
@@ -55,7 +65,7 @@
       else if(istate==='ok' && liveNow) stMsg = ' <b style="color:var(--entry)">— 지금 수집 중(깜빡임)</b>';
       else if(istate==='ok') stMsg = ' <span style="color:var(--mute)">— 방금 수집됨</span>';
       else stMsg = ' <span style="color:var(--mute)">— 개장+31분에 갱신(현재 대기)</span>';
-      h += '<p class="subtle" style="margin:2px 0 10px"><span class="tag a">🤖</span> EOD · <span class="tag o live">⚡👁</span> 장중'+stMsg+'</p>';
+      h += '<p class="subtle" style="margin:2px 0 10px">실시간 수집'+stMsg+'</p>';
     }
     const mt = (vv && vv.metrics) || {};
     h += '<div class="grouplabel f">① 필터 (통과 못하면 진입 금지)</div>';
@@ -63,9 +73,9 @@
     d.filter.forEach((c,i)=>{
       if(c.ek){                                  // 항목별 자동 판정(예: 2거래일 유지)
         const e = ecf[c.ek];
-        h+=chk('f'+i,{t:c.t, src:c.src, ref:c.ref, live:(e&&e.label)}, false, !!(e&&e.ok), 'eod', e?'ok':'pending');
+        h+=chk('f'+i,{t:c.t, src:c.src, ref:c.ref, bkey:c.bkey, live:(e&&e.label)}, false, !!(e&&e.ok), 'eod', e?'ok':'pending');
       } else {
-        h+=chk('f'+i,{t:c.t,src:c.src,ref:c.ref,live:mt.filter}, false, vv?!!vv.filter_ok:false, 'eod', vv?'ok':'pending');
+        h+=chk('f'+i,{t:c.t,src:c.src,ref:c.ref,bkey:c.bkey,live:mt.filter}, false, vv?!!vv.filter_ok:false, 'eod', vv?'ok':'pending');
       }
     });
     h += '<div class="grouplabel e">② 진입 조건 ('+d.need+'개 이상 충족)</div>';
@@ -74,19 +84,19 @@
       const ic = ia && c.ik && ia.checks && ia.checks[c.ik];  // 장중 자동판정 대상
       if(c.ek){                                 // 야후 EOD 자동(예: 섹터 폭)
         const e = ec[c.ek];
-        h+=chk('e'+i,{t:c.t, src:c.src, ref:c.ref, live:(e&&e.label)}, false, !!(e&&e.ok), 'eod', e?'ok':'pending');
+        h+=chk('e'+i,{t:c.t, src:c.src, ref:c.ref, bkey:c.bkey, live:(e&&e.label)}, false, !!(e&&e.ok), 'eod', e?'ok':'pending');
       } else if(c.ik){
         let st = istate;
         if(ic && ic.status==='error') st='error';
         else if(ic) st='ok';
         else if(istate!=='error') st='pending';
         // 수집된 값(live)이 있으면 출처 뒤에 붙임
-        h+=chk('e'+i,{t:c.t, src:c.src, ref:c.ref, live:(ic&&ic.label)}, false, !!(ic&&ic.ok), 'intra', st);
+        h+=chk('e'+i,{t:c.t, src:c.src, ref:c.ref, bkey:c.bkey, live:(ic&&ic.label)}, false, !!(ic&&ic.ok), 'intra', st);
       } else {
         h+=chk('e'+i,c,false, false, 'manual', (istate==='ok')?'ok':'pending');
       }
     });
-    h+=chk('e_vol',{t:DATA.COMMON.entry[0].t, src:DATA.COMMON.entry[0].src, ref:DATA.COMMON.entry[0].ref, live:mt.vol}, false, vv?!!vv.vol_ok:false, 'eod', vv?'ok':'pending');
+    h+=chk('e_vol',{t:DATA.COMMON.entry[0].t, src:DATA.COMMON.entry[0].src, ref:DATA.COMMON.entry[0].ref, bkey:DATA.COMMON.entry[0].bkey, live:mt.vol}, false, vv?!!vv.vol_ok:false, 'eod', vv?'ok':'pending');
     h += '<div class="grouplabel x">③ 회피 신호 (하나라도 걸리면 보류)</div>';
     d.avoid.forEach((c,i)=>{
       if(c.groupNeed){
@@ -95,23 +105,31 @@
         const g = groupState(c, vv);        // {states:[{on,auto,why}...], count}
         const trig = g.count >= c.groupNeed;
         const label = c.t + ' <b>'+g.count+'/'+(c.subs||[]).length+'</b>';
-        h+=chk('x'+i,{t:label,src:c.src,ref:c.ref},true, trig, '', vv?'ok':'pending');
+        h+=chk('x'+i,{t:label,src:c.src,ref:c.ref,bkey:c.bkey,autoLock:true},true, trig, '', vv?'ok':'pending');
+        h += '<div class="subkids">';
         (c.subs || []).forEach((s,si)=>{ h += subLine(s, g.states[si]); });
+        h += '</div>';
         return;
       }
       const ks=(c.k||'').split('|').filter(Boolean);
       const on = vv && ks.some(k=>(vv.avoid_keys||[]).includes(k));
       // 이 회피 항목의 대표 지표 수치(첫 키 기준)
       const mkey = ks[0];
-      h+=chk('x'+i,{t:c.t,src:c.src,ref:c.ref,live:mkey?mt[mkey]:undefined},true, !!on, (vv&&c.k)?'eod':'', vv?'ok':'pending');
-      // 동의어 병합 항목: 부모 체크박스 아래에 저자 소절별 원문 조건을 작은 글씨로 나열(표시 전용).
-      //   체크박스는 부모 하나뿐이고, 각 하위줄은 그 소절 bullet 이 점프해 올 수 있게 chk-<sub.ref> 앵커를 심는다.
-      (c.subs || []).forEach((s)=>{ h += subLine(s); });
+      // 자식(subs) 각각의 실시간 값·걸림 상태를 여기서 계산해 넘긴다(렌더는 주제 모름).
+      //   k 있으면 자동(그 지표 실제 값 mt[k] + avoid_keys 로 걸림판정), 없으면 수동(직접 확인).
+      const subsView = (c.subs||[]).map(s=>{
+        const sk=(s.k||'').split('|').filter(Boolean);
+        const cls = clsOf(s.k, s.mtype);
+        return {t:s.t, ref:s.ref, bkey:s.bkey, src:s.src, cls:cls, auto:cls==='auto',
+                live: sk.length ? mt[sk[0]] : undefined,
+                on: !!(vv && sk.some(k=>(vv.avoid_keys||[]).includes(k)))};
+      });
+      h+=chk('x'+i,{t:c.t,src:c.src,ref:c.ref,bkey:c.bkey,mtype:c.mtype,live:mkey?mt[mkey]:undefined,merged:subsView},true, !!on, (vv&&c.k)?'eod':'', vv?'ok':'pending');
     });
     if(d.caution){
       h += '<div class="grouplabel" style="color:var(--gold)">④ 호재·뉴스 되돌림 체크 <span class="tag a" style="text-transform:none">저자 2-7</span> — 3개 중 2개 불편하면 조심 신호</div>';
       d.caution.forEach((c,i)=>{
-        h+=chk('c'+i,{t:c.t, src:c.src, ref:c.ref, live:c.k?mt[c.k]:undefined}, true, false, (vv&&c.k)?'eod':'', vv?'ok':'pending');
+        h+=chk('c'+i,{t:c.t, src:c.src, ref:c.ref, bkey:c.bkey, live:c.k?mt[c.k]:undefined}, true, false, (vv&&c.k)?'eod':'', vv?'ok':'pending');
       });
       h += '<div class="note" id="cauNote" style="margin-top:8px"></div>';
     }
@@ -126,36 +144,67 @@
     }
     card.innerHTML = h;
     card.querySelectorAll('input').forEach(b=>b.addEventListener('change',()=>evalEntry(p)));
+    // 줄(체크박스 제외)을 누르면 플레이북 원문의 그 bullet 로 점프. 체크 토글은 체크박스에서만.
+    //   부모(.chk)·자식(.subchk) 모두 대상. 자식 클릭은 stopPropagation 으로 부모 점프를 막는다.
+    card.querySelectorAll('.chk[data-ref], .subchk[data-ref]').forEach(row=>{
+      row.addEventListener('click', ev=>{
+        if(ev.target.closest('input')) return;   // 체크박스 클릭은 토글만(점프 안 함)
+        ev.stopPropagation();
+        if(window.__jumpToPlaybook) window.__jumpToPlaybook(row.getAttribute('data-ref'), row.getAttribute('data-bkey')||'');
+      });
+    });
     evalEntry(p);
   }
   function chk(id,c,warn,checked,bt,state){
-    // bt: 'eod'(🤖) | 'intra'(⚡ 장중자동) | 'manual'(👁 장중수동)
-    // state: 'ok'(수집됨) | 'pending'(대기·회색) | 'error'(수집실패·빨강)
-    let badge='';
-    if(bt==='eod'){
-      badge = (state==='ok') ? ' <span class="tag a" title="아침 EOD 수집됨">🤖 자동</span>'
-                             : ' <span class="tag miss" title="아직 수집 전">⚫ 대기</span>';
-    } else if(bt==='intra'){
-      if(state==='ok') badge=' <span class="tag o live" title="장중 실시간 수집">⚡ 장중</span>';
-      else if(state==='error') badge=' <span class="tag err" title="장중 수집 실패 — 조치 필요">🔴 수집실패</span>';
-      else badge=' <span class="tag miss" title="장중 직접 확인 항목(무료 실시간 소스 없음)">⚫ 대기</span>';
-    } else if(bt==='manual'){
-      // 데이터 수집 대상이 아닌 사람 판단 항목 — 깜빡이지 않는 정적 표시
-      badge=' <span class="tag o" title="무료 데이터 없음 · HTS에서 직접 확인">✋ 직접</span>';
-    }
-    // 작은 글씨: 데이터 출처(src) + 수집된 값(live) — 없으면 기존 s
+    // bt: 'eod'|'intra'(자동수집) | 'manual'(사람 확인). 자동뱃지(🤖/⚡/✋)는 표시하지 않는다 —
+    //   자동 여부는 잠김(disabled) 상태와 실제 값 노출로 드러난다.
+    // 출처(src)는 작은 회색 글씨, 실제 값(live)은 데이터 pill 로 — 체크리스트 텍스트와 구분.
     let small = '';
     const srcTxt = c.src || c.s;
     if(srcTxt) small += '<span style="color:var(--mute)">'+srcTxt+'</span>';
-    if(c.live) small += (small?' → ':'')+'<b style="color:var(--text)">'+c.live+'</b>';
-    // 소절 ref 로 개별 판정 항목에 안정적 앵커를 심는다(chk-<ref>). 같은 ref 가 여러 항목이면 chk-<ref>-<n>.
-    let anchor = '';
+    const hasKids = !!(c.merged && c.merged.length);
+    const dataPill = (c.live && !hasKids) ? '<span class="dataval">'+c.live+'</span>' : '';
+    // 비병합 항목: live 값이 없고 mtype 이 미구현/무데이터면 상태 태그(🚧/✋)로 알린다.
+    let statusTag = '';
+    if(!hasKids && !c.live && c.mtype){
+      const cls = clsOf(null, c.mtype);
+      if(cls==='todo') statusTag = ' <span class="todo-tag">🚧 자동 예정(미구현)</span>';
+      else if(cls==='manual') statusTag = ' <span class="manual-tag">✋ 직접</span>';
+    }
+    // 소절 ref 로 안정적 앵커(chk-<ref>) + 역방향 점프용 data 속성(줄 클릭 → 그 bullet).
+    let anchor = '', dataAttr = '';
     if(c.ref){
       const n = (_chkRefSeen[c.ref] = (_chkRefSeen[c.ref]||0) + 1);
       anchor = ' id="chk-' + c.ref + (n>1 ? '-'+n : '') + '"';
+      dataAttr = ' data-ref="' + c.ref + '"' + (c.bkey ? ' data-bkey="' + String(c.bkey).replace(/"/g,'&quot;') + '"' : '');
     }
-    return '<label class="chk"'+anchor+'><input type="checkbox" data-k="'+id+'"'+(warn?' class="warn"':'')+(checked?' checked':'')
-      +'><span class="txt">'+c.t+badge+(small?'<small>'+small+'</small>':'')+'</span></label>';
+    // 자동수집(EOD·장중) 항목은 사람이 체크를 못 바꾼다 — 오직 자동만 제어(disabled). 수동만 토글.
+    const autoLock = c.autoLock || bt==='eod' || bt==='intra';
+    // 의미단위 병합(동의어) 하위 조건 — 부모와 같은 사각형 체크박스(크기만 작게)로 편다.
+    //   각 자식: 작은 체크박스(자동=걸림상태 잠김 / 수동=토글) + 조건 텍스트 + 데이터값 pill(구분).
+    //   chk-<sub.ref> 앵커·data-ref 로 그 소절 bullet 로 역방향 점프까지 도달.
+    let merged = '';
+    if(hasKids){
+      merged = '<div class="subkids">'
+        + c.merged.map(function(s){
+            let a='';
+            if(s.ref){ const n=(_chkRefSeen[s.ref]=(_chkRefSeen[s.ref]||0)+1); a=' id="chk-'+s.ref+(n>1?'-'+n:'')+'"'; }
+            const dref = s.ref ? ' data-ref="'+s.ref+'"'+(s.bkey?' data-bkey="'+String(s.bkey).replace(/"/g,'&quot;')+'"':'') : '';
+            const dis = s.auto ? ' disabled' : '';
+            const chkd = s.on ? ' checked' : '';
+            const wc = s.on ? ' class="warn"' : '';
+            let dataEl;
+            if(s.cls==='auto') dataEl = s.live ? '<span class="dataval">'+s.live+'</span>' : '<span class="manual-tag">수집 대기</span>';
+            else if(s.cls==='todo') dataEl = '<span class="todo-tag">🚧 자동 예정(미구현)</span>';
+            else dataEl = '<span class="manual-tag">✋ 직접</span>';
+            return '<div class="subchk'+(s.on?' on':'')+'"'+a+dref+'><input type="checkbox"'+wc+chkd+dis+'><span class="stext">'+s.t+'</span>'+dataEl+'</div>';
+          }).join('')
+        + '</div>';
+    }
+    // <div>(라벨 아님) — 줄 텍스트 클릭은 플레이북 점프, 체크 토글은 체크박스에서만.
+    return '<div class="chk'+(autoLock?' autolock':'')+'"'+anchor+dataAttr+' style="cursor:pointer">'
+      +'<input type="checkbox" data-k="'+id+'"'+(warn?' class="warn"':'')+(checked?' checked':'')+(autoLock?' disabled':'')
+      +'><span class="txt">'+c.t+statusTag+(small?'<small>'+small+'</small>':'')+dataPill+merged+'</span></div>';
   }
   // 카운트-그룹 라이브 판정 — 규칙(groupExtra/groupNeed)만 보고 계산한다. 특정 주제를 모른다.
   //   ① VD.extras[rule.groupExtra] 가 있으면 그 signals[] 를 하위조건과 (sub.sk 키 → 없으면 순서)로 맞춰 on 을 읽는다.
@@ -181,20 +230,23 @@
   //   렌더는 '주제'를 모른다. subs 유무만 보고 하위줄로 펼친다(책무관).
   //   st(선택): 카운트-그룹 하위줄의 라이브 판정 {on,auto,why} — 있으면 ⚠/· 아이콘·걸림 뱃지·why 를 표시한다.
   function subLine(s, st){
-    let anchor = '';
+    let anchor = '', dref = '';
     if(s.ref){
       const n = (_chkRefSeen[s.ref] = (_chkRefSeen[s.ref]||0) + 1);
       anchor = ' id="chk-' + s.ref + (n>1 ? '-'+n : '') + '"';
+      dref = ' data-ref="'+s.ref+'"' + (s.bkey ? ' data-bkey="'+String(s.bkey).replace(/"/g,'&quot;')+'"' : '');
     }
-    const isAuto = st ? st.auto : !!s.k;
-    let badge;
-    if(st && st.on) badge = '<span class="tag err">🔴 걸림</span>';
-    else badge = isAuto ? '<span class="tag a">🤖 자동</span>' : '<span class="tag o">✋ 직접</span>';
-    const mark = st ? (st.on ? '⚠ ' : '· ') : '↳ ';
-    const src = s.src ? '<small><span style="color:var(--mute)">'+s.src+'</span></small>' : '';
-    const why = (st && st.why) ? '<small><b style="color:var(--text)">'+st.why+'</b></small>' : '';
-    const col = (st && st.on) ? ' style="color:var(--warn)"' : '';
-    return '<div class="subline"'+anchor+'><span class="txt"'+col+'>'+mark+s.t+' '+badge+src+why+'</span></div>';
+    // 자식 체크리스트 한 줄 — 부모와 같은 사각형(작게). 자동=걸림상태 잠김, 수동=토글. 값은 데이터 pill.
+    const on = !!(st && st.on);
+    const auto = st ? st.auto : !!s.k;
+    const dis = auto ? ' disabled' : '';
+    const chkd = on ? ' checked' : '';
+    const wc = on ? ' class="warn"' : '';
+    let dataEl;
+    if(st && st.why) dataEl = '<span class="dataval">'+st.why+'</span>';
+    else if(!auto) dataEl = '<span class="manual-tag">✋ 직접</span>';
+    else dataEl = '<span class="manual-tag">수집 대기</span>';
+    return '<div class="subchk'+(on?' on':'')+'"'+anchor+dref+'><input type="checkbox"'+wc+chkd+dis+'><span class="stext">'+s.t+'</span>'+dataEl+'</div>';
   }
   function evalEntry(p){
     const d = DATA[p];

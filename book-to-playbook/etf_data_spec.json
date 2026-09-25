@@ -1,415 +1,434 @@
 {
-  "book": "김프로랩 『미국 돈복사 ETF 투자방법』",
-  "note": "etf_daily_verdict.py STEP1 정량규칙을 data_spec로 옮긴 것. verdict_engine 대조검증용. ma_distance(2-7)·gap_up(7-3)은 저자가 임계 %를 명시하지 않아 min 없이 수치만 노출한다(ok=null). volume_ratio 는 base 기본값이 전일 대비(저자 7-4 '전일보다 1.5배'). 2-6 '나스닥 선물'·'S&P500 선물'은 지수(^NDX/^GSPC)가 아니라 선물(NQ=F/ES=F) — books.json verify.symbol_lexicon 참고.",
-  "items": [
-    {
-      "item": "나스닥 선물 방향(전일 대비 +)",
-      "ref": "2-6",
-      "source": "auto",
-      "metric": {
-        "type": "pct_change",
-        "symbol": "NQ=F",
-        "min": 0
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "S&P500 선물 방향(전일 대비 +)",
-      "ref": "2-6",
-      "source": "auto",
-      "metric": {
-        "type": "pct_change",
-        "symbol": "ES=F",
-        "min": 0
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "VIX 등락률",
-      "ref": "2-4",
-      "source": "auto",
-      "metric": {
-        "type": "pct_change",
-        "symbol": "^VIX",
-        "min": 10
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "10년물 등락률",
-      "ref": "2-5",
-      "source": "auto",
-      "metric": {
-        "type": "pct_change",
-        "symbol": "^TNX"
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "TQQQ 필터: 나스닥100 20일선 위",
-      "ref": "3-2",
-      "source": "auto",
-      "metric": {
-        "type": "above_ma",
-        "symbol": "^NDX",
-        "ma": 20
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "TQQQ 필터: 나스닥100 20일선 회복 후 2거래일 유지",
-      "ref": "3-2",
-      "source": "auto",
-      "metric": {
-        "type": "hold_above_ma",
-        "symbol": "^NDX",
-        "ma": 20,
-        "days": 2
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "UPRO 필터: S&P500 20일선 위",
-      "ref": "2-2",
-      "source": "auto",
-      "metric": {
-        "type": "above_ma",
-        "symbol": "^GSPC",
-        "ma": 20
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "UPRO 필터: S&P500 20일선 회복 후 2거래일 유지",
-      "ref": "5-2",
-      "source": "auto",
-      "metric": {
-        "type": "hold_above_ma",
-        "symbol": "^GSPC",
-        "ma": 20,
-        "days": 2
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "UPRO 회피: S&P500 60일선 아래에서 20일선만 회복(반등 시도)",
-      "ref": "2-2",
-      "source": "auto",
-      "metric": {
-        "type": "above_ma",
-        "symbol": "^GSPC",
-        "ma": 60
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "SOXL 필터A: SOXL 20일선 위",
-      "ref": "4-4",
-      "source": "auto",
-      "metric": {
-        "type": "above_ma",
-        "symbol": "SOXL",
-        "ma": 20
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "SOXL 필터B: 반도체지수 20일선 위",
-      "ref": "4-4",
-      "source": "auto",
-      "metric": {
-        "type": "above_ma",
-        "symbol": "^SOX",
-        "ma": 20
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "TQQQ 최근 5일 수익률",
-      "ref": "3-1",
-      "source": "auto",
-      "metric": {
-        "type": "n_day_return",
-        "symbol": "TQQQ",
-        "n": 5
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "SOXL 최근 5일 수익률(15%↑ 과열 기준)",
-      "ref": "4-5",
-      "source": "auto",
-      "metric": {
-        "type": "n_day_return",
-        "symbol": "SOXL",
-        "n": 5,
-        "min": 15
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "TQQQ 윗꼬리(고점 대비 종가)",
-      "ref": "3-1",
-      "source": "auto",
-      "metric": {
-        "type": "upper_wick",
-        "symbol": "TQQQ"
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "SOXL 윗꼬리(고점 대비 종가, 4%↑ 밀림 기준)",
-      "ref": "4-5",
-      "source": "auto",
-      "metric": {
-        "type": "upper_wick",
-        "symbol": "SOXL",
-        "min": 4
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "SOXL 과열: 반도체지수 10거래일 중 7일↑",
-      "ref": "2-3",
-      "source": "auto",
-      "metric": {
-        "type": "count_up_days",
-        "symbol": "^SOX",
-        "n": 10,
-        "min": 7
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "SOXL 과열: 최근 5거래일 20%↑ 상승",
-      "ref": "2-3",
-      "source": "auto",
-      "metric": {
-        "type": "n_day_return",
-        "symbol": "SOXL",
-        "n": 5,
-        "min": 20
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "TQQQ 거래량 배수(전일 대비)",
-      "ref": "7-4",
-      "source": "auto",
-      "metric": {
-        "type": "volume_ratio",
-        "symbol": "TQQQ",
-        "min": 1.5
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "SOXL 거래량 배수(전일 대비)",
-      "ref": "7-4",
-      "source": "auto",
-      "metric": {
-        "type": "volume_ratio",
-        "symbol": "SOXL",
-        "min": 1.5
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "UPRO 거래량 배수(전일 대비)",
-      "ref": "7-4",
-      "source": "auto",
-      "metric": {
-        "type": "volume_ratio",
-        "symbol": "UPRO",
-        "min": 1.5
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "TQQQ 5일선 이격도",
-      "ref": "2-7",
-      "source": "auto",
-      "metric": {
-        "type": "ma_distance",
-        "symbol": "TQQQ",
-        "ma": 5
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "SOXL 5일선 이격도",
-      "ref": "2-7",
-      "source": "auto",
-      "metric": {
-        "type": "ma_distance",
-        "symbol": "SOXL",
-        "ma": 5
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "UPRO 5일선 이격도",
-      "ref": "2-7",
-      "source": "auto",
-      "metric": {
-        "type": "ma_distance",
-        "symbol": "UPRO",
-        "ma": 5
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "TQQQ 뉴스 후 첫 30분 고점 유지(장중)",
-      "ref": "2-7",
-      "source": "manual",
-      "cadence": "intraday",
-      "reason": "EOD 데이터로는 뉴스 발표 후 첫 30분 고점 유지 여부를 판별할 수 없음(장중 분봉 필요) → 직접 확인. 저자 2-7: '뉴스가 나온 뒤 첫 30분 동안 고점을 지키는지'"
-    },
-    {
-      "item": "TQQQ 갭(시가 vs 전일종가)",
-      "ref": "7-3",
-      "source": "auto",
-      "metric": {
-        "type": "gap_up",
-        "symbol": "TQQQ"
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "SOXL 갭(시가 vs 전일종가)",
-      "ref": "7-3",
-      "source": "auto",
-      "metric": {
-        "type": "gap_up",
-        "symbol": "SOXL"
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "UPRO 갭(시가 vs 전일종가)",
-      "ref": "7-3",
-      "source": "auto",
-      "metric": {
-        "type": "gap_up",
-        "symbol": "UPRO"
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "TQQQ 빅테크 7종목 중 상승수(저자 2-1 목록)",
-      "ref": "2-1",
-      "source": "auto",
-      "metric": {
-        "type": "count_up",
-        "symbols": [
-          "NVDA",
-          "MSFT",
-          "AAPL",
-          "AMZN",
-          "META",
-          "GOOGL",
-          "TSLA"
-        ],
-        "min": 3
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "SOXL 주도주 3개 중 상승수(엔비디아·AMD·브로드컴)",
-      "ref": "4-2",
-      "source": "auto",
-      "metric": {
-        "type": "count_up",
-        "symbols": [
-          "NVDA",
-          "AMD",
-          "AVGO"
-        ],
-        "min": 2
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "TQQQ 빅테크 실적 임박(엔비디아·MS·애플 다음 발표일)",
-      "ref": "3-5",
-      "source": "auto",
-      "metric": {
-        "type": "earnings_dday",
-        "symbols": [
-          "NVDA",
-          "MSFT",
-          "AAPL"
-        ]
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "TQQQ 시초가 위(장중)",
-      "ref": "7-2",
-      "source": "auto",
-      "metric": {
-        "type": "above_open",
-        "symbol": "TQQQ"
-      },
-      "cadence": "intraday"
-    },
-    {
-      "item": "TQQQ 첫 눌림 저점 높임(장중)",
-      "ref": "7-2",
-      "source": "auto",
-      "metric": {
-        "type": "higher_low",
-        "symbol": "TQQQ"
-      },
-      "cadence": "intraday"
-    },
-    {
-      "item": "달러인덱스 안정(급강세 아님)",
-      "ref": "2-6",
-      "source": "manual",
-      "reason": "무료 달러인덱스 EOD는 심볼 폴백(DX-Y.NYB/DX=F) 불안정 → 직접 확인"
-    },
-    {
-      "item": "회피: VIX 튐 + 달러 강세 동시",
-      "ref": "2-5",
-      "source": "manual",
-      "reason": "달러인덱스 무료 EOD 소스가 불안정(DX-Y.NYB/DX=F 폴백) → VIX·달러 동시 신호는 직접 확인. 저자 2-5: '달러가 강해지고, 금리가 오르고, VIX까지 튀면 그날은 레버리지 ETF를 크게 누를 날이 아닙니다'"
-    },
-    {
-      "item": "UPRO 섹터 5개 중 3개↑ 동반(XLK·XLF·XLI·XLV·XLY 20일선 위 개수)",
-      "ref": "5-1",
-      "source": "auto",
-      "metric": {
-        "type": "count_above_ma",
-        "symbols": [
-          "XLK",
-          "XLF",
-          "XLI",
-          "XLV",
-          "XLY"
-        ],
-        "ma": 20,
-        "min": 3
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "UPRO 방어주만 강세(경기민감 vs 방어 5일 수익률)",
-      "ref": "5-3",
-      "source": "auto",
-      "metric": {
-        "type": "defensive_only"
-      },
-      "cadence": "eod"
-    },
-    {
-      "item": "UPRO 나쁜 금리 하락(금리↓·S&P500 못오름·금융주 약세 동시)",
-      "ref": "5-3",
-      "source": "auto",
-      "metric": {
-        "type": "bad_rate_drop"
-      },
-      "cadence": "eod"
-    }
-  ]
+ "book": "김프로랩 『미국 돈복사 ETF 투자방법』",
+ "note": "etf_daily_verdict.py STEP1 정량규칙을 data_spec로 옮긴 것. verdict_engine 대조검증용. ma_distance(2-7)·gap_up(7-3)은 저자가 임계 %를 명시하지 않아 min 없이 수치만 노출한다(ok=null). volume_ratio 는 base 기본값이 전일 대비(저자 7-4 '전일보다 1.5배'). 2-6 '나스닥 선물'·'S&P500 선물'은 지수(^NDX/^GSPC)가 아니라 선물(NQ=F/ES=F) — books.json verify.symbol_lexicon 참고.",
+ "items": [
+  {
+   "item": "나스닥 선물 방향(전일 대비 +)",
+   "ref": "2-6",
+   "source": "auto",
+   "metric": {
+    "type": "pct_change",
+    "symbol": "NQ=F",
+    "min": 0
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "S&P500 선물 방향(전일 대비 +)",
+   "ref": "2-6",
+   "source": "auto",
+   "metric": {
+    "type": "pct_change",
+    "symbol": "ES=F",
+    "min": 0
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "VIX 등락률",
+   "ref": "2-4",
+   "source": "auto",
+   "metric": {
+    "type": "pct_change",
+    "symbol": "^VIX",
+    "min": 10
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "10년물 등락률",
+   "ref": "2-5",
+   "source": "auto",
+   "metric": {
+    "type": "pct_change",
+    "symbol": "^TNX"
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "TQQQ 필터: 나스닥100 20일선 위",
+   "ref": "3-2",
+   "source": "auto",
+   "metric": {
+    "type": "above_ma",
+    "symbol": "^NDX",
+    "ma": 20
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "TQQQ 필터: 나스닥100 20일선 회복 후 2거래일 유지",
+   "ref": "3-2",
+   "source": "auto",
+   "metric": {
+    "type": "hold_above_ma",
+    "symbol": "^NDX",
+    "ma": 20,
+    "days": 2
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "UPRO 필터: S&P500 20일선 위",
+   "ref": "2-2",
+   "source": "auto",
+   "metric": {
+    "type": "above_ma",
+    "symbol": "^GSPC",
+    "ma": 20
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "UPRO 필터: S&P500 20일선 회복 후 2거래일 유지",
+   "ref": "5-2",
+   "source": "auto",
+   "metric": {
+    "type": "hold_above_ma",
+    "symbol": "^GSPC",
+    "ma": 20,
+    "days": 2
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "UPRO 회피: S&P500 60일선 아래에서 20일선만 회복(반등 시도)",
+   "ref": "2-2",
+   "source": "auto",
+   "metric": {
+    "type": "above_ma",
+    "symbol": "^GSPC",
+    "ma": 60
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "SOXL 필터A: SOXL 20일선 위",
+   "ref": "4-4",
+   "source": "auto",
+   "metric": {
+    "type": "above_ma",
+    "symbol": "SOXL",
+    "ma": 20
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "SOXL 필터B: 반도체지수 20일선 위",
+   "ref": "4-4",
+   "source": "auto",
+   "metric": {
+    "type": "above_ma",
+    "symbol": "^SOX",
+    "ma": 20
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "TQQQ 최근 5일 수익률",
+   "ref": "3-1",
+   "source": "auto",
+   "metric": {
+    "type": "n_day_return",
+    "symbol": "TQQQ",
+    "n": 5
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "SOXL 최근 5일 수익률(15%↑ 과열 기준)",
+   "ref": "4-5",
+   "source": "auto",
+   "metric": {
+    "type": "n_day_return",
+    "symbol": "SOXL",
+    "n": 5,
+    "min": 15
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "TQQQ 윗꼬리(고점 대비 종가)",
+   "ref": "3-1",
+   "source": "auto",
+   "metric": {
+    "type": "upper_wick",
+    "symbol": "TQQQ"
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "SOXL 윗꼬리(고점 대비 종가, 4%↑ 밀림 기준)",
+   "ref": "4-5",
+   "source": "auto",
+   "metric": {
+    "type": "upper_wick",
+    "symbol": "SOXL",
+    "min": 4
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "SOXL 과열: 반도체지수 10거래일 중 7일↑",
+   "ref": "2-3",
+   "source": "auto",
+   "metric": {
+    "type": "count_up_days",
+    "symbol": "^SOX",
+    "n": 10,
+    "min": 7
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "SOXL 과열: 최근 5거래일 20%↑ 상승",
+   "ref": "2-3",
+   "source": "auto",
+   "metric": {
+    "type": "n_day_return",
+    "symbol": "SOXL",
+    "n": 5,
+    "min": 20
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "TQQQ 거래량 배수(전일 대비)",
+   "ref": "7-4",
+   "source": "auto",
+   "metric": {
+    "type": "volume_ratio",
+    "symbol": "TQQQ",
+    "min": 1.5
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "SOXL 거래량 배수(전일 대비)",
+   "ref": "7-4",
+   "source": "auto",
+   "metric": {
+    "type": "volume_ratio",
+    "symbol": "SOXL",
+    "min": 2.0
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "UPRO 거래량 배수(전일 대비)",
+   "ref": "7-4",
+   "source": "auto",
+   "metric": {
+    "type": "volume_ratio",
+    "symbol": "UPRO",
+    "min": 1.5
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "TQQQ 5일선 이격도",
+   "ref": "2-7",
+   "source": "auto",
+   "metric": {
+    "type": "ma_distance",
+    "symbol": "TQQQ",
+    "ma": 5
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "SOXL 5일선 이격도",
+   "ref": "2-7",
+   "source": "auto",
+   "metric": {
+    "type": "ma_distance",
+    "symbol": "SOXL",
+    "ma": 5
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "UPRO 5일선 이격도",
+   "ref": "2-7",
+   "source": "auto",
+   "metric": {
+    "type": "ma_distance",
+    "symbol": "UPRO",
+    "ma": 5
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "TQQQ 뉴스 후 첫 30분 고점 유지(장중)",
+   "ref": "2-7",
+   "source": "manual",
+   "cadence": "intraday",
+   "reason": "분봉 데이터는 자동 수집되나(야후 1분봉) '뉴스 발표 시각 기준 첫 30분 고점 유지' 판정 로직이 미구현 → 직접 확인. 무료 소스가 없어서가 아니라 이벤트-시각 트리거 미구현."
+  },
+  {
+   "item": "TQQQ 갭(시가 vs 전일종가)",
+   "ref": "7-3",
+   "source": "auto",
+   "metric": {
+    "type": "gap_up",
+    "symbol": "TQQQ"
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "SOXL 갭(시가 vs 전일종가)",
+   "ref": "7-3",
+   "source": "auto",
+   "metric": {
+    "type": "gap_up",
+    "symbol": "SOXL"
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "UPRO 갭(시가 vs 전일종가)",
+   "ref": "7-3",
+   "source": "auto",
+   "metric": {
+    "type": "gap_up",
+    "symbol": "UPRO"
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "TQQQ 빅테크 7종목 중 상승수(저자 2-1 목록)",
+   "ref": "2-1",
+   "source": "auto",
+   "metric": {
+    "type": "count_up",
+    "symbols": [
+     "NVDA",
+     "MSFT",
+     "AAPL",
+     "AMZN",
+     "META",
+     "GOOGL",
+     "TSLA"
+    ],
+    "min": 3
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "SOXL 주도주 3개 중 상승수(엔비디아·AMD·브로드컴)",
+   "ref": "4-2",
+   "source": "auto",
+   "metric": {
+    "type": "count_up",
+    "symbols": [
+     "NVDA",
+     "AMD",
+     "AVGO"
+    ],
+    "min": 2
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "TQQQ 빅테크 실적 임박(엔비디아·MS·애플 다음 발표일)",
+   "ref": "3-5",
+   "source": "auto",
+   "metric": {
+    "type": "earnings_dday",
+    "symbols": [
+     "NVDA",
+     "MSFT",
+     "AAPL"
+    ]
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "TQQQ 시초가 위(장중)",
+   "ref": "7-2",
+   "source": "auto",
+   "metric": {
+    "type": "above_open",
+    "symbol": "TQQQ"
+   },
+   "cadence": "intraday"
+  },
+  {
+   "item": "TQQQ 첫 눌림 저점 높임(장중)",
+   "ref": "7-2",
+   "source": "auto",
+   "metric": {
+    "type": "higher_low",
+    "symbol": "TQQQ"
+   },
+   "cadence": "intraday"
+  },
+  {
+   "item": "달러인덱스 안정(급강세 아님)",
+   "ref": "2-6",
+   "source": "auto",
+   "metric": {
+    "type": "dxy_change",
+    "symbol": "DX-Y.NYB"
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "회피: VIX 튐 + 달러 강세 동시",
+   "ref": "2-5",
+   "source": "auto",
+   "metric": {
+    "type": "dxy_change",
+    "symbol": "DX-Y.NYB"
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "UPRO 섹터 5개 중 3개↑ 동반(XLK·XLF·XLI·XLV·XLY 20일선 위 개수)",
+   "ref": "5-1",
+   "source": "auto",
+   "metric": {
+    "type": "count_above_ma",
+    "symbols": [
+     "XLK",
+     "XLF",
+     "XLI",
+     "XLV",
+     "XLY"
+    ],
+    "ma": 20,
+    "min": 3
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "UPRO 방어주만 강세(경기민감 vs 방어 5일 수익률)",
+   "ref": "5-3",
+   "source": "auto",
+   "metric": {
+    "type": "defensive_only"
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "UPRO 나쁜 금리 하락(금리↓·S&P500 못오름·금융주 약세 동시)",
+   "ref": "5-3",
+   "source": "auto",
+   "metric": {
+    "type": "bad_rate_drop"
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "SOXL 거래량 급증(전일比) + 종가 고점 아래 = 매물",
+   "ref": "4-3",
+   "source": "auto",
+   "metric": {
+    "type": "volume_ratio",
+    "symbol": "SOXL",
+    "min": 1.7
+   },
+   "cadence": "eod"
+  }
+ ]
 }

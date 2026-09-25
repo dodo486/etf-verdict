@@ -35,8 +35,10 @@ def ok(v):  # 유효 데이터?
 # (지수 ^NDX/^GSPC 는 종목 필터·판정에 계속 쓰인다)
 #   · 일봉 필요(MA20/MA60·거래량·연속유지) → md_feed.series()
 #   · 방향만 필요(선물·^VIX·^TNX) → 선물=quote 스냅샷, 지수=index 스냅샷
+SEMI6 = ["NVDA", "AMD", "AVGO", "MU", "AMAT", "LRCX"]   # 반도체 주도주 6개(엔비디아·AMD·브로드컴·마이크론·장비주 2)
 SERIES_SYMS = ["^NDX", "^GSPC", "^SOX", "TQQQ", "SOXL", "UPRO",
-               "NVDA", "MSFT", "AAPL", "AMD", "AVGO"]
+               "NVDA", "MSFT", "AAPL", "AMD", "AVGO",
+               "MU", "AMAT", "LRCX"]
 FUTURES_SYMS = ["NQ=F", "ES=F"]
 INDEX_SNAP_SYMS = ["^VIX", "^TNX"]
 
@@ -62,6 +64,25 @@ for s in INDEX_SNAP_SYMS:
 def above20(v): return ok(v) and v["ma20"] and v["close"] > v["ma20"]
 def above60(v): return ok(v) and v["ma60"] and v["close"] > v["ma60"]
 def plus(sym): return ok(D[sym]) and D[sym]["chg"] is not None and D[sym]["chg"] > 0
+
+# ---------- 제네릭 지표 함수 (심볼 리스트만 받는다 — 특정 종목/책 안 박음) ----------
+def breadth_aligned(syms):
+    """같은 방향(상승/하락) 최대 개수와 상세. 넓은 장 판정용. → (aligned, up, down, n)"""
+    up = sum(1 for s in syms if plus(s))
+    down = sum(1 for s in syms if ok(D.get(s)) and D[s].get("chg") is not None and D[s]["chg"] < 0)
+    n = sum(1 for s in syms if ok(D.get(s)))
+    return max(up, down), up, down, n
+
+def prev_low_breaks(syms):
+    """오늘 저가가 전일 저가를 깬 심볼 개수. → (breaks, checked)"""
+    br = ck = 0
+    for s in syms:
+        d = D.get(s)
+        if ok(d) and d.get("low") is not None and d.get("prevlow") is not None:
+            ck += 1
+            if d["low"] < d["prevlow"]:
+                br += 1
+    return br, ck
 
 # ---------- 스코어카드 (5점) ----------
 sc = []   # (라벨, 통과여부, 근거수치) — 근거는 시트가 항목 아래에 그대로 보여준다
@@ -190,6 +211,27 @@ def wick(v):  # 윗꼬리 근사: 고가 대비 종가 하락 폭
         return (v["high"] - v["close"]) / v["high"] * 100
     return None
 
+# 매물(거래량 급증) 판정 임계는 data_spec(구간③)에서 읽는다 — 코드에 숫자를 박지 않는다.
+def _load_spec_items():
+    try:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "etf_data_spec.json"), encoding="utf-8") as f:
+            return json.load(f).get("items", [])
+    except Exception:
+        return []
+_SPEC_ITEMS = _load_spec_items()
+
+def spec_min(mtype, sym=None):
+    """data_spec 에서 그 지표(type[, symbol])의 임계 min 을 읽는다(코드에 숫자 안 박음). 여럿이면 최소."""
+    vals = [(it.get("metric") or {}).get("min") for it in _SPEC_ITEMS
+            if (it.get("metric") or {}).get("type") == mtype
+            and (sym is None or (it.get("metric") or {}).get("symbol") == sym)
+            and (it.get("metric") or {}).get("min") is not None]
+    return min(vals) if vals else None
+
+def vol_ratio_min(sym):
+    """그 종목 volume_ratio 명세 중 가장 낮은 min(가장 민감한 임계). 없으면 None."""
+    return spec_min("volume_ratio", sym)
+
 prod_cfg = {
     "TQQQ": {"idx":"^NDX", "color":"🔵"},
     "SOXL": {"idx":"^SOX", "color":"🟠"},
@@ -224,15 +266,28 @@ def verdict(prod):
         filt_txt = "S&P500 20일선 위 + 2거래일 유지"
     # 상품별 회피
     if prod == "SOXL":
-        if ok(idx) and idx["updays10"] >= 7 and p["ret5"] is not None and p["ret5"] >= 20:
+        overheated = ok(idx) and idx["updays10"] >= 7 and p["ret5"] is not None and p["ret5"] >= 20
+        if overheated:
             av.append(f"과열: 반도체 10일중 {idx['updays10']}일↑ + SOXL 5일 {p['ret5']:.0f}%↑"); akeys.append("overheat")
-        elif p["ret5"] is not None and p["ret5"] >= 15:
-            av.append(f"SOXL 최근 5일 {p['ret5']:.0f}% 급등"); akeys.append("run5")
+        # run5(5일 15%↑)는 overheat 와 **독립**으로 판정한다(elif 아님). 20%↑면 15%도 당연히 참이므로
+        #   둘 다 켜서 병합 UI 의 두 자식이 각자 제 상태를 보이게 한다. 등급 텍스트만 중복을 피한다.
+        if p["ret5"] is not None and p["ret5"] >= 15:
+            akeys.append("run5")
+            if not overheated:
+                av.append(f"SOXL 최근 5일 {p['ret5']:.0f}% 급등")
         w = wick(p)
         if w is not None and w >= 4:
             av.append(f"장중 고점 대비 {w:.1f}% 밀려 마감(윗꼬리)"); akeys.append("wick")
         if plus("NVDA") and not (plus("AMD") or plus("AVGO")):
             av.append("엔비디아만 강하고 AMD·브로드컴 약함"); akeys.append("nvda_only")
+        # 저자 2-3: 대표주 6개 중 같은 방향 4개 미만이면 좁은 장(갈라짐). breadth_count 제네릭.
+        _al, _up, _dn, _n = breadth_aligned(SEMI6)
+        if _n >= 4 and _al < 4:
+            av.append(f"주도주 갈라짐: 6개 중 같은 방향 {_al}개(상승 {_up}·하락 {_dn})"); akeys.append("breadth6")
+        # 저자 4-3: 대표주 2개↑ 전일 저점 이탈이면 주도주 이탈. prev_low_break 제네릭.
+        _br, _ck = prev_low_breaks(["NVDA", "AMD", "AVGO"])
+        if _br >= 2:
+            av.append(f"주도주 이탈: 대표주 {_br}개 전일 저점 깸"); akeys.append("leader_break")
     if prod == "UPRO":
         # 저자 5-3: 금융·산업재 5거래일 약세 + 방어주만 버팀 → 30% 축소
         if DEFONLY.get("ok") and DEFONLY.get("flag"):
@@ -241,6 +296,10 @@ def verdict(prod):
         if BADRATE.get("ok") and BADRATE.get("flag"):
             av.append("나쁜 금리 하락(금리↓인데 S&P500 못 오르고 금융 약함)")
             akeys.append("bad_rate")
+        # 저자 2-5: 달러 강세 → UPRO 회피. 달러인덱스는 이미 자동 수집(dxy)·판정(dxy_ok).
+        #   임계(+0.5%)는 저자 미명시라 data_spec 이 아니라 운영값(dxy_ok, 이 파일 상단)으로 둔다.
+        if ok(dxy) and dxy.get("chg") is not None and not dxy_ok:
+            av.append(f"달러 강세 ({dxy['sym']} {dxy['chg']:+.2f}%)"); akeys.append("usd_str")
     if prod == "TQQQ":
         # 저자 3-5: 실적 발표 전 + 5일 이상 상승 → 노출 축소
         _near = [(s, v) for s, v in EARN.items() if s in ("NVDA", "MSFT", "AAPL") and v[1] <= 5]
@@ -253,6 +312,15 @@ def verdict(prod):
         w = wick(p)
         if w is not None and w >= 4:
             av.append(f"전고점권 윗꼬리(고점 대비 -{w:.1f}%)"); akeys.append("wick")
+    # 매물: 거래량 급증(data_spec volume_ratio min 이상) + 종가 고점 아래(밀림) — 종목 무관.
+    #   임계는 data_spec 에서 읽는다(코드에 안 박음). 규칙과는 k="vol_sell" 로 연결.
+    vmin = vol_ratio_min(prod)
+    if vmin and ok(p) and p.get("vol") and p.get("vol20"):
+        ratio = (p["vol"] / p["vol20"]) if p["vol20"] else None
+        nh = ((p["high"] - p["close"]) / p["high"]) if (p.get("high") and p["high"]) else None
+        if ratio is not None and ratio >= vmin and nh is not None and nh > 0.015:
+            av.append(f"거래량 {ratio:.1f}배 급증 + 종가 고점比 -{nh*100:.1f}% (매물)")
+            akeys.append("vol_sell")
     # 등급
     if not filt:
         grade, reason = "🚫 진입 금지", f"필터 미충족 — {filt_txt} 아님(추세 없음)"
@@ -304,6 +372,7 @@ def verdict(prod):
         ratio=p["vol"]/p["vol20"] if p["vol20"] else None
         nh=(p["high"]-p["close"])/p["high"]*100 if p.get("high") else None
         metrics["vol"]=f"거래량 {mil(p['vol'])}/20일평균 {mil(p['vol20'])} ({ratio:.2f}배), 고점比 {-nh:+.1f}%" if ratio is not None else "거래량 데이터 없음"
+        metrics["vol_sell"]=metrics["vol"]   # 매물 sub(k=vol_sell)가 실제 값을 보이도록 같은 값 노출
     # 회피 지표(모두, 걸리든 안 걸리든 현재값 표시)
     if ok(vix) and vix["chg"] is not None:
         metrics["vix"]=f"^VIX {vix['close']:.1f} (전일比 {vix['chg']:+.1f}%)"
@@ -326,6 +395,8 @@ def verdict(prod):
     if prod == "UPRO":
         if DEFONLY.get("ok"): metrics["def_only"]=DEFONLY["label"]
         if BADRATE.get("ok"): metrics["bad_rate"]=BADRATE["label"]
+        if ok(dxy) and dxy.get("chg") is not None:
+            metrics["usd_str"]=f"{dxy['sym']} {dxy['close']:,.2f} ({dxy['chg']:+.2f}%)"
     if prod == "TQQQ" and EARN:
         metrics["earnings"]=" · ".join("%s %s(D-%d)"%(s,v[0],v[1]) for s,v in list(EARN.items())[:3])
     w=wick(p)
@@ -338,6 +409,10 @@ def verdict(prod):
         bc=D['AVGO']['chg'] if ok(D.get('AVGO')) else None
         if nv is not None:
             metrics["nvda_only"]=f"엔비디아 {nv:+.1f}%, AMD {am:+.1f}%, 브로드컴 {bc:+.1f}%" if (am is not None and bc is not None) else f"엔비디아 {nv:+.1f}%"
+        _al, _up, _dn, _n = breadth_aligned(SEMI6)
+        metrics["breadth6"]=f"6개 중 같은 방향 {_al}개 (상승 {_up}·하락 {_dn}, 수집 {_n})"
+        _br, _ck = prev_low_breaks(["NVDA", "AMD", "AVGO"])
+        metrics["leader_break"]=f"대표주 {_br}/{_ck}개 전일 저점 이탈"
     # EOD로 자동 판정되는 진입 항목(시트가 체크박스를 자동으로 켠다)
     eod_checks = {}
     if ok(idx):

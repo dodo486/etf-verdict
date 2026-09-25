@@ -133,24 +133,39 @@ python verify_contract.py      # 책별·조항별 충족/미충족 표, 미충�
                 조건들, 각자 ref·bkey 보존) + xref(각 sub 소절 bullet → 이 부모).
                 · "같은 말"인가는 **의미로 판단한다**(추출자가 책을 읽고). 엔진키나
                   지표가 있어야만 묶는 게 아니다 — manual 규칙도 의미가 같으면 묶는다.
+                · **지표(metric)가 달라도 관찰 현상이 같으면 흡수한다.** 예: '고점 대비
+                  4% 밀림(upper_wick)'과 '거래량 급증+종가 밀림(volume_ratio)'은 둘 다
+                  "위에서 털림/매물"이라 **한 부모**로 합치고, 각 지표는 subs 로 분해해
+                  보존한다. **지표가 다르다는 것은 별개 top-level 규칙으로 둘 이유가 아니다**
+                  — 분해(지표별 subs)와 묶기(같은 현상 한 부모)는 한 쌍이다. 판별 질문:
+                  "체크하는 사람이 이걸 하나의 상황으로 보나?" 예면 한 부모, subs 로 지표 분해.
                 · 부모 라벨은 그 책의 저자 표현으로 쓴다. **고정 주제 목록(카테고리)을
                   코드/스키마에 박지 않는다.** 책마다 다르며, 묶는 판단은 데이터의 몫.
-                · 하위 저자 조건은 subs 로 전부 보존(누락 0). 렌더는 부모+하위줄로
-                  펼쳐 보인다 — 렌더 코드는 주제를 모르고 subs 유무만 본다(책무관 SSOT).
-                · 개수 기반 판정(예: 5신호 중 2개↑)도 이 subs 모델의 인스턴스다.
-                  특정 소절 전용 패널을 따로 만들지 않는다(두더지잡기).
+                · 하위 저자 조건은 subs 로 전부 보존(누락 0). 렌더는 **한 체크박스 안에
+                  전부 몰아넣어(생략 없이)** 보여준다(부모 라벨 + 하위 조건 크램) — 렌더
+                  코드는 주제를 모르고 subs 유무만 본다(책무관 SSOT). 각 sub 는 자기
+                  지표(k)·출처(src)를 달고, 부모 `k` 는 `a|b` 로 이어 **하나라도 걸리면**
+                  부모가 걸리게 한다.
+                · 개수 기반 판정(예: 5신호 중 2개↑)만 예외 — `groupNeed` 를 달면 하위
+                  각각을 on/off 로 펴서 센다(이때만 하위줄 표시). 이것도 subs 모델의
+                  인스턴스다. 특정 소절 전용 패널을 따로 만들지 않는다(두더지잡기).
 3) 분류      모든 소절 전수 → reflected / gap / mindset
              → 책 HTML 의 coverage-data 블록(#src 소절 키 전부를 map 에 담는다)
-4) 수집요청  각 규칙 → books/<slug>/data_spec.json 항목(+같은 ref).
-             자동 데이터 가능하면 source 지정, 불가면 source:"manual" + reason.
-             (규칙 자체는 저자 주장이므로 manual 로 찍지 않는다 — manual 은
-              '데이터 수집이 수동'이라는 뜻이지 '저자가 말한 적 없다'가 아니다.)
-5) 게이트    5검사를 --json 으로 그 책 slug 기준 실행:
+4) 수집요청  각 규칙/조건(부모·subs) → **metric type 을 선언한다**(`mtype` 또는 data_spec.metric.type).
+             ── **자동/직접은 사람이 정하지 않는다 — `metric_registry.json` 이 파생한다:**
+                · type ∈ auto_types & impl=true  → 🤖 자동(jhts 데이터 O + 판정 로직 O)
+                · type ∈ auto_types & impl=false → 🚧 미구현(jhts 데이터는 O, 로직만 X — **✋직접 아님, 해야 할 일**)
+                · type ∈ no_data_types           → ✋ 직접(데이터 자체가 없음: 뉴스감성·애널추정·한국수급·뉴스시각)
+                · 선언 없음/미등록 type          → ❌ 미결선(블로킹 — 반드시 선언)
+             ── 핵심: "jhts 시세수집팀에 요청하면 나오는 데이터"를 ✋직접으로 두는 것은 **금지**.
+                그건 미구현(🚧)이지 직접이 아니다. 데이터가 새로 생기면(예: 심볼 추가) auto_types 로,
+                무료 소스가 정말 없을 때만 no_data_types 로. **엔진(판정)은 jhts.marketdata(수집)에 위임**한다.
+5) 게이트    6검사를 --json 으로 그 책 slug 기준 실행:
              verify_source_integrity · verify_source_fabrication · verify_coverage
-             · verify_contract · verify_rules_vs_spec
-6) 수리      실패를 읽고 산출물을 고쳐 5 재실행 (아래 수리 매핑):
+             · verify_contract · verify_rules_vs_spec · **verify_auto_coverage**(자동가능한데 직접으로 샌 것 차단)
+6) 수리      실패를 읽고 산출물을 고쳐 재실행 (아래 수리 매핑):
 7) 수렴      그 책의 blocking(코드1) = 0 까지. 남는 건 전부 '수동/미구현'으로 표시된
-             warning(코드2) 뿐이어야 한다.
+             warning(코드2) 뿐이어야 한다. **미결선(❌)은 blocking, 미구현(🚧)은 warning.**
 ```
 
 ### 수리 매핑 — 어느 검사 실패 → 어느 산출물을 고치나
@@ -162,6 +177,8 @@ python verify_contract.py      # 책별·조항별 충족/미충족 표, 미충�
 | `verify_rules_vs_spec` **위반** | 규칙 ref 에 짝지을 spec 항목이 없거나(nospec)·규칙 토큰을 spec 이 못 담거나(cond)·spec 파라미터가 원문에 없음(param, 창작) | `data_spec.json` — 규칙 ref 마다 spec 항목을 만들고 규칙 토큰을 담는다 |
 | `verify_contract` **미충족** | 계약 1~4 중 형식이 빔 | 해당 산출물을 계약 형식으로 채운다(source_index / rules.json+ref / coverage-data / data_spec+ref) · HTML 안 규칙 리터럴(누출)은 `id="rules"` JSON 안으로 이동 |
 | `verify_source_integrity` **실패** | 저자 원문(#src·def_table·labels·rule_data)이 바뀜 | **원문을 되돌린다.** 절대 원문을 고쳐 검사에 맞추지 않는다. 의도한 신규 등록만 `--accept` 로 기준 갱신 |
+| `verify_auto_coverage` **미결선(❌)** | 조건이 자동/무데이터를 안 밝힘 | `rules.json` 조건에 `mtype` 선언 — jhts 데이터 있으면 auto_types, 없으면 no_data_types |
+| `verify_auto_coverage` **미구현(🚧)** | jhts 데이터는 있는데 판정 로직 미작성(✋직접 위장 금지) | 엔진에 그 metric type 계산 구현 + `metric_registry.json` 에서 `impl:true` 로. 데이터 없으면 no_data 로 재선언 |
 
 **절대원칙(재확인).** 책 = 사양, 코드 = 구현. **통과하려고 #src/원문을 고치지 않는다.**
 어긋나면 ①구현을 원문에 맞추거나 ②`source:"manual"` + `reason` 으로 미구현/수동 표시.
