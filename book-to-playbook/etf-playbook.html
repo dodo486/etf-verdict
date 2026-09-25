@@ -229,6 +229,10 @@
   /* checklist */
   .chk{display:flex; gap:11px; align-items:flex-start; padding:9px 0; border-bottom:1px solid var(--line); cursor:pointer; line-height:1.55}
   .chk:last-child{border-bottom:none}
+  /* 동의어 병합 하위 조건줄 — 부모 체크박스 아래 들여쓰기, 표시 전용 */
+  .subline{padding:5px 0 5px 31px; font-size:13px; line-height:1.5; color:var(--mute)}
+  .subline .txt{color:var(--text)}
+  .subline small{display:block; margin-top:1px}
   .chk input{appearance:none; -webkit-appearance:none; width:20px; height:20px; flex:none; margin-top:1px;
     border:1.5px solid var(--mute); border-radius:6px; cursor:pointer; position:relative; transition:.12s; background:var(--ground)}
   .chk input:checked{background:var(--entry); border-color:var(--entry)}
@@ -327,6 +331,10 @@
   /* 소절 제목 = 시트로 가는 버튼 */
   .jumpable{cursor:pointer}
   .jumpable:hover{color:var(--gold)}
+  /* 시트에 반영된 저자 조건(bullet) — 노랑 + 클릭 점프 */
+  .pb-hit{color:var(--gold); cursor:pointer; font-weight:600}
+  .pb-hit:hover{text-decoration:underline}
+  .pb-hit::after{content:" →"; font-size:11px; color:var(--gold-dim)}
   .jumpto{display:none; font-size:11px; font-weight:800; color:var(--gold);
     border:1px solid var(--gold-dim); border-radius:6px; padding:2px 7px; margin-left:8px;
     white-space:nowrap; vertical-align:middle}
@@ -565,14 +573,6 @@
       <p class="subtle" id="cashLine" style="margin:8px 0 0"></p>
       <div id="gapLine" class="note warn"></div>
       <div id="modeGap" class="note" style="display:none"></div>
-    </div>
-
-    <!-- STEP 2-B: 경기침체 5신호 (저자 5-3) -->
-    <h2 id="sheet-step2b"><span class="step">STEP 2-B</span>경기침체 5신호 — UPRO 축소 판정 <span class="tag a">저자 5-3</span></h2>
-    <p class="subtle">저자가 든 5개 신호 중 <b>자동 4개</b>는 오늘 값으로 채워집니다. 실적 전망 하향만 무료 데이터가 없어 직접 확인입니다.</p>
-    <div class="card">
-      <div id="recBox"></div>
-      <div class="verdict" id="recV"><span id="recMsg">불러오는 중</span></div>
     </div>
 
     <!-- 내 계좌 실제 비중 점검 (저자 6-3 · 10-1 · 9-4) -->
@@ -1206,7 +1206,8 @@
       ],
       "avoid": [
         {
-          "t": "VIX 전일 대비 +10% 이상 급등",
+          "t": "VIX 전일 대비 10% 이상 급등",
+          "ref": "2-4",
           "k": "vix",
           "src": "📊 야후 EOD · ^VIX 전일비"
         },
@@ -1223,9 +1224,10 @@
           "src": "📊 야후 EOD · 고가 대비 종가"
         },
         {
-          "t": "10년물 금리 +0.1%p 급등",
+          "t": "10년물 금리 전일 대비 급등",
+          "ref": "2-5",
           "k": "tnx",
-          "src": "📊 야후 EOD · ^TNX 전일비"
+          "src": "📊 야후 EOD · ^TNX 전일비 (판정 임계 +0.10%p↑는 우리 운영값 — 저자 2-6은 '빠르게 오르면·이틀 연속'으로 방향·속도만, %p 미명시)"
         },
         {
           "t": "갭상승 추격 구간 — 눌림 기다리고 금액은 1/3로",
@@ -1301,9 +1303,20 @@
       "need": 2,
       "filter": [
         {
-          "t": "SOXL·반도체지수 모두 20일선 위",
+          "t": "SOXL 20일선 위 (스윙 기준선)",
           "ref": "4-4",
-          "src": "📊 야후 EOD · SOXL·^SOX 종가 vs 20일선"
+          "src": "📊 야후 EOD · SOXL 종가 vs 20일선"
+        },
+        {
+          "t": "반도체지수 20일선 위 (스윙 기준선)",
+          "ref": "4-4",
+          "src": "📊 야후 EOD · ^SOX 종가 vs 20일선"
+        },
+        {
+          "t": "SOXL 5일선 위 (단타 기준선)",
+          "ref": "4-4",
+          "src": "📊 야후 EOD · SOXL 종가 vs 5일선 (단타=5일선 regime, 저자 4-4 — 판정엔진 미구현이라 수치 보고 직접)",
+          "source": "manual"
         }
       ],
       "entry": [
@@ -1324,11 +1337,6 @@
           "ref": "7-2",
           "ik": "pullback",
           "src": "👁 장중 직접 · 전반부 저점 vs 후반부 저점 (개장 30분 분봉 확인)"
-        },
-        {
-          "t": "(참고) 반도체지수 20일선 위 2거래일 유지",
-          "ek": "hold20",
-          "src": "⚙ 운영 · 저자는 SOXL에 2거래일 유지를 명시하지 않음(3-2 TQQQ·5-2 UPRO에만) — 참고 수치"
         }
       ],
       "avoid": [
@@ -1351,9 +1359,16 @@
           "src": "📊 야후 EOD · 고가 대비 종가"
         },
         {
-          "t": "VIX +10%↑ / 엔비디아만 강하고 나머지 약함",
-          "k": "vix|nvda_only",
-          "src": "📊 야후 EOD · ^VIX + NVDA·AMD·AVGO"
+          "t": "VIX 전일 대비 10% 이상 급등",
+          "ref": "2-4",
+          "k": "vix",
+          "src": "📊 야후 EOD · ^VIX 전일비"
+        },
+        {
+          "t": "엔비디아만 강하고 나머지 약함 (대표주 갈라짐)",
+          "ref": "4-2",
+          "k": "nvda_only",
+          "src": "📊 야후 EOD · NVDA·AMD·AVGO"
         },
         {
           "t": "갭상승 추격 구간 — 눌림 기다리고 금액은 1/3로",
@@ -1469,9 +1484,16 @@
           "src": "✋ 직접 · 지수 60일선"
         },
         {
-          "t": "VIX 튐 + 달러 강세 동시",
+          "t": "VIX 전일 대비 10% 이상 급등",
+          "ref": "2-4",
+          "k": "vix",
+          "src": "📊 야후 EOD · ^VIX 전일비"
+        },
+        {
+          "t": "달러 강세",
           "ref": "2-5",
-          "src": "✋ 직접 · VIX·달러"
+          "src": "📊 야후 EOD · DX-Y.NYB(실패 시 DX=F) 전일비 (달러 강세 방향만, 임계 저자 미명시 — 수치 보고 직접)",
+          "source": "manual"
         },
         {
           "t": "갭상승 추격 구간 — 눌림 기다리고 금액은 1/3로",
@@ -1662,7 +1684,7 @@
     else if(t.startsWith('### ')){
       flushList();
       const ht = t.slice(4);
-      html += '<h3 class="sec">'+inline(ht)+covBadge(ht)+'</h3>';
+      html += '<h3 class="sec">'+inline(ht)+'</h3>';   // 소절 배지 제거 — 대신 반영된 bullet 을 노랑+점프로
     }
     else if(t.startsWith('- ')){
       listBuf.push(t.slice(2));
@@ -1678,7 +1700,39 @@
   closeChap();
 
   document.getElementById('content').innerHTML = html;
-  if(Object.keys(COV).length){ const lg=document.getElementById('covlegend'); if(lg) lg.style.display='flex'; }
+
+  // 반영된 저자 조건(bullet) → 노랑 글씨 + 클릭 시 그 소절의 체크리스트 항목으로 점프.
+  //   규칙에 bkey(그 조건이 나온 bullet 의 고유 문구)가 있으면, 그 소절 bullet 에서 찾아 링크한다.
+  //   한 조건이 여러 소절에 나오면(예: '엔비디아만 강함'=4-2·4-5) xref:[{ref,bkey}] 로 보조 위치도 링크.
+  //   점프 목적지(jref)는 그 규칙이 사는 소절(primary ref)이다.
+  (function(){
+    var RD = RULES.DATA || {};
+    var bk = [];   // {bkey, ref(bullet 있는 소절), jref(점프 목적지), t}
+    Object.keys(RD).forEach(function(prod){
+      var cfg = RD[prod]; if(!cfg || typeof cfg !== 'object') return;
+      ['filter','entry','avoid','caution','exit'].forEach(function(grp){
+        (cfg[grp] || []).forEach(function(r){
+          if(!r || typeof r !== 'object') return;
+          var t = r.t || r.L || '';
+          if(r.bkey && r.ref) bk.push({bkey:r.bkey, ref:r.ref, jref:r.ref, t:t});
+          (r.xref || []).forEach(function(x){ if(x.bkey && x.ref) bk.push({bkey:x.bkey, ref:x.ref, jref:r.ref, t:t}); });
+        });
+      });
+    });
+    if(!bk.length) return;
+    var curRef = null;
+    Array.prototype.forEach.call(document.querySelectorAll('#content h3.sec, #content li'), function(n){
+      if(n.tagName === 'H3'){ var m=(n.textContent||'').match(/^\s*([0-9]+-[0-9]+|에필로그)/); curRef = m?m[1]:null; return; }
+      var txt = n.textContent || '';
+      var hit = null;
+      for(var i=0;i<bk.length;i++){ if(bk[i].ref===curRef && txt.indexOf(bk[i].bkey)>=0){ hit=bk[i]; break; } }
+      if(hit){
+        n.classList.add('pb-hit');
+        n.setAttribute('title', '시트 항목: ' + hit.t);
+        n.addEventListener('click', function(ev){ ev.stopPropagation(); if(window.__jumpToSheet) window.__jumpToSheet(hit.jref, hit.t.slice(0,32), hit.t); });
+      }
+    });
+  })();
 
   document.getElementById('nav').innerHTML = nav.map(n=>
     '<li><a class="navlink" href="#'+n.id+'"><span class="n">'+esc(n.num)+'</span><span>'+esc(n.title)+'</span></a></li>'
@@ -1714,6 +1768,7 @@
 })();
 </script>
 
+<!-- INJECT:checklist-ui -->
 <script>
 (function(){
   /* ---- tab switching ---- */
@@ -1747,8 +1802,10 @@
   const gradeCls = g => g.includes('매수 후보') ? 'go' : (g.includes('소액') ? 'small' : (g.includes('보류')||g.includes('금지') ? 'no' : ''));
   const RULES = JSON.parse(document.getElementById('rules').textContent);
   const DATA = RULES.DATA;
+  // 종목 키는 rules.json 에서 파생한다(책무관) — 특정 티커를 코드에 박지 않는다.
+  const PRODS = Object.keys(DATA).filter(function(k){ return k !== 'COMMON'; });
   const card = document.getElementById('entryCard');
-  let curP = 'TQQQ';
+  let curP = PRODS[0];
   function vFor(p){ return (VD && VD.verdicts) ? VD.verdicts.find(x=>x.prod===p) : null; }
   let _chkRefSeen = {};   // 이 카드 렌더 동안 같은 ref 가 몇 번째인지 — 앵커 충돌 방지
   function renderEntry(p){
@@ -1804,11 +1861,24 @@
     h+=chk('e_vol',{t:DATA.COMMON.entry[0].t, src:DATA.COMMON.entry[0].src, ref:DATA.COMMON.entry[0].ref, live:mt.vol}, false, vv?!!vv.vol_ok:false, 'eod', vv?'ok':'pending');
     h += '<div class="grouplabel x">③ 회피 신호 (하나라도 걸리면 보류)</div>';
     d.avoid.forEach((c,i)=>{
+      if(c.groupNeed){
+        // 카운트-그룹: 하위조건 각각의 live on/off 를 세어 임계(groupNeed) 이상이면 부모가 걸린다.
+        //   렌더는 '주제'를 모른다 — groupExtra 는 verdict-data.extras 로 들어가는 불투명 키일 뿐이다.
+        const g = groupState(c, vv);        // {states:[{on,auto,why}...], count}
+        const trig = g.count >= c.groupNeed;
+        const label = c.t + ' <b>'+g.count+'/'+(c.subs||[]).length+'</b>';
+        h+=chk('x'+i,{t:label,src:c.src,ref:c.ref},true, trig, '', vv?'ok':'pending');
+        (c.subs || []).forEach((s,si)=>{ h += subLine(s, g.states[si]); });
+        return;
+      }
       const ks=(c.k||'').split('|').filter(Boolean);
       const on = vv && ks.some(k=>(vv.avoid_keys||[]).includes(k));
       // 이 회피 항목의 대표 지표 수치(첫 키 기준)
       const mkey = ks[0];
       h+=chk('x'+i,{t:c.t,src:c.src,ref:c.ref,live:mkey?mt[mkey]:undefined},true, !!on, (vv&&c.k)?'eod':'', vv?'ok':'pending');
+      // 동의어 병합 항목: 부모 체크박스 아래에 저자 소절별 원문 조건을 작은 글씨로 나열(표시 전용).
+      //   체크박스는 부모 하나뿐이고, 각 하위줄은 그 소절 bullet 이 점프해 올 수 있게 chk-<sub.ref> 앵커를 심는다.
+      (c.subs || []).forEach((s)=>{ h += subLine(s); });
     });
     if(d.caution){
       h += '<div class="grouplabel" style="color:var(--gold)">④ 호재·뉴스 되돌림 체크 <span class="tag a" style="text-transform:none">저자 2-7</span> — 3개 중 2개 불편하면 조심 신호</div>';
@@ -1859,6 +1929,45 @@
     return '<label class="chk"'+anchor+'><input type="checkbox" data-k="'+id+'"'+(warn?' class="warn"':'')+(checked?' checked':'')
       +'><span class="txt">'+c.t+badge+(small?'<small>'+small+'</small>':'')+'</span></label>';
   }
+  // 카운트-그룹 라이브 판정 — 규칙(groupExtra/groupNeed)만 보고 계산한다. 특정 주제를 모른다.
+  //   ① VD.extras[rule.groupExtra] 가 있으면 그 signals[] 를 하위조건과 (sub.sk 키 → 없으면 순서)로 맞춰 on 을 읽는다.
+  //   ② 없으면 sub.k 를 vv.avoid_keys 로 판정(EOD 폴백). ③ 그것도 없으면 라이브 없음(정적 표시).
+  function groupState(rule, vv){
+    const ex = (VD && VD.extras && VD.extras[rule.groupExtra]) || null;
+    const sigs = (ex && ex.signals) || null;
+    const subs = rule.subs || [];
+    const states = subs.map((s,si)=>{
+      let sig = null;
+      if(sigs){
+        sig = (s.sk ? sigs.find(x=>x.key===s.sk) : null) || sigs[si] || null;
+      }
+      if(sig) return {live:true, on:!!sig.on, auto:!!sig.auto, why:sig.why||''};
+      // 라이브 신호 없음 → EOD 키 폴백(가능하면), 아니면 정적
+      const on = !!(s.k && vv && (vv.avoid_keys||[]).includes(s.k));
+      return {live: !!s.k, on:on, auto:!!s.k, why:''};
+    });
+    const count = states.filter(x=>x.on).length;
+    return {states:states, count:count};
+  }
+  // 동의어 병합 항목의 하위 저자 조건 — 표시 전용(체크박스 없음), 점프 도달용 chk-<ref> 앵커만 심는다.
+  //   렌더는 '주제'를 모른다. subs 유무만 보고 하위줄로 펼친다(책무관).
+  //   st(선택): 카운트-그룹 하위줄의 라이브 판정 {on,auto,why} — 있으면 ⚠/· 아이콘·걸림 뱃지·why 를 표시한다.
+  function subLine(s, st){
+    let anchor = '';
+    if(s.ref){
+      const n = (_chkRefSeen[s.ref] = (_chkRefSeen[s.ref]||0) + 1);
+      anchor = ' id="chk-' + s.ref + (n>1 ? '-'+n : '') + '"';
+    }
+    const isAuto = st ? st.auto : !!s.k;
+    let badge;
+    if(st && st.on) badge = '<span class="tag err">🔴 걸림</span>';
+    else badge = isAuto ? '<span class="tag a">🤖 자동</span>' : '<span class="tag o">✋ 직접</span>';
+    const mark = st ? (st.on ? '⚠ ' : '· ') : '↳ ';
+    const src = s.src ? '<small><span style="color:var(--mute)">'+s.src+'</span></small>' : '';
+    const why = (st && st.why) ? '<small><b style="color:var(--text)">'+st.why+'</b></small>' : '';
+    const col = (st && st.on) ? ' style="color:var(--warn)"' : '';
+    return '<div class="subline"'+anchor+'><span class="txt"'+col+'>'+mark+s.t+' '+badge+src+why+'</span></div>';
+  }
   function evalEntry(p){
     const d = DATA[p];
     const get = pre => [...card.querySelectorAll('[data-k^="'+pre+'"]')];
@@ -1891,7 +2000,7 @@
     }
     else { v.classList.add('small'); m.innerHTML='🟡 장중 확인 대기<span class="sub">필터·회피 통과 — 진입 조건 '+eN+'/'+d.need+' (장중 '+(d.need-eN)+'개 더 충족 시 진입)</span>'; }
   }
-  renderEntry('TQQQ');
+  renderEntry(curP);
 
   /* ---- STEP 5: position calculator ---- */
   // 저자 5,000만 예시 → 비율(%)
@@ -1905,7 +2014,7 @@
     const T = Math.max(0, +cap.value||0);
     const m = MODES[curMode];
     let rows='';
-    ['TQQQ','SOXL','UPRO'].forEach(k=>{
+    PRODS.forEach(k=>{
       const amt = T*m[k]/100;
       rows += '<tr><td style="color:var(--'+k.toLowerCase()+')">'+k+' ('+m[k]+'%)</td><td>'+fmt(amt)+'만</td>'
             + '<td>'+fmt(amt*0.25)+'만</td><td>'+fmt(amt*0.30)+'만</td><td>'+fmt(amt*0.45)+'만</td></tr>';
@@ -1916,7 +2025,7 @@
     // 저자 7-3: 갭상승 추격 구간은 평소 3,000만 자리를 1,000만 이하로 = 1/3
     const gl = document.getElementById('gapLine');
     if(gl){
-      const thirds = ['TQQQ','SOXL','UPRO'].map(k=>k+' '+fmt(T*m[k]/100*0.25/3)+'만').join(' · ');
+      const thirds = PRODS.map(k=>k+' '+fmt(T*m[k]/100*0.25/3)+'만').join(' · ');
       gl.innerHTML = '📉 <b>갭상승 추격 구간이면 1차 금액을 1/3로</b> (저자 7-3: 평소 3,000만 자리 → 1,000만 이하) — '
         + thirds + ' <span style="color:var(--mute)">(갭 %는 STEP2 회피 항목에 오늘 수치가 표시됩니다)</span>';
     }
@@ -1974,9 +2083,9 @@
       });
       scUpdate();
       // STEP 3: 3종목 요약 칩 = 종목 선택 UI (클릭 시 해당 종목 상세 판정)
-      const pcol = {TQQQ:'--tqqq',SOXL:'--soxl',UPRO:'--upro'};
+      const pcol = {}; PRODS.forEach(function(k){ pcol[k] = DATA[k].v; });   // 종목→CSS색 변수, rules.json 에서 파생
       const sumEl = document.getElementById('td-summary');
-      if(sumEl) sumEl.innerHTML = '<div id="td-chips" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:2px 0 14px">'
+      if(sumEl) sumEl.innerHTML = '<div id="td-chips" style="display:grid;grid-template-columns:repeat('+VD.verdicts.length+',1fr);gap:10px;margin:2px 0 14px">'
         + VD.verdicts.map(v=>`<button class="td-chip" data-jump="${v.prod}" style="text-align:left;cursor:pointer;background:var(--surface);border:1px solid var(--line);border-top:3px solid var(${pcol[v.prod]});border-radius:10px;padding:11px 13px;transition:background .15s">
              <div style="font-weight:800;font-size:15px;color:var(${pcol[v.prod]})">${v.color} ${v.prod}</div>
              <div class="verdict ${gradeCls(v.grade)}" style="margin:6px 0 0;padding:3px 9px;font-size:12.5px;display:inline-block">${v.grade}</div>
@@ -2001,6 +2110,7 @@
   window.__applyVerdict = applyVerdict;
 })();
 </script>
+<!-- /INJECT:checklist-ui -->
 
 <script>
 /* ============================================================
@@ -2115,7 +2225,7 @@
     posWarn.innerHTML = msgs.map(function(m){ return '<div class="note ' + m[0] + '">' + m[1] + '</div>'; }).join('');
 
     // 계산기 목표 모드 대비 갭
-    var MODES = {'공격':{TQQQ:34,SOXL:24,UPRO:18,cash:24}, '균형':{TQQQ:26,SOXL:14,UPRO:26,cash:34}, '방어':{TQQQ:14,SOXL:6,UPRO:30,cash:50}};
+    var MODES = JSON.parse(document.getElementById('rules').textContent).MODES;   // SSOT: rules.json MODES (하드코딩 제거)
     var m = MODES[curMode()];
     if(m){
       var gaps = ['TQQQ','SOXL','UPRO'].map(function(k){
@@ -2466,49 +2576,13 @@
 
 <script>
 /* ============================================================
-   5-3 경기침체 5신호 렌더 · 5-5/3-5 화력 낮추기(UPRO·현금 이관) 판정
+   5-5/3-5 화력 낮추기(UPRO·현금 이관) 판정
    ============================================================ */
 (function(){
   'use strict';
-  function renderRecession(){
+  function renderXfer(){
   var VD = null;
   try { VD = JSON.parse(document.getElementById('verdict-data').textContent); } catch(e){}
-  var EX = (VD && VD.extras) || {};
-
-  /* ---- 5-3: 경기침체 5신호 ---- */
-  (function(){
-    var box = document.getElementById('recBox'), v = document.getElementById('recV'),
-        msg = document.getElementById('recMsg');
-    if(!box) return;
-    var rec = EX.recession;
-    if(!rec || !rec.signals){
-      box.innerHTML = '<p class="subtle" style="margin:0">판정 데이터에 침체 신호가 없습니다(엔진 재실행 필요).</p>';
-      v.classList.add('no'); msg.textContent = '데이터 없음';
-      return;
-    }
-    box.innerHTML = rec.signals.map(function(s){
-      var badge = s.auto
-        ? (s.on ? '<span class="tag err">🔴 걸림</span>' : '<span class="tag a">🤖 자동</span>')
-        : '<span class="tag o">✋ 직접</span>';
-      return '<div class="gatestep"><div style="font-size:14px;color:var('
-        + (s.on ? '--warn' : '--text') + ')">' + (s.on ? '⚠ ' : '· ') + s.label + ' ' + badge
-        + '</div><small style="display:block;color:var(--mute);margin-top:2px">' + (s.why || '') + '</small></div>';
-    }).join('');
-
-    var n = rec.count || 0;
-    v.classList.remove('go','small','no');
-    if(n >= 2){
-      v.classList.add('no');
-      msg.innerHTML = '⚠ 침체 신호 ' + n + '개<span class="sub">저자 5-3: 금융·산업재 약세 + 방어주만 버팀 → <b>보유금액 30% 축소</b>'
-        + (rec.spx_below_ma60 ? ' · <b>S&P500이 60일선까지 위협 → 추가 30% 축소</b>' : '') + '</span>';
-    } else if(n === 1){
-      v.classList.add('small');
-      msg.innerHTML = '🟡 침체 신호 1개<span class="sub">아직 축소 트리거는 아닙니다. 금융·산업재가 5거래일 이상 약해지는지 보세요</span>';
-    } else {
-      v.classList.add('go');
-      msg.innerHTML = '✅ 침체 신호 없음<span class="sub">경기민감 업종이 버티는 중 — UPRO 축소 사유 아님</span>';
-    }
-  })();
 
   /* ---- 5-5 + 3-5: 화력 낮추기 ---- */
   (function(){
@@ -2594,12 +2668,13 @@
     render();
   })();
   }
-  renderRecession();
-  // 라이브 폴링이 새 판정을 받으면 침체 5신호·화력 판정도 새 extras 로 다시 그린다.
-  window.addEventListener('verdict:updated', renderRecession);
+  renderXfer();
+  // 라이브 폴링이 새 판정을 받으면 화력 낮추기 판정도 새 값으로 다시 그린다.
+  window.addEventListener('verdict:updated', renderXfer);
 })();
 </script>
 
+<!-- INJECT:review-ui -->
 <script>
 /* ============================================================
    검수 모드 — 플레이북 소절 ↔ 실전 시트 구현 위치 대조
@@ -2650,7 +2725,7 @@
     'STEP3-B':'sheet-step3b', 'STEP3-C':'sheet-step3c', 'STEP4':'sheet-step4',
     'STEP5':'sheet-step5', 'STEP6':'sheet-step6', 'STEP7':'sheet-step7'
   };
-  var OVERRIDE = { '5-3':'sheet-step2b', '5-5':'sheet-step3b' };
+  var OVERRIDE = { '5-5':'sheet-step3b' };   // 5-3 은 경기침체 전용 패널 삭제로 STEP2 카드(카운트-그룹)로 자연 라우팅
   // 장 번호 → 그 장이 다루는 종목(시트 STEP2 칩을 맞춰 연다)
   var CHAP_PROD = { '3':'TQQQ', '4':'SOXL', '5':'UPRO' };
 
@@ -2699,7 +2774,7 @@
     setTimeout(function(){ el.classList.remove('jump-hit'); }, 2200);
   }
 
-  function jump(key, title){
+  function jump(key, title, targetLabel){
     var id = anchorFor(key);
     var c = COV[key] || {};
     var pane = document.getElementById('panel-sheet');
@@ -2742,8 +2817,18 @@
       '#panel-sheet [data-ref~="' + key + '"]');
     var hasChk = checks.length > 0;
 
+    // 여러 규칙이 한 소절을 공유하면(4-3 등), 클릭한 bullet 의 규칙 라벨과 일치하는 항목을 콕 집는다.
+    var pick = null;
+    if(hasChk && targetLabel){
+      var want = String(targetLabel).replace(/\s+/g,'');
+      for(var ci=0; ci<checks.length; ci++){
+        var ctxt = ((checks[ci].querySelector('.txt') || checks[ci]).textContent || '').replace(/\s+/g,'');
+        if(ctxt.indexOf(want) >= 0){ pick = checks[ci]; break; }
+      }
+    }
+
     setTimeout(function(){
-      var scrollTo = hasChk ? checks[0] : target;      // 개별 항목 우선, 없으면 STEP 제목
+      var scrollTo = pick || (hasChk ? checks[0] : target);   // 규칙 콕집기 > 소절 첫항목 > STEP 제목
       if(document.body.classList.contains('split') && pane){
         // pane 뷰포트 대비 실제 위치로 계산해 정확한 항목으로 스크롤한다(offsetParent 기준 아님).
         var pr = pane.getBoundingClientRect(), er = scrollTo.getBoundingClientRect();
@@ -2752,7 +2837,7 @@
         scrollTo.scrollIntoView({behavior:'smooth', block:'start'});
       }
       if(hasChk){
-        Array.prototype.forEach.call(checks, flash);   // 같은 소절을 공유하는 항목 전부 하이라이트
+        if(pick){ flash(pick); } else { Array.prototype.forEach.call(checks, flash); }   // 콕집은 그 항목만, 아니면 소절 전체
       } else {
         flash(target.nextElementSibling && target.nextElementSibling.classList.contains('card')
               ? target.nextElementSibling : target);
@@ -2796,12 +2881,7 @@
       var key = m[1];
       h.dataset.jumpReady = '1';
       h.classList.add('jumpable');
-      var id = anchorFor(key);
-      var precise = id && hasPrecise(key);   // 개별 판정 항목이 있으면 그 항목으로, 없으면 STEP 전체로
-      var tag = document.createElement('span');
-      tag.className = 'jumpto' + (id ? '' : ' none');
-      tag.textContent = !id ? '원칙(시트 없음)' : (precise ? '시트에서 보기 →' : 'STEP 전체 보기 →');
-      h.appendChild(tag);
+      // '시트에서 보기 →' 배지는 표시하지 않는다(소절 제목 자체가 클릭 가능).
       h.addEventListener('click', function(ev){
         ev.stopPropagation();
         jump(key, t.replace(/시트에서 보기 →|STEP 전체 보기 →|원칙\(시트 없음\)/, '').trim().slice(0, 40));
@@ -2814,9 +2894,7 @@
 
   try { if(localStorage.getItem('etf-split') === '1') setSplit(true); } catch(e){}
 })();
-</script>
 
-<script>
 /* ============================================================
    체크리스트 반영 현황 요약표 — 소절을 하나씩 안 눌러도 전체가 보이게
    ============================================================ */
@@ -2828,10 +2906,7 @@
   var COV = {};
   try { COV = (JSON.parse(document.getElementById('coverage-data').textContent).map) || {}; } catch(e){}
 
-  var STEPNAME = {"STEP1":"STEP1 스코어카드","STEP2-filter":"STEP2 필터","STEP2-entry":"STEP2 진입",
-    "STEP2-avoid":"STEP2 회피","STEP2-exit":"STEP2 청산","STEP2-B":"STEP2-B 침체신호",
-    "STEP3":"STEP3 계산기","STEP3-B":"STEP3-B 계좌점검","STEP3-C":"STEP3-C 주간리듬",
-    "STEP4":"STEP4 메모","STEP5":"STEP5 재진입","STEP6":"STEP6 출금루틴","STEP7":"STEP7 최종5기준"};
+  var STEPNAME = JSON.parse(document.getElementById('rules').textContent).STEPNAME;   // SSOT: rules.json STEPNAME (하드코딩 제거)
 
   // 소절 제목은 플레이북 원문에서 가져온다(따로 적지 않는다 — 어긋날 수 있으므로)
   var TITLE = {};
@@ -2903,6 +2978,7 @@
   });
 })();
 </script>
+<!-- /INJECT:review-ui -->
 
 <script>
 /* ============================================================
