@@ -26,17 +26,18 @@
     },
     {
       "item": "VIX 등락률",
-      "ref": "2-6",
+      "ref": "2-4",
       "source": "auto",
       "metric": {
         "type": "pct_change",
-        "symbol": "^VIX"
+        "symbol": "^VIX",
+        "min": 10
       },
       "cadence": "eod"
     },
     {
       "item": "10년물 등락률",
-      "ref": "2-6",
+      "ref": "2-5",
       "source": "auto",
       "metric": {
         "type": "pct_change",
