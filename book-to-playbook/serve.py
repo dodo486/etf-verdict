@@ -40,7 +40,12 @@ HOST = os.environ.get("ETF_VERDICT_HOST", "0.0.0.0")
 CACHE_TTL = float(os.environ.get("ETF_VERDICT_TTL", "8"))   # 초 — 잦은 폴링이 야후를 안 두드리게
 SSE_TICK = float(os.environ.get("ETF_VERDICT_TICK", "15"))  # 초 — SSE tick 주기
 
-PAGE_SRC = os.path.join(BASE, "etf-playbook.html")
+# 어느 책을 라이브로 띄울지는 books.json 에서 온다(코드에 특정 책을 박지 않는다).
+# BOOK_SLUG 로 덮어쓸 수 있고, 기본은 첫 live 책.
+from paths import default_slug, book_engine, playbook_src   # noqa: E402
+SLUG = os.environ.get("BOOK_SLUG") or default_slug()
+PAGE_SRC = playbook_src(SLUG)
+DAILY_ENGINE = book_engine(SLUG, "daily")
 VERDICT_RE = re.compile(
     r'(<script type="application/json" id="verdict-data">)(.*?)(</script>)', re.S)
 
@@ -57,7 +62,9 @@ def _run_verdict():
     latest-verdict.json 을 만들 때와 동일한 호출). 새 프로세스라 매번 md_feed(야후)로
     새로 시세를 받는다. 텔레그램/데스크톱 알림은 --no-send 로 끈다.
     """
-    cmd = [PY, os.path.join(BASE, "etf_daily_verdict.py"), "--json", "--no-send"]
+    if not DAILY_ENGINE:
+        raise RuntimeError("%s 책에 시세 엔진(engine.daily)이 없습니다 — books.json 확인" % SLUG)
+    cmd = [PY, os.path.join(BASE, DAILY_ENGINE), "--json", "--no-send"]
     p = subprocess.run(cmd, cwd=BASE, capture_output=True, timeout=90)
     if p.returncode != 0:
         raise RuntimeError((p.stderr or b"").decode("utf-8", "replace")[:400]
@@ -104,7 +111,7 @@ def render_page():
     # 옛 #rules 사본(드리프트)이 서빙돼 최신 books/etf/rules.json 의 병합·수정이 안 보인다.
     try:
         from inject_rules import inject as _inject_rules
-        html = _inject_rules(html, "etf")
+        html = _inject_rules(html, SLUG)
     except Exception:
         pass
     try:
@@ -122,7 +129,7 @@ def render_page():
         pass
     try:
         import inject_nav
-        html = inject_nav.inject(html, "etf")
+        html = inject_nav.inject(html, SLUG)
     except Exception:
         pass
     try:
@@ -174,7 +181,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._serve_verdict()
         if route == "/events":
             return self._serve_sse()
-        if route in ("/", "/index.html", "/etf/", "/etf/index.html"):
+        if route in ("/", "/index.html", "/%s/" % SLUG, "/%s/index.html" % SLUG):
             return self._serve_page()
         return super().do_GET()
 
@@ -245,7 +252,7 @@ def _warm():
 
 if __name__ == "__main__":
     os.chdir(BASE)
-    print("etf-verdict 로컬 실시간 서버")
+    print("%s 로컬 실시간 서버" % SLUG)
     print("  로컬:      http://127.0.0.1:%d/" % PORT)
     print("  LAN/폰:    http://<이 컴퓨터 IP 또는 테일스케일 MagicDNS>:%d/" % PORT)
     print("  판정 JSON: http://127.0.0.1:%d/api/verdict" % PORT)

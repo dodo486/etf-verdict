@@ -256,16 +256,26 @@ def main(argv):
 
     latest = os.path.join(BASE, "latest-verdict.json")
 
+    # 어느 엔진을 돌릴지는 books.json 에서 온다(코드에 특정 책을 박지 않는다).
+    # live:true 인 책의 engine.daily / engine.intraday 를 순서대로 실행.
+    live = paths.live_slugs()
+    if not live:
+        r.say("!! books.json 에 live:true 책이 없음 — 시세 엔진 건너뜀")
     if mode == "daily":
-        # 1) 알림 포함 본 실행 (텔레그램/데스크톱)
-        r.step("etf_daily_verdict.py")
-        # 2) 발행용 JSON (알림 없이 stdout → 파일)
-        r.step("etf_daily_verdict.py", ["--json", "--no-send"], capture_to=latest)
+        for slug in live:
+            daily = paths.book_engine(slug, "daily")
+            if not daily:
+                r.say("!! %s: engine.daily 없음 — 건너뜀" % slug); continue
+            r.step(daily)                                              # 1) 알림 포함 본 실행
+            r.step(daily, ["--json", "--no-send"], capture_to=latest)  # 2) 발행용 JSON
     elif mode == "intraday":
-        # 장중 KIS 판정 → kis-intraday.json
-        r.step("etf_intraday_verdict.py")
-        # EOD JSON도 같이 갱신(장중 병합 대상)
-        r.step("etf_daily_verdict.py", ["--json", "--no-send"], capture_to=latest)
+        for slug in live:
+            intraday = paths.book_engine(slug, "intraday")
+            daily = paths.book_engine(slug, "daily")
+            if intraday:
+                r.step(intraday)                                       # 장중 판정
+            if daily:
+                r.step(daily, ["--json", "--no-send"], capture_to=latest)  # EOD 병합 대상
 
     if not os.path.exists(latest):
         r.say("!! latest-verdict.json 없음 — 발행 중단")

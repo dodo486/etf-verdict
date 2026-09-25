@@ -9,6 +9,7 @@
       "tickers": "TQQQ · SOXL · UPRO",
       "desc": "3배 레버리지 ETF 진입·익절·손절. 시세 자동판정(야후 EOD + KIS 장중) 연동.",
       "live": true,
+      "engine": {"daily": "etf_daily_verdict.py", "intraday": "etf_intraday_verdict.py"},
       "accent": "#d4a24e",
       "verify": {
         "attribution_axis": {"TQQQ": "3", "SOXL": "4", "UPRO": "5"},

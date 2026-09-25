@@ -70,11 +70,11 @@ print(f"홈 생성: {os.path.join(outdir, 'index.html')} ({len(manifest['books']
 # (라이브 책=etf는 publish_pages.py가 담당하므로 건너뜀)
 from inject_nav import inject
 from inject_rules import gate as rules_gate
-STATIC_SRC = {"supply": os.path.join(BASE, "supply-playbook.html")}
+from paths import playbook_src   # 소스 경로는 규칙(<slug>-playbook.html)에서 — 책마다 dict 에 안 박음
 for b in manifest["books"]:
     if b.get("live"):
         continue
-    slug = b["slug"]; src = STATIC_SRC.get(slug)
+    slug = b["slug"]; src = playbook_src(slug)
     if not src or not os.path.exists(src):
         print(f"  (건너뜀: {slug} 소스 없음)"); continue
     s = read_text(src)
