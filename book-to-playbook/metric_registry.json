@@ -1,0 +1,73 @@
+{
+ "_note": "구간③ 자동/직접 판정의 단일 진실(SSOT). 사람이 source 를 자유 판단하지 않는다 — 지표(metric.type)만 선언하면 여기서 자동가능 여부가 파생된다. verify_auto_coverage.py 가 이 레지스트리로 data_spec 을 검사한다.",
+ "auto_types": {
+  "_note": "jhts 시세수집팀이 데이터를 주는 지표들. impl=true 면 엔진 계산까지 구현됨(🤖 자동), false 면 데이터는 있으나 판정 로직 미구현(🚧 미구현 — ✋직접이 아니라 '해야 할 일').",
+  "pct_change": {
+   "data": "eod_close",
+   "impl": true
+  },
+  "n_day_return": {
+   "data": "eod_close",
+   "impl": true
+  },
+  "above_ma": {
+   "data": "eod_close_ma",
+   "impl": true
+  },
+  "ma_distance": {
+   "data": "eod_close_ma",
+   "impl": true
+  },
+  "upper_wick": {
+   "data": "eod_ohlc",
+   "impl": true
+  },
+  "volume_ratio": {
+   "data": "eod_ohlcv",
+   "impl": true
+  },
+  "count_up_days": {
+   "data": "eod_close",
+   "impl": true
+  },
+  "count_up": {
+   "data": "eod_close_multi",
+   "impl": true
+  },
+  "gap_up": {
+   "data": "eod_open_prev",
+   "impl": true
+  },
+  "dxy_change": {
+   "data": "eod_close",
+   "impl": true
+  },
+  "above_open": {
+   "data": "minute_bars",
+   "impl": true
+  },
+  "higher_low": {
+   "data": "minute_bars",
+   "impl": true
+  },
+  "breadth_count": {
+   "data": "eod_close_multi",
+   "impl": true
+  },
+  "prev_low_break": {
+   "data": "eod_ohlc_multi",
+   "impl": true
+  },
+  "minute_high_hold": {
+   "data": "minute_bars",
+   "impl": false
+  }
+ },
+ "no_data_types": {
+  "_note": "jhts 시세수집팀·무료 소스에 데이터 자체가 없는 것들. 여기 속해야만 정당한 ✋직접이다.",
+  "news_sentiment": "뉴스 헤드라인 온도·재료 소진 (정성 — 구조화 소스 없음)",
+  "analyst_estimate": "애널리스트 실적 추정치 상향/하향 (무료 소스 없음)",
+  "kr_flow": "한국 창구별 수급 (무료 실시간 소스 없음)",
+  "event_timestamp": "뉴스 발표 '시각' 기준 창(무료 뉴스 이벤트 피드 없음). 개장 기준 창은 minute_* 로 자동 가능."
+ }
+}

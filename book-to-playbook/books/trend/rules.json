@@ -1,0 +1,642 @@
+{
+  "DATA": {
+    "SPY": {
+      "v": "--spy",
+      "need": 2,
+      "filter": [
+        {
+          "t": "S&P500 종가가 20일선 위",
+          "ref": "2-1",
+          "ek": "above20",
+          "src": "📊 야후 EOD · ^GSPC 종가 vs 20일선",
+          "bkey": "20일선 위",
+          "metric": {
+            "type": "above_ma",
+            "role": "gate",
+            "op": "above",
+            "source": "auto",
+            "symbol": "^GSPC",
+            "ma": 20
+          }
+        },
+        {
+          "t": "20일선 회복 후 2거래일 동안 다시 안 깸",
+          "ref": "2-1",
+          "ek": "hold20",
+          "src": "📊 야후 EOD · ^GSPC 종가가 20일선 위를 며칠 연속 지켰나 (회복일+2거래일=3)",
+          "bkey": "2거래일 동안 다시 안 깸",
+          "metric": {
+            "type": "hold_above_ma",
+            "role": "gate",
+            "op": "above",
+            "source": "auto",
+            "symbol": "^GSPC",
+            "ma": 20,
+            "days": 2
+          }
+        }
+      ],
+      "entry": [
+        {
+          "t": "전고점 돌파 후 2거래일 버티는 자리",
+          "ref": "2-4",
+          "src": "📊 야후 EOD · SPY 전고점 돌파 후 며칠 지지",
+          "bkey": "2거래일 버티는 자리",
+          "metric": {
+            "type": "breakout_hold",
+            "role": "gate",
+            "op": ">=",
+            "source": "auto",
+            "symbol": "SPY",
+            "threshold": 2
+          },
+          "ek": "breakout"
+        },
+        {
+          "t": "대표 대형주 3개 이상 같은 방향",
+          "ref": "1-4",
+          "src": "📊 야후 EOD · 대형주 등락 개수",
+          "bkey": "3개 이상 같은 방향",
+          "metric": {
+            "type": "count_up",
+            "role": "gate",
+            "op": ">=",
+            "source": "auto",
+            "symbols": [
+              "AAPL",
+              "MSFT",
+              "AMZN",
+              "GOOGL",
+              "JPM"
+            ],
+            "threshold": 3
+          },
+          "ek": "leaders"
+        }
+      ],
+      "avoid": [
+        {
+          "t": "변동성 전일 대비 10% 이상 급등",
+          "ref": "1-2",
+          "k": "vix",
+          "src": "📊 야후 EOD · ^VIX 전일비",
+          "bkey": "10% 이상 튀면",
+          "metric": {
+            "type": "pct_change",
+            "role": "trigger",
+            "op": ">=",
+            "source": "auto",
+            "symbol": "^VIX",
+            "threshold": 10
+          }
+        },
+        {
+          "t": "최근 5거래일 20% 이상 급등(추격 위험)",
+          "ref": "3-1",
+          "k": "run5",
+          "src": "📊 야후 EOD · SPY 최근 5일 수익률",
+          "bkey": "5거래일 동안 20% 넘게",
+          "metric": {
+            "type": "n_day_return",
+            "role": "trigger",
+            "op": ">=",
+            "source": "auto",
+            "symbol": "SPY",
+            "n": 5,
+            "threshold": 20
+          }
+        },
+        {
+          "t": "고점 대비 종가 4% 이상 밀림(윗꼬리)",
+          "ref": "3-2",
+          "k": "wick",
+          "src": "📊 야후 EOD · 고가 대비 종가",
+          "bkey": "4% 이상 밀려 마감",
+          "metric": {
+            "type": "upper_wick",
+            "role": "trigger",
+            "op": ">=",
+            "source": "auto",
+            "symbol": "SPY",
+            "threshold": 4
+          }
+        },
+        {
+          "t": "거래량 전일 1.5배 이상 + 종가 고점 아래(매물)",
+          "ref": "3-2",
+          "k": "vol_sell",
+          "src": "📊 야후 EOD · 전일比 거래량 배수 + 종가 고점比",
+          "bkey": "1.5배 이상 늘면서 종가 밀림",
+          "metric": {
+            "type": "volume_ratio",
+            "role": "trigger",
+            "op": ">=",
+            "source": "auto",
+            "symbol": "SPY",
+            "threshold": 1.5
+          }
+        }
+      ],
+      "note": "진입 2조건 이상 + 필터 통과 + 회피 0 → 1차 분할 진입",
+      "caution": [
+        {
+          "t": "5일선에서 크게 벌어짐(단기 과열)",
+          "ref": "3-1",
+          "k": "ma5_gap",
+          "src": "📊 야후 EOD · 종가 vs 5일선 이격 (몇 %부터인지는 저자 미명시 — 수치 보고 직접)",
+          "bkey": "5일선과의 거리",
+          "metric": {
+            "type": "ma_distance",
+            "role": "gate",
+            "op": ">=",
+            "source": "auto",
+            "symbol": "SPY",
+            "ma": 5
+          }
+        }
+      ],
+      "exit": [
+        {
+          "L": "1차 익절",
+          "v": "수익 구간에서 일부 먼저 매도 → 추세 살아 있는 동안 잔량 보유"
+        },
+        {
+          "L": "손절",
+          "v": "정해둔 손실선에 닿으면 이유 재론 없이 먼저 축소 (파는 규칙을 사는 규칙보다 먼저)"
+        }
+      ]
+    },
+    "QQQ": {
+      "v": "--qqq",
+      "need": 2,
+      "filter": [
+        {
+          "t": "나스닥100 종가가 20일선 위",
+          "ref": "2-2",
+          "ek": "above20",
+          "src": "📊 야후 EOD · ^NDX 종가 vs 20일선",
+          "bkey": "20일선 위",
+          "metric": {
+            "type": "above_ma",
+            "role": "gate",
+            "op": "above",
+            "source": "auto",
+            "symbol": "^NDX",
+            "ma": 20
+          }
+        },
+        {
+          "t": "20일선 회복 후 2거래일 동안 다시 안 깸",
+          "ref": "2-2",
+          "ek": "hold20",
+          "src": "📊 야후 EOD · ^NDX 종가가 20일선 위를 며칠 연속 지켰나 (회복일+2거래일=3)",
+          "bkey": "2거래일 동안 다시 안 깸",
+          "metric": {
+            "type": "hold_above_ma",
+            "role": "gate",
+            "op": "above",
+            "source": "auto",
+            "symbol": "^NDX",
+            "ma": 20,
+            "days": 2
+          }
+        }
+      ],
+      "entry": [
+        {
+          "t": "강한 상승 뒤 짧은 눌림(2거래일~4거래일) 끝 반등",
+          "ref": "2-2",
+          "src": "📊 야후 EOD · QQQ 최근 고점 이후 눌림 거래일수",
+          "bkey": "2거래일에서 4거래일 눌림",
+          "metric": {
+            "type": "pullback_length",
+            "role": "gate",
+            "op": ">=",
+            "source": "auto",
+            "symbol": "QQQ",
+            "threshold": 2,
+            "max": 4
+          },
+          "ek": "pullback"
+        },
+        {
+          "t": "대표 대형주 3개 이상 같은 방향",
+          "ref": "1-4",
+          "src": "📊 야후 EOD · 대형 기술주 등락 개수",
+          "bkey": "3개 이상 같은 방향",
+          "metric": {
+            "type": "count_up",
+            "role": "gate",
+            "op": ">=",
+            "source": "auto",
+            "symbols": [
+              "AAPL",
+              "MSFT",
+              "NVDA",
+              "AMZN",
+              "META"
+            ],
+            "threshold": 3
+          },
+          "ek": "leaders"
+        }
+      ],
+      "avoid": [
+        {
+          "t": "변동성 전일 대비 10% 이상 급등",
+          "ref": "1-2",
+          "k": "vix",
+          "src": "📊 야후 EOD · ^VIX 전일비",
+          "bkey": "10% 이상 튀면",
+          "metric": {
+            "type": "pct_change",
+            "role": "trigger",
+            "op": ">=",
+            "source": "auto",
+            "symbol": "^VIX",
+            "threshold": 10
+          }
+        },
+        {
+          "t": "최근 5거래일 20% 이상 급등(추격 위험)",
+          "ref": "3-1",
+          "k": "run5",
+          "src": "📊 야후 EOD · QQQ 최근 5일 수익률",
+          "bkey": "5거래일 동안 20% 넘게",
+          "metric": {
+            "type": "n_day_return",
+            "role": "trigger",
+            "op": ">=",
+            "source": "auto",
+            "symbol": "QQQ",
+            "n": 5,
+            "threshold": 20
+          }
+        },
+        {
+          "t": "고점 대비 종가 4% 이상 밀림(윗꼬리)",
+          "ref": "3-2",
+          "k": "wick",
+          "src": "📊 야후 EOD · 고가 대비 종가",
+          "bkey": "4% 이상 밀려 마감",
+          "metric": {
+            "type": "upper_wick",
+            "role": "trigger",
+            "op": ">=",
+            "source": "auto",
+            "symbol": "QQQ",
+            "threshold": 4
+          }
+        },
+        {
+          "t": "거래량 전일 1.5배 이상 + 종가 고점 아래(매물)",
+          "ref": "3-2",
+          "k": "vol_sell",
+          "src": "📊 야후 EOD · 전일比 거래량 배수 + 종가 고점比",
+          "bkey": "1.5배 이상 늘면서 종가 밀림",
+          "metric": {
+            "type": "volume_ratio",
+            "role": "trigger",
+            "op": ">=",
+            "source": "auto",
+            "symbol": "QQQ",
+            "threshold": 1.5
+          }
+        }
+      ],
+      "note": "진입 2조건 이상 + 필터 통과 + 회피 0 → 1차 분할 진입",
+      "caution": [
+        {
+          "t": "5일선에서 크게 벌어짐(단기 과열)",
+          "ref": "3-1",
+          "k": "ma5_gap",
+          "src": "📊 야후 EOD · 종가 vs 5일선 이격 (몇 %부터인지는 저자 미명시 — 수치 보고 직접)",
+          "bkey": "5일선과의 거리",
+          "metric": {
+            "type": "ma_distance",
+            "role": "gate",
+            "op": ">=",
+            "source": "auto",
+            "symbol": "QQQ",
+            "ma": 5
+          }
+        }
+      ],
+      "exit": [
+        {
+          "L": "1차 익절",
+          "v": "수익 구간에서 일부 먼저 매도 → 추세 살아 있는 동안 잔량 보유"
+        },
+        {
+          "L": "손절",
+          "v": "정해둔 손실선에 닿으면 이유 재론 없이 먼저 축소"
+        }
+      ]
+    },
+    "IWM": {
+      "v": "--iwm",
+      "need": 2,
+      "filter": [
+        {
+          "t": "러셀2000 종가가 20일선 위",
+          "ref": "2-3",
+          "ek": "above20",
+          "src": "📊 야후 EOD · ^RUT 종가 vs 20일선",
+          "bkey": "20일선 위",
+          "metric": {
+            "type": "above_ma",
+            "role": "gate",
+            "op": "above",
+            "source": "auto",
+            "symbol": "^RUT",
+            "ma": 20
+          }
+        },
+        {
+          "t": "20일선 회복 후 2거래일 동안 다시 안 깸",
+          "ref": "2-3",
+          "ek": "hold20",
+          "src": "📊 야후 EOD · ^RUT 종가가 20일선 위를 며칠 연속 지켰나 (회복일+2거래일=3)",
+          "bkey": "2거래일 동안 다시 안 깸",
+          "metric": {
+            "type": "hold_above_ma",
+            "role": "gate",
+            "op": "above",
+            "source": "auto",
+            "symbol": "^RUT",
+            "ma": 20,
+            "days": 2
+          }
+        }
+      ],
+      "entry": [
+        {
+          "t": "대표 대형주 3개 이상 같은 방향(넓은 위험선호)",
+          "ref": "1-4",
+          "src": "📊 야후 EOD · 대형주 등락 개수",
+          "bkey": "3개 이상 같은 방향",
+          "metric": {
+            "type": "count_up",
+            "role": "gate",
+            "op": ">=",
+            "source": "auto",
+            "symbols": [
+              "AAPL",
+              "MSFT",
+              "AMZN",
+              "GOOGL",
+              "JPM"
+            ],
+            "threshold": 3
+          },
+          "ek": "leaders"
+        },
+        {
+          "t": "전고점 돌파 후 2거래일 버티는 자리",
+          "ref": "2-4",
+          "src": "📊 야후 EOD · IWM 전고점 돌파 후 며칠 지지",
+          "bkey": "2거래일 버티는 자리",
+          "metric": {
+            "type": "breakout_hold",
+            "role": "gate",
+            "op": ">=",
+            "source": "auto",
+            "symbol": "IWM",
+            "threshold": 2
+          },
+          "ek": "breakout"
+        }
+      ],
+      "avoid": [
+        {
+          "t": "변동성 전일 대비 10% 이상 급등",
+          "ref": "1-2",
+          "k": "vix",
+          "src": "📊 야후 EOD · ^VIX 전일비",
+          "bkey": "10% 이상 튀면",
+          "metric": {
+            "type": "pct_change",
+            "role": "trigger",
+            "op": ">=",
+            "source": "auto",
+            "symbol": "^VIX",
+            "threshold": 10
+          }
+        },
+        {
+          "t": "최근 5거래일 20% 이상 급등(추격 위험)",
+          "ref": "3-1",
+          "k": "run5",
+          "src": "📊 야후 EOD · IWM 최근 5일 수익률",
+          "bkey": "5거래일 동안 20% 넘게",
+          "metric": {
+            "type": "n_day_return",
+            "role": "trigger",
+            "op": ">=",
+            "source": "auto",
+            "symbol": "IWM",
+            "n": 5,
+            "threshold": 20
+          }
+        },
+        {
+          "t": "고점 대비 종가 4% 이상 밀림(윗꼬리)",
+          "ref": "3-2",
+          "k": "wick",
+          "src": "📊 야후 EOD · 고가 대비 종가",
+          "bkey": "4% 이상 밀려 마감",
+          "metric": {
+            "type": "upper_wick",
+            "role": "trigger",
+            "op": ">=",
+            "source": "auto",
+            "symbol": "IWM",
+            "threshold": 4
+          }
+        },
+        {
+          "t": "거래량 전일 1.5배 이상 + 종가 고점 아래(매물)",
+          "ref": "3-2",
+          "k": "vol_sell",
+          "src": "📊 야후 EOD · 전일比 거래량 배수 + 종가 고점比",
+          "bkey": "1.5배 이상 늘면서 종가 밀림",
+          "metric": {
+            "type": "volume_ratio",
+            "role": "trigger",
+            "op": ">=",
+            "source": "auto",
+            "symbol": "IWM",
+            "threshold": 1.5
+          }
+        }
+      ],
+      "note": "소형주는 넓은 위험선호가 확인될 때만 무게를 싣는다",
+      "caution": [
+        {
+          "t": "5일선에서 크게 벌어짐(단기 과열)",
+          "ref": "3-1",
+          "k": "ma5_gap",
+          "src": "📊 야후 EOD · 종가 vs 5일선 이격 (몇 %부터인지는 저자 미명시 — 수치 보고 직접)",
+          "bkey": "5일선과의 거리",
+          "metric": {
+            "type": "ma_distance",
+            "role": "gate",
+            "op": ">=",
+            "source": "auto",
+            "symbol": "IWM",
+            "ma": 5
+          }
+        }
+      ],
+      "exit": [
+        {
+          "L": "1차 익절",
+          "v": "수익 구간에서 일부 먼저 매도 → 추세 살아 있는 동안 잔량 보유"
+        },
+        {
+          "L": "손절",
+          "v": "정해둔 손실선에 닿으면 이유 재론 없이 먼저 축소"
+        }
+      ]
+    },
+    "COMMON": {
+      "entry": [
+        {
+          "t": "거래량 전일 1.5배 이상 + 종가 고점 근처",
+          "ref": "3-2",
+          "src": "📊 야후 EOD · 당일 거래량 vs 전일 거래량",
+          "bkey": "1.5배 이상 늘었나",
+          "metric": {
+            "type": "volume_ratio",
+            "role": "gate",
+            "op": ">=",
+            "source": "auto",
+            "symbol": "SPY",
+            "threshold": 1.5
+          }
+        }
+      ],
+      "avoid": []
+    }
+  },
+  "MODES": {
+    "공격": {
+      "SPY": 30,
+      "QQQ": 30,
+      "IWM": 20,
+      "cash": 20
+    },
+    "균형": {
+      "SPY": 34,
+      "QQQ": 20,
+      "IWM": 12,
+      "cash": 34
+    },
+    "방어": {
+      "SPY": 30,
+      "QQQ": 12,
+      "IWM": 6,
+      "cash": 52
+    }
+  },
+  "PRODMETA": {
+    "SPY": {
+      "color": "🔵",
+      "idx": "^GSPC"
+    },
+    "QQQ": {
+      "color": "🟢",
+      "idx": "^NDX"
+    },
+    "IWM": {
+      "color": "🟠",
+      "idx": "^RUT"
+    }
+  },
+  "SCORECARD": [
+    {
+      "t": "S&P500 선물 방향",
+      "ref": "1-1",
+      "src": "📊 야후 EOD · ES=F S&P500 선물 전일비 · '고점 낮추지 않음'은 직접 확인",
+      "metric": {
+        "type": "pct_change",
+        "role": "trigger",
+        "op": "above",
+        "source": "auto",
+        "symbol": "ES=F",
+        "threshold": 0
+      }
+    },
+    {
+      "t": "나스닥 선물 방향",
+      "ref": "1-1",
+      "src": "📊 야후 EOD · NQ=F 나스닥100 선물 전일비 · '고점 낮추지 않음'은 직접 확인",
+      "metric": {
+        "type": "pct_change",
+        "role": "trigger",
+        "op": "above",
+        "source": "auto",
+        "symbol": "NQ=F",
+        "threshold": 0
+      }
+    },
+    {
+      "t": "변동성 안정(전일 10% 미만)",
+      "ref": "1-2",
+      "src": "📊 야후 EOD · ^VIX 전일비",
+      "metric": {
+        "type": "pct_change",
+        "role": "trigger",
+        "op": "below",
+        "source": "auto",
+        "symbol": "^VIX",
+        "threshold": 10
+      }
+    },
+    {
+      "t": "10년물 안정(0.1%p 미만)",
+      "ref": "1-3",
+      "src": "📊 야후 EOD · ^TNX 전일 대비 %p",
+      "metric": {
+        "type": "point_change",
+        "role": "trigger",
+        "op": "below",
+        "source": "auto",
+        "symbol": "^TNX",
+        "threshold": 0.1
+      }
+    },
+    {
+      "t": "달러인덱스 안정(급강세 아님)",
+      "ref": "1-1",
+      "src": "📊 야후 EOD · DX-Y.NYB(실패 시 DX=F) 전일비 (급강세 기준은 운영값 — 저자 미명시)",
+      "metric": {
+        "type": "dxy_change",
+        "role": "trigger",
+        "op": "below",
+        "source": "auto",
+        "symbol": "DX-Y.NYB",
+        "fallback": [
+          "DX=F"
+        ],
+        "threshold": 0.5
+      }
+    }
+  ],
+  "SCSRC": [
+    "📊 야후 EOD · ES=F S&P500 선물 전일비 · '고점 낮추지 않음'은 직접 확인",
+    "📊 야후 EOD · NQ=F 나스닥100 선물 전일비 · '고점 낮추지 않음'은 직접 확인",
+    "📊 야후 EOD · ^VIX 전일비",
+    "📊 야후 EOD · ^TNX 전일 대비 %p",
+    "📊 야후 EOD · DX-Y.NYB(실패 시 DX=F) 전일비"
+  ],
+  "STEPNAME": {
+    "STEP1": "STEP1 스코어카드",
+    "STEP2-filter": "STEP2 필터",
+    "STEP2-entry": "STEP2 진입",
+    "STEP2-avoid": "STEP2 회피",
+    "STEP2-exit": "STEP2 청산",
+    "STEP3": "STEP3 계산기",
+    "STEP4": "STEP4 메모"
+  }
+}

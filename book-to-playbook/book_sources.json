@@ -1,0 +1,15 @@
+{
+  "_comment": [
+    "책 원문은 raw_dir+file 또는 env BOOK_SOURCE_<SLUG> 로 찾는다.",
+    "리포에 남는 건 books/<slug>/source_index.json(본문 없음, 해시·토큰만).",
+    "데모(trend)는 자작 소스라 trend-source.md 를 리포에 둔다."
+  ],
+  "raw_dir": ".",
+  "sources": {
+    "trend": {
+      "file": "trend-source.md",
+      "chapter_style": "Chapter",
+      "has_toc": false
+    }
+  }
+}
