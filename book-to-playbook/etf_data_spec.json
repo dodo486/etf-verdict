@@ -503,6 +503,50 @@
     "min": 2
    },
    "cadence": "eod"
+  },
+  {
+   "item": "강한 상승 후 눌림 길이(거래일)",
+   "ref": "3-1",
+   "source": "auto",
+   "metric": {
+    "type": "pullback_length",
+    "symbol": "TQQQ",
+    "min": 2,
+    "max": 4
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "전고점 돌파 후 지지 일수",
+   "ref": "3-1",
+   "source": "auto",
+   "metric": {
+    "type": "breakout_hold",
+    "symbol": "TQQQ",
+    "min": 2
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "20일선 아래 첫 양봉(미끼 경계)",
+   "ref": "3-1",
+   "source": "auto",
+   "metric": {
+    "type": "first_green_below_ma",
+    "symbol": "TQQQ"
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "S&P500 전고점 돌파 후 지지 일수",
+   "ref": "5-4",
+   "source": "auto",
+   "metric": {
+    "type": "breakout_hold",
+    "symbol": "^GSPC",
+    "min": 2
+   },
+   "cadence": "eod"
   }
  ]
 }

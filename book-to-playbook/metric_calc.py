@@ -264,6 +264,33 @@ def breadth_aligned(m):
             "text": "%d개 중 같은 방향 %d개 (상승 %d·하락 %d)" % (n, aligned, up, dn)}
 
 
+def pullback_length(m):
+    """최근 고점 이후 눌림 거래일수(사실은 시세팀 days_since_high). 범위(min~max)면 favorable."""
+    d = _series(m["symbol"])
+    v = _num(d, "days_since_high")
+    if v is None:
+        return {"value": None, "pass": None, "text": "눌림 데이터 없음"}
+    return {"value": v, "pass": None, "text": "최근 고점 이후 %d거래일 눌림" % v}
+
+
+def breakout_hold(m):
+    """전고점 위 연속 유지 거래일수(사실은 시세팀 breakout_hold). min 이상이면 지지."""
+    d = _series(m["symbol"])
+    v = _num(d, "breakout_hold")
+    if v is None:
+        return {"value": None, "pass": None, "text": "전고점 데이터 없음"}
+    return {"value": v, "pass": _pass_min(v, m), "text": "전고점 위 %d거래일 유지" % v}
+
+
+def first_green_below_ma(m):
+    """20일선 아래 첫 양봉인가(사실은 시세팀 first_green_below_ma20). True 면 발화(미끼 경계)."""
+    d = _series(m["symbol"])
+    v = _num(d, "first_green_below_ma20")
+    if v is None:
+        return {"value": None, "pass": None, "text": "데이터 없음"}
+    return {"value": bool(v), "pass": bool(v), "text": "20일선 아래 첫 양봉" if v else "해당 없음"}
+
+
 def prev_low_break(m):
     """전일 저점 이탈 개수(사실은 시세팀 prev_low_breaks). min 이상이면 pass(주도주 이탈)."""
     br, ck = md_feed.prev_low_breaks(m.get("symbols") or [])
@@ -307,6 +334,9 @@ CALC = {
     "bad_rate_drop": bad_rate_drop,
     "breadth_aligned": breadth_aligned,
     "prev_low_break": prev_low_break,
+    "pullback_length": pullback_length,
+    "breakout_hold": breakout_hold,
+    "first_green_below_ma": first_green_below_ma,
 }
 
 
@@ -317,6 +347,9 @@ def _decide(value, m):
         return None
     op = m.get("op")
     th = m.get("threshold", m.get("min"))
+    mx = m.get("max")
+    if th is not None and mx is not None:      # 범위 판정: min ≤ v ≤ max (눌림 2~4일 등)
+        return th <= value <= mx
     if op == "above":
         return value > (th if th is not None else 0)
     if op == "below":

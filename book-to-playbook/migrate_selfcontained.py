@@ -82,7 +82,7 @@ def to_inline(metric, group):
     op = "above" if t in GATE_TYPES and role == "gate" else ">="
     threshold = metric.get("min")
     out = {"type": t, "role": role, "op": op, "source": "auto"}
-    for k in ("symbol", "symbols", "ma", "n", "days"):
+    for k in ("symbol", "symbols", "ma", "n", "days", "max"):
         if k in metric:
             out[k] = metric[k]
     if threshold is not None:
@@ -129,11 +129,20 @@ def resolve(rule, group, prod, cands):
             if hit:
                 return hit, "k=%s→%s @%s" % (k, typ, hit.get("symbol"))
 
-    # 2) 게이트(필터/진입) — 라벨 키워드로 above/hold/ma 구분
+    # 2) 게이트(필터/진입) — 라벨 키워드로 above/hold/ma/눌림/전고점 구분
     if group in ("filter", "entry"):
         want_sym = _label_symbol(t, prod) or (prod if prod in ("TQQQ", "SOXL", "UPRO") else None)
-        # 장중(시초가·눌림·저점) → intraday
-        if "시초가" in t or "눌림" in t or "저점" in t:
+        # 여러 날 사실(시세팀 제공): 눌림 길이·전고점 지지
+        if "눌림" in t:
+            hit = next((m for m in cands if m.get("type") == "pullback_length"), None)
+            if hit:
+                return hit, "눌림→pullback_length"
+        if "전고점" in t or "돌파" in t:
+            hit = next((m for m in cands if m.get("type") == "breakout_hold"), None)
+            if hit:
+                return hit, "전고점→breakout_hold"
+        # 장중(시초가·저점) → intraday
+        if "시초가" in t or "저점" in t:
             for m in cands:
                 if m.get("type") in INTRADAY_TYPES:
                     return m, "장중(intraday)"
@@ -149,6 +158,10 @@ def resolve(rule, group, prod, cands):
 
     # 3) 회피 — 트리거 지표(문턱 있는 것) 우선, 심볼로 좁힘
     if group == "avoid":
+        if "첫 양봉" in t:
+            hit = next((m for m in cands if m.get("type") == "first_green_below_ma"), None)
+            if hit:
+                return hit, "첫양봉→first_green_below_ma"
         want = _label_symbol(t, prod) or prod
         trig = [m for m in cands if m.get("type") not in STRENGTH_TYPES]
         cand2 = [m for m in trig if m.get("symbol") in (want, IDX.get(prod), prod)] or trig

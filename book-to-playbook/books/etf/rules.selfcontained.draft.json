@@ -69,10 +69,12 @@
      "src": "✋ 직접 · 전고점 돌파 후 2~3거래일 지지 확인 (판정엔진 미구현)",
      "bkey": "돌파 후 2~3거래일",
      "metric": {
-      "type": "manual",
+      "type": "breakout_hold",
       "role": "gate",
-      "source": "manual",
-      "reason": "수동/미선언"
+      "op": ">=",
+      "source": "auto",
+      "symbol": "TQQQ",
+      "threshold": 2
      }
     },
     {
@@ -82,10 +84,13 @@
      "src": "✋ 직접 · 눌림 길이 2~4거래일 + 5/10일선 근처 반등 (일 단위 눌림 판정 미구현)",
      "bkey": "짧은 눌림(2~4거래일)",
      "metric": {
-      "type": "manual",
+      "type": "pullback_length",
       "role": "gate",
-      "source": "manual",
-      "reason": "수동/미선언"
+      "op": ">=",
+      "source": "auto",
+      "symbol": "TQQQ",
+      "max": 4,
+      "threshold": 2
      }
     },
     {
@@ -194,10 +199,12 @@
      "src": "✋ 직접 · 20일선 아래에서 나온 첫 양봉인지 (필터가 20일선 아래 진입은 1차로 막음)",
      "bkey": "20일선 아래에서 나오는 첫 양봉",
      "metric": {
-      "type": "manual",
+      "type": "first_green_below_ma",
       "role": "trigger",
-      "source": "manual",
-      "reason": "수동/미선언"
+      "op": ">=",
+      "source": "auto",
+      "symbol": "TQQQ",
+      "_todo": "문턱(threshold) 미선언 — 저자 숫자 확인 필요"
      }
     },
     {
