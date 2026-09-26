@@ -99,9 +99,10 @@ import 할 수 있다 — 팀 사이 인터페이스는 코드가 아니라 산�
 | `publish/build_home.py` | books.json → 책 선택 홈 + 정적 책 조립 |
 | `publish/publish_pages.py` | 판정 병합 → `PUBLIC/<slug>/index.html` |
 | `publish/serve.py` | 로컬 실시간 서버(폴링/SSE) |
-| `coverage_exempt.json` | 검사 면제 목록(분류·사유 필수) |
-| `source_baseline.json` | 원문 무결 검사의 기준 해시(커밋 대상) |
-| `metric_registry.json` | metric type 의 자동/무데이터 분류(SSOT) |
+| `coverage_exempt.json` | 검사 면제 목록(분류·사유 필수 — 전 팀 공유) |
+| `playbook/book_sources.json` | 책 원문 위치 설정(① 소유) |
+| `playbook/source_baseline.json` | 원문 무결 검사의 기준 해시(① 소유, 커밋 대상) |
+| `verdict/metric_registry.json` | metric type 의 자동/무데이터 분류(③ 소유 SSOT) |
 | `ADAPTERS.md` | 구간③ 데이터 계층 · metric.type 카탈로그 · 새 책 붙이는 법 |
 | `SETUP.md` | 설치·크레덴셜·스케줄 등록(launchd / 작업 스케줄러) |
 
@@ -109,7 +110,7 @@ import 할 수 있다 — 팀 사이 인터페이스는 코드가 아니라 산�
 
 1. **추출**(①): 책 원문(정제 텍스트)을 서브에이전트로 완독 → 플레이북 마크다운(PART A) + 시트 스펙 JSON(PART B). 규칙: 저자 명시분만·원문 숫자·미명시 표기·지어내기 금지. `python -m playbook.book_source --write` 로 소절 인덱스 생성.
 2. **조립**(②): `trend-playbook.html`을 베이스로 콘텐츠만 교체 → `<slug>-playbook.html`. 규칙은 `books/<slug>/rules.json` 으로(HTML 리터럴 금지).
-3. **데이터 명세**(③): 그 책 규칙에 필요한 데이터를 `data_spec.json`으로. `metric_registry.json` 의 auto type 이면 자동판정이 붙고, 데이터가 없으면(한국 수급·업종·공매도잔고 등) `source:"manual"`로 정직하게 표시. 새 데이터가 필요하면 **jhts 시세수집팀에 요청**한다 — 여기서 직접 수집기를 만들지 않는다.
+3. **데이터 명세**(③): 그 책 규칙에 필요한 데이터를 `data_spec.json`으로. `verdict/metric_registry.json` 의 auto type 이면 자동판정이 붙고, 데이터가 없으면(한국 수급·업종·공매도잔고 등) `source:"manual"`로 정직하게 표시. 새 데이터가 필요하면 **jhts 시세수집팀에 요청**한다 — 여기서 직접 수집기를 만들지 않는다.
 4. **등록**: `books.json`에 항목 추가(slug/title/tickers/desc/live). 등록의 조건은
    **계약 4조 충족**이다 — `python -m verify_contract` 가 그 책 줄에서 4조를 모두 ✅로
    찍어야 한다. 못 채우면 등록이 아니라 미완이다(검사를 건너뛰게 두지 않는다).

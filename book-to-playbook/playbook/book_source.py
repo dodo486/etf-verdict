@@ -59,7 +59,8 @@ from shared.paths import BASE
 # 정량 토큰 정규식은 shared/tokens.py 가 기준(SSOT)이다. 복붙하면 두 곳이 갈라진다.
 from shared.tokens import TOKEN_RE, norm
 
-CONFIG = os.path.join(BASE, "book_sources.json")
+# 원문 위치 설정은 이 팀(①)만 쓰므로 팀 폴더 안에 산다.
+CONFIG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "book_sources.json")
 BOOKS_DIR = os.path.join(BASE, "books")
 
 MARK_CHAPTER = re.compile(r"^\s*(?:Chapter\s+(\d+)|(\d+)\s*장)\.")
@@ -105,7 +106,8 @@ def source_path(slug, cfg=None):
     raw_dir = os.environ.get("BOOK_RAW_DIR") or cfg.get("raw_dir")
     if not raw_dir:
         raise SourceMissing("raw_dir 가 비어 있습니다. BOOK_RAW_DIR 로 지정하세요.")
-    p = os.path.abspath(os.path.join(raw_dir, ent["file"]))
+    # 상대 raw_dir 는 cwd 가 아니라 BASE 기준(어디서 실행하든 같은 파일을 본다)
+    p = os.path.abspath(os.path.join(BASE, raw_dir, ent["file"]))
     if not os.path.exists(p):
         raise SourceMissing(
             "원문 파일이 없습니다: %s\n"

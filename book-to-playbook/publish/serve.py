@@ -121,7 +121,8 @@ def render_page():
     # 지표 레지스트리 주입 — 체크리스트가 mtype 으로 🤖자동/🚧미구현/✋직접을 구분해 보이게 한다.
     try:
         import re as _re
-        _reg = open(os.path.join(BASE, "metric_registry.json"), encoding="utf-8").read()
+        _reg = open(os.path.join(BASE, "verdict", "metric_registry.json"),
+                    encoding="utf-8").read()
         html = _re.sub(r'(<script type="application/json" id="metric-registry">).*?(</script>)',
                        lambda m: m.group(1) + _reg + m.group(2), html, count=1, flags=_re.S)
     except Exception:

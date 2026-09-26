@@ -41,7 +41,7 @@ python -m playbook.verify_source_integrity --show trend # 그 책의 라벨 목�
 ```
 
 **새 책을 추가하면 처음 한 번 `--accept` 로 기준을 등록한다.** 기준값
-(`source_baseline.json`)은 커밋 대상이다.
+(`playbook/source_baseline.json`)은 커밋 대상이다.
 
 ## ⛔ 절대 규칙 2 — 규칙마다 출처(ref)를 박는다
 

@@ -8,7 +8,7 @@
 - `verdict/md_feed.py` — **jhts 시세수집팀(jhts.marketdata) 어댑터. 유일한 시세 창구.**
   구간③의 누구도 시세를 직접 수집하지 않는다(야후/KIS/스크래핑 금지 — `verify_teams.py` 가 강제).
 - `verdict/metric_calc.py` — metric 선언 `{type, symbol, ...}` → `{value, pass, text}` 평가기
-- `metric_registry.json` — type 의 자동/무데이터 분류(SSOT). `verify_auto_coverage` 가 이걸로
+- `verdict/metric_registry.json` — type 의 자동/무데이터 분류(SSOT). `verify_auto_coverage` 가 이걸로
   "자동 가능한데 ✋직접으로 샌 것"을 잡는다
 - `verdict/verdict_engine.py` — `books/<slug>/rules.json` 선언을 읽어 판정을 만드는 범용 엔진
 - `books/<slug>/data_spec.json` — 책 규칙을 수집요청으로 옮긴 명세 (`books/trend/` 참고)

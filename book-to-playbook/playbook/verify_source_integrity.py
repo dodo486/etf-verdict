@@ -51,7 +51,8 @@ from shared.paths import BASE
 from shared.rules_io import load_rules, iter_rules
 from shared.pages import book_pages, report_stale
 
-BASELINE = os.path.join(BASE, "source_baseline.json")
+# 기준 해시는 이 팀(①)의 소유물이라 팀 폴더 안에 산다(커밋 대상).
+BASELINE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source_baseline.json")
 
 
 def rule_labels(rules):

@@ -71,7 +71,8 @@ def classify(cond, registry):
     return "unset", "자동/무데이터 미선언"
 
 def check(slug, product=None):
-    registry = load("metric_registry.json")
+    # 레지스트리는 이 팀(③)의 SSOT 라 팀 폴더 안에 산다.
+    registry = load(os.path.join("verdict", "metric_registry.json"))
     rules = load(rules_path(slug))
 
     rows = []
