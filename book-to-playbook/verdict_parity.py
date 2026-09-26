@@ -69,9 +69,9 @@ def interpret(slug):
 
 
 def interpret_draft(slug):
-    """자기완결 초안(규칙 안에 metric 이 박힌 것)만 읽어 판정한다 — ref 조회 없음.
+    """자기완결 정식본(규칙 안에 metric 이 박힌 rules.json)만 읽어 판정한다 — ref 조회 없음.
     이게 '레시피 한 곳' 구조가 실제로 도는지 보는 검증이다."""
-    path = os.path.join(BASE, "books", slug, "rules.selfcontained.draft.json")
+    path = os.path.join(BASE, "books", slug, "rules.json")
     DATA = json.load(open(path, encoding="utf-8"))["DATA"]
 
     def fires(rule):

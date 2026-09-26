@@ -52,11 +52,38 @@ def html_path(slug):
     return os.path.join(BASE, "%s-playbook.html" % slug)
 
 
+# 프런트(#rules)는 t/ref/k/subs 만 읽는다. rules.json 이 자기완결로 승격되며 규칙마다
+# 백엔드 판정 필드(metric·metric_candidates·combine)를 품는데, 이건 해석기/엔진 몫이라
+# HTML 에는 넣지 않는다(시트 계약·무결성 해시 불변 유지).
+_BACKEND_KEYS = ("metric", "metric_candidates", "combine")
+
+
+def _strip_backend(obj):
+    data = obj.get("DATA") if isinstance(obj, dict) else None
+    if isinstance(data, dict):
+        for cfg in data.values():
+            if not isinstance(cfg, dict):
+                continue
+            for items in cfg.values():
+                if not isinstance(items, list):
+                    continue
+                for it in items:
+                    if not isinstance(it, dict):
+                        continue
+                    for k in _BACKEND_KEYS:
+                        it.pop(k, None)
+                    for s in it.get("subs") or []:
+                        if isinstance(s, dict):
+                            for k in _BACKEND_KEYS:
+                                s.pop(k, None)
+    return obj
+
+
 def load_rules(slug):
     p = rules_path(slug)
     if not os.path.exists(p):
         raise SystemExit("규칙 파일이 없습니다: %s" % p)
-    return json.loads(read_text(p))
+    return _strip_backend(json.loads(read_text(p)))
 
 
 def dumps(obj):
