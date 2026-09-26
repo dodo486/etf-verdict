@@ -34,79 +34,48 @@ except Exception:  # noqa: BLE001
 
 
 # ---------------------------------------------------------------- 공통 계산 유틸
-def _ma(xs, n):
-    return sum(xs[-n:]) / n if len(xs) >= n else None
-
-
+# 파생 계산(MA·수익률·연속일·눌림·거래량·폭)은 전부 jhts.marketdata.indicators 로 옮겼다
+# (시세팀이 사실을 계산해 서빙 · 어느 프로젝트든 같은 함수 호출). 여기엔 스냅샷 등에
+# 아직 쓰는 _pct 만 남긴다.
 def _pct(a, b):
     return (a - b) / b * 100 if (a is not None and b) else None
 
 
-def _up_days(closes, n=10):
-    c = closes[-(n + 1):]
-    return sum(1 for i in range(1, len(c)) if c[i] > c[i - 1])
-
-
-def _hold_above_ma(closes, n=20, look=12):
-    """종가가 N일선 위를 며칠 연속 지켰나(당일부터 거꾸로).
-
-    저자 3-2 "종가로 위에 올라서고 최소 2거래일 버티는지", 5-2 "그다음 2거래일 동안
-    20일선 다시 안 깸". 회복일 + 이후 2거래일 = 3 이 기준(옛 코드와 동일).
-    """
-    cnt = 0
-    for k in range(look):
-        i = len(closes) - 1 - k
-        if i < n - 1:
-            break
-        m = sum(closes[i - n + 1:i + 1]) / n
-        if closes[i] > m:
-            cnt += 1
-        else:
-            break
-    return cnt
-
-
-# ---------------------------------------------------------------- 일봉 시계열
-def _candles(symbol):
-    """md.candles → 오름차순 Candle 리스트. 실패 시 []."""
-    if not AVAILABLE:
-        return []
-    try:
-        return md.candles(symbol) or []
-    except Exception:  # noqa: BLE001
-        return []
-
-
 def series(symbol):
-    """일봉으로 계산한 심볼 시계열 요약. 옛 etf_daily_verdict.load() 와 동일한 키.
+    """심볼의 파생 시계열 사실 — jhts.marketdata.daily_features 로 위임한다.
 
-    반환(성공): {sym, close, prev, ma5, ma20, ma60, chg, ret5, high, open, vol,
-                 vol20, updays10, hold20, closes}
-    반환(실패): {"sym": symbol, "error": "..."}  ← 옛 load() 실패형과 동일.
+    계산은 시세팀(indicators)이 소유한다(어느 프로젝트든 같은 함수). 여기선 창구로서
+    미설치/실패만 감싼다. 반환 키는 daily_features 와 동일(기존 키 + days_since_high·
+    breakout_hold·vol_down_up·first_green_below_ma20 등 신규 사실).
     """
-    cs = _candles(symbol)
-    closes = [c.close for c in cs if c.close is not None]
-    if len(closes) < 21:
-        return {"sym": symbol, "error": "시세 데이터 부족" if cs else "시세 조회 실패"}
-    highs = [c.high for c in cs if c.high is not None]
-    lows = [c.low for c in cs if c.low is not None]
-    opens = [c.open for c in cs if c.open is not None]
-    vols = [c.volume for c in cs if c.volume is not None]
-    return {
-        "sym": symbol, "close": closes[-1], "prev": closes[-2],
-        "ma5": _ma(closes, 5), "ma20": _ma(closes, 20), "ma60": _ma(closes, 60),
-        "chg": _pct(closes[-1], closes[-2]),
-        "ret5": _pct(closes[-1], closes[-6]) if len(closes) >= 6 else None,
-        "high": highs[-1] if highs else None,
-        "low": lows[-1] if lows else None,
-        "prevlow": lows[-2] if len(lows) >= 2 else None,
-        "open": opens[-1] if opens else None,
-        "vol": vols[-1] if vols else None,
-        "vol20": _ma(vols, 20) if len(vols) >= 20 else None,
-        "updays10": _up_days(closes, 10),
-        "hold20": _hold_above_ma(closes, 20),
-        "closes": closes,
-    }
+    if not AVAILABLE:
+        return {"sym": symbol, "error": "jhts.marketdata 미설치"}
+    try:
+        return md.daily_features(symbol)
+    except Exception as e:  # noqa: BLE001
+        return {"sym": symbol, "error": "시세 조회 실패: %s" % e}
+
+
+# ---------------------------------------------------------------- 여러 종목 폭(breadth)
+# 교차종목 사실도 시세팀이 계산한다 — 여기선 창구로 위임(판정·문턱은 소비자).
+def breadth_up(symbols):
+    """상승 종목 수 → (up, checked)."""
+    return md.breadth_up(symbols) if AVAILABLE else (0, 0)
+
+
+def breadth_aligned(symbols):
+    """같은 방향 최대 개수 → (aligned, up, down, checked)."""
+    return md.breadth_aligned(symbols) if AVAILABLE else (0, 0, 0, 0)
+
+
+def breadth_above_ma(symbols, n=20):
+    """n일선 위 종목 수 → (count, checked)."""
+    return md.breadth_above_ma(symbols, n) if AVAILABLE else (0, 0)
+
+
+def prev_low_breaks(symbols):
+    """전일 저점 이탈 종목 수 → (breaks, checked)."""
+    return md.prev_low_breaks(symbols) if AVAILABLE else (0, 0)
 
 
 # ---------------------------------------------------------------- 현재값 / 등락률

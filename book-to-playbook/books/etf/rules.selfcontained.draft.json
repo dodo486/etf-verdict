@@ -463,34 +463,18 @@
      "ik": "leaders",
      "src": "👁 장중 직접 · NVDA·AMD·AVGO 등락 (HTS에서 확인)",
      "bkey": "엔비디아+AMD+브로드컴",
-     "metric_candidates": [
-      {
-       "type": "count_up",
-       "role": "gate",
-       "op": ">=",
-       "source": "auto",
-       "symbols": [
-        "NVDA",
-        "AMD",
-        "AVGO"
-       ],
-       "threshold": 2
-      },
-      {
-       "type": "breadth_aligned",
-       "role": "gate",
-       "op": ">=",
-       "source": "auto",
-       "symbols": [
-        "NVDA",
-        "AMD",
-        "AVGO",
-        "MU",
-        "AMAT",
-        "LRCX"
-       ]
-      }
-     ]
+     "metric": {
+      "type": "count_up",
+      "role": "gate",
+      "op": ">=",
+      "source": "auto",
+      "symbols": [
+       "NVDA",
+       "AMD",
+       "AVGO"
+      ],
+      "threshold": 2
+     }
     },
     {
      "t": "첫 눌림에서 저점 높임",
@@ -647,21 +631,20 @@
        "bkey": "엔비디아만 좋고 나머지 약하면",
        "src": "📊 야후 EOD · NVDA·AMD·AVGO",
        "k": "nvda_only",
-       "metric": {
-        "type": "breadth_aligned",
-        "role": "trigger",
-        "op": ">=",
-        "source": "auto",
-        "symbols": [
-         "NVDA",
-         "AMD",
-         "AVGO",
-         "MU",
-         "AMAT",
-         "LRCX"
-        ],
-        "_todo": "문턱(threshold) 미선언 — 저자 숫자 확인 필요"
-       }
+       "metric_candidates": [
+        {
+         "type": "count_up",
+         "role": "trigger",
+         "op": ">=",
+         "source": "auto",
+         "symbols": [
+          "NVDA",
+          "AMD",
+          "AVGO"
+         ],
+         "threshold": 2
+        }
+       ]
       },
       {
        "t": "대표주 6개 중 4개 미만만 같은 방향(1~2개만 끌면 조심)",
@@ -672,10 +655,19 @@
        "mtype": "breadth_count",
        "k": "breadth6",
        "metric": {
-        "type": "manual",
+        "type": "breadth_aligned",
         "role": "trigger",
-        "source": "manual",
-        "reason": "수동/미선언"
+        "op": "below",
+        "source": "auto",
+        "symbols": [
+         "NVDA",
+         "AMD",
+         "AVGO",
+         "MU",
+         "AMAT",
+         "LRCX"
+        ],
+        "threshold": 4
        }
       },
       {

@@ -200,31 +200,17 @@ def gap_up(m):
 
 
 def count_up(m):
-    """심볼 목록 중 상승(전일比 +) 개수. min 이상이면 pass. (주도주 N개 동반 등)"""
-    syms = m.get("symbols") or []
-    up = n = 0
-    for s in syms:
-        d = _dir(s)
-        if d and d.get("chg") is not None:
-            n += 1
-            if d["chg"] > 0:
-                up += 1
+    """심볼 목록 중 상승 개수(사실은 시세팀 breadth_up). min 이상이면 pass."""
+    up, n = md_feed.breadth_up(m.get("symbols") or [])
     if n == 0:
         return {"value": None, "pass": None, "text": "심볼 수집 실패"}
     return {"value": up, "pass": _pass_min(up, m), "text": "%d/%d개 상승" % (up, n)}
 
 
 def count_above_ma(m):
-    """심볼 목록 중 N일선 위 개수. min 이상이면 pass. (섹터 몇 개 위 등)"""
-    syms, ma = m.get("symbols") or [], m.get("ma", 20)
-    cnt = n = 0
-    for s in syms:
-        d = _series(s)
-        mav = _num(d, "ma%d" % ma)
-        if mav and _num(d, "close") is not None:
-            n += 1
-            if d["close"] > mav:
-                cnt += 1
+    """심볼 목록 중 N일선 위 개수(사실은 시세팀 breadth_above_ma). min 이상이면 pass."""
+    ma = m.get("ma", 20)
+    cnt, n = md_feed.breadth_above_ma(m.get("symbols") or [], ma)
     if n == 0:
         return {"value": None, "pass": None, "text": "%d일선 데이터 없음" % ma}
     return {"value": cnt, "pass": _pass_min(cnt, m), "text": "%d/%d개 %d일선 위" % (cnt, n, ma)}
@@ -269,36 +255,18 @@ def cyclical_weak(m):
 
 
 def breadth_aligned(m):
-    """심볼 목록 중 같은 방향(상승/하락) 최대 개수. 주도주 갈라짐 판정용.
+    """같은 방향 최대 개수(사실은 시세팀 breadth_aligned). 주도주 갈라짐 판정용.
     op:below + threshold N → 같은 방향이 N개 미만이면 발화(갈라짐)."""
-    syms = m.get("symbols") or []
-    up = dn = n = 0
-    for s in syms:
-        d = _dir(s)
-        if d and d.get("chg") is not None:
-            n += 1
-            if d["chg"] > 0:
-                up += 1
-            elif d["chg"] < 0:
-                dn += 1
+    aligned, up, dn, n = md_feed.breadth_aligned(m.get("symbols") or [])
     if n == 0:
         return {"value": None, "pass": None, "text": "심볼 수집 실패"}
-    aligned = max(up, dn)
     return {"value": aligned, "pass": None,
             "text": "%d개 중 같은 방향 %d개 (상승 %d·하락 %d)" % (n, aligned, up, dn)}
 
 
 def prev_low_break(m):
-    """심볼 목록 중 오늘 저가가 전일 저가를 깬 개수. min 이상이면 pass(주도주 이탈)."""
-    syms = m.get("symbols") or []
-    br = ck = 0
-    for s in syms:
-        d = _series(s)
-        lo, plo = _num(d, "low"), _num(d, "prevlow")
-        if lo is not None and plo is not None:
-            ck += 1
-            if lo < plo:
-                br += 1
+    """전일 저점 이탈 개수(사실은 시세팀 prev_low_breaks). min 이상이면 pass(주도주 이탈)."""
+    br, ck = md_feed.prev_low_breaks(m.get("symbols") or [])
     if ck == 0:
         return {"value": None, "pass": None, "text": "저가 데이터 없음"}
     return {"value": br, "pass": _pass_min(br, m), "text": "%d/%d개 전일 저점 이탈" % (br, ck)}

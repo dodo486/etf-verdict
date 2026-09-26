@@ -41,7 +41,8 @@ K2TYPE = {"run5": "n_day_return", "wick": "upper_wick", "tnx": "pct_change",
           "overheat": "count_up_days", "leader_break": "prev_low_break"}
 # 강도/개수 지표 = 진입·게이트용(많을수록 좋음). 회피 트리거로 쓰면 방향이 거꾸로다.
 # (예: nvda_only '주도주 약화'는 count_up>=2 발화가 아니라 그 반대 — 전용 divergence 지표 필요)
-STRENGTH_TYPES = GATE_TYPES | {"count_up", "count_above_ma"}
+# breadth_aligned 도 방향(정렬<N) 없이는 못 쓴다 — 명시적 '갈라짐' 규칙에서만 붙인다.
+STRENGTH_TYPES = GATE_TYPES | {"count_up", "count_above_ma", "breadth_aligned"}
 
 
 def _label_symbol(t, prod):
@@ -108,9 +109,13 @@ def resolve(rule, group, prod, cands):
                 if typ == "bad_rate_drop" and not ("하락" in t or "↓" in t):
                     continue
                 return hit, "%s→%s" % (how, typ)
-    # NOTE: 주도주 '갈라짐'(6개 중 4개미만)은 breadth_aligned 로 계산 가능하지만,
-    # 그 sub 이 nvda_only 부모 밑에 있어 발화 시 부모키(nvda_only)로 나가 엔진의
-    # 세분키(breadth6)와 어긋난다 — 키 세분화 결정이 먼저다. 지금은 flag 로 남긴다.
+    # 주도주 '갈라짐'(6개 중 4개 미만 같은 방향) → breadth_aligned, 정렬<4 면 발화.
+    # (세분키 방출로 이 sub 은 제 키 breadth6 로 나간다 — 부모 nvda_only 아님)
+    # '갈라'는 옆 sub(nvda_only)에도 있으니 쓰지 않고 '6개'·'같은 방향'으로만 집는다.
+    if "6개" in t or "같은 방향" in t:
+        hit = next((m for m in cands if m.get("type") == "breadth_aligned"), None)
+        if hit:
+            return dict(hit, _below=True, _thr=4), "갈라짐→breadth_aligned<4"
 
     # 1) 엔진키(k)가 지표 type 을 지목한다
     if k and k in K2TYPE:

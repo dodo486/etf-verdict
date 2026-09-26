@@ -473,8 +473,8 @@
    "cadence": "eod"
   },
   {
-   "item": "반도체 주도주 6개 방향 정렬(갈라짐)",
-   "ref": "4-2",
+   "item": "반도체 주도주 6개 방향 정렬(갈라짐, 4개 미만)",
+   "ref": "2-3",
    "source": "auto",
    "metric": {
     "type": "breadth_aligned",
