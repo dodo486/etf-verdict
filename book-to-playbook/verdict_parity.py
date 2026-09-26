@@ -84,6 +84,20 @@ def interpret_draft(slug):
             return None                              # 자동 대상 아님
         return metric_calc.evaluate(m)["pass"]
 
+    def fired_keys(rule):
+        """발화한 **leaf(또는 sub)의 자기 키**를 모은다 — 부모키가 아니라 세분키.
+        (subs 는 각자 엔진과 같은 세분키를 갖는다: nvda_only·breadth6·leader_break…)"""
+        subs = rule.get("subs")
+        if subs:
+            out = []
+            for s in subs:
+                out.extend(fired_keys(s))
+            return out
+        if fires(rule) is True:
+            k = rule.get("k") or ""
+            return k.split("|") if k else []
+        return []
+
     out = {}
     for prod, cfg in DATA.items():
         if not isinstance(cfg, dict) or prod == "COMMON":
@@ -93,9 +107,7 @@ def interpret_draft(slug):
         filter_ok = all(filt) if filt else None
         fired = []
         for r in cfg.get("avoid", []):
-            if fires(r) is True:
-                k = r.get("k") or ""
-                fired.extend(k.split("|") if k else [])
+            fired.extend(fired_keys(r))
         out[prod] = {"filter_ok": filter_ok, "avoid_fired": sorted(set(fired))}
     return out
 
@@ -123,12 +135,17 @@ def main(slug="etf"):
         if fo_e != fo_i and fo_i is not None:
             bad += 1
         print("  [%s] filter_ok 엔진=%s 해석기=%s  %s" % (prod, fo_e, fo_i, mark))
-        # avoid: 해석기가 켠 것이 엔진에도 켜져 있나(자동 가능한 것만 해석기가 안다)
+        # avoid: 양방향 비교 — 해석기만 켬(과발화)·엔진만 켬(미발화) 둘 다 불일치.
         e_av, i_av = set(e["avoid_keys"]), set(i.get("avoid_fired") or [])
-        extra = i_av - e_av       # 해석기만 켬 = 불일치(있으면 문제)
-        print("      avoid 엔진=%s · 해석기발화=%s%s"
-              % (sorted(e_av), sorted(i_av), ("  ❌해석기만:" + str(sorted(extra))) if extra else ""))
+        extra = i_av - e_av       # 해석기만 켬
+        missing = e_av - i_av     # 엔진만 켬(해석기가 놓침)
+        tail = ""
         if extra:
+            tail += "  ❌해석기만:" + str(sorted(extra))
+        if missing:
+            tail += "  ❌엔진만(놓침):" + str(sorted(missing))
+        print("      avoid 엔진=%s · 해석기발화=%s%s" % (sorted(e_av), sorted(i_av), tail))
+        if extra or missing:
             bad += 1
     print("\n%s" % ("✅ 결정 불일치 0 — 해석기가 엔진과 같은 판정" if bad == 0
                     else "❌ 불일치 %d건 — 교체 전 조사 필요" % bad))

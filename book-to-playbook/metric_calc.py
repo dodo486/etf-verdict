@@ -256,6 +256,54 @@ def defensive_only(m):
             "text": r.get("label") or "방어주 편중"}
 
 
+def cyclical_weak(m):
+    """금융·산업재 5거래일 약세(경기침체 실전 트리거). md_feed 위임."""
+    try:
+        r = md_feed.cyclical_weak(_sectors())
+    except Exception as e:  # noqa: BLE001
+        return {"value": None, "pass": None, "text": "섹터 수집 실패: %s" % e}
+    if not r.get("ok"):
+        return {"value": None, "pass": None, "text": r.get("reason", "섹터 수집 실패")}
+    return {"value": bool(r.get("flag")), "pass": bool(r.get("flag")),
+            "text": r.get("label") or "금융·산업재 약세"}
+
+
+def breadth_aligned(m):
+    """심볼 목록 중 같은 방향(상승/하락) 최대 개수. 주도주 갈라짐 판정용.
+    op:below + threshold N → 같은 방향이 N개 미만이면 발화(갈라짐)."""
+    syms = m.get("symbols") or []
+    up = dn = n = 0
+    for s in syms:
+        d = _dir(s)
+        if d and d.get("chg") is not None:
+            n += 1
+            if d["chg"] > 0:
+                up += 1
+            elif d["chg"] < 0:
+                dn += 1
+    if n == 0:
+        return {"value": None, "pass": None, "text": "심볼 수집 실패"}
+    aligned = max(up, dn)
+    return {"value": aligned, "pass": None,
+            "text": "%d개 중 같은 방향 %d개 (상승 %d·하락 %d)" % (n, aligned, up, dn)}
+
+
+def prev_low_break(m):
+    """심볼 목록 중 오늘 저가가 전일 저가를 깬 개수. min 이상이면 pass(주도주 이탈)."""
+    syms = m.get("symbols") or []
+    br = ck = 0
+    for s in syms:
+        d = _series(s)
+        lo, plo = _num(d, "low"), _num(d, "prevlow")
+        if lo is not None and plo is not None:
+            ck += 1
+            if lo < plo:
+                br += 1
+    if ck == 0:
+        return {"value": None, "pass": None, "text": "저가 데이터 없음"}
+    return {"value": br, "pass": _pass_min(br, m), "text": "%d/%d개 전일 저점 이탈" % (br, ck)}
+
+
 def bad_rate_drop(m):
     """나쁜 금리 하락: 금리↓ + S&P 못 오름 + 금융 약함(엔진 _bad_rate_drop 과 동일 공식)."""
     tnx, g, sec = _dir("^TNX"), _dir("^GSPC"), _sectors()
@@ -287,7 +335,10 @@ CALC = {
     "count_up": count_up,
     "count_above_ma": count_above_ma,
     "defensive_only": defensive_only,
+    "cyclical_weak": cyclical_weak,
     "bad_rate_drop": bad_rate_drop,
+    "breadth_aligned": breadth_aligned,
+    "prev_low_break": prev_low_break,
 }
 
 
@@ -299,9 +350,9 @@ def _decide(value, m):
     op = m.get("op")
     th = m.get("threshold", m.get("min"))
     if op == "above":
-        return value > 0
+        return value > (th if th is not None else 0)
     if op == "below":
-        return value < 0
+        return value < (th if th is not None else 0)
     if th is None:
         return None
     if op in ("<=",):

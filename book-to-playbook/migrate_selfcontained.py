@@ -38,7 +38,7 @@ IDX = {"TQQQ": "^NDX", "SOXL": "^SOX", "UPRO": "^GSPC"}   # 종목 → 대표 �
 K2TYPE = {"run5": "n_day_return", "wick": "upper_wick", "tnx": "pct_change",
           "usd_str": "dxy_change", "vol_sell": "volume_ratio",
           "gap": "gap_up", "vix": "pct_change", "earnings": "earnings_dday",
-          "overheat": "count_up_days"}
+          "overheat": "count_up_days", "leader_break": "prev_low_break"}
 # 강도/개수 지표 = 진입·게이트용(많을수록 좋음). 회피 트리거로 쓰면 방향이 거꾸로다.
 # (예: nvda_only '주도주 약화'는 count_up>=2 발화가 아니라 그 반대 — 전용 divergence 지표 필요)
 STRENGTH_TYPES = GATE_TYPES | {"count_up", "count_above_ma"}
@@ -99,6 +99,7 @@ def resolve(rule, group, prod, cands):
 
     # 0) 복합/특수 지표는 라벨 키워드로 지목(k 없음)
     for kw, typ, how in (("방어주", "defensive_only", "라벨 '방어주'"),
+                         ("산업재", "cyclical_weak", "라벨 '금융·산업재'"),
                          ("금리", "bad_rate_drop", "라벨 '나쁜금리'"),
                          ("섹터", "count_above_ma", "라벨 '섹터'")):
         if kw in t:
@@ -107,6 +108,9 @@ def resolve(rule, group, prod, cands):
                 if typ == "bad_rate_drop" and not ("하락" in t or "↓" in t):
                     continue
                 return hit, "%s→%s" % (how, typ)
+    # NOTE: 주도주 '갈라짐'(6개 중 4개미만)은 breadth_aligned 로 계산 가능하지만,
+    # 그 sub 이 nvda_only 부모 밑에 있어 발화 시 부모키(nvda_only)로 나가 엔진의
+    # 세분키(breadth6)와 어긋난다 — 키 세분화 결정이 먼저다. 지금은 flag 로 남긴다.
 
     # 1) 엔진키(k)가 지표 type 을 지목한다
     if k and k in K2TYPE:
@@ -146,11 +150,11 @@ def resolve(rule, group, prod, cands):
         if len(cand2) == 1:
             return cand2[0], "회피 트리거 @%s" % cand2[0].get("symbol")
         # 방향 회피: '아래' 규칙인데 게이트 지표(above_ma)뿐 → op:below 로 전환
-        if "아래" in t:
+        if any(w in t for w in ("아래", "이탈", "깨", "깸", "회복 못", "못 함")):
             g = [m for m in cands if m.get("type") == "above_ma"]
             g = [m for m in g if ("60일선" in t) == (m.get("ma") == 60)]
             if len(g) == 1:
-                return dict(g[0], _below=True), "방향 '아래'→below @%s" % g[0].get("symbol")
+                return dict(g[0], _below=True), "방향 약세→below @%s" % g[0].get("symbol")
 
     # 4) 주의(caution) — 이격(ma_distance)은 종목별로 짝. 나머지(급등·장중)는 지표 미비→수동
     if group == "caution":
@@ -169,11 +173,11 @@ def resolve(rule, group, prod, cands):
     return None, None
 
 
-def to_inline_resolved(metric, group, below=False):
+def to_inline_resolved(metric, group, below=False, thr=None):
     out = to_inline(metric, group)
     if below:
         out["op"] = "below"
-        out["threshold"] = 0
+        out["threshold"] = thr if thr is not None else 0
         out.pop("_todo", None)
     if metric.get("type") in INTRADAY_TYPES:
         out["source"] = "intraday"
@@ -201,7 +205,8 @@ def bind(rule, group, by_ref, report, path, prod):
     picked, how = resolve(rule, group, prod, cands) if ref else (None, None)
     if picked is not None:
         below = picked.pop("_below", False)
-        rule["metric"] = to_inline_resolved(picked, group, below)
+        thr = picked.pop("_thr", None)
+        rule["metric"] = to_inline_resolved(picked, group, below, thr)
         note = "  (%s%s)" % (how, ", manual→auto 승격" if rule.get("source") == "manual" else "")
         report["bound"].append(label + note)
         return

@@ -429,6 +429,80 @@
     "min": 1.7
    },
    "cadence": "eod"
+  },
+  {
+   "item": "금융·산업재 5일 약세(경기침체)",
+   "ref": "5-3",
+   "source": "auto",
+   "metric": {
+    "type": "cyclical_weak"
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "S&P500 20일선 이탈 후 회복 못함",
+   "ref": "5-3",
+   "source": "auto",
+   "metric": {
+    "type": "above_ma",
+    "symbol": "^GSPC",
+    "ma": 20
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "SOXL 5일선 위(단타 기준선)",
+   "ref": "4-4",
+   "source": "auto",
+   "metric": {
+    "type": "above_ma",
+    "symbol": "SOXL",
+    "ma": 5
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "나스닥100 60일선 위(추세 재개)",
+   "ref": "3-2",
+   "source": "auto",
+   "metric": {
+    "type": "above_ma",
+    "symbol": "^NDX",
+    "ma": 60
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "반도체 주도주 6개 방향 정렬(갈라짐)",
+   "ref": "4-2",
+   "source": "auto",
+   "metric": {
+    "type": "breadth_aligned",
+    "symbols": [
+     "NVDA",
+     "AMD",
+     "AVGO",
+     "MU",
+     "AMAT",
+     "LRCX"
+    ]
+   },
+   "cadence": "eod"
+  },
+  {
+   "item": "주도주 전일 저점 이탈수(NVDA·AMD·AVGO)",
+   "ref": "4-3",
+   "source": "auto",
+   "metric": {
+    "type": "prev_low_break",
+    "symbols": [
+     "NVDA",
+     "AMD",
+     "AVGO"
+    ],
+    "min": 2
+   },
+   "cadence": "eod"
   }
  ]
 }

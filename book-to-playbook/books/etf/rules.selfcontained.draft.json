@@ -433,10 +433,12 @@
      "bkey": "단타 = 5일선",
      "mtype": "above_ma",
      "metric": {
-      "type": "manual",
+      "type": "above_ma",
       "role": "gate",
-      "source": "manual",
-      "reason": "수동/미선언"
+      "op": "above",
+      "source": "auto",
+      "symbol": "SOXL",
+      "ma": 5
      }
     }
    ],
@@ -461,18 +463,34 @@
      "ik": "leaders",
      "src": "👁 장중 직접 · NVDA·AMD·AVGO 등락 (HTS에서 확인)",
      "bkey": "엔비디아+AMD+브로드컴",
-     "metric": {
-      "type": "count_up",
-      "role": "gate",
-      "op": ">=",
-      "source": "auto",
-      "symbols": [
-       "NVDA",
-       "AMD",
-       "AVGO"
-      ],
-      "threshold": 2
-     }
+     "metric_candidates": [
+      {
+       "type": "count_up",
+       "role": "gate",
+       "op": ">=",
+       "source": "auto",
+       "symbols": [
+        "NVDA",
+        "AMD",
+        "AVGO"
+       ],
+       "threshold": 2
+      },
+      {
+       "type": "breadth_aligned",
+       "role": "gate",
+       "op": ">=",
+       "source": "auto",
+       "symbols": [
+        "NVDA",
+        "AMD",
+        "AVGO",
+        "MU",
+        "AMAT",
+        "LRCX"
+       ]
+      }
+     ]
     },
     {
      "t": "첫 눌림에서 저점 높임",
@@ -629,20 +647,21 @@
        "bkey": "엔비디아만 좋고 나머지 약하면",
        "src": "📊 야후 EOD · NVDA·AMD·AVGO",
        "k": "nvda_only",
-       "metric_candidates": [
-        {
-         "type": "count_up",
-         "role": "trigger",
-         "op": ">=",
-         "source": "auto",
-         "symbols": [
-          "NVDA",
-          "AMD",
-          "AVGO"
-         ],
-         "threshold": 2
-        }
-       ]
+       "metric": {
+        "type": "breadth_aligned",
+        "role": "trigger",
+        "op": ">=",
+        "source": "auto",
+        "symbols": [
+         "NVDA",
+         "AMD",
+         "AVGO",
+         "MU",
+         "AMAT",
+         "LRCX"
+        ],
+        "_todo": "문턱(threshold) 미선언 — 저자 숫자 확인 필요"
+       }
       },
       {
        "t": "대표주 6개 중 4개 미만만 같은 방향(1~2개만 끌면 조심)",
@@ -668,12 +687,16 @@
        "mtype": "prev_low_break",
        "k": "leader_break",
        "metric": {
-        "type": "volume_ratio",
+        "type": "prev_low_break",
         "role": "trigger",
         "op": ">=",
         "source": "auto",
-        "symbol": "SOXL",
-        "threshold": 1.7
+        "symbols": [
+         "NVDA",
+         "AMD",
+         "AVGO"
+        ],
+        "threshold": 2
        }
       }
      ],
@@ -1051,10 +1074,11 @@
        "src": "✋ 직접 · 경기민감주·금융·산업재가 전고점서 계속 밀리는지 (판정엔진 미구현)",
        "bkey": "경기민감주·금융·산업재가 전고점서 계속 밀림",
        "metric": {
-        "type": "manual",
+        "type": "cyclical_weak",
         "role": "trigger",
-        "source": "manual",
-        "reason": "수동/미선언"
+        "op": ">=",
+        "source": "auto",
+        "_todo": "문턱(threshold) 미선언 — 저자 숫자 확인 필요"
        }
       },
       {
@@ -1092,10 +1116,13 @@
        "src": "✋ 직접 · S&P500 20일선 이탈 후 회복 못 하는지",
        "bkey": "20일선 깨고 반등해도 회복 못 함",
        "metric": {
-        "type": "manual",
+        "type": "above_ma",
         "role": "trigger",
-        "source": "manual",
-        "reason": "수동/미선언"
+        "op": "below",
+        "source": "auto",
+        "symbol": "^GSPC",
+        "ma": 20,
+        "threshold": 0
        }
       }
      ],
