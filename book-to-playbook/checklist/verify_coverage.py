@@ -40,9 +40,9 @@ coverage-data 에 `status:"reflected"` 라고 써넣으면 그대로 ✅가 찍�
 
 ## 사용
 
-    python verify_coverage.py              # 검사 (미해명 누락 있으면 exit 1)
-    python verify_coverage.py --show 5-2   # 그 소절의 토큰·범위·판정 상세
-    python verify_coverage.py --list       # 누락 전체를 면제 파일 양식으로 출력
+    python -m checklist.verify_coverage              # 검사 (미해명 누락 있으면 exit 1)
+    python -m checklist.verify_coverage --show 5-2   # 그 소절의 토큰·범위·판정 상세
+    python -m checklist.verify_coverage --list       # 누락 전체를 면제 파일 양식으로 출력
 """
 import io
 import json
@@ -50,63 +50,17 @@ import os
 import re
 import sys
 
-import paths
-from paths import BASE, PUBLIC
-
-EXEMPT = os.path.join(BASE, "coverage_exempt.json")
-
-# 정량 토큰 — 저자가 숫자로 말한 것만
-TOKEN_RE = re.compile(
-    r"(\d+\s*~\s*\d+\s*%p?"          # 7~10%
-    r"|[+-]?\d+(?:\.\d+)?\s*%p"      # 0.1%p
-    r"|[+-]?\d+(?:\.\d+)?\s*%"       # -5%, 30%
-    r"|\d+\s*거래일"                  # 2거래일
-    r"|\d+\s*일선"                    # 20일선
-    r"|\d+(?:\.\d+)?\s*배"            # 1.5배
-    r"|\d+\s*개"                      # 3개
-    r"|\d+\s*분)"                     # 30분
-)
-
-
-def norm(t):
-    return re.sub(r"\s+", "", t).replace("＋", "+")
-
-
-# ---------------------------------------------------------------- 규칙 읽기
-def rules_path(slug):
-    return os.path.join(BASE, "books", slug, "rules.json")
-
-
-def load_rules(slug):
-    """`books/<slug>/rules.json` 이 있으면 구조 그대로. 없으면 None(→ HTML 리터럴 폴백).
-
-    규칙이 HTML 안 JS 리터럴(`const DATA = {...}`)에 있던 시절엔 이 검사기가
-    들여쓰기 4칸(줄바꿈+공백 4개+키명)에 기대 텍스트를 잘랐다. 그 문자열 하나가 사라지자
-    입력이 빈 문자열이 되고, 검사는 **규칙 0개를 돌고 조용히 끝났다.**
-    조용한 스킵이 가장 비싼 실패다. 그래서 이제 **파일을 파싱해 구조로** 다룬다.
-    """
-    p = rules_path(slug)
-    if not os.path.exists(p):
-        return None
-    return json.loads(io.open(p, encoding="utf-8").read())
+from shared import paths  # noqa: F401  (경로·UTF-8 출력 고정)
+from shared.paths import BASE
+from shared.tokens import TOKEN_RE, norm
+from shared.exempt import load_exempt, exempt_entries, exempt_help
+from shared.rules_io import load_rules
+from shared.pages import book_pages, report_stale
 
 
 def _txt(obj):
     """구조 → 토큰 검색용 텍스트. 통째로 직렬화한다(어느 키에 있든 수치를 안 놓치게)."""
     return json.dumps(obj, ensure_ascii=False)
-
-
-def book_pages():
-    man = json.loads(io.open(os.path.join(BASE, "books.json"), encoding="utf-8").read())
-    out = {}
-    for b in man.get("books", []):
-        slug = b["slug"]
-        for c in (os.path.join(PUBLIC, slug, "index.html"),
-                  os.path.join(BASE, "%s-playbook.html" % slug)):
-            if os.path.exists(c):
-                out[slug] = c
-                break
-    return out
 
 
 def book_axis(slug):
@@ -347,66 +301,7 @@ def product_rules(html, rules=None):
     return out
 
 
-def load_exempt():
-    if os.path.exists(EXEMPT):
-        return json.loads(io.open(EXEMPT, encoding="utf-8").read())
-    return {}
-
-
-# ---------------------------------------------------------------- 면제 분류
-# 면제는 **검사를 끄는 스위치**다. 사유를 받는 것만으로는 부족했다 — 사유가
-# 타당한지를 아무도 안 봤고, 실제로 "저자 조건과 구현이 다르다"가 면제로 덮여
-# 있었다(3-1·4-1·7-1·7-5. 전부 저자의 시간 조건이 수익률 등으로 대체된 모양).
-# 그래서 사유에 **분류를 강제한다.** 분류는 아래 다섯뿐이고 '구현이 다름'은
-# 없다 — 그건 면제가 아니라 gap 이거나 구현 대상이다.
-EXEMPT_KINDS = {
-    "설명": "규칙이 아니라 설명·심리 경고 문장에 나온 숫자",
-    "예시": "저자가 든 사례 수치(임계값 아님)",
-    "표기차이": "같은 값의 다른 표기(10거래일↔10일, %p↔%포인트)",
-    "단위": "소요시간·항목 개수 등 판정 임계값이 아닌 수치",
-    "UI": "매매 규칙이 아닌 화면 코드",
-}
-
-EXEMPT_FORM = '"<토큰>": {"kind": "<분류>", "why": "<사유>"}'
-
-
-def exempt_help():
-    """면제가 거부됐을 때 보여줄 안내문."""
-    lines = ["  면제 형식: %s" % EXEMPT_FORM, "  허용 분류는 다섯뿐입니다."]
-    lines += ["    · %-4s %s" % (k, v) for k, v in EXEMPT_KINDS.items()]
-    lines.append("  '구현이 다름'은 허용 분류가 **아닙니다** — 저자 조건과 구현이 다르면")
-    lines.append("  면제가 아니라 status 를 gap 으로 내리거나 구현할 것.")
-    return "\n".join(lines)
-
-
-def exempt_entries(bucket):
-    """{토큰: {kind, why}} 에서 **유효한 면제만** 추린다. (유효, 거부목록) 반환.
-
-    옛 문자열 형식({토큰: "사유"})은 분류가 없으므로 면제로 인정하지 않는다.
-    """
-    valid, bad = {}, []
-    for tok, v in (bucket or {}).items():
-        if isinstance(v, str):
-            bad.append((tok, "옛 문자열 형식(분류 없음) — %s 로 바꿀 것" % EXEMPT_FORM))
-            continue
-        if not isinstance(v, dict):
-            bad.append((tok, "형식이 잘못됨 — %s 이어야 함" % EXEMPT_FORM))
-            continue
-        kind = v.get("kind")
-        kind = kind.strip() if isinstance(kind, str) else ""
-        why = v.get("why")
-        why = why.strip() if isinstance(why, str) else ""
-        if not kind:
-            bad.append((tok, "kind 없음"))
-        elif kind not in EXEMPT_KINDS:
-            bad.append((tok, "허용 분류가 아님: '%s'" % kind))
-        elif not why:
-            bad.append((tok, "why 가 비어 있음(분류 '%s')" % kind))
-        else:
-            valid[tok] = v
-    return valid, bad
-
-
+# 면제 읽기·분류 검증은 shared/exempt.py 가 단일 기준이다(여기 있던 정의가 그리로 나감).
 def exempt_bucket(slug, key):
     """책 slug 의 버킷 하나 — 유효한 면제만 돌려준다(거부분은 audit_exempt 가 보고)."""
     return exempt_entries((load_exempt().get(slug, {}) or {}).get(key))[0]
@@ -678,7 +573,6 @@ def main(argv):
 
     pages = book_pages()
     total_bad, out_list = 0, {}
-    from verify_source_integrity import report_stale  # noqa: PLC0415
     if report_stale(pages):
         total_bad += 1
 

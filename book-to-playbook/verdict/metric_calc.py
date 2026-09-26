@@ -15,7 +15,7 @@ data_spec 의 metric 선언 `{type, symbol, ...params}` 을 받아 md_feed 데�
 
 이 모듈은 라이브 엔진을 아직 대체하지 않는다. verdict_engine.py 가 이 값들을 읽어 판정을 만든다.
 """
-import md_feed
+from verdict import md_feed
 
 # ------------------------------------------------------------------ 데이터 접근
 # 심볼 종류에 따라 데이터 출처가 다르다(엔진의 SERIES/FUTURES/INDEX 분기를 여기 하나로 흡수).
@@ -410,7 +410,10 @@ def evaluate(metric):
 
 if __name__ == "__main__":
     import json
-    spec = json.load(open("books/trend/data_spec.json", encoding="utf-8"))["items"]
+    import os
+    from shared.paths import BASE
+    spec = json.load(open(os.path.join(BASE, "books", "trend", "data_spec.json"),
+                          encoding="utf-8"))["items"]
     for it in spec:
         m = it.get("metric") or {}
         r = evaluate(m)

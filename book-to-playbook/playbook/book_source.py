@@ -41,10 +41,10 @@ supply 는 스캔/OCR 산물이라 셋이 다르다.
 
 ## 사용
 
-    python book_source.py                 # 파싱 요약(장별 분포)
-    python book_source.py --write         # books/<slug>/source_index.json 생성
-    python book_source.py --diff          # 원문 소절 키 ↔ 플레이북 소절 키 대조
-    python book_source.py --slug supply --show 3-1
+    python -m playbook.book_source                 # 파싱 요약(장별 분포)
+    python -m playbook.book_source --write         # books/<slug>/source_index.json 생성
+    python -m playbook.book_source --diff          # 원문 소절 키 ↔ 플레이북 소절 키 대조
+    python -m playbook.book_source --slug supply --show 3-1
 """
 import hashlib
 import io
@@ -53,11 +53,11 @@ import os
 import re
 import sys
 
-import paths
-from paths import BASE
+from shared import paths  # noqa: F401  (경로·UTF-8 출력 고정)
+from shared.paths import BASE
 
-# 정량 토큰 정규식은 verify_coverage 가 기준(SSOT)이다. 복붙하면 두 곳이 갈라진다.
-from verify_coverage import TOKEN_RE, norm
+# 정량 토큰 정규식은 shared/tokens.py 가 기준(SSOT)이다. 복붙하면 두 곳이 갈라진다.
+from shared.tokens import TOKEN_RE, norm
 
 CONFIG = os.path.join(BASE, "book_sources.json")
 BOOKS_DIR = os.path.join(BASE, "books")

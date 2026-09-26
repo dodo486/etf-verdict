@@ -5,15 +5,15 @@ book-to-playbook 판정 페이지를 **두 모드**로 쓸 수 있다.
 | 모드 | 여는 법 | 동작 |
 |------|---------|------|
 | **정적 스냅샷** | GitHub Pages URL | 빌드 때 구운 값 그대로 (`⏸ 스냅샷 · 빌드 …`). 서버 불필요. |
-| **로컬 실시간** | `python3 serve.py` 로 띄운 서버 | 15초마다 `/api/verdict` 폴링(또는 `/events` SSE) → 값이 살아 움직임 (`🟢 실시간 · 야후(marketdata) · 갱신 HH:MM:SS`). |
+| **로컬 실시간** | `python3 -m publish.serve` 로 띄운 서버 | 15초마다 `/api/verdict` 폴링(또는 `/events` SSE) → 값이 살아 움직임 (`🟢 실시간 · jhts(marketdata) · 갱신 HH:MM:SS`). |
 
 정적 페이지는 서버가 없으면 `fetch('/api/verdict')` 가 조용히 실패하고 스냅샷을 그대로 유지한다(에러·콘솔 스팸 없음). 진행형 향상(progressive enhancement)이라 GitHub Pages 는 그대로 계속 돈다.
 
 ## 1. 서버 켜기
 
 ```bash
-cd ~/claude-projects/book-to-playbook
-python3 serve.py
+cd ~/claude-projects/etf-verdict/book-to-playbook
+python3 -m publish.serve
 ```
 
 콘솔에 뜨는 주소:
@@ -24,7 +24,7 @@ python3 serve.py
 포트를 바꾸려면:
 
 ```bash
-PLAYBOOK_PORT=9000 python3 serve.py
+PLAYBOOK_PORT=9000 python3 -m publish.serve
 ```
 
 환경변수(선택):
@@ -33,7 +33,7 @@ PLAYBOOK_PORT=9000 python3 serve.py
 |------|------|----|
 | `PLAYBOOK_PORT` | `8799` | 포트 |
 | `PLAYBOOK_HOST` | `0.0.0.0` | 바인딩 주소(LAN/테일스케일 접속 허용) |
-| `PLAYBOOK_TTL`  | `8`    | 판정 캐시 TTL(초) — 잦은 폴링이 야후를 두드리지 않게 |
+| `PLAYBOOK_TTL`  | `8`    | 판정 캐시 TTL(초) — 잦은 폴링이 시세 창구를 두드리지 않게 |
 | `PLAYBOOK_TICK` | `15`   | SSE tick 주기(초) |
 
 ## 2. 엔드포인트
@@ -41,7 +41,7 @@ PLAYBOOK_PORT=9000 python3 serve.py
 | 경로 | 내용 |
 |------|------|
 | `GET /` `GET /index.html` | 최신 판정을 구워 넣은 플레이북 페이지(루트로 바로 열림, 이후 스스로 갱신) |
-| `GET /api/verdict` | 판정 JSON(라이브). `verdict_engine.py` 로 계산, 8초 TTL 캐시, CORS 허용 |
+| `GET /api/verdict` | 판정 JSON(라이브). `verdict.verdict_engine` 으로 계산, 8초 TTL 캐시, CORS 허용 |
 | `GET /events` | SSE — 15초마다 tick. 브라우저가 받으면 `/api/verdict` 를 한 번 더 당겨 다시 그림 |
 | 기타 | `BASE` 디렉터리 정적 파일 서빙 |
 
@@ -57,7 +57,7 @@ PLAYBOOK_PORT=9000 python3 serve.py
    tailscale up
    ```
 2. **폰** 에 Tailscale 앱 설치 → 같은 계정으로 로그인.
-3. 데스크톱에서 서버를 켠다: `python3 serve.py` (0.0.0.0 바인딩이라 이미 LAN/테일스케일에서 접속 가능).
+3. 데스크톱에서 서버를 켠다: `python3 -m publish.serve` (0.0.0.0 바인딩이라 이미 LAN/테일스케일에서 접속 가능).
 4. 데스크톱의 Tailscale 주소를 확인:
    ```bash
    tailscale ip -4          # 예: 100.x.y.z

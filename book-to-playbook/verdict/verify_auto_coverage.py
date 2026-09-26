@@ -22,12 +22,12 @@
   · 위 어느 것도 없음                        → ❌ 미결선
 
 ## 사용
-    python verify_auto_coverage.py [slug] [--product SPY] [--json]
+    python -m verdict.verify_auto_coverage [slug] [--product SPY] [--json]
 결과: 🤖/🚧/✋/❌ 개수 + ❌·🚧 목록. ❌ 있으면 exit 1(블로킹), 🚧 는 경고.
 """
 import io, json, os, sys
 
-BASE = os.path.dirname(os.path.abspath(__file__))
+from shared.paths import BASE
 
 def load(p):
     return json.loads(io.open(os.path.join(BASE, p), encoding="utf-8").read())

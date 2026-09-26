@@ -23,24 +23,13 @@ books/<slug>/rules.json 선언만 읽어 판정을 만든다 — 어떤 책이�
 """
 import json
 import os
-import ssl
 import sys
-import urllib.parse
-import urllib.request
 from datetime import datetime, timezone
 
-import metric_calc
-
-# 알림 전송용(시세와 무관 — 텔레그램 전송에만).
-_UA = {"User-Agent": "Mozilla/5.0"}
-_CTX = ssl.create_default_context()
-
-BASE = os.path.dirname(os.path.abspath(__file__))
-
-
-def load_rules(slug):
-    with open(os.path.join(BASE, "books", slug, "rules.json"), encoding="utf-8") as f:
-        return json.load(f)
+from shared.paths import BASE
+from shared.notify import send_telegram, send_desktop
+from shared.rules_io import load_rules
+from verdict import metric_calc
 
 
 def book_title(slug):
@@ -317,50 +306,13 @@ def build_text(top, title=""):
     return "\n".join(L)
 
 
-def send_telegram(msg):
-    tok = os.environ.get("TELEGRAM_BOT_TOKEN"); cid = os.environ.get("TELEGRAM_CHAT_ID")
-    if not (tok and cid):
-        return False
-    try:
-        url = "https://api.telegram.org/bot%s/sendMessage" % tok
-        body = urllib.parse.urlencode({"chat_id": cid, "text": msg}).encode()
-        urllib.request.urlopen(urllib.request.Request(url, data=body, headers=_UA),
-                               timeout=20, context=_CTX)
-        return True
-    except Exception as e:  # noqa: BLE001
-        print("[telegram 실패]", e, file=sys.stderr); return False
-
-
-def send_desktop(msg):
-    """데스크톱 알림 — macOS/Windows/Linux 각각의 기본 수단. 실패해도 조용히 넘어간다."""
-    import subprocess
-    title = "진입 환경"
-    first = msg.split("\n")[1] if "\n" in msg else msg
-    try:
-        if sys.platform == "darwin":
-            subprocess.run(["osascript", "-e",
-                            "display notification %s with title %s"
-                            % (json.dumps(first), json.dumps(title))], check=False)
-        elif sys.platform == "win32":
-            ps = ("[void][System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');"
-                  "$n=New-Object System.Windows.Forms.NotifyIcon;"
-                  "$n.Icon=[System.Drawing.SystemIcons]::Information;$n.Visible=$true;"
-                  "$n.ShowBalloonTip(10000,%s,%s,'Info');Start-Sleep -Seconds 6;$n.Dispose()"
-                  % (json.dumps(title), json.dumps(first)))
-            subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
-                           check=False, capture_output=True)
-        else:
-            subprocess.run(["notify-send", title, first], check=False)
-        return True
-    except Exception:  # noqa: BLE001
-        return False
-
-
+# 알림 발신(send_telegram/send_desktop)은 shared/notify.py 로 나갔다 —
+# 이 팀에는 네트워크 코드를 두지 않는다(verify_teams.py 가 강제).
 def _cli():
     argv = sys.argv[1:]
     slug = next((a for a in argv if not a.startswith("-")), None)
     if not slug:
-        print("사용법: python verdict_engine.py <slug> [--json] [--no-send]", file=sys.stderr)
+        print("사용법: python -m verdict.verdict_engine <slug> [--json] [--no-send]", file=sys.stderr)
         sys.exit(2)
     top = render(slug)
     title = book_title(slug)
@@ -373,7 +325,7 @@ def _cli():
         if not send_telegram(text):
             send_desktop(text)
     try:
-        from paths import LOGS as _LOGS, ensure_dir as _ensure, write_text as _write
+        from shared.paths import LOGS as _LOGS, ensure_dir as _ensure, write_text as _write
         _ensure(_LOGS)
         now = datetime.fromisoformat(top["ts"])
         _write(os.path.join(_LOGS, "%s-%s.txt" % (slug, now.strftime("%Y%m%d"))), text)

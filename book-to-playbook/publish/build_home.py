@@ -3,7 +3,7 @@
 """books.json → public/index.html (책 선택 홈/런처). 카드 클릭 시 /slug/ 로 이동."""
 import os, sys, json, html
 
-from paths import BASE, PUBLIC, ensure_dir, read_text, write_text
+from shared.paths import BASE, PUBLIC, ensure_dir, read_text, write_text
 
 manifest = json.loads(read_text(os.path.join(BASE, "books.json")))
 outdir = ensure_dir(PUBLIC)
@@ -68,9 +68,9 @@ print(f"홈 생성: {os.path.join(outdir, 'index.html')} ({len(manifest['books']
 
 # 정적 책(라이브 아님) 조립: 소스 HTML에 레일 주입 → public/slug/index.html
 # (라이브 책은 publish_pages.py가 담당하므로 건너뜀)
-from inject_nav import inject
-from inject_rules import gate as rules_gate
-from paths import playbook_src   # 소스 경로는 규칙(<slug>-playbook.html)에서 — 책마다 dict 에 안 박음
+from publish.inject_nav import inject
+from checklist.inject_rules import gate as rules_gate
+from shared.paths import playbook_src   # 소스 경로는 규칙(<slug>-playbook.html)에서 — 책마다 dict 에 안 박음
 for b in manifest["books"]:
     if b.get("live"):
         continue

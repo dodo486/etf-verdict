@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""jhts 시세수집팀(jhts.marketdata) 어댑터 — book-to-playbook의 유일한 시세 창구.
+"""jhts 시세수집팀(jhts.marketdata) 어댑터 — 구간③의 유일한 시세 창구.
 
-book-to-playbook은 시세(미국 ETF·지수·선물·섹터 ETF의 일봉·현재값·분봉)를 직접
+구간③(verdict 팀)은 시세(미국 ETF·지수·선물·섹터 ETF의 일봉·현재값·분봉)를 직접
 스크래핑하지 않는다. 모든 시세를 여기서 jhts.marketdata(md)로부터 받는다.
 야후/KIS urllib 수집 코드는 전부 걷어내고 이 창구로 옮겼다.
 
@@ -13,18 +13,9 @@ book-to-playbook은 시세(미국 ETF·지수·선물·섹터 ETF의 일봉·현
 
 jhts.marketdata 미설치 시 AVAILABLE=False, 함수는 빈 값/None 을 돌려준다(무크래시).
 
-주의: 여기서 다루는 것 중 '실적 캘린더'(earnings_dday)만 시세가 아니라 나스닥
-공개 캘린더다. md 는 시세 전용이라 이 하나는 나스닥 공개 API(가격 엔드포인트 아님)를
-그대로 호출한다 — market_extras.py 에 있던 로직을 여기로 접어 넣은 것.
+이 파일에는 네트워크 코드가 **없어야 한다** — 수집은 전부 jhts 몫이다.
+(`import jhts` 가 허용되는 곳도 팀 전체에서 이 파일 하나다. verify_teams.py 가 강제.)
 """
-import io
-import json
-import os
-import ssl
-import urllib.parse
-import urllib.request
-from datetime import date, datetime, timedelta
-
 try:
     import jhts.marketdata as md
     AVAILABLE = True
@@ -241,107 +232,6 @@ def cyclical_weak(snap):
     flag = f["ret5"] < 0 and i["ret5"] < 0
     return {"ok": True, "flag": flag,
             "label": "금융 5일 %+.1f%% · 산업재 5일 %+.1f%%" % (f["ret5"], i["ret5"])}
-
-
-# ---------------------------------------------------------------- 실적 캘린더
-# 시세가 아니라 나스닥 공개 캘린더(가격 엔드포인트 아님). md 는 시세 전용이라
-# 이 하나는 여기서 직접 호출한다 — market_extras.py 에 있던 로직을 접어 넣음.
-_UA = {"User-Agent": "Mozilla/5.0"}
-_CTX = ssl.create_default_context()
-_EARNINGS_CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                               "earnings-dates.json")
-
-
-def _nasdaq_day(day):
-    u = "https://api.nasdaq.com/api/calendar/earnings?date=%s" % day.isoformat()
-    h = dict(_UA)
-    h.update({"Accept": "application/json", "Referer": "https://www.nasdaq.com/"})
-    with urllib.request.urlopen(urllib.request.Request(u, headers=h),
-                                timeout=25, context=_CTX) as f:
-        d = json.loads(f.read().decode("utf-8", "replace"))
-    rows = (d.get("data") or {}).get("rows") or []
-    return {r.get("symbol", "").upper() for r in rows}
-
-
-def _load_earn_cache():
-    if os.path.exists(_EARNINGS_CACHE):
-        try:
-            return json.loads(io.open(_EARNINGS_CACHE, encoding="utf-8").read())
-        except Exception:  # noqa: BLE001
-            pass
-    return {}
-
-
-def _save_earn_cache(c):
-    io.open(_EARNINGS_CACHE, "w", encoding="utf-8", newline="\n").write(
-        json.dumps(c, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
-
-
-def next_earnings(symbols, horizon=110, force=False):
-    """각 심볼의 다음 실적 발표일. {sym: 'YYYY-MM-DD' | None}. 소스 막히면 None."""
-    symbols = [s.upper() for s in symbols]
-    cache = _load_earn_cache()
-    today = date.today()
-
-    def fresh(sym):
-        e = cache.get(sym)
-        if not e:
-            return False
-        try:
-            if e.get("date"):
-                return date.fromisoformat(e["date"]) >= today
-            if e.get("scanned_until"):
-                return date.fromisoformat(e["scanned_until"]) > today
-        except Exception:  # noqa: BLE001
-            return False
-        return False
-
-    need = [s for s in symbols if force or not fresh(s)]
-    if need:
-        found, day, scanned, failed = {}, today, 0, False
-        while scanned < horizon and need:
-            if day.weekday() < 5:
-                try:
-                    syms = _nasdaq_day(day)
-                except Exception as e:  # noqa: BLE001
-                    cache["_error"] = "%s (%s)" % (
-                        e, datetime.now().isoformat(timespec="seconds"))
-                    failed = True
-                    break
-                for s in list(need):
-                    if s in syms:
-                        found[s] = day.isoformat()
-                        need.remove(s)
-                scanned += 1
-            day += timedelta(days=1)
-
-        stamp = datetime.now().isoformat(timespec="seconds")
-        for s, dt in found.items():
-            cache[s] = {"date": dt, "fetched": stamp}
-        if not failed:
-            for s in need:
-                cache[s] = {"date": None, "fetched": stamp,
-                            "scanned_until": (today + timedelta(days=horizon)).isoformat()}
-            cache.pop("_error", None)
-        if found or need or failed:
-            _save_earn_cache(cache)
-
-    out = {}
-    for s in symbols:
-        e = cache.get(s)
-        out[s] = e["date"] if (e and fresh(s)) else None
-    return out
-
-
-def earnings_dday(symbols, horizon=110):
-    """{sym: (날짜, D-n)} — 가장 가까운 것부터. 못 구한 심볼은 빠진다."""
-    dates = next_earnings(symbols, horizon=horizon)
-    today = date.today()
-    out = {}
-    for s, dt in dates.items():
-        if dt:
-            out[s] = (dt, (date.fromisoformat(dt) - today).days)
-    return dict(sorted(out.items(), key=lambda kv: kv[1][1]))
 
 
 if __name__ == "__main__":

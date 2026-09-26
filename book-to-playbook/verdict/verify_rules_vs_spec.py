@@ -29,7 +29,7 @@
     검사 2 (창작)  spec 항목 ──ref──▶ 소절 본문  spec 의 정량 파라미터가
                                               그 소절 원문에 실제로 있는가
 
-토큰 추출은 `verify_coverage.TOKEN_RE` 를 **import** 한다(복붙하면 두 검사기의
+토큰 추출은 `shared.tokens.TOKEN_RE` 를 **import** 한다(복붙하면 두 검사기의
 토큰 정의가 갈라진다).
 
 ## 한계 (정직하게)
@@ -40,8 +40,8 @@
 
 ## 사용
 
-    python verify_rules_vs_spec.py           # 검사 (위반·검사불가 있으면 exit 1)
-    python verify_rules_vs_spec.py --show 5-2  # 그 소절의 규칙·spec·판정 상세
+    python -m verdict.verify_rules_vs_spec           # 검사 (위반·검사불가 있으면 exit 1)
+    python -m verdict.verify_rules_vs_spec --show 5-2  # 그 소절의 규칙·spec·판정 상세
 """
 import io
 import json
@@ -49,15 +49,12 @@ import os
 import re
 import sys
 
-import paths  # noqa: F401  (경로·UTF-8 출력 고정. 반드시 먼저 import)
-from paths import BASE
+from shared import paths  # noqa: F401  (경로·UTF-8 출력 고정. 반드시 먼저 import)
+from shared.paths import BASE
 
-import book_source
-from verify_coverage import TOKEN_RE, norm   # 토큰 정의는 하나뿐이어야 한다
+from shared.tokens import TOKEN_RE, norm   # 토큰 정의는 하나뿐이어야 한다
 # 면제 형식·분류도 하나뿐이어야 한다(복붙하면 두 검사기의 면제 기준이 갈라진다)
-from verify_coverage import exempt_entries, exempt_help
-
-EXEMPT = os.path.join(BASE, "coverage_exempt.json")
+from shared.exempt import EXEMPT, exempt_entries, exempt_help  # noqa: F401
 
 # 소절 키 형식(계약 1). 규칙/spec 의 ref 가 이 모양이어야 '출처'로 본다.
 KEY_RE = re.compile(r"^(?:[0-9]+-[0-9]+|프롤로그|에필로그)$")

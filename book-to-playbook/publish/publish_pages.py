@@ -10,8 +10,8 @@
 """
 import os, re, sys
 import json
-from paths import (BASE, book_meta, live_slugs, playbook_src, public_book_dir,
-                   ensure_dir, read_text, write_text, PUBLIC)
+from shared.paths import (BASE, book_meta, live_slugs, playbook_src, public_book_dir,
+                          ensure_dir, read_text, write_text, PUBLIC)
 
 VERDICT_RE = re.compile(
     r'(<script type="application/json" id="verdict-data">)(.*?)(</script>)', re.S)
@@ -61,7 +61,7 @@ def publish(slug):
     html = read_text(src)
 
     # 규칙 사본 드리프트 게이트 — JSON(단일 진실)과 HTML 사본이 갈라졌으면 발행 중단.
-    from inject_rules import gate as _rules_gate
+    from checklist.inject_rules import gate as _rules_gate
     _ok, _lines = _rules_gate(html, slug)
     for _l in _lines:
         print(_l, file=sys.stderr if not _ok else sys.stdout)
@@ -73,24 +73,27 @@ def publish(slug):
     if meta.get("live"):
         js = os.path.join(BASE, "latest-verdict.json")
         if os.path.exists(js):
+            # 장중 판정 파일 — 옛 KIS 클라이언트가 쓰던 kis-intraday.json 을 중립 이름으로
+            # 바꿨다(KIS 잔재 정리). 지금은 만드는 쪽이 없어 항상 '대기(pending)'로 나가고,
+            # 장중 엔진이 재설계되면 이 파일을 쓰는 것으로 다시 잇는다.
             data = _merge_intraday(json.loads(read_text(js)),
-                                   os.path.join(BASE, "kis-intraday.json"))
+                                   os.path.join(BASE, "intraday-verdict.json"))
             data_str = json.dumps(data, ensure_ascii=False)
             if not VERDICT_RE.search(html):
                 print("verdict-data 블록을 찾지 못함(%s)" % slug, file=sys.stderr)
                 return False
             html = VERDICT_RE.sub(lambda m: m.group(1) + "\n" + data_str + "\n" + m.group(3), html)
 
-    # 책-무관 검수 모드 UI JS 주입 (SSOT = ui/*.js — 한 번 고치면 모든 책에 전파)
+    # 책-무관 검수 모드 UI JS 주입 (SSOT = checklist/ui/*.js — 한 번 고치면 모든 책에 전파)
     try:
-        from inject_ui import inject as _inject_ui
+        from checklist.inject_ui import inject as _inject_ui
         html = _inject_ui(html)
     except Exception as e:
         print("검수 UI 주입 실패(무시):", e, file=sys.stderr)
 
     # 책 전환 사이드 레일 주입
     try:
-        from inject_nav import inject
+        from publish.inject_nav import inject
         html = inject(html, slug)
     except Exception as e:
         print("레일 주입 실패(무시):", e, file=sys.stderr)

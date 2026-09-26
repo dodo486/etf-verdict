@@ -32,9 +32,9 @@
 
 ## 사용
 
-    python verify_source_integrity.py            # 검사 (다르면 종료코드 1)
-    python verify_source_integrity.py --accept   # 원문을 의도적으로 고쳤을 때 기준 갱신
-    python verify_source_integrity.py --show etf # 해당 책이 가진 라벨 목록 출력
+    python -m playbook.verify_source_integrity            # 검사 (다르면 종료코드 1)
+    python -m playbook.verify_source_integrity --accept   # 원문을 의도적으로 고쳤을 때 기준 갱신
+    python -m playbook.verify_source_integrity --show etf # 해당 책이 가진 라벨 목록 출력
 
 기준값은 `source_baseline.json`에 저장되며 **커밋 대상**이다.
 새 책을 추가하면 처음 한 번 `--accept` 로 기준을 등록한다.
@@ -46,92 +46,17 @@ import os
 import re
 import sys
 
-import paths
-from paths import BASE, PUBLIC
+from shared import paths  # noqa: F401  (경로·UTF-8 출력 고정)
+from shared.paths import BASE
+from shared.rules_io import load_rules, iter_rules
+from shared.pages import book_pages, report_stale
 
 BASELINE = os.path.join(BASE, "source_baseline.json")
 
 
-# ---------------------------------------------------------------- 책 찾기
-def book_pages():
-    """{slug: html경로} — books.json 기준, 배포본(PUBLIC/<slug>/index.html) 우선."""
-    manifest = json.loads(io.open(os.path.join(BASE, "books.json"), encoding="utf-8").read())
-    out = {}
-    for b in manifest.get("books", []):
-        slug = b["slug"]
-        for cand in (os.path.join(PUBLIC, slug, "index.html"),
-                     os.path.join(BASE, "%s-playbook.html" % slug)):
-            if os.path.exists(cand):
-                out[slug] = cand
-                break
-    return out
-
-
-# ------------------------------------------------------------ 낡은 배포본
-def stale_pages(pages):
-    """배포본이 작업본보다 오래된 책 목록 -> [(slug, 검사대상, 작업본)]."""
-    out = []
-    for slug, path in sorted(pages.items()):
-        src = os.path.join(BASE, "%s-playbook.html" % slug)
-        if path == src or not os.path.exists(src):
-            continue
-        try:
-            if os.path.getmtime(path) < os.path.getmtime(src):
-                out.append((slug, path, src))
-        except OSError:
-            pass
-    return out
-
-
-def report_stale(pages):
-    """낡은 배포본이 있으면 밝히고 True(=실패) 를 돌려준다.
-
-    통과로 찍으면 어제 페이지를 검사하고 '이상 없음'이라고 말하는 게 된다.
-    """
-    bad = stale_pages(pages)
-    if not bad:
-        return False
-    print("")
-    print("낡은 배포본을 검사했습니다 — 이 결과는 지금 작업본의 상태가 아닙니다.")
-    for slug, path, src in bad:
-        print("  ! %-8s 검사 대상  %s" % (slug, path))
-        print("           작업본이 더 최신  %s" % src)
-    print("  발행하거나(python run.py publish), 작업본을 직접 보려면")
-    print("  BOOK_TO_PLAYBOOK_PUBLIC 을 없는 경로로 지정해 다시 돌리세요.")
-    return True
-
-# ---------------------------------------------------------------- 규칙 파일
-def rules_path(slug):
-    return os.path.join(BASE, "books", slug, "rules.json")
-
-
-def load_rules(slug):
-    """`books/<slug>/rules.json` 이 있으면 그 구조. 없으면 None(→ HTML 리터럴 폴백)."""
-    if not slug:
-        return None
-    p = rules_path(slug)
-    if not os.path.exists(p):
-        return None
-    return json.loads(io.open(p, encoding="utf-8").read())
-
-
 def rule_labels(rules):
-    """규칙(라벨 `t` 를 가진 dict)을 중첩 어디에 있든 훑는다 — 몇 개를 지키는지 세려고."""
-    out = []
-
-    def walk(o):
-        if isinstance(o, dict):
-            if isinstance(o.get("t"), str):
-                out.append(o)
-                return
-            for v in o.values():
-                walk(v)
-        elif isinstance(o, list):
-            for v in o:
-                walk(v)
-
-    walk(rules or {})
-    return out
+    """규칙(라벨 `t` 를 가진 dict) 목록 — 몇 개를 지키는지 세려고."""
+    return list(iter_rules(rules or {}))
 
 
 # ---------------------------------------------------------------- 원문 블록 추출

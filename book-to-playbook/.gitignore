@@ -1,14 +1,11 @@
 # ==== 비밀·크레덴셜 (절대 커밋 금지) ====
-kis.env
 telegram.env
-.kis_token.json
 *.env
 !*.env.example
 
 # ==== 런타임 생성물 (매 실행마다 갱신) ====
 latest-verdict.json
-kis-intraday.json
-kis-verdict.json
+intraday-verdict.json
 
 logs/
 

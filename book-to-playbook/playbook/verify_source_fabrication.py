@@ -28,7 +28,7 @@
 입력은 **JSON 두 개뿐**이다: `books/<slug>/rules.json`(플레이북이 저자에게 돌린 주장)과
 `books/<slug>/source_index.json`(원문 소절별 정량 토큰). HTML 은 읽지 않는다.
 소절 원문 자체는 저작권물이라 리포에 없다 — `source_index.json` 은 저자 원문을
-`verify_coverage.TOKEN_RE` **같은 토크나이저**로 뽑아 소절별 `tokens` 로 커밋해 둔
+`shared.tokens.TOKEN_RE` **같은 토크나이저**로 뽑아 소절별 `tokens` 로 커밋해 둔
 '토큰 지문'이다. 그래서 원문 파일(BOOK_RAW_DIR) 없이도 커밋본만으로 돌아간다.
 
     검사 1 (고아 주장)  규칙 ──ref──▶ 소절     모든 저자-귀속 규칙이 **실존하는**
@@ -42,7 +42,7 @@
 
 - **규칙(저자-귀속 주장)**: `t`(라벨) 문자열을 가진 dict. `verify_contract.iter_rules`
   와 **같은** 정의로 훑는다(복붙하면 두 검사기의 규칙 정의가 갈라진다).
-- **정량 토큰**: `verify_coverage.TOKEN_RE` 로 뽑은 것 — `-5%`·`20일선`·`2거래일`·
+- **정량 토큰**: `shared.tokens.TOKEN_RE` 로 뽑은 것 — `-5%`·`20일선`·`2거래일`·
   `1.5배`·`0.1%p`·`3개`·`30분`. 이게 창작 판정의 유일한 대상이다.
   숫자가 안 붙은 산문(패러프레이즈)은 판정하지 않는다 — 저자 문장을 글자 그대로
   베끼라는 게 아니라, **저자가 숫자로 말한 것**을 안 지어내는지만 본다.
@@ -67,9 +67,9 @@
 
 ## 사용
 
-    python verify_source_fabrication.py          # 검사 (창작 있으면 exit 1)
-    python verify_source_fabrication.py --json    # {slug:{claims,orphans,ungrounded,fabrications}}
-    python verify_source_fabrication.py --show 3-2 # 그 소절의 규칙·토큰·근거 상세
+    python -m playbook.verify_source_fabrication          # 검사 (창작 있으면 exit 1)
+    python -m playbook.verify_source_fabrication --json    # {slug:{claims,orphans,ungrounded,fabrications}}
+    python -m playbook.verify_source_fabrication --show 3-2 # 그 소절의 규칙·토큰·근거 상세
 """
 import io
 import json
@@ -77,15 +77,14 @@ import os
 import re
 import sys
 
-import paths  # noqa: F401  (경로·UTF-8 출력 고정. 반드시 먼저 import)
-from paths import BASE
+from shared import paths  # noqa: F401  (경로·UTF-8 출력 고정. 반드시 먼저 import)
+from shared.paths import BASE
 
-# 토큰·정규화·면제 형식은 한 곳에서만 정의돼야 한다(복붙하면 검사기끼리 갈라진다).
-from verify_coverage import TOKEN_RE, norm, exempt_entries, exempt_help
-# 규칙(저자-귀속 주장) 정의도 하나뿐이어야 한다.
-from verify_contract import iter_rules
-
-EXEMPT = os.path.join(BASE, "coverage_exempt.json")
+# 토큰·정규화·면제 형식·규칙 순회는 공통층 한 곳에서만 정의된다
+# (복붙하면 검사기끼리 갈라진다).
+from shared.tokens import TOKEN_RE, norm
+from shared.exempt import EXEMPT, exempt_entries, exempt_help  # noqa: F401
+from shared.rules_io import rules_path, iter_rules
 
 # 소절 키 형식(계약 1). ref 가 이 모양이어야 '출처'로 본다.
 KEY_RE = re.compile(r"^(?:[0-9]+-[0-9]+|프롤로그|에필로그)$")
@@ -95,10 +94,6 @@ KEY_RE = re.compile(r"^(?:[0-9]+-[0-9]+|프롤로그|에필로그)$")
 def books():
     man = json.loads(io.open(os.path.join(BASE, "books.json"), encoding="utf-8").read())
     return [b for b in man.get("books", []) if b.get("slug")]
-
-
-def rules_path(slug):
-    return os.path.join(BASE, "books", slug, "rules.json")
 
 
 def source_index_path(slug):
@@ -121,7 +116,7 @@ def source_tokens(slug):
     """{소절키: [정량토큰...]} — 저자 원문을 같은 토크나이저로 뽑아 커밋한 지문.
 
     본문 텍스트는 저작권물이라 리포에 없다. source_index.json 의 소절별 `tokens` 가
-    'book_source.py 가 verify_coverage.TOKEN_RE 로 뽑아 둔' 원문 정량 토큰이다.
+    'book_source.py 가 shared.tokens.TOKEN_RE 로 뽑아 둔' 원문 정량 토큰이다.
     그래서 원문 파일 없이도 커밋본만으로 근거 검사가 돈다.
     """
     p = source_index_path(slug)

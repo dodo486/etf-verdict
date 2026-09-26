@@ -35,9 +35,9 @@ description: 트레이딩 책을 읽어 실전 매매 플레이북 + 인터랙�
 | 체크 항목 라벨 | 스코어카드·진입·회피 체크박스의 규칙 문구 |
 
 ```
-python verify_source_integrity.py            # 검사(다르면 exit 1)
-python verify_source_integrity.py --accept   # 원문을 의도적으로 고쳤을 때만
-python verify_source_integrity.py --show trend # 그 책의 라벨 목록
+python -m playbook.verify_source_integrity            # 검사(다르면 exit 1)
+python -m playbook.verify_source_integrity --accept   # 원문을 의도적으로 고쳤을 때만
+python -m playbook.verify_source_integrity --show trend # 그 책의 라벨 목록
 ```
 
 **새 책을 추가하면 처음 한 번 `--accept` 로 기준을 등록한다.** 기준값
@@ -91,7 +91,7 @@ python verify_source_integrity.py --show trend # 그 책의 라벨 목록
 STEP 1 추출은 규칙을 **파일로** 내놓고, STEP 2 빌드는 그 파일을 읽어 렌더한다.
 
 ```
-python verify_contract.py      # 책별·조항별 충족/미충족 표, 미충족 있으면 exit 1
+python -m verify_contract      # 책별·조항별 충족/미충족 표, 미충족 있으면 exit 1
 ```
 
 계약을 못 채운 책은 검사가 **실패로 막는다** — 그게 이 검사의 존재 이유다.
@@ -119,7 +119,7 @@ python verify_contract.py      # 책별·조항별 충족/미충족 표, 미충�
 ```
 1) 자르기    원문 → 소절 단위 + 고유 키 (N-n · 프롤로그 · 에필로그)
              → #src(플레이북 마크다운) / books/<slug>/source_index.json
-             (book_source.py --write 가 소절키·제목·줄범위·해시·정량토큰을 산출)
+             (python -m playbook.book_source --write 가 소절키·제목·줄범위·해시·정량토큰을 산출)
 2) 추출      각 소절 → 저자 매매규칙, books/<slug>/rules.json (t=라벨).
              규칙마다 ref(소절 키). 라벨의 정량 토큰은 그 ref 소절 원문에서 나온
              토큰이어야 한다(창작 금지). 근거 소절을 못 대는 규칙은 넣지 않는다.
@@ -191,7 +191,7 @@ python verify_contract.py      # 책별·조항별 충족/미충족 표, 미충�
 검사의 `--json` 결과에서 그 slug 의 값만** 본다:
 
 ```
-python verify_source_fabrication.py --json   # {slug:{claims,orphans,ungrounded,fabrications}}
+python -m playbook.verify_source_fabrication --json   # {slug:{claims,orphans,ungrounded,fabrications}}
 python verify_contract.py --json             # {slug:{reflected,gap,mindset,rules,ref_missing,spec_items,leaks,...}}
 python verify_rules_vs_spec.py --json        # {slug: 위반수|null}
 ```
@@ -238,7 +238,7 @@ null(검사 불가)은 통과가 아니다. 계약 구조를 못 채운 것이�
 Artifact 도구로 HTML 게시(같은 책은 같은 file_path→같은 URL 재배포).
 
 ## 데일리 자동판정 엔진 (선택)
-`verdict_engine.py` — `books/<slug>/data_spec.json` 을 읽어 매일 자동 판정 (`books.json` 의 `engine.daily` 로 연결).
+`verdict/verdict_engine.py` — `books/<slug>/rules.json` 선언을 읽어 매일 자동 판정 (`books.json` 의 `engine.daily` 로 연결).
 - 무인증 Yahoo chart API(urllib)로 지표 계산 → 필터/스코어카드/회피 → 상품별 verdict
 - 장중 항목은 자동 불가 → "장중 확인"으로 표시
 - 전송: `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID`(telegram.env) 있으면 텔레그램, 없으면 macOS 알림
@@ -250,7 +250,7 @@ Artifact 도구로 HTML 게시(같은 책은 같은 file_path→같은 URL 재�
 ## 파일
 - `SKILL.md` — 이 문서
 - `trend-playbook.html` — 디자인/구조 기준 템플릿(데모: trend)
-- `verdict_engine.py` / `run.sh` / `telegram.env.example` — 데일리 엔진
+- `verdict/verdict_engine.py` / `run.sh` / `telegram.env.example` — 데일리 엔진
 - `verify_contract.py` — 책 계약 4조 검사(절대 규칙 3). 못 채운 책은 등록 불가
 - `verify_source_fabrication.py` — 구간① 창작 검사. 플레이북이 책에 없는 저자 주장을 지어내지 않았나(정량 토큰이 ref 소절 원문에 근거하나)
 - `logs/` — 판정 로그

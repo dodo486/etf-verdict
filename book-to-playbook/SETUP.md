@@ -6,7 +6,8 @@ launchd)은 모두 걷어냈다.
 
 ## 0. 요구사항
 
-- Python **3.7 이상** (표준 라이브러리만 사용 — pip 설치 불필요)
+- Python **3.7 이상** (이 리포 자체는 표준 라이브러리만 사용)
+- `jhts` 패키지(시세수집팀) — 시세 자동판정용. 없으면 판정이 "데이터 없음"으로 정직하게 나올 뿐 크래시하지 않는다
 - git (자동 발행을 쓸 때만)
 
 확인:
@@ -18,11 +19,11 @@ python3 --version       # macOS
 
 ## 1. 경로 규칙
 
-`paths.py` 가 단일 기준점이다. 하드코딩된 경로는 더 이상 없다.
+`shared/paths.py` 가 단일 기준점이다. 하드코딩된 경로는 더 이상 없다.
 
 | 값 | 결정 방식 |
 |---|---|
-| `BASE` | `$BOOK_TO_PLAYBOOK_HOME` → 없으면 **이 폴더**(`paths.py`가 있는 곳) |
+| `BASE` | `$BOOK_TO_PLAYBOOK_HOME` → 없으면 **이 폴더**(book-to-playbook 루트 — `shared/`의 부모) |
 | `PUBLIC` | `$BOOK_TO_PLAYBOOK_PUBLIC` → 없으면 **부모 폴더에 `.nojekyll`이 있으면 그 부모**, 아니면 `BASE/public` |
 | `LOGS` | `BASE/logs` |
 
@@ -42,20 +43,13 @@ python3 --version       # macOS
 현재 값 확인:
 
 ```
-python paths.py
+python -m shared.paths
 ```
 
 ## 2. 크레덴셜
 
 `BASE` 에 아래 파일을 두면 실행 시 자동으로 환경변수에 주입된다(없으면 건너뜀).
-둘 다 `.gitignore` 처리되어 있다.
-
-`kis.env` — 장중 자동판정용 (없으면 장중 항목이 "직접 확인"으로 표시될 뿐, 나머지는 정상)
-
-```
-KIS_APP_KEY=...
-KIS_APP_SECRET=...
-```
+`.gitignore` 처리되어 있다. 시세 크레덴셜은 이 리포에 없다 — 수집은 jhts 시세수집팀 몫이다.
 
 `telegram.env` — (선택) 알림. 없으면 데스크톱 알림으로 대체된다.
 
@@ -74,7 +68,7 @@ python run.py publish      # 재판정 없이 현재 JSON으로 발행만
 
 옵션: `--no-git`(커밋/푸시 생략) · `--no-push`(커밋만) · `--quiet`
 
-래퍼도 있다 — macOS/Linux는 `./run.sh` / `./run_intraday.sh`, Windows는 `run.cmd` / `run.cmd intraday`.
+래퍼도 있다 — macOS/Linux는 `./run.sh [intraday]`, Windows는 `run.cmd [intraday]`.
 파이썬 경로를 고정하고 싶으면 `BOOK_TO_PLAYBOOK_PYTHON` 환경변수를 쓴다.
 
 첫 실행은 `--no-git` 으로 결과를 눈으로 확인한 뒤 자동화에 걸 것.
@@ -157,7 +151,7 @@ schtasks /Delete /TN "book-to-playbook daily" /F            :: 해제
 | 증상 | 원인 · 조치 |
 |---|---|
 | 콘솔에 한글이 `???` 로 | 옛 스크립트를 직접 실행한 경우. `run.py` 를 거치면 UTF-8이 강제된다 |
-| `latest-verdict.json 없음 — 발행 중단` | 야후 조회 실패. `logs/cron.log` 의 stderr 확인(사내망 차단 여부) |
-| 장중 항목이 계속 `⚫ 대기` | `kis.env` 없음 또는 개장+31분 작업이 안 돌았음 |
+| `latest-verdict.json 없음 — 발행 중단` | jhts 시세 조회 실패. `logs/cron.log` 의 stderr 확인(jhts 설치·수집 상태) |
+| 장중 항목이 계속 `⚫ 대기` | 장중 자동판정은 재설계 대기 — 현재는 EOD 판정만 자동이다 |
 | 발행은 됐는데 사이트가 그대로 | 푸시 안 됨(`--no-push`/origin 없음) 또는 GitHub Pages 반영 지연 |
 | `python` 을 못 찾음(Windows) | `BOOK_TO_PLAYBOOK_PYTHON` 에 python.exe 전체 경로 지정 |

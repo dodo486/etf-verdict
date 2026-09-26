@@ -18,9 +18,9 @@ HTML 안의 것은 사본일 뿐이고, 고치는 곳은 언제나 JSON 파일�
 
 ## 사용
 
-    python inject_rules.py trend            # JSON → HTML 의 id="rules" 블록에 주입
-    python inject_rules.py trend --check    # 사본과 파일이 다르면 exit 1
-    python inject_rules.py trend --show     # 주입될 블록을 표준출력으로
+    python -m checklist.inject_rules trend            # JSON → HTML 의 id="rules" 블록에 주입
+    python -m checklist.inject_rules trend --check    # 사본과 파일이 다르면 exit 1
+    python -m checklist.inject_rules trend --show     # 주입될 블록을 표준출력으로
 
 `--target <경로>` 로 대상 HTML 을 직접 지정할 수 있다(기본: `<slug>-playbook.html`).
 import 해서 `inject(html, slug)` / `check(html, slug)` 로도 쓴다.
@@ -31,8 +31,9 @@ import os
 import re
 import sys
 
-import paths
-from paths import BASE, read_text, write_text
+from shared import paths  # noqa: F401  (경로·UTF-8 출력 고정)
+from shared.paths import BASE, read_text, write_text
+from shared.rules_io import rules_path
 
 BLOCK_RE = re.compile(
     r'[ \t]*<script type="application/json" id="rules">.*?</script>[ \t]*\n?',
@@ -42,10 +43,6 @@ BLOCK_RE = re.compile(
 # (DOM 파싱 시점에 이미 있어야 getElementById 가 잡는다).
 AFTER_RE = re.compile(r'<script type="text/markdown" id="src">.*?</script>\n', re.S)
 FIRST_SCRIPT_RE = re.compile(r'\n<script>\n')
-
-
-def rules_path(slug):
-    return os.path.join(BASE, "books", slug, "rules.json")
 
 
 def html_path(slug):

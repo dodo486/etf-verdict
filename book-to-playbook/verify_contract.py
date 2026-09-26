@@ -46,11 +46,13 @@ import sys
 import unicodedata
 from collections import Counter
 
-import paths
-from paths import BASE, PUBLIC
-# 면제 분류(kind/why 검증)는 verify_coverage 가 유일한 기준이다 — 여기서 다시 만들면
+from shared import paths  # noqa: F401  (경로·UTF-8 출력 고정)
+from shared.paths import BASE, PUBLIC
+# 면제 분류(kind/why 검증)는 shared/exempt.py 가 유일한 기준이다 — 여기서 다시 만들면
 # 두 검사기의 면제 기준이 갈라진다. --json 통계(exempt 총수)만 그 판정을 빌려 쓴다.
-from verify_coverage import exempt_entries, EXEMPT
+from shared.exempt import exempt_entries, EXEMPT
+# 규칙(라벨 t 를 가진 dict) 순회도 공통층 하나뿐이다.
+from shared.rules_io import iter_rules
 
 KEY_RE = re.compile(r"^(?:[0-9]+-[0-9]+|프롤로그|에필로그)$")
 HEAD_RE = re.compile(r"^#{2,3}\s*([0-9]+-[0-9]+|프롤로그|에필로그)[.\s]", re.M)
@@ -95,29 +97,6 @@ def c1(slug):
     if bad:
         return False, "키 형식 위반 %d개: %s" % (len(bad), ", ".join(map(str, bad[:5])))
     return True, "소절 %d개" % len(keys)
-
-
-def iter_rules(obj):
-    """중첩 어디에 있든 규칙을 훑는다. 규칙 = 라벨(`t`)을 가진 dict.
-
-    rules.json 이 `{DATA:{종목:{filter:[...],entry:[...]}}, MODES, SCSRC, STEPNAME}`
-    처럼 중첩돼 있는데 플랫 배열을 기대하면 **"규칙이 비어 있음"으로 오진**한다.
-    없는 것과 못 읽은 것은 다르다 — 못 읽은 것을 없다고 적는 순간 검사는 거짓이 된다.
-
-    반대 방향(파일에 플랫 사본을 하나 더 두기)은 **안 된다.** 같은 규칙의 사본이
-    둘이면 반드시 드리프트한다. 데이터는 그대로 두고 검사기가 중첩을 훑는다.
-    """
-    if isinstance(obj, dict):
-        if isinstance(obj.get("t"), str):
-            yield obj
-            return                      # 규칙 안쪽은 더 파고들지 않는다
-        for v in obj.values():
-            for r in iter_rules(v):
-                yield r
-    elif isinstance(obj, list):
-        for v in obj:
-            for r in iter_rules(v):
-                yield r
 
 
 def c2(slug):

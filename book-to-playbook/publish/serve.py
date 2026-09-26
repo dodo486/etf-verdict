@@ -5,13 +5,13 @@
 
 두 모드, 한 파일:
   · GitHub Pages(정적)      → publish_pages.py 가 구운 스냅샷을 그대로 본다(서버 없음).
-  · 이 서버(python3 serve.py) → 책 페이지(<slug>-playbook.html)를 열면 /api/verdict 를
+  · 이 서버(python -m publish.serve) → 책 페이지(<slug>-playbook.html)를 열면 /api/verdict 를
     폴링(또는 /events SSE 수신)해 값이 실시간으로 갱신된다.
 
 엔드포인트
   GET /api/verdict   판정 JSON(라이브). 엔진(books.json engine.daily) --json 을 그대로 재사용해
-                     계산하고, 짧은 TTL 캐시(기본 8초)로 잦은 폴링이 야후를 두드리지
-                     않게 막는다. CORS 허용(Access-Control-Allow-Origin: *).
+                     계산하고, 짧은 TTL 캐시(기본 8초)로 잦은 폴링이 시세 창구를
+                     두드리지 않게 막는다. CORS 허용(Access-Control-Allow-Origin: *).
   GET /events        SSE — ~15초마다 tick 을 밀어준다(캐시 무효화 후 최신 ts 동봉).
                      브라우저가 tick 을 받으면 /api/verdict 를 한 번 더 당겨 다시 그린다.
   GET / , /index.html  최신 판정을 #verdict-data 에 구워 넣은 책 페이지(루트로 바로 열림).
@@ -33,16 +33,15 @@ import threading
 import time
 import urllib.parse
 
-BASE = os.path.dirname(os.path.abspath(__file__))
 PY = sys.executable or "python3"
 PORT = int(os.environ.get("PLAYBOOK_PORT", "8799"))
 HOST = os.environ.get("PLAYBOOK_HOST", "0.0.0.0")
-CACHE_TTL = float(os.environ.get("PLAYBOOK_TTL", "8"))   # 초 — 잦은 폴링이 야후를 안 두드리게
+CACHE_TTL = float(os.environ.get("PLAYBOOK_TTL", "8"))   # 초 — 잦은 폴링이 시세 창구를 안 두드리게
 SSE_TICK = float(os.environ.get("PLAYBOOK_TICK", "15"))  # 초 — SSE tick 주기
 
 # 어느 책을 라이브로 띄울지는 books.json 에서 온다(코드에 특정 책을 박지 않는다).
 # BOOK_SLUG 로 덮어쓸 수 있고, 기본은 첫 live 책.
-from paths import default_slug, book_engine, playbook_src   # noqa: E402
+from shared.paths import BASE, default_slug, book_engine, playbook_src   # noqa: E402
 SLUG = os.environ.get("BOOK_SLUG") or default_slug()
 PAGE_SRC = playbook_src(SLUG)
 DAILY_ENGINE = book_engine(SLUG, "daily")
@@ -58,20 +57,20 @@ _cache = {"data": None, "ts": 0.0, "err": None}
 def _run_verdict():
     """엔진(books.json engine.daily) --json 을 한 프로세스로 돌려 판정 dict 를 받는다.
 
-    로직을 복제하지 않고 **같은 스크립트의 --json 경로를 재사용**한다(run.py 가
-    latest-verdict.json 을 만들 때와 동일한 호출). 새 프로세스라 매번 md_feed(야후)로
+    로직을 복제하지 않고 **같은 엔진 모듈의 --json 경로를 재사용**한다(run.py 가
+    latest-verdict.json 을 만들 때와 동일한 호출). 새 프로세스라 매번 md_feed(jhts)로
     새로 시세를 받는다. 텔레그램/데스크톱 알림은 --no-send 로 끈다.
     """
     if not DAILY_ENGINE:
         raise RuntimeError("%s 책에 시세 엔진(engine.daily)이 없습니다 — books.json 확인" % SLUG)
-    cmd = [PY, os.path.join(BASE, DAILY_ENGINE), "--json", "--no-send"]
+    cmd = [PY, "-m", DAILY_ENGINE, SLUG, "--json", "--no-send"]
     p = subprocess.run(cmd, cwd=BASE, capture_output=True, timeout=90)
     if p.returncode != 0:
         raise RuntimeError((p.stderr or b"").decode("utf-8", "replace")[:400]
                            or "verdict 계산 실패(코드 %d)" % p.returncode)
     data = json.loads(p.stdout.decode("utf-8"))
     # 라이브 모드임을 프런트가 알 수 있게 소스 라벨을 동봉(정직한 신선도 표기용)
-    data["source"] = "야후(marketdata)"
+    data["source"] = "jhts(marketdata)"
     data["live"] = True
     # 서버는 EOD 판정만 계산한다(장중 KIS 자동판정은 M2에서 제거됨).
     # 프런트의 장중 뱃지가 '수집 실패'로 오해하지 않도록 대기 상태로 표시.
@@ -110,12 +109,12 @@ def render_page():
     # 좌측 책 레일(nav)을 여기서 얹는다. 특히 rules 를 주입하지 않으면 페이지에 구워진
     # 옛 #rules 사본(드리프트)이 서빙돼 최신 books/<slug>/rules.json 의 병합·수정이 안 보인다.
     try:
-        from inject_rules import inject as _inject_rules
+        from checklist.inject_rules import inject as _inject_rules
         html = _inject_rules(html, SLUG)
     except Exception:
         pass
     try:
-        from inject_ui import inject as _inject_ui
+        from checklist.inject_ui import inject as _inject_ui
         html = _inject_ui(html)
     except Exception:
         pass
@@ -128,7 +127,7 @@ def render_page():
     except Exception:
         pass
     try:
-        import inject_nav
+        from publish import inject_nav
         html = inject_nav.inject(html, SLUG)
     except Exception:
         pass

@@ -16,8 +16,11 @@ homebrew·python.org·Microsoft Store 어느 설치본이든 그대로 동작한
   --no-push    commit 은 하되 push 는 생략
   --quiet      콘솔 출력 최소화(로그 파일에는 그대로 남음)
 
-경로·크레덴셜은 paths.py 규칙을 따른다. kis.env / telegram.env 가 BASE에 있으면
+경로·크레덴셜은 shared/paths.py 규칙을 따른다. telegram.env 가 BASE에 있으면
 자동으로 환경변수에 주입한다(없으면 그냥 건너뜀).
+
+팀 구조: 실행 대상은 전부 패키지 모듈(python -m <팀>.<모듈>)이다 — playbook(구간①)
+· checklist(구간②) · verdict(구간③) · publish(발행층) · shared(공통).
 """
 import json
 import os
@@ -25,8 +28,8 @@ import subprocess
 import sys
 from datetime import datetime
 
-import paths
-from paths import BASE, PUBLIC, LOGS, ensure_dir, load_env_file, write_text
+from shared import paths
+from shared.paths import BASE, PUBLIC, LOGS, ensure_dir, load_env_file, write_text
 
 PY = sys.executable or "python3"
 
@@ -53,22 +56,22 @@ class Runner:
         except Exception:
             pass
 
-    def step(self, script, args=(), capture_to=None, required=True):
-        """BASE 안의 파이썬 스크립트 하나 실행.
+    def step(self, module, args=(), capture_to=None, required=True):
+        """팀 패키지 모듈 하나 실행(python -m <팀>.<모듈>, cwd=BASE).
 
         capture_to 가 있으면 stdout 을 그 파일에 UTF-8로 저장한다
         (bash의 `> latest-verdict.json` 리다이렉트 대체 — Windows 콘솔
         코드페이지를 타지 않도록 파이프에서 직접 디코드한다).
         """
-        cmd = [PY, os.path.join(BASE, script)] + list(args)
-        self.say("실행: %s %s" % (script, " ".join(args)))
+        cmd = [PY, "-m", module] + list(args)
+        self.say("실행: %s %s" % (module, " ".join(args)))
         env = dict(os.environ, PYTHONIOENCODING="utf-8")
         try:
             p = subprocess.run(cmd, cwd=BASE, env=env, capture_output=True)
         except Exception as e:
             self.say("  !! 실행 실패: %s" % e)
             if required:
-                self.failed.append(script)
+                self.failed.append(module)
             return False
 
         out = p.stdout.decode("utf-8", "replace")
@@ -78,14 +81,14 @@ class Runner:
         if p.returncode != 0:
             self.say("  !! 종료코드 %d" % p.returncode)
             if required:
-                self.failed.append(script)
+                self.failed.append(module)
             return False
 
         if capture_to:
             if not out.strip():
                 self.say("  !! 출력이 비어 %s 를 덮지 않음" % os.path.basename(capture_to))
                 if required:
-                    self.failed.append(script)
+                    self.failed.append(module)
                 return False
             write_text(capture_to, out)
             self.say("  → %s (%d bytes)" % (os.path.basename(capture_to), len(out)))
@@ -95,7 +98,7 @@ class Runner:
                 self.say("  %s" % t)
         return True
 
-    def verify(self, script, args=()):
+    def verify(self, module, args=()):
         """검사기(verify_*.py) 전용 실행 — 종료코드를 그대로 돌려준다.
 
         step() 은 성공/실패(True/False) 하나만 알려주고, 실패 시 곧바로
@@ -105,7 +108,7 @@ class Runner:
         그래서 이 메서드는 self.failed 를 건드리지 않고 (종료코드, stdout, stderr)
         셋을 그대로 돌려준다.
         """
-        cmd = [PY, os.path.join(BASE, script)] + list(args)
+        cmd = [PY, "-m", module] + list(args)
         env = dict(os.environ, PYTHONIOENCODING="utf-8")
         try:
             p = subprocess.run(cmd, cwd=BASE, env=env, capture_output=True)
@@ -163,11 +166,11 @@ def publish_git(r, do_push=True):
 HISTORY_FIELDS = ("gap", "violations", "exempt", "leaks", "fabrications")  # 악화(값 증가)를 감시하는 항목
 
 
-def verify_json_stats(script):
+def verify_json_stats(module):
     """검사기를 --json 모드로 한 번 더 돌려 숫자만 받는다. 등급(통과/경고/정지) 판단에는
     이 결과를 쓰지 않는다 — 그건 main() 이 일반 실행(verify())의 종료코드로 이미 끝냈다.
     이 호출은 순수하게 추이 기록용 숫자 채집이다."""
-    cmd = [PY, os.path.join(BASE, script), "--json"]
+    cmd = [PY, "-m", module, "--json"]
     env = dict(os.environ, PYTHONIOENCODING="utf-8")
     try:
         p = subprocess.run(cmd, cwd=BASE, env=env, capture_output=True, timeout=60)
@@ -203,9 +206,9 @@ def record_verify_history(r, mode):
     환경마다 새로 쌓이는 것이지 버전관리 대상이 아니다). 그래서 이 파일도 커밋
     대상으로 새로 옮기지 않는다 — 기존 로그들과 다르게 취급할 근거가 없다.
     """
-    contract_stats = verify_json_stats("verify_contract.py")      # {slug: {reflected,gap,mindset,rules,ref_missing,spec_items,exempt,leaks}}
-    rvs_stats = verify_json_stats("verify_rules_vs_spec.py")      # {slug: violations|null}
-    fab_stats = verify_json_stats("verify_source_fabrication.py")  # {slug: {claims,orphans,ungrounded,fabrications}|null 값들}
+    contract_stats = verify_json_stats("verify_contract")      # {slug: {reflected,gap,mindset,rules,ref_missing,spec_items,exempt,leaks}}
+    rvs_stats = verify_json_stats("verdict.verify_rules_vs_spec")      # {slug: violations|null}
+    fab_stats = verify_json_stats("playbook.verify_source_fabrication")  # {slug: {claims,orphans,ungrounded,fabrications}|null 값들}
 
     books = {}
     for slug in set(contract_stats) | set(rvs_stats) | set(fab_stats):
@@ -246,7 +249,7 @@ def main(argv):
     no_git = "--no-git" in argv
     no_push = "--no-push" in argv
 
-    for envfile in ("kis.env", "telegram.env"):
+    for envfile in ("telegram.env",):
         loaded = load_env_file(os.path.join(BASE, envfile))
         if loaded and not quiet:
             print("%s 로드 (%d개 키)" % (envfile, len(loaded)))
@@ -281,10 +284,10 @@ def main(argv):
         r.say("!! latest-verdict.json 없음 — 발행 중단")
         return 1
 
-    r.step("publish_pages.py")
-    r.step("build_home.py", required=False)
+    r.step("publish.publish_pages")
+    r.step("publish.build_home", required=False)
 
-    # ---- 검사 5종 — 반드시 여기(publish/build_home 직후 · git 커밋/푸시 이전)에서 돈다.
+    # ---- 검사 6종 — 반드시 여기(publish/build_home 직후 · git 커밋/푸시 이전)에서 돈다.
     #
     # 왜 이 위치인가: 검사기 넷은 모두 PUBLIC/<slug>/index.html(방금 위에서 새로 쓴
     # 배포본)을 작업본보다 **우선** 읽는다.
@@ -295,13 +298,16 @@ def main(argv):
     #     안 나간다. 그래서 publish_pages/build_home 다음 · publish_git 이전인
     #     지금 위치가 유일하게 맞다.
     #
-    # 다섯의 순서(사람이 읽는 로그 기준, 판정에는 영향 없음 — 서로 독립):
+    # 순서(사람이 읽는 로그 기준, 판정에는 영향 없음 — 서로 독립):
+    #   팀 경계(코드 구조가 맞는가)가 맨 앞 —
+
     #   원문 무결(있는 그대로인가) → 원문 창작(플레이북이 저자에게 없는 걸 안 돌렸나)
     #   → 커버리지(반영 주장이 맞는가) → 계약(형식을 갖췄는가) → 규칙↔수집(층 사이가 맞는가)
     # 원문 창작은 입력(책→플레이북) 쪽 근거 검사라 원문 무결 바로 뒤에 온다.
     # 앞이 깨지면 뒤의 결과도 그 위에서 흔들리므로, 좁은 것부터 넓은 것 순.
-    checks = ["verify_source_integrity.py", "verify_source_fabrication.py",
-              "verify_coverage.py", "verify_contract.py", "verify_rules_vs_spec.py"]
+    checks = ["verify_teams", "playbook.verify_source_integrity",
+              "playbook.verify_source_fabrication", "checklist.verify_coverage",
+              "verify_contract", "verdict.verify_rules_vs_spec"]
     codes = {}
     for script in checks:
         code, out, err = r.verify(script)
@@ -317,22 +323,24 @@ def main(argv):
     #   verify_contract / verify_rules_vs_spec: 자체적으로 0=통과·1=발행 정지(위반/누출)·
     #     2=경고뿐(계약 미충족/검사 불가) 를 낸다 — 각 스크립트의 등급표 참고.
     blocking = []
-    if codes["verify_source_integrity.py"] != 0:
-        blocking.append("verify_source_integrity.py — 저자 원문이 바뀜")
-    if codes["verify_source_fabrication.py"] == 1:
-        blocking.append("verify_source_fabrication.py — 플레이북이 책에 없는 걸 지어냄(창작)")
-    elif codes["verify_source_fabrication.py"] == 2:
-        r.say("!! verify_source_fabrication.py: 검사 불가(경고) — 발행은 막지 않음")
-    if codes["verify_coverage.py"] != 0:
-        blocking.append("verify_coverage.py — 커버리지 배지가 거짓")
-    if codes["verify_contract.py"] == 1:
-        blocking.append("verify_contract.py — 규칙 누출(JSON 밖 규칙)")
-    elif codes["verify_contract.py"] == 2:
-        r.say("!! verify_contract.py: 계약 미충족(경고) — 발행은 막지 않음")
-    if codes["verify_rules_vs_spec.py"] == 1:
-        blocking.append("verify_rules_vs_spec.py — 체크리스트↔수집요청 위반(누락/창작)")
-    elif codes["verify_rules_vs_spec.py"] == 2:
-        r.say("!! verify_rules_vs_spec.py: 검사 불가(경고) — 발행은 막지 않음")
+    if codes["verify_teams"] != 0:
+        blocking.append("verify_teams — 팀 경계/jhts 단일창구 위반")
+    if codes["playbook.verify_source_integrity"] != 0:
+        blocking.append("playbook.verify_source_integrity — 저자 원문이 바뀜")
+    if codes["playbook.verify_source_fabrication"] == 1:
+        blocking.append("playbook.verify_source_fabrication — 플레이북이 책에 없는 걸 지어냄(창작)")
+    elif codes["playbook.verify_source_fabrication"] == 2:
+        r.say("!! playbook.verify_source_fabrication: 검사 불가(경고) — 발행은 막지 않음")
+    if codes["checklist.verify_coverage"] != 0:
+        blocking.append("checklist.verify_coverage — 커버리지 배지가 거짓")
+    if codes["verify_contract"] == 1:
+        blocking.append("verify_contract — 규칙 누출(JSON 밖 규칙)")
+    elif codes["verify_contract"] == 2:
+        r.say("!! verify_contract: 계약 미충족(경고) — 발행은 막지 않음")
+    if codes["verdict.verify_rules_vs_spec"] == 1:
+        blocking.append("verdict.verify_rules_vs_spec — 체크리스트↔수집요청 위반(누락/창작)")
+    elif codes["verdict.verify_rules_vs_spec"] == 2:
+        r.say("!! verdict.verify_rules_vs_spec: 검사 불가(경고) — 발행은 막지 않음")
 
     # ---- 추이 기록 — 통과든 실패든 항상 남긴다(오늘의 실패도 내일 비교할 기준이 된다)
     try:

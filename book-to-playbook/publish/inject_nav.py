@@ -5,7 +5,7 @@
 드릴다운 없이 책 사이를 바로 오간다. import 해서 inject(html, cur_slug) 사용."""
 import os, json, html as H
 
-BASE = os.path.dirname(os.path.abspath(__file__))
+from shared.paths import BASE
 
 def _books():
     return json.load(open(os.path.join(BASE, "books.json"), encoding="utf-8"))

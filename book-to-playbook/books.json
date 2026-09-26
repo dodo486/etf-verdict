@@ -10,7 +10,7 @@
       "desc": "20일선 추세 + 시장 환경 5신호로 진입·회피 판정. 데모 중립 샘플(자작). 시세 자동판정(야후 EOD) 연동.",
       "live": true,
       "engine": {
-        "daily": "verdict_engine.py"
+        "daily": "verdict.verdict_engine"
       },
       "accent": "#3fae7a",
       "verify": {

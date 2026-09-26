@@ -6,7 +6,7 @@
 여기서 그 가정을 걷어내고, 어느 OS·어느 폴더에 두든 그대로 돌게 만든다.
 
 경로 결정 순서
-  BASE   = $BOOK_TO_PLAYBOOK_HOME  또는  이 파일이 있는 폴더
+  BASE   = $BOOK_TO_PLAYBOOK_HOME  또는  이 파일이 있는 폴더(shared/)의 부모
   PUBLIC = $BOOK_TO_PLAYBOOK_PUBLIC 또는  (부모가 배포 리포면 부모) 아니면 BASE/public
   LOGS   = BASE/logs
 
@@ -31,7 +31,9 @@ force_utf8_io()
 
 
 # ---------------------------------------------------------------- 경로
-BASE = os.environ.get("BOOK_TO_PLAYBOOK_HOME") or os.path.dirname(os.path.abspath(__file__))
+# 이 파일은 shared/ 안에 있다 — BASE 는 그 부모(book-to-playbook 루트).
+BASE = os.environ.get("BOOK_TO_PLAYBOOK_HOME") or os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__)))
 BASE = os.path.abspath(BASE)
 
 
@@ -140,7 +142,8 @@ def default_slug():
 
 
 def book_engine(slug, kind):
-    """그 책의 시세 엔진 스크립트명(daily/intraday). 없으면 None(=엔진 없는 책)."""
+    """그 책의 시세 엔진 모듈명(daily/intraday, 예: 'verdict.verdict_engine').
+    없으면 None(=엔진 없는 책). 실행은 `python -m <모듈명> <slug>` (cwd=BASE)."""
     return (book_meta(slug).get("engine") or {}).get(kind)
 
 
