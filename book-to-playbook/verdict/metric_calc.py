@@ -229,63 +229,6 @@ def count_up(m):
     return {"value": up, "pass": _pass_min(up, m), "text": "%d/%d개 상승" % (up, n)}
 
 
-def count_above_ma(m):
-    """심볼 목록 중 N일선 위 개수(사실은 시세팀 breadth_above_ma). min 이상이면 pass."""
-    ma = m.get("ma", 20)
-    cnt, n = md_feed.breadth_above_ma(m.get("symbols") or [], ma)
-    if n == 0:
-        return {"value": None, "pass": None, "text": "%d일선 데이터 없음" % ma}
-    return {"value": cnt, "pass": _pass_min(cnt, m), "text": "%d/%d개 %d일선 위" % (cnt, n, ma)}
-
-
-# --- 섹터 기반 복합 신호 (md_feed 가 섹터 스냅샷을 준다 — 엔진과 같은 데이터원) ---
-_SECTOR = None
-
-
-def _sectors():
-    global _SECTOR
-    if _SECTOR is None:
-        try:
-            _SECTOR = md_feed.sector_snapshot()
-        except Exception:
-            _SECTOR = {}
-    return _SECTOR
-
-
-def defensive_only(m):
-    """방어주만 살아나고 기술·금융·산업재 약화(경기침체 신호). md_feed 위임."""
-    try:
-        r = md_feed.defensive_only(_sectors())
-    except Exception as e:  # noqa: BLE001
-        return {"value": None, "pass": None, "text": "섹터 수집 실패: %s" % e}
-    if not r.get("ok"):
-        return {"value": None, "pass": None, "text": r.get("reason", "섹터 수집 실패")}
-    return {"value": bool(r.get("flag")), "pass": bool(r.get("flag")),
-            "text": r.get("label") or "방어주 편중"}
-
-
-def cyclical_weak(m):
-    """금융·산업재 5거래일 약세(경기침체 실전 트리거). md_feed 위임."""
-    try:
-        r = md_feed.cyclical_weak(_sectors())
-    except Exception as e:  # noqa: BLE001
-        return {"value": None, "pass": None, "text": "섹터 수집 실패: %s" % e}
-    if not r.get("ok"):
-        return {"value": None, "pass": None, "text": r.get("reason", "섹터 수집 실패")}
-    return {"value": bool(r.get("flag")), "pass": bool(r.get("flag")),
-            "text": r.get("label") or "금융·산업재 약세"}
-
-
-def breadth_aligned(m):
-    """같은 방향 최대 개수(사실은 시세팀 breadth_aligned). 주도주 갈라짐 판정용.
-    op:below + threshold N → 같은 방향이 N개 미만이면 발화(갈라짐)."""
-    aligned, up, dn, n = md_feed.breadth_aligned(m.get("symbols") or [])
-    if n == 0:
-        return {"value": None, "pass": None, "text": "심볼 수집 실패"}
-    return {"value": aligned, "pass": None,
-            "text": "%d개 중 같은 방향 %d개 (상승 %d·하락 %d)" % (n, aligned, up, dn)}
-
-
 def pullback_length(m):
     """최근 고점 이후 눌림 거래일수(사실은 시세팀 days_since_high). 범위(min~max)면 favorable."""
     d = _series(m["symbol"])
@@ -304,37 +247,12 @@ def breakout_hold(m):
     return {"value": v, "pass": _pass_min(v, m), "text": "전고점 위 %d거래일 유지" % v}
 
 
-def first_green_below_ma(m):
-    """20일선 아래 첫 양봉인가(사실은 시세팀 first_green_below_ma20). True 면 발화(미끼 경계)."""
-    d = _series(m["symbol"])
-    v = _num(d, "first_green_below_ma20")
-    if v is None:
-        return {"value": None, "pass": None, "text": "데이터 없음"}
-    return {"value": bool(v), "pass": bool(v), "text": "20일선 아래 첫 양봉" if v else "해당 없음"}
-
-
 def prev_low_break(m):
     """전일 저점 이탈 개수(사실은 시세팀 prev_low_breaks). min 이상이면 pass(주도주 이탈)."""
     br, ck = md_feed.prev_low_breaks(m.get("symbols") or [])
     if ck == 0:
         return {"value": None, "pass": None, "text": "저가 데이터 없음"}
     return {"value": br, "pass": _pass_min(br, m), "text": "%d/%d개 전일 저점 이탈" % (br, ck)}
-
-
-def bad_rate_drop(m):
-    """나쁜 금리 하락: 금리↓ + S&P 못 오름 + 금융 약함(엔진 _bad_rate_drop 과 동일 공식)."""
-    tnx, g, sec = _dir("^TNX"), _dir("^GSPC"), _sectors()
-    if not tnx or not g or tnx.get("prev") is None:
-        return {"value": None, "pass": None, "text": "수집 실패"}
-    rate_down = (tnx["close"] - tnx["prev"]) < 0
-    spx_down = g.get("chg") is not None and g["chg"] <= 0
-    fin = (sec.get("금융") or {}).get("ret5")
-    fin_weak = fin is not None and fin < 0
-    flag = bool(rate_down and spx_down and fin_weak)
-    return {"value": flag, "pass": flag,
-            "text": "금리 %+.2f%%p · S&P %+.1f%% · 금융5일 %s" % (
-                tnx["close"] - tnx["prev"], g.get("chg") or 0,
-                ("%+.1f%%" % fin) if fin is not None else "?")}
 
 
 # 선언 type → 계산기. (여기 없는 type = 아직 미구현/장중 — 상위가 '미구현'으로 표시)
@@ -351,15 +269,9 @@ CALC = {
     "count_up_days": count_up_days,
     "gap_up": gap_up,
     "count_up": count_up,
-    "count_above_ma": count_above_ma,
-    "defensive_only": defensive_only,
-    "cyclical_weak": cyclical_weak,
-    "bad_rate_drop": bad_rate_drop,
-    "breadth_aligned": breadth_aligned,
     "prev_low_break": prev_low_break,
     "pullback_length": pullback_length,
     "breakout_hold": breakout_hold,
-    "first_green_below_ma": first_green_below_ma,
 }
 
 

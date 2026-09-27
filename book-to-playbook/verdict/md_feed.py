@@ -24,14 +24,8 @@ except Exception:  # noqa: BLE001
     AVAILABLE = False
 
 
-# ---------------------------------------------------------------- 공통 계산 유틸
 # 파생 계산(MA·수익률·연속일·눌림·거래량·폭)은 전부 jhts.marketdata.indicators 로 옮겼다
-# (시세팀이 사실을 계산해 서빙 · 어느 프로젝트든 같은 함수 호출). 여기엔 스냅샷 등에
-# 아직 쓰는 _pct 만 남긴다.
-def _pct(a, b):
-    return (a - b) / b * 100 if (a is not None and b) else None
-
-
+# (시세팀이 사실을 계산해 서빙 · 어느 프로젝트든 같은 함수 호출).
 def series(symbol):
     """심볼의 파생 시계열 사실 — jhts.marketdata.daily_features 로 위임한다.
 
@@ -52,16 +46,6 @@ def series(symbol):
 def breadth_up(symbols):
     """상승 종목 수 → (up, checked)."""
     return md.breadth_up(symbols) if AVAILABLE else (0, 0)
-
-
-def breadth_aligned(symbols):
-    """같은 방향 최대 개수 → (aligned, up, down, checked)."""
-    return md.breadth_aligned(symbols) if AVAILABLE else (0, 0, 0, 0)
-
-
-def breadth_above_ma(symbols, n=20):
-    """n일선 위 종목 수 → (count, checked)."""
-    return md.breadth_above_ma(symbols, n) if AVAILABLE else (0, 0)
 
 
 def prev_low_breaks(symbols):
@@ -160,78 +144,6 @@ def intraday_snapshot(symbol):
     if not s:
         return None
     return {"last": s["price"], "base": s["prev"], "chg": s["chg"]}
-
-
-# ---------------------------------------------------------------- 섹터 (일봉 기반)
-# 저자 5-3/5-4 매핑: 경기민감 기술 XLK·금융 XLF·산업재 XLI / 방어 필수소비재 XLP·
-# 유틸리티 XLU·헬스케어 XLV. 섹터 5개(5-4) = 기술·금융·산업재·헬스케어·소비재.
-SECTOR_ETF = {
-    "기술": "XLK", "금융": "XLF", "산업재": "XLI",
-    "헬스케어": "XLV", "소비재": "XLY",
-    "필수소비재": "XLP", "유틸리티": "XLU",
-}
-FIVE = ["기술", "금융", "산업재", "헬스케어", "소비재"]
-CYCLICAL = ["기술", "금융", "산업재"]
-DEFENSIVE = ["필수소비재", "유틸리티", "헬스케어"]
-
-
-def sector_snapshot():
-    """섹터별 20일선 위 여부 · 5일 수익률. 실패한 섹터는 error 로 남긴다."""
-    out = {}
-    for name, sym in SECTOR_ETF.items():
-        s = series(sym)
-        if "error" in s:
-            out[name] = {"sym": sym, "error": s["error"]}
-            continue
-        out[name] = {
-            "sym": sym, "close": s["close"], "ma20": s["ma20"],
-            "above": bool(s["ma20"] and s["close"] > s["ma20"]),
-            "gap20": _pct(s["close"], s["ma20"]),
-            "ret5": s["ret5"],
-        }
-    return out
-
-
-def _avg(vals):
-    vals = [v for v in vals if v is not None]
-    return sum(vals) / len(vals) if vals else None
-
-
-def sector_breadth(snap):
-    """5-4: 섹터 5개 중 20일선 위 개수. 하나라도 실패면 count 를 신뢰하지 않는다."""
-    got = [snap.get(n) for n in FIVE]
-    if any((not s) or s.get("error") for s in got):
-        bad = [n for n in FIVE if (not snap.get(n)) or snap[n].get("error")]
-        return {"ok": False, "reason": "수집 실패: " + ", ".join(bad)}
-    above = [n for n in FIVE if snap[n]["above"]]
-    return {"ok": True, "count": len(above), "total": len(FIVE),
-            "above": above, "below": [n for n in FIVE if n not in above],
-            "label": "섹터 %d/%d 20일선 위 (%s)" % (
-                len(above), len(FIVE), ", ".join(above) if above else "없음")}
-
-
-def defensive_only(snap):
-    """5-3 첫 신호: 방어주만 살아나고 경기민감(기술·산업재·금융)이 약한가."""
-    cyc = [snap.get(n, {}).get("ret5") for n in CYCLICAL]
-    dfn = [snap.get(n, {}).get("ret5") for n in DEFENSIVE]
-    if any(v is None for v in cyc + dfn):
-        return {"ok": False, "reason": "섹터 수집 실패"}
-    c, d = _avg(cyc), _avg(dfn)
-    flag = (d > 0) and (c < 0)
-    return {"ok": True, "flag": flag, "cyc": c, "dfn": d,
-            "label": "경기민감 5일 %+.1f%% (기술 %+.1f·금융 %+.1f·산업재 %+.1f) / 방어 5일 %+.1f%%"
-                     % (c, snap["기술"]["ret5"], snap["금융"]["ret5"],
-                        snap["산업재"]["ret5"], d)}
-
-
-def cyclical_weak(snap):
-    """5-3 실전 트리거: '금융·산업재 5거래일 이상 약함'."""
-    f, i = snap.get("금융", {}), snap.get("산업재", {})
-    if f.get("ret5") is None or i.get("ret5") is None:
-        return {"ok": False, "reason": "섹터 수집 실패"}
-    flag = f["ret5"] < 0 and i["ret5"] < 0
-    return {"ok": True, "flag": flag,
-            "label": "금융 5일 %+.1f%% · 산업재 5일 %+.1f%%" % (f["ret5"], i["ret5"])}
 
 
 if __name__ == "__main__":

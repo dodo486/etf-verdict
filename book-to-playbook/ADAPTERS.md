@@ -62,15 +62,9 @@ verdict/verdict_engine.py   ← rules.json 의 SCORECARD/DATA 선언 → 종목�
 | `count_up_days` | 최근 N거래일 중 상승일 개수 | `symbol`, `n?` |
 | `gap_up` | 당일 시가의 전일종가 대비 갭(%) | `symbol` |
 | `count_up` | 여러 심볼 중 상승 개수 | `symbols:[...]` |
-| `count_above_ma` | 여러 심볼 중 N일선 위 개수 | `symbols:[...]`, `ma?` |
-| `breadth_aligned` | 같은 방향 최대 개수 | `symbols:[...]` |
 | `prev_low_break` | 전일 저점 이탈 종목 수 | `symbols:[...]` |
 | `pullback_length` | 눌림 길이(거래일) | `symbol` |
 | `breakout_hold` | 돌파 후 유지일 | `symbol` |
-| `first_green_below_ma` | 20일선 아래 첫 양봉 | `symbol` |
-| `defensive_only` | 방어(XLP·XLU·XLV) 강세 + 경기민감(XLK·XLF·XLI) 약세 동시(5일) | — |
-| `cyclical_weak` | 금융·산업재 5일 약세 | — |
-| `bad_rate_drop` | 나쁜 금리 하락(10년물↓ + S&P500 못오름 + XLF 약세) | — |
 
 `op`/`threshold` 가 선언돼 있으면 그 방향·문턱으로 `pass` 를 정하고, 없으면 계산기
 기본 판정(있을 때만)을 쓴다. **임계값을 저자가 안 준 지표는 문턱을 비워 둔다** —
