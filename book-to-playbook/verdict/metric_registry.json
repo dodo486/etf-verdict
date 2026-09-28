@@ -38,10 +38,6 @@
    "data": "eod_open_prev",
    "impl": true
   },
-  "dxy_change": {
-   "data": "eod_close",
-   "impl": true
-  },
   "above_open": {
    "data": "minute_bars",
    "impl": true

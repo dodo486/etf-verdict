@@ -1,6 +1,6 @@
 {
  "book": "데모 『추세추종 스윙 전략』 (자작 중립 샘플)",
- "note": "trend rules.json 의 ref마다 수집요청(metric+ref)을 짝지은 것. verify_rules_vs_spec 대조용. 종목=SPY·QQQ·IWM, 지수=^GSPC/^NDX/^RUT, 시장환경=ES=F·NQ=F·^VIX·^TNX·DX-Y.NYB. 임계는 규칙 라벨의 정량 토큰에서 온다(창작 없음).",
+ "note": "trend rules.json 의 ref마다 수집요청(metric+ref)을 짝지은 것. verify_rules_vs_spec 대조용. 종목=SPY·QQQ·IWM, 지수=^GSPC/^NDX/^RUT, 시장환경=ES=F·NQ=F·^VIX·^TNX. 임계는 규칙 라벨의 정량 토큰에서 온다(창작 없음).",
  "items": [
   {
    "item": "S&P500 선물 방향(전일 대비 +)",
@@ -19,16 +19,6 @@
    "metric": {
     "type": "pct_change",
     "symbol": "NQ=F"
-   },
-   "cadence": "eod"
-  },
-  {
-   "item": "달러인덱스 안정(급강세 아님)",
-   "ref": "1-1",
-   "source": "auto",
-   "metric": {
-    "type": "dxy_change",
-    "symbol": "DX-Y.NYB"
    },
    "cadence": "eod"
   },

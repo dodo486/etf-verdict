@@ -605,30 +605,13 @@
         "symbol": "^TNX",
         "threshold": 0.1
       }
-    },
-    {
-      "t": "달러인덱스 안정(급강세 아님)",
-      "ref": "1-1",
-      "src": "📊 야후 EOD · DX-Y.NYB(실패 시 DX=F) 전일비 (급강세 기준은 운영값 — 저자 미명시)",
-      "metric": {
-        "type": "dxy_change",
-        "role": "trigger",
-        "op": "below",
-        "source": "auto",
-        "symbol": "DX-Y.NYB",
-        "fallback": [
-          "DX=F"
-        ],
-        "threshold": 0.5
-      }
     }
   ],
   "SCSRC": [
     "📊 야후 EOD · ES=F S&P500 선물 전일비 · '고점 낮추지 않음'은 직접 확인",
     "📊 야후 EOD · NQ=F 나스닥100 선물 전일비 · '고점 낮추지 않음'은 직접 확인",
     "📊 야후 EOD · ^VIX 전일비",
-    "📊 야후 EOD · ^TNX 전일 대비 %p",
-    "📊 야후 EOD · DX-Y.NYB(실패 시 DX=F) 전일비"
+    "📊 야후 EOD · ^TNX 전일 대비 %p"
   ],
   "STEPNAME": {
     "STEP1": "STEP1 스코어카드",

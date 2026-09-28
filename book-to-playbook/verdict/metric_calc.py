@@ -35,7 +35,7 @@ def _series(sym):
 
 
 def _snap(sym):
-    """chg/close/prev 만 필요한 심볼(선물·^VIX·^TNX·달러)용 스냅샷."""
+    """chg/close/prev 만 필요한 심볼(선물·^VIX·^TNX)용 스냅샷."""
     if sym in _SNAP_CACHE:
         return _SNAP_CACHE[sym]
     snap = None
@@ -101,21 +101,6 @@ def point_change(m):
     v = d["close"] - d["prev"]
     return {"value": v, "pass": _pass_min(v, m),
             "text": "%s %.2f (전일 %.2f, %+.2f%%p)" % (sym, d["close"], d["prev"], v)}
-
-
-def dxy_change(m):
-    """달러인덱스 등락률 — pct_change 와 같은 계산이되, 심볼이 불안정해 fallback 을 순서대로 시도.
-    (엔진: DX-Y.NYB 실패 시 DX=F). 첫 성공 심볼의 값을 쓴다."""
-    syms = [m.get("symbol")] + list(m.get("fallback") or [])
-    for sym in syms:
-        if not sym:
-            continue
-        d = _dir(sym)
-        if d and d.get("chg") is not None:
-            mm = dict(m)
-            mm["symbol"] = sym
-            return pct_change(mm)
-    return {"value": None, "pass": None, "text": "달러인덱스 수집 실패(심볼 불안정)"}
 
 
 def _num(d, k):
@@ -259,7 +244,6 @@ def prev_low_break(m):
 CALC = {
     "pct_change": pct_change,
     "point_change": point_change,
-    "dxy_change": dxy_change,
     "above_ma": above_ma,
     "hold_above_ma": hold_above_ma,
     "n_day_return": n_day_return,

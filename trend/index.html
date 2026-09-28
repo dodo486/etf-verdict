@@ -553,7 +553,7 @@ body{padding-left:var(--rail)}
     </div>
 
     <script type="application/json" id="verdict-data">
-{"score": 5, "scorecard": [{"label": "S&P500 선물 방향", "ok": true, "why": "ES=F +0.47%"}, {"label": "나스닥 선물 방향", "ok": true, "why": "NQ=F +0.40%"}, {"label": "변동성 안정(전일 10% 미만)", "ok": true, "why": "^VIX -5.11%"}, {"label": "10년물 안정(0.1%p 미만)", "ok": true, "why": "^TNX 5.18 (전일 5.16, +0.02%p)"}, {"label": "달러인덱스 안정(급강세 아님)", "ok": true, "why": "DX-Y.NYB -0.32%"}], "verdicts": [{"prod": "SPY", "color": "🔵", "grade": "✅ 매수 후보", "reason": "필터 통과 · 스코어 5 → 1차 분할 진입 준비", "eod_checks": {"above20": {"ok": true, "label": "^GSPC 7743.41 / 20일선 7672.48 (+0.9%)"}, "hold20": {"ok": true, "label": "^GSPC 20일선 위 5거래일 연속 (기준 3)"}, "breakout": {"ok": false, "label": "전고점 위 0거래일 유지"}, "leaders": {"ok": true, "label": "5/5개 상승"}}, "avoid": [], "avoid_keys": [], "filter_ok": true, "vol_ok": false, "intraday": [], "metrics": {"vix": "^VIX -5.11%", "run5": "최근 5일 +1.3%", "wick": "고점 대비 종가 -0.1%", "vol_sell": "거래량 0.84배 (당일/20일평균)", "filter": "^GSPC 7743.41 / 20일선 7672.48 (+0.9%)", "vol": "거래량 0.84배 (당일/20일평균)"}, "close": 771.3499755859375, "ma20": 765.3504974365235, "chg": 0.5435468794763696}, {"prod": "QQQ", "color": "🟢", "grade": "✅ 매수 후보", "reason": "필터 통과 · 스코어 5 → 1차 분할 진입 준비", "eod_checks": {"above20": {"ok": true, "label": "^NDX 30608.13 / 20일선 29620.59 (+3.3%)"}, "hold20": {"ok": true, "label": "^NDX 20일선 위 7거래일 연속 (기준 3)"}, "pullback": {"ok": true, "label": "최근 고점 이후 3거래일 눌림"}, "leaders": {"ok": true, "label": "4/5개 상승"}}, "avoid": [], "avoid_keys": [], "filter_ok": true, "vol_ok": false, "intraday": [], "metrics": {"vix": "^VIX -5.11%", "run5": "최근 5일 +3.2%", "wick": "고점 대비 종가 -0.2%", "vol_sell": "거래량 0.91배 (당일/20일평균)", "filter": "^NDX 30608.13 / 20일선 29620.59 (+3.3%)", "vol": "거래량 0.84배 (당일/20일평균)"}, "close": 744.5, "ma20": 720.8744964599609, "chg": 0.4587808023302566}, {"prod": "IWM", "color": "🟠", "grade": "🚫 진입 금지", "reason": "필터 미충족 — 추세 없음", "eod_checks": {"above20": {"ok": false, "label": "^RUT 2837.55 / 20일선 2902.79 (-2.2%)"}, "hold20": {"ok": false, "label": "^RUT 20일선 위 0거래일 연속 (기준 3)"}, "leaders": {"ok": true, "label": "5/5개 상승"}, "breakout": {"ok": false, "label": "전고점 위 0거래일 유지"}}, "avoid": [], "avoid_keys": [], "filter_ok": false, "vol_ok": false, "intraday": [], "metrics": {"vix": "^VIX -5.11%", "run5": "최근 5일 -0.7%", "wick": "고점 대비 종가 -0.5%", "vol_sell": "거래량 0.99배 (당일/20일평균)", "filter": "^RUT 2837.55 / 20일선 2902.79 (-2.2%)", "vol": "거래량 0.84배 (당일/20일평균)"}, "close": 281.9700012207031, "ma20": 288.6100051879883, "chg": 0.11006090838713313}], "ts": "2026-09-26T17:17:14.582262+09:00", "extras": {}, "intraday_state": "pending"}
+{"score": 1, "scorecard": [{"label": "S&P500 선물 방향", "ok": false, "why": "ES=F -0.53%"}, {"label": "나스닥 선물 방향", "ok": false, "why": "NQ=F -1.01%"}, {"label": "변동성 안정(전일 10% 미만)", "ok": false, "why": "^VIX +10.42%"}, {"label": "10년물 안정(0.1%p 미만)", "ok": true, "why": "^TNX 5.18 (전일 5.16, +0.02%p)"}], "verdicts": [{"prod": "SPY", "color": "🔵", "grade": "⛔ 보류", "reason": "회피 신호 1개 — 눌림 대기", "eod_checks": {"above20": {"ok": true, "label": "^GSPC 7743.41 / 20일선 7672.48 (+0.9%)"}, "hold20": {"ok": true, "label": "^GSPC 20일선 위 5거래일 연속 (기준 3)"}, "breakout": {"ok": false, "label": "전고점 위 0거래일 유지"}, "leaders": {"ok": true, "label": "5/5개 상승"}}, "avoid": ["변동성 전일 대비 10% 이상 급등 — ^VIX +10.42%"], "avoid_keys": ["vix"], "filter_ok": true, "vol_ok": false, "intraday": [], "metrics": {"vix": "^VIX +10.42%", "run5": "최근 5일 +1.3%", "wick": "고점 대비 종가 -0.1%", "vol_sell": "거래량 0.84배 (당일/20일평균)", "filter": "^GSPC 7743.41 / 20일선 7672.48 (+0.9%)", "vol": "거래량 0.84배 (당일/20일평균)"}, "close": 771.3499755859375, "ma20": 765.3504974365235, "chg": 0.5435468794763696}, {"prod": "QQQ", "color": "🟢", "grade": "⛔ 보류", "reason": "회피 신호 1개 — 눌림 대기", "eod_checks": {"above20": {"ok": true, "label": "^NDX 30608.13 / 20일선 29620.59 (+3.3%)"}, "hold20": {"ok": true, "label": "^NDX 20일선 위 7거래일 연속 (기준 3)"}, "pullback": {"ok": true, "label": "최근 고점 이후 3거래일 눌림"}, "leaders": {"ok": true, "label": "4/5개 상승"}}, "avoid": ["변동성 전일 대비 10% 이상 급등 — ^VIX +10.42%"], "avoid_keys": ["vix"], "filter_ok": true, "vol_ok": false, "intraday": [], "metrics": {"vix": "^VIX +10.42%", "run5": "최근 5일 +3.2%", "wick": "고점 대비 종가 -0.2%", "vol_sell": "거래량 0.91배 (당일/20일평균)", "filter": "^NDX 30608.13 / 20일선 29620.59 (+3.3%)", "vol": "거래량 0.84배 (당일/20일평균)"}, "close": 744.5, "ma20": 720.8744964599609, "chg": 0.4587808023302566}, {"prod": "IWM", "color": "🟠", "grade": "🚫 진입 금지", "reason": "필터 미충족 — 추세 없음", "eod_checks": {"above20": {"ok": false, "label": "^RUT 2837.55 / 20일선 2902.79 (-2.2%)"}, "hold20": {"ok": false, "label": "^RUT 20일선 위 0거래일 연속 (기준 3)"}, "leaders": {"ok": true, "label": "5/5개 상승"}, "breakout": {"ok": false, "label": "전고점 위 0거래일 유지"}}, "avoid": ["변동성 전일 대비 10% 이상 급등 — ^VIX +10.42%"], "avoid_keys": ["vix"], "filter_ok": false, "vol_ok": false, "intraday": [], "metrics": {"vix": "^VIX +10.42%", "run5": "최근 5일 -0.7%", "wick": "고점 대비 종가 -0.5%", "vol_sell": "거래량 0.99배 (당일/20일평균)", "filter": "^RUT 2837.55 / 20일선 2902.79 (-2.2%)", "vol": "거래량 0.84배 (당일/20일평균)"}, "close": 281.9700012207031, "ma20": 288.6100051879883, "chg": 0.11006090838713313}], "ts": "2026-09-28T19:28:46.739004+09:00", "extras": {}, "intraday_state": "pending"}
 </script>
 
     <!-- STEP 1: Definition table -->
@@ -581,15 +581,14 @@ body{padding-left:var(--rail)}
 
     <!-- STEP 1: pre-market scorecard -->
     <h2 id="sheet-step1"><span class="step">STEP 1</span>장 시작 전 스코어카드 <span class="tag a">1-1~1-3</span></h2>
-    <p class="subtle">5개 지표 각 양호 시 1점. <b>🤖 오늘 값으로 자동 체크됨</b> — 직접 수정하면 점수·판정이 즉시 다시 계산됩니다.</p>
+    <p class="subtle">4개 지표 각 양호 시 1점. <b>🤖 오늘 값으로 자동 체크됨</b> — 직접 수정하면 점수·판정이 즉시 다시 계산됩니다.</p>
     <div class="card" id="scorecard" data-ref="1-1 1-2 1-3">
       <label class="chk"><input type="checkbox" data-sc><span class="txt">S&amp;P500 선물 방향 양호 <small>전일 대비 플러스 유지</small><small class="scwhy"></small></span></label>
       <label class="chk"><input type="checkbox" data-sc><span class="txt">나스닥 선물 방향 양호 <small>전일 대비 플러스 유지</small><small class="scwhy"></small></span></label>
       <label class="chk"><input type="checkbox" data-sc><span class="txt">변동성 안정(전일 10% 미만) <small>VIX 전일 대비 +10% 미만, 급하게 안 튐</small><small class="scwhy"></small></span></label>
       <label class="chk"><input type="checkbox" data-sc><span class="txt">10년물 안정(0.1%p 미만) <small>미국 10년물 금리 전일 대비 +0.1%p 미만</small><small class="scwhy"></small></span></label>
-      <label class="chk"><input type="checkbox" data-sc><span class="txt">달러인덱스 안정(급강세 아님) <small>달러인덱스 전일 대비 급격한 강세 아님</small><small class="scwhy"></small></span></label>
-      <div class="verdict" id="scVerdict"><span class="big score">0 / 5</span><span id="scMsg">지표를 체크하세요</span></div>
-      <p class="subtle" style="margin:10px 0 0">5개 지표 모두 양호하면 진입 준비. 하나라도 흔들리면 관망. 환경 점검은 종목 선택보다 먼저.</p>
+      <div class="verdict" id="scVerdict"><span class="big score">0 / 4</span><span id="scMsg">지표를 체크하세요</span></div>
+      <p class="subtle" style="margin:10px 0 0">4개 지표 모두 양호하면 진입 준비. 하나라도 흔들리면 관망. 환경 점검은 종목 선택보다 먼저.</p>
     </div>
 
     <!-- STEP 3: entry checklist (오늘 자동판정 흡수) -->
@@ -1188,8 +1187,7 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
     "📊 야후 EOD · ES=F S&P500 선물 전일비 · '고점 낮추지 않음'은 직접 확인",
     "📊 야후 EOD · NQ=F 나스닥100 선물 전일비 · '고점 낮추지 않음'은 직접 확인",
     "📊 야후 EOD · ^VIX 전일비",
-    "📊 야후 EOD · ^TNX 전일 대비 %p",
-    "📊 야후 EOD · DX-Y.NYB(실패 시 DX=F) 전일비"
+    "📊 야후 EOD · ^TNX 전일 대비 %p"
   ],
   "STEPNAME": {
     "STEP1": "STEP1 스코어카드",
@@ -1400,7 +1398,7 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
   const scMsg = document.getElementById('scMsg');
   function scUpdate(){
     const n = scBoxes.filter(b=>b.checked).length;
-    scV.querySelector('.score').textContent = n+' / 5';
+    scV.querySelector('.score').textContent = n+' / '+scBoxes.length;
     scV.classList.remove('go','small','no');
     if(n>=4){scV.classList.add('go'); scMsg.textContent='공격 가능 — 진입 조건 충족 시 계획대로 매수';}
     else if(n===3){scV.classList.add('small'); scMsg.textContent='소액만 — 확인 매수 수준으로 축소';}
