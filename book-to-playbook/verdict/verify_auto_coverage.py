@@ -97,7 +97,7 @@ def check(slug, product=None):
     return rows
 
 def book_slugs():
-    """books.json 에 등록된 전 책 slug. 인자 없이 돌릴 때 대상(ETF 기본값 하드코딩 제거)."""
+    """books.json 에 등록된 전 책 slug. 인자 없이 돌릴 때 대상."""
     return [b["slug"] for b in load("books.json").get("books", [])]
 
 def main():

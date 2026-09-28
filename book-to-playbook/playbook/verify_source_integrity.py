@@ -8,7 +8,7 @@
 그런데 자동판정을 붙이다 보면 "구현이 보는 것"과 "책이 시킨 것"이 어긋나는 순간이
 반드시 온다. 그때 **책 문구를 구현에 맞춰 고치고 싶은 유혹**이 생긴다.
 
-실제 사고(2026-09-22, etf):
+실제 사고(2026-09-22):
   시트 라벨은 저자 2-6대로 "나스닥 **선물** 방향"이었는데 파이프라인은 지수(^NDX)를
   보고 있었다. 라벨을 "나스닥100 방향"으로 바꿔 구현에 맞췄다.
   → 불일치가 사라진 게 아니라 **안 보이게** 됐고, 커버리지 배지(✅반영)까지 거짓이 됐다.
@@ -32,9 +32,9 @@
 
 ## 사용
 
-    python -m playbook.verify_source_integrity            # 검사 (다르면 종료코드 1)
-    python -m playbook.verify_source_integrity --accept   # 원문을 의도적으로 고쳤을 때 기준 갱신
-    python -m playbook.verify_source_integrity --show etf # 해당 책이 가진 라벨 목록 출력
+    python -m playbook.verify_source_integrity              # 검사 (다르면 종료코드 1)
+    python -m playbook.verify_source_integrity --accept     # 원문을 의도적으로 고쳤을 때 기준 갱신
+    python -m playbook.verify_source_integrity --show trend # 해당 책이 가진 라벨 목록 출력
 
 기준값은 `source_baseline.json`에 저장되며 **커밋 대상**이다.
 새 책을 추가하면 처음 한 번 `--accept` 로 기준을 등록한다.

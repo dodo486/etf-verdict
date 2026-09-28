@@ -32,7 +32,7 @@ python3 --version       # macOS
 ```
 # (A) 리포 안에서 바로 — PUBLIC = 리포 루트
 <repo>/.nojekyll
-<repo>/etf/index.html          ← 발행 대상
+<repo>/trend/index.html        ← 발행 대상
 <repo>/book-to-playbook/       ← BASE
 
 # (B) 스킬 폴더에 두고 public/ 으로 — 기존 macOS 배치
