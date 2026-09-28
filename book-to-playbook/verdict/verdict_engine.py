@@ -65,12 +65,21 @@ def _auto(m):
 
 
 def _fires(rule):
-    """이 규칙이 발화하나 — 자기 metric(과 subs, combine=any)으로만. 자동 대상 아니면 None."""
+    """이 규칙이 발화하나 — 자기 metric(과 subs)으로만. 자동 대상 아니면 None.
+
+    subs 합성: 기본 any(하나라도 걸리면 부모 발화). 개수 기반 판정(저자가
+    '네 가지 중 두 개 이상'처럼 셈을 명시)은 groupNeed=N — 평가 가능한 하위 중
+    발화 수가 N 이상일 때만 부모가 발화한다."""
     subs = rule.get("subs")
     if subs:
         vals = [_fires(s) for s in subs]
         vals = [v for v in vals if v is not None]
-        return any(vals) if vals else None
+        if not vals:
+            return None
+        need = rule.get("groupNeed")
+        if need:
+            return sum(1 for v in vals if v) >= need
+        return any(vals)
     m = rule.get("metric")
     if not _auto(m):
         return None
@@ -188,6 +197,10 @@ def full_verdict(rules, prod, score, go, small):
     avoid_rules = list(cfg.get("avoid", [])) + list(common.get("avoid", []))
     av, akeys = [], []
     for r in avoid_rules:
+        # 발동 여부는 부모 판정(_fires — groupNeed 반영)이 정한다.
+        # _fired_keys 로 정하면 개수 판정 규칙이 하위 1개 발화만으로 발동된다.
+        if _fires(r) is not True:
+            continue
         keys = _fired_keys(r)
         if keys:
             av.append(_avoid_sentence(r))
@@ -199,6 +212,9 @@ def full_verdict(rules, prod, score, go, small):
     _collect_metrics(cfg.get("filter", []), metrics)
     _collect_metrics(avoid_rules, metrics)
     _collect_metrics(cfg.get("entry", []), metrics)
+    # caution(④ 과열 체크)도 근거 수치를 모은다 — 특히 advisory(임계 미명시) 항목은
+    # 자동판정은 못 해도 값은 보여줘야 사람이 판단한다.
+    _collect_metrics(cfg.get("caution", []), metrics)
     # 필터 요약(UI 의 mt.filter) — 첫 자동 필터 규칙의 근거 텍스트
     for r in cfg.get("filter", []):
         if _auto(r.get("metric")):
@@ -260,8 +276,23 @@ def interpret(rules):
     return out
 
 
+def reentry_checks(rules):
+    """COMMON.reentry 의 자동 항목만 평가 → {k:{ok,label}}. 프런트가 실시간값·잠금에 쓴다.
+    수동(✋) 항목은 metric 이 없거나 source=manual 이라 여기서 빠진다(프런트가 editable 로 표시)."""
+    common = rules.get("DATA", {}).get("COMMON", {})
+    out = {}
+    for r in common.get("reentry", []) or []:
+        k = r.get("k")
+        m = r.get("metric")
+        if not k or not _auto(m):
+            continue
+        res = metric_calc.evaluate(m)
+        out[k] = {"ok": res.get("pass") is True, "label": res.get("text", "")}
+    return out
+
+
 def render(slug):
-    """top 계약을 만든다: {score, scorecard, verdicts, extras, ts}."""
+    """top 계약을 만든다: {score, scorecard, verdicts, reentry, extras, ts}."""
     metric_calc.clear_cache()
     rules = load_rules(slug)
     score, rows = scorecard(rules)
@@ -273,7 +304,8 @@ def render(slug):
     now = datetime.now(timezone.utc).astimezone()
     return {"score": score,
             "scorecard": [{"label": r["label"], "ok": r["ok"], "why": r["why"]} for r in rows],
-            "verdicts": verdicts, "ts": now.isoformat(), "extras": {}}
+            "verdicts": verdicts, "reentry": reentry_checks(rules),
+            "ts": now.isoformat(), "extras": {}}
 
 
 # ------------------------------------------------------------------ 출력 텍스트 / 알림

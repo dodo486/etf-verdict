@@ -5,6 +5,7 @@ telegram.env
 
 # ==== 런타임 생성물 (매 실행마다 갱신) ====
 latest-verdict.json
+latest-verdict-*.json
 intraday-verdict.json
 
 logs/

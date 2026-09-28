@@ -57,6 +57,26 @@
   "minute_high_hold": {
    "data": "minute_bars",
    "impl": false
+  },
+  "updown_magnitude": {
+   "data": "eod_close",
+   "impl": false
+  },
+  "rise_from_low": {
+   "data": "eod_close",
+   "impl": false
+  },
+  "declining_days": {
+   "data": "eod_close",
+   "impl": true
+  },
+  "pullback_resume": {
+   "data": "eod_ohlc",
+   "impl": true
+  },
+  "pullback_length": {
+   "data": "eod_close",
+   "impl": true
   }
  },
  "no_data_types": {
@@ -64,6 +84,9 @@
   "news_sentiment": "뉴스 헤드라인 온도·재료 소진 (정성 — 구조화 소스 없음)",
   "analyst_estimate": "애널리스트 실적 추정치 상향/하향 (무료 소스 없음)",
   "kr_flow": "한국 창구별 수급 (무료 실시간 소스 없음)",
-  "event_timestamp": "뉴스 발표 '시각' 기준 창(무료 뉴스 이벤트 피드 없음). 개장 기준 창은 minute_* 로 자동 가능."
+  "event_timestamp": "뉴스 발표 '시각' 기준 창(무료 뉴스 이벤트 피드 없음). 개장 기준 창은 minute_* 로 자동 가능.",
+  "manual_confirm": {
+   "note": "무료 EOD로 자동 판정 불가 — 사람이 차트/거래량을 직접 확인"
+  }
  }
 }

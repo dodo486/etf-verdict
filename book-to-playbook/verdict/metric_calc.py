@@ -207,11 +207,30 @@ def gap_up(m):
 
 
 def count_up(m):
-    """심볼 목록 중 상승 개수(사실은 시세팀 breadth_up). min 이상이면 pass."""
-    up, n = md_feed.breadth_up(m.get("symbols") or [])
+    """심볼 목록 중 상승 개수. min 이상이면 pass.
+
+    개수와 종목별 실제값을 **같은 스냅샷**에서 만든다 — breadth_up(개수)과 quote(값)를
+    따로 부르면 두 소스가 다른 시점을 봐 '6/6 상승'인데 종목값은 2개만 +인 모순이 난다.
+    그래서 quote_snapshot 하나로 세고, 라벨에 종목별 등락률을 그대로 노출한다(요약 개수가
+    아니라 실데이터를 보여준다). 심볼 순서는 규칙에 적힌 순서를 유지한다."""
+    syms = m.get("symbols") or []
+    snap = md_feed.quote_snapshot(syms)
+    parts, up, n = [], 0, 0
+    for s in syms:
+        v = snap.get(s) or {}
+        chg = v.get("chg")
+        if chg is None:
+            parts.append("%s?" % s)
+            continue
+        n += 1
+        if chg > 0:
+            up += 1
+        parts.append("%s%+.1f%%" % (s, chg))
     if n == 0:
         return {"value": None, "pass": None, "text": "심볼 수집 실패"}
-    return {"value": up, "pass": _pass_min(up, m), "text": "%d/%d개 상승" % (up, n)}
+    detail = " · ".join(parts)
+    return {"value": up, "pass": _pass_min(up, m),
+            "text": "%d/%d개 상승 (%s)" % (up, n, detail)}
 
 
 def pullback_length(m):
@@ -221,6 +240,38 @@ def pullback_length(m):
     if v is None:
         return {"value": None, "pass": None, "text": "눌림 데이터 없음"}
     return {"value": v, "pass": None, "text": "최근 고점 이후 %d거래일 눌림" % v}
+
+
+def pullback_resume(m):
+    """'짧은 눌림이 끝나고 다시 올라오는 자리' 를 충실히 판정한다.
+
+    days_since_high(눌림 일수)만 세면 하락이 계속되는 날(예: -10%)도 '눌림 N일'로
+    통과한다 — 저자가 말한 '다시 올라오는' 조건이 빠졌기 때문이다. 그래서 세 사실을
+    함께 본다(전부 시세팀 daily_features 사실):
+      · 짧은 눌림   : 1 ≤ days_since_high ≤ max_days
+      · 다시 반등   : 당일 등락률(chg) > 0
+      · (선택)전일저점 안 깸 : require_no_break 이면 오늘 저가 ≥ 전일 저가
+    저자가 명시한 조건만 켠다(SOXL 2-3 은 '전일 저점 안 깸'을 명시 → require_no_break).
+    """
+    sym = m["symbol"]
+    d = _series(sym)
+    if not _ok(d):
+        return {"value": None, "pass": None, "text": "%s 데이터 없음" % sym}
+    dsh, chg = d.get("days_since_high"), d.get("chg")
+    if dsh is None or chg is None:
+        return {"value": None, "pass": None, "text": "%s 눌림/등락 데이터 부족" % sym}
+    maxd = m.get("max_days", 4)
+    short = 1 <= dsh <= maxd
+    up = chg > 0
+    nobreak = True
+    parts = ["%s 눌림 %d일(≤%d)" % (sym, dsh, maxd),
+             ("반등 +%.1f%%" % chg) if up else ("당일 %.1f%% (반등 아님)" % chg)]
+    if m.get("require_no_break"):
+        low, plow = d.get("low"), d.get("prevlow")
+        nobreak = low is not None and plow is not None and low >= plow
+        parts.append("전일저점 " + ("지킴" if nobreak else "이탈"))
+    return {"value": dsh, "pass": bool(short and up and nobreak),
+            "text": " · ".join(parts)}
 
 
 def breakout_hold(m):
@@ -240,6 +291,31 @@ def prev_low_break(m):
     return {"value": br, "pass": _pass_min(br, m), "text": "%d/%d개 전일 저점 이탈" % (br, ck)}
 
 
+def declining_days(m):
+    """최근 종가가 days 일 연속 하락(직전 종가보다 낮음)인가. days 연속이면 pass.
+
+    '공포 진정 — VIX가 고점을 꺾고 2일 연속 낮아짐'(9-5)용. days 는 metric 선언에서
+    읽는다(코드에 숫자 안 박음). 실제 종가 흐름을 text 로 노출한다(요약 아니라 실데이터)."""
+    sym = m["symbol"]
+    days = m.get("days", 2)
+    d = _series(sym)
+    if not _ok(d):
+        return {"value": None, "pass": None, "text": "%s 데이터 없음" % sym}
+    cs = d.get("closes") or []
+    if len(cs) < days + 1:
+        return {"value": None, "pass": None, "text": "%s 종가 부족" % sym}
+    tail = cs[-(days + 1):]
+    streak = 0
+    for i in range(len(tail) - 1, 0, -1):
+        if tail[i] < tail[i - 1]:
+            streak += 1
+        else:
+            break
+    flow = " → ".join("%.2f" % x for x in tail)
+    return {"value": streak, "pass": _pass_min(streak, m),
+            "text": "%s %d일 연속 하락 (%s)" % (sym, streak, flow)}
+
+
 # 선언 type → 계산기. (여기 없는 type = 아직 미구현/장중 — 상위가 '미구현'으로 표시)
 CALC = {
     "pct_change": pct_change,
@@ -255,7 +331,9 @@ CALC = {
     "count_up": count_up,
     "prev_low_break": prev_low_break,
     "pullback_length": pullback_length,
+    "pullback_resume": pullback_resume,
     "breakout_hold": breakout_hold,
+    "declining_days": declining_days,
 }
 
 

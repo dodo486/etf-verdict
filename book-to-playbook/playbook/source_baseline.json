@@ -1,8 +1,32 @@
 {
+  "moneycopy": {
+    "src": "c0fcc80b551225fb",
+    "def_table": "e3b0c44298fc1c14",
+    "labels": "6c5bd8c744c2fb3d",
+    "rule_data": "b1cc4f1e00dec3e2"
+  },
   "trend": {
     "src": "cd4813d0bf901881",
     "def_table": "e3b0c44298fc1c14",
-    "labels": "543aa80cec70aa05",
+    "labels": "915edf628755d036",
     "rule_data": "8464cfdd2db07c8f"
-  }
+  },
+  "accept_log": [
+    {
+      "ts": "2026-09-28T20:57:35",
+      "why": "신규 책 moneycopy 첫 등록 — 기준 해시 생성"
+    },
+    {
+      "ts": "2026-09-28T23:36:02",
+      "why": "재진입 게이트 데이터화(9-3·9-5 reentry 5규칙: ①②자동·③④⑤수동)"
+    },
+    {
+      "ts": "2026-09-29T00:06:30",
+      "why": "pullback 충실화(2-3·3-1): days_since_high 프록시→전일저점 안 깸+당일 반등 조건 추가(pullback_resume)"
+    },
+    {
+      "ts": "2026-09-29T07:10:19",
+      "why": "advisory 4항목 반영"
+    }
+  ]
 }

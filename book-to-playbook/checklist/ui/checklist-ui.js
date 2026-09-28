@@ -13,6 +13,13 @@
   const scBoxes = [...document.querySelectorAll('[data-sc]')];
   const scV = document.getElementById('scVerdict');
   const scMsg = document.getElementById('scMsg');
+  // 공통로직: 데이터 판정이 들어가는 체크박스는 사람이 못 바꾼다(자동=잠금). chk() 의
+  //   autoLock 과 같은 규칙을 스코어카드에도 적용한다. 스코어카드는 설계상 장전 자동
+  //   지표 패널이라 항목 전부가 야후 EOD 자동 판정(VD.scorecard 로 프리필)이다 — 그래서
+  //   모두 disabled + .autolock. 그래야 실데이터 판정을 사람이 잘못 눌러 못 뒤집는다.
+  //   (판정 근거 SCORECARD 는 백엔드 전용 키라 #rules 에 안 들어오므로 여기서 참조하지
+  //    않는다 — data-sc 존재 자체가 '자동 지표'라는 계약이다.)
+  scBoxes.forEach(b=>{ b.disabled=true; const w=b.closest('.chk'); if(w) w.classList.add('autolock'); });
   function scUpdate(){
     const n = scBoxes.filter(b=>b.checked).length;
     scV.querySelector('.score').textContent = n+' / '+scBoxes.length;
@@ -21,7 +28,8 @@
     else if(n===3){scV.classList.add('small'); scMsg.textContent='소액만 — 확인 매수 수준으로 축소';}
     else {scV.classList.add('no'); scMsg.textContent='관망 — 오늘은 신규 진입 보류';}
   }
-  scBoxes.forEach(b=>b.addEventListener('change',scUpdate)); scUpdate();
+  // 자동 항목은 잠겨 change 가 안 뜨므로, 남은 수동 항목만 재계산에 반응한다.
+  scBoxes.forEach(b=>{ if(!b.disabled) b.addEventListener('change',scUpdate); }); scUpdate();
 
   /* ---- STEP 3: entry checklist ---- */
   // VD 는 #verdict-data 를 다시 읽어 갱신 가능(라이브 모드에서 서버 폴링이 값을 갈아끼운다).
@@ -33,12 +41,39 @@
   // 지표 레지스트리 — 조건의 mtype 으로 🤖자동/🚧미구현/✋직접을 파생한다(게이트와 같은 기준, 주제 모름).
   const REG = (function(){ try { return JSON.parse(document.getElementById('metric-registry').textContent) || {}; } catch(e){ return {}; } })();
   const _AUTO = REG.auto_types || {}, _NODATA = REG.no_data_types || {};
+  // ★ 데이터 원천 링크(공통) — 값 텍스트에 나오는 티커를 야후 파이낸스 페이지로 링크해
+  //   사람이 원본 데이터를 직접 대조할 수 있게 한다. 심볼 목록은 #symbols(rules.json metric
+  //   에서 추출·주입). 책별 하드코딩 없음 — 어떤 책이든 자기 심볼로 링크된다.
+  const SYMS = (function(){ try { return JSON.parse(document.getElementById('symbols').textContent) || []; } catch(e){ return []; } })();
+  const SYM_RE = SYMS.length
+    ? new RegExp('(?<![A-Za-z0-9])(' + SYMS.slice().sort((a,b)=>b.length-a.length)
+        .map(s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|') + ')(?![A-Za-z0-9])', 'g')
+    : null;
+  function withSrc(text){
+    if(!text || !SYM_RE) return text;
+    return String(text).replace(SYM_RE, function(m){
+      return '<a href="https://finance.yahoo.com/quote/' + encodeURIComponent(m)
+        + '" target="_blank" rel="noopener" title="야후 파이낸스 — 원본 데이터 확인"'
+        + ' style="color:inherit;text-decoration:underline dotted;text-underline-offset:2px">' + m + '</a>';
+    });
+  }
   //   반환: 'auto'(값 표시) | 'todo'(🚧 데이터O·로직X) | 'manual'(✋ 데이터 없음)
   function clsOf(k, mtype){
     if(k) return 'auto';
     if(mtype && _AUTO[mtype]) return _AUTO[mtype].impl ? 'auto' : 'todo';
     if(mtype && _NODATA[mtype]) return 'manual';
     return 'manual';   // 미선언은 보수적으로 직접 취급(게이트가 별도로 미결선 잡음)
+  }
+  // ★ 공통 단일 잠금 결정자 — 모든 체크리스트 항목이 이 함수 하나로 자동/수동을 정한다.
+  //   "데이터로 자동판정 가능하면(auto·todo) 체크박스를 잠가 사람이 못 바꾸게 한다."
+  //   'todo'(데이터는 있고 로직 미구현)도 '자동판정 대상'이라 잠근다 — 사람이 임의로 못 켠다.
+  //   책별로 다른 잠금 분기를 만들지 말 것: 스코어카드·필터·진입·회피·재진입 전부 이걸 쓴다.
+  function isAuto(c, bt){
+    // advisory: 데이터는 있으나 저자가 임계를 안 줘서 자동판정 불가 → 잠그지 않는다
+    //   (값은 보여주되 사람이 판단). 이게 없으면 bt='eod' 만으로 잠겨 오해를 부른다.
+    if(c && c.advisory) return false;
+    const cls = clsOf(c.k, c.mtype);
+    return c.autoLock===true || cls==='auto' || cls==='todo' || bt==='eod' || bt==='intra';
   }
   // 종목 키는 rules.json 에서 파생한다(책무관) — 특정 티커를 코드에 박지 않는다.
   const PRODS = Object.keys(DATA).filter(function(k){ return k !== 'COMMON'; });
@@ -124,12 +159,12 @@
                 live: sk.length ? mt[sk[0]] : undefined,
                 on: !!(vv && sk.some(k=>(vv.avoid_keys||[]).includes(k)))};
       });
-      h+=chk('x'+i,{t:c.t,src:c.src,ref:c.ref,bkey:c.bkey,mtype:c.mtype,live:mkey?mt[mkey]:undefined,merged:subsView},true, !!on, (vv&&c.k)?'eod':'', vv?'ok':'pending');
+      h+=chk('x'+i,{t:c.t,src:c.src,ref:c.ref,bkey:c.bkey,mtype:c.mtype,advisory:c.advisory,live:mkey?mt[mkey]:undefined,merged:subsView},true, !!on, (vv&&c.k)?'eod':'', vv?'ok':'pending');
     });
     if(d.caution){
       h += '<div class="grouplabel" style="color:var(--gold)">④ 되돌림·과열 체크 — 아래 중 다수가 불편하면 조심 신호</div>';
       d.caution.forEach((c,i)=>{
-        h+=chk('c'+i,{t:c.t, src:c.src, ref:c.ref, bkey:c.bkey, live:c.k?mt[c.k]:undefined}, true, false, (vv&&c.k)?'eod':'', vv?'ok':'pending');
+        h+=chk('c'+i,{t:c.t, src:c.src, ref:c.ref, bkey:c.bkey, advisory:c.advisory, live:c.k?mt[c.k]:undefined}, true, false, (vv&&c.k)?'eod':'', vv?'ok':'pending');
       });
       h += '<div class="note" id="cauNote" style="margin-top:8px"></div>';
     }
@@ -163,10 +198,13 @@
     const srcTxt = c.src || c.s;
     if(srcTxt) small += '<span style="color:var(--mute)">'+srcTxt+'</span>';
     const hasKids = !!(c.merged && c.merged.length);
-    const dataPill = (c.live && !hasKids) ? '<span class="dataval">'+c.live+'</span>' : '';
+    const dataPill = (c.live && !hasKids) ? '<span class="dataval">'+withSrc(c.live)+'</span>' : '';
     // 비병합 항목: live 값이 없고 mtype 이 미구현/무데이터면 상태 태그(🚧/✋)로 알린다.
     let statusTag = '';
-    if(!hasKids && !c.live && c.mtype){
+    if(c.advisory){
+      // 데이터는 보여주되 저자가 임계를 안 줘서 자동판정 불가 — 사람이 값 보고 판단.
+      statusTag = ' <span class="manual-tag">✋ 임계 미명시 · 값 보고 직접 판단</span>';
+    } else if(!hasKids && !c.live && c.mtype){
       const cls = clsOf(null, c.mtype);
       if(cls==='todo') statusTag = ' <span class="todo-tag">🚧 자동 예정(미구현)</span>';
       else if(cls==='manual') statusTag = ' <span class="manual-tag">✋ 직접</span>';
@@ -179,7 +217,8 @@
       dataAttr = ' data-ref="' + c.ref + '"' + (c.bkey ? ' data-bkey="' + String(c.bkey).replace(/"/g,'&quot;') + '"' : '');
     }
     // 자동수집(EOD·장중) 항목은 사람이 체크를 못 바꾼다 — 오직 자동만 제어(disabled). 수동만 토글.
-    const autoLock = c.autoLock || bt==='eod' || bt==='intra';
+    //   잠금 결정은 공통 단일 함수 isAuto() 하나로만 한다(책무관·중복 0).
+    const autoLock = isAuto(c, bt);
     // 의미단위 병합(동의어) 하위 조건 — 부모와 같은 사각형 체크박스(크기만 작게)로 편다.
     //   각 자식: 작은 체크박스(자동=걸림상태 잠김 / 수동=토글) + 조건 텍스트 + 데이터값 pill(구분).
     //   chk-<sub.ref> 앵커·data-ref 로 그 소절 bullet 로 역방향 점프까지 도달.
@@ -194,7 +233,7 @@
             const chkd = s.on ? ' checked' : '';
             const wc = s.on ? ' class="warn"' : '';
             let dataEl;
-            if(s.cls==='auto') dataEl = s.live ? '<span class="dataval">'+s.live+'</span>' : '<span class="manual-tag">수집 대기</span>';
+            if(s.cls==='auto') dataEl = s.live ? '<span class="dataval">'+withSrc(s.live)+'</span>' : '<span class="manual-tag">수집 대기</span>';
             else if(s.cls==='todo') dataEl = '<span class="todo-tag">🚧 자동 예정(미구현)</span>';
             else dataEl = '<span class="manual-tag">✋ 직접</span>';
             return '<div class="subchk'+(s.on?' on':'')+'"'+a+dref+'><input type="checkbox"'+wc+chkd+dis+'><span class="stext">'+s.t+'</span>'+dataEl+'</div>';
@@ -243,7 +282,7 @@
     const chkd = on ? ' checked' : '';
     const wc = on ? ' class="warn"' : '';
     let dataEl;
-    if(st && st.why) dataEl = '<span class="dataval">'+st.why+'</span>';
+    if(st && st.why) dataEl = '<span class="dataval">'+withSrc(st.why)+'</span>';
     else if(!auto) dataEl = '<span class="manual-tag">✋ 직접</span>';
     else dataEl = '<span class="manual-tag">수집 대기</span>';
     return '<div class="subchk'+(on?' on':'')+'"'+anchor+dref+'><input type="checkbox"'+wc+chkd+dis+'><span class="stext">'+s.t+'</span>'+dataEl+'</div>';
@@ -333,6 +372,52 @@
   }
   memoInputs.forEach(i=>i.addEventListener('input',memoUpdate)); memoUpdate();
 
+  /* ---- STEP 5: 폭락 후 재진입 게이트 (책무관, rules.json COMMON.reentry) ----
+     하드코딩 없이 rules.json 에서 렌더한다 → 진입/회피와 같은 chk() 경로 →
+     isAuto() 하나로 자동판정 항목은 자동 잠금+실시간값, 수동(✋)만 사람이 토글.
+     COMMON.reentry 없는 책은 이 섹션 자체를 숨긴다(책무관). */
+  function updateGate(){
+    const gateV = document.getElementById('gateV'), gateMsg = document.getElementById('gateMsg');
+    const rc = document.getElementById('reentryCard');
+    if(!gateV || !rc) return;
+    const items = (DATA.COMMON && DATA.COMMON.reentry) || [];
+    const boxes = [...rc.querySelectorAll('[data-k^="rg"]')];
+    let blocked = false, pos = 0, posTotal = 0;
+    boxes.forEach((b,i)=>{ const c = items[i] || {};
+      if(c.warn){ if(b.checked) blocked = true; }
+      else { posTotal++; if(b.checked) pos++; }
+    });
+    gateV.classList.remove('go','small','no');
+    if(blocked){ gateV.classList.add('no'); gateMsg.innerHTML = '🚫 진입 금지<span class="sub">대표주가 아직 저점을 낮추는 중 — 바닥 지지 전엔 재진입 금지</span>'; return; }
+    const need = Math.max(1, Math.ceil(posTotal*0.75));
+    if(posTotal && pos>=need){ gateV.classList.add('go'); gateMsg.innerHTML = '✅ 재진입 가능<span class="sub">'+pos+'/'+posTotal+' 확인 — <b>1차는 평소 금액의 1/3</b>로만 시작, 청산라인 동시 설정</span>'; }
+    else if(pos>=Math.ceil(posTotal/2)){ gateV.classList.add('small'); gateMsg.innerHTML = '🟡 소액 탐색<span class="sub">'+pos+'/'+posTotal+' — 큰돈은 조건을 더 채운 뒤(첫 바닥은 사지 않음)</span>'; }
+    else { gateV.classList.add('no'); gateMsg.innerHTML = '🚫 대기<span class="sub">'+pos+'/'+posTotal+' — 공포 진정·가격 회복이 먼저</span>'; }
+  }
+  function renderReentry(){
+    const rc = document.getElementById('reentryCard');
+    const sec = document.getElementById('reentrySection');
+    if(!rc) return;
+    const items = (DATA.COMMON && DATA.COMMON.reentry) || [];
+    if(!items.length){ if(sec) sec.style.display='none'; return; }
+    if(sec) sec.style.display='';
+    const RC = (VD && VD.reentry) || {};
+    _chkRefSeen = {};
+    rc.innerHTML = items.map((c,i)=>{
+      const has = c.k && RC[c.k];
+      const live = has ? RC[c.k].label : undefined;
+      const on = has ? !!RC[c.k].ok : false;
+      const bt = c.k ? 'eod' : 'manual';   // k=자동(잠금·실시간값) / 무k=수동(✋ 토글)
+      return chk('rg'+i, {t:c.t, src:c.src, ref:c.ref, bkey:c.bkey, k:c.k, mtype:c.mtype, live:live}, !!c.warn, on, bt, 'ok');
+    }).join('');
+    rc.querySelectorAll('.chk[data-ref]').forEach(row=>{
+      row.addEventListener('click', ev=>{ if(ev.target.closest('input')) return; ev.stopPropagation();
+        if(window.__jumpToPlaybook) window.__jumpToPlaybook(row.getAttribute('data-ref'), row.getAttribute('data-bkey')||''); });
+    });
+    rc.querySelectorAll('input:not(:disabled)').forEach(b=>b.addEventListener('change', updateGate));
+    updateGate();
+  }
+
   /* ---- 오늘 자동판정: STEP2 스코어카드 프리필 + STEP3 요약 스트립/시각 ----
      applyVerdict() 로 감싸 라이브 갱신 때 다시 부를 수 있게 한다. */
   function applyVerdict(){
@@ -358,8 +443,8 @@
         if(scBoxes[i]) scBoxes[i].checked = !!s.ok;
         if(whyEls[i]){
           const bad = !s.why || s.why.indexOf('수집 실패') === 0;
-          whyEls[i].innerHTML = '<span style="color:var(--mute)">'+(SCSRC[i]||'')+'</span> → '
-            + '<b style="color:var(' + (bad ? '--warn' : '--text') + ')">' + (s.why || '값 없음') + '</b>';
+          whyEls[i].innerHTML = '<span style="color:var(--mute)">'+withSrc(SCSRC[i]||'')+'</span> → '
+            + '<b style="color:var(' + (bad ? '--warn' : '--text') + ')">' + withSrc(s.why || '값 없음') + '</b>';
         }
       });
       scUpdate();
@@ -387,6 +472,7 @@
    }
   }
   applyVerdict();
-  // 라이브 모듈이 새 판정을 받으면 이 훅으로 스코어카드·요약칩·진입판정을 다시 그린다.
-  window.__applyVerdict = applyVerdict;
+  renderReentry();   // 재진입 게이트(rules.json COMMON.reentry) — VD 유무와 무관하게 렌더/숨김
+  // 라이브 모듈이 새 판정을 받으면 이 훅으로 스코어카드·요약칩·진입판정·재진입을 다시 그린다.
+  window.__applyVerdict = function(){ applyVerdict(); renderReentry(); };
 })();

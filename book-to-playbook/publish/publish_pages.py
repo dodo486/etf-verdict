@@ -71,7 +71,11 @@ def publish(slug):
 
     # 라이브 책만 최신 판정(verdict-data) 병합. 비-라이브 책은 정적 페이지 그대로.
     if meta.get("live"):
-        js = os.path.join(BASE, "latest-verdict.json")
+        # 자기 책의 판정 파일을 읽는다 — 공용 파일 하나를 돌려쓰면 다른 live 책의
+        # 판정이 이 페이지에 병합된다. 구버전 단일 파일은 폴백으로만.
+        js = os.path.join(BASE, "latest-verdict-%s.json" % slug)
+        if not os.path.exists(js):
+            js = os.path.join(BASE, "latest-verdict.json")
         if os.path.exists(js):
             # 장중 판정 파일 — 옛 KIS 클라이언트가 쓰던 kis-intraday.json 을 중립 이름으로
             # 바꿨다(KIS 잔재 정리). 지금은 만드는 쪽이 없어 항상 '대기(pending)'로 나가고,

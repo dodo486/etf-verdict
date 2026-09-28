@@ -89,6 +89,45 @@ def load_rules(slug):
     return _strip_backend(json.loads(read_text(p)))
 
 
+# ---- 데이터 원천(심볼) 목록 — 값에 야후 파이낸스 링크를 달아 사람이 대조할 수 있게 한다.
+# rules.json 의 모든 metric(symbol/symbols)에서 심볼을 모은다. 프런트(#rules)는 metric 을
+# 안 받으므로(백엔드 전용), 심볼만 따로 #symbols 로 넣는다. 값 텍스트에 있는 티커를
+# 이 목록으로 링크한다(SSOT linkify). 심볼→URL 은 프런트가 encodeURIComponent 로 만든다.
+SYMBOLS_BLOCK_RE = re.compile(
+    r'[ \t]*<script type="application/json" id="symbols">.*?</script>[ \t]*\n?',
+    re.S)
+
+
+def _walk_metrics(obj, out):
+    if isinstance(obj, dict):
+        if "symbol" in obj and isinstance(obj["symbol"], str):
+            out.add(obj["symbol"])
+        for s in obj.get("symbols") or []:
+            if isinstance(s, str) and s:
+                out.add(s)
+        for v in obj.values():
+            _walk_metrics(v, out)
+    elif isinstance(obj, list):
+        for v in obj:
+            _walk_metrics(v, out)
+
+
+def collect_symbols(slug):
+    """rules.json 전체(백엔드 metric 포함)에서 데이터 원천 심볼을 모은다(정렬)."""
+    p = rules_path(slug)
+    if not os.path.exists(p):
+        return []
+    raw = json.loads(read_text(p))
+    syms = set()
+    _walk_metrics(raw, syms)
+    return sorted(syms)
+
+
+def symbols_block_text(slug):
+    body = json.dumps(collect_symbols(slug), ensure_ascii=False)
+    return '<script type="application/json" id="symbols">%s</script>\n' % body
+
+
 def dumps(obj):
     """파일에 쓰는 것과 **같은** 직렬화. 파일/사본이 글자까지 같아야 대조가 쉽다."""
     return json.dumps(obj, ensure_ascii=False, indent=2)
@@ -119,18 +158,32 @@ def extract(html):
     return json.loads(m.group(1))
 
 
+def _inject_symbols(html, slug):
+    """#symbols 블록을 #rules 블록 바로 뒤에 (재)주입한다. 값 링크의 원천 목록."""
+    blk = symbols_block_text(slug)
+    if SYMBOLS_BLOCK_RE.search(html):
+        return SYMBOLS_BLOCK_RE.sub(lambda _: blk, html, count=1)
+    m = BLOCK_RE.search(html)  # #rules 블록 바로 뒤
+    if m:
+        return html[:m.end()] + blk + html[m.end():]
+    return html  # #rules 가 없으면 심볼도 붙일 자리가 없다(정상 흐름에선 항상 있음)
+
+
 def inject(html, slug, obj=None):
     obj = load_rules(slug) if obj is None else obj
     blk = block_text(obj)
     if BLOCK_RE.search(html):
-        return BLOCK_RE.sub(lambda _: blk, html, count=1)
-    m = AFTER_RE.search(html)
-    if m:
-        return html[:m.end()] + "\n" + blk + html[m.end():]
-    m = FIRST_SCRIPT_RE.search(html)
-    if m:
-        return html[:m.start() + 1] + blk + html[m.start() + 1:]
-    raise SystemExit("주입 위치를 못 찾았습니다(#src 도 <script> 도 없음)")
+        html = BLOCK_RE.sub(lambda _: blk, html, count=1)
+    else:
+        m = AFTER_RE.search(html)
+        if m:
+            html = html[:m.end()] + "\n" + blk + html[m.end():]
+        else:
+            m = FIRST_SCRIPT_RE.search(html)
+            if not m:
+                raise SystemExit("주입 위치를 못 찾았습니다(#src 도 <script> 도 없음)")
+            html = html[:m.start() + 1] + blk + html[m.start() + 1:]
+    return _inject_symbols(html, slug)
 
 
 def check(html, slug):

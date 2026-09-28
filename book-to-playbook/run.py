@@ -257,7 +257,10 @@ def main(argv):
     r = Runner(mode, quiet)
     r.say("=== %s 시작 · %s · BASE=%s · PUBLIC=%s" % (mode, sys.platform, BASE, PUBLIC))
 
-    latest = os.path.join(BASE, "latest-verdict.json")
+    # 판정 JSON은 책마다 분리 저장한다(latest-verdict-<slug>.json). 한 파일을
+    # 돌려쓰면 live 2권째부터 마지막 책의 판정이 모든 페이지에 병합된다.
+    def latest_path(slug):
+        return os.path.join(BASE, "latest-verdict-%s.json" % slug)
 
     # 어느 엔진을 돌릴지는 books.json 에서 온다(코드에 특정 책을 박지 않는다).
     # live:true 인 책의 engine.daily / engine.intraday 를 순서대로 실행.
@@ -270,7 +273,7 @@ def main(argv):
             if not daily:
                 r.say("!! %s: engine.daily 없음 — 건너뜀" % slug); continue
             r.step(daily, [slug])                                              # 1) 알림 포함 본 실행
-            r.step(daily, [slug, "--json", "--no-send"], capture_to=latest)    # 2) 발행용 JSON
+            r.step(daily, [slug, "--json", "--no-send"], capture_to=latest_path(slug))  # 2) 발행용 JSON
     elif mode == "intraday":
         for slug in live:
             intraday = paths.book_engine(slug, "intraday")
@@ -278,11 +281,18 @@ def main(argv):
             if intraday:
                 r.step(intraday, [slug])                               # 장중 판정
             if daily:
-                r.step(daily, [slug, "--json", "--no-send"], capture_to=latest)  # EOD 병합 대상
+                r.step(daily, [slug, "--json", "--no-send"], capture_to=latest_path(slug))  # EOD 병합 대상
 
-    if not os.path.exists(latest):
-        r.say("!! latest-verdict.json 없음 — 발행 중단")
-        return 1
+    have = [s for s in live if os.path.exists(latest_path(s))]
+    if live and not have:
+        if os.path.exists(os.path.join(BASE, "latest-verdict.json")):
+            r.say("!! 책별 판정 파일 없음 — 구버전 latest-verdict.json 폴백으로 발행")
+        else:
+            r.say("!! latest-verdict-<slug>.json 이 하나도 없음 — 발행 중단")
+            return 1
+    for s in live:
+        if s not in have:
+            r.say("!! %s: latest-verdict-%s.json 없음 — 지난 스냅샷/구파일로 발행됨" % (s, s))
 
     r.step("publish.publish_pages")
     r.step("publish.build_home", required=False)
@@ -307,7 +317,7 @@ def main(argv):
     # 앞이 깨지면 뒤의 결과도 그 위에서 흔들리므로, 좁은 것부터 넓은 것 순.
     checks = ["verify_teams", "playbook.verify_source_integrity",
               "playbook.verify_source_fabrication", "checklist.verify_coverage",
-              "verify_contract", "verdict.verify_rules_vs_spec"]
+              "verify_contract", "verdict.verify_rules_vs_spec", "verify_editable_auto"]
     codes = {}
     for script in checks:
         code, out, err = r.verify(script)
@@ -337,6 +347,8 @@ def main(argv):
         blocking.append("verify_contract — 규칙 누출(JSON 밖 규칙)")
     elif codes["verify_contract"] == 2:
         r.say("!! verify_contract: 계약 미충족(경고) — 발행은 막지 않음")
+    if codes.get("verify_editable_auto", 0) != 0:
+        blocking.append("verify_editable_auto — 자동판정 체크박스가 파이프라인 밖 하드코딩(editable 위험)")
     if codes["verdict.verify_rules_vs_spec"] == 1:
         blocking.append("verdict.verify_rules_vs_spec — 체크리스트↔수집요청 위반(누락/창작)")
     elif codes["verdict.verify_rules_vs_spec"] == 2:

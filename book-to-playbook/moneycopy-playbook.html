@@ -1,45 +1,14 @@
 <meta charset="utf-8">
-<style>
-:root{--rail:186px}
-#bookrail{position:fixed;left:0;top:0;bottom:0;width:var(--rail);z-index:200;background:#0d0f14;border-right:1px solid #2b303c;overflow-y:auto;padding:16px 12px}
-#bookrail .rh{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#7a8194;font-weight:700;padding:4px 8px 10px}
-#bookrail .bitem{display:block;text-decoration:none;padding:11px 12px;border-radius:10px;margin-bottom:6px;border:1px solid transparent;transition:background .15s,border-color .15s}
-#bookrail .bitem:hover{background:#171a22}
-#bookrail .bitem.active{background:#1a1e28;border-color:var(--ac);border-left:3px solid var(--ac)}
-#bookrail .bt{display:block;font-size:13.5px;font-weight:700;color:#eef1f6;line-height:1.35}
-#bookrail .bitem.active .bt{color:var(--ac)}
-#bookrail .bs{display:flex;align-items:center;gap:6px;font-size:11px;color:#7a8194;margin-top:3px}
-#bookrail .bd{width:6px;height:6px;border-radius:50%;background:#3fb950;display:inline-block}
-#bookrail .home{display:block;margin-top:10px;padding:8px 12px;font-size:12px;color:#7a8194;text-decoration:none;border-top:1px solid #2b303c}
-#bookrail .home:hover{color:#d4a24e}
-body{padding-left:var(--rail)}
-.tabbar{left:var(--rail)}
-#railtoggle{display:none}
-@media(max-width:820px){
-  :root{--rail:0px}
-  body{padding-left:0}
-  #bookrail{width:200px;transform:translateX(-100%);transition:transform .2s;box-shadow:0 0 40px rgba(0,0,0,.6)}
-  #bookrail.open{transform:none}
-  #railtoggle{display:inline-flex;position:fixed;z-index:210;top:10px;right:12px;background:#20242f;color:#d4a24e;border:1px solid #2b303c;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:700;cursor:pointer}
-}
-</style>
-<button id="railtoggle" onclick="document.getElementById('bookrail').classList.toggle('open')">📚 책</button>
-<nav id="bookrail">
-  <div class="rh">📚 책 목록</div>
-  <a class="bitem active" href="../trend/" style="--ac:#3fae7a" title="추세추종 스윙 전략"><span class="bt">추세추종 스윙 전략</span><span class="bs">SPY · QQQ · IWM<span class="bd"></span></span></a><a class="bitem" href="../moneycopy/" style="--ac:#e8833a" title="미국 돈복사 ETF 투자방법"><span class="bt">미국 돈복사 ETF 투자방법</span><span class="bs">TQQQ · SOXL · UPRO<span class="bd"></span></span></a>
-  <a class="home" href="../">＋ 전체 홈</a>
-</nav>
-
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>미국 ETF 추세추종 스윙 플레이북</title>
-<meta name="description" content="추세추종 스윙 플레이북 — SPY·QQQ·IWM 진입/청산/필터 규칙과 핵심 숫자 레퍼런스">
+<title>미국 돈복사 ETF 플레이북</title>
+<meta name="description" content="미국 돈복사 ETF 플레이북 — TQQQ·SOXL·UPRO 3배 레버리지 진입/청산/필터 규칙과 핵심 숫자 레퍼런스">
 
 <style>
   :root{
     --ground:#12141a; --surface:#1a1e28; --surface-2:#20242f; --line:#2b303c;
     --text:#c7ccd6; --head:#eef1f6; --mute:#7a8194;
     --gold:#d4a24e; --gold-dim:#8f7538;
-    --spy:#4c8dff; --qqq:#3fb950; --iwm:#f0883e;
+    --tqqq:#4c8dff; --soxl:#f0883e; --upro:#3fb950;
     --entry:#3fb950; --warn:#e5484d;
     --maxw:1200px;
   }
@@ -474,17 +443,17 @@ body{padding-left:var(--rail)}
 
 <div class="wrap">
   <nav class="side" id="side">
-    <div class="brand">TREND PLAYBOOK</div>
-    <div class="sub">추세추종 스윙 플레이북<br>SPY · QQQ · IWM</div>
+    <div class="brand">MONEYCOPY PLAYBOOK</div>
+    <div class="sub">미국 돈복사 ETF 플레이북<br>TQQQ · SOXL · UPRO</div>
     <ol id="nav"></ol>
   </nav>
 
   <main>
     <header class="hero">
-      <div class="kicker">추세추종 스윙 실전 정리</div>
-      <h1>미국 ETF 추세추종 스윙 플레이북</h1>
+      <div class="kicker">3배 레버리지 ETF 실전 운용 정리</div>
+      <h1>미국 돈복사 ETF 플레이북</h1>
       <div class="meta">
-        원문 <b>추세추종 스윙 실전 기록</b> · 프롤로그 + Chapter 1~3 + 에필로그 (전 14소절)<br>
+        원문 <b>미국 돈복사 ETF 투자방법</b> (김프로랩 | 프로랩북스) · 프롤로그 + Chapter 1~10 + 에필로그 (전 55소절)<br>
         정리 기준 — <b>명시한 매매기법만</b> 추출 · 원문 숫자 그대로 · 미명시 항목은 그대로 표시 · 지어내지 않음
       </div>
       <div class="cover"><span class="dot"></span> 프롤로그~에필로그 전 소절 커버리지 검증 완료 · 빠진 챕터 없음</div>
@@ -505,25 +474,25 @@ body{padding-left:var(--rail)}
       </details>
 
       <div class="thesis">
-        <span class="q">"추세를 따라가되 위치를 먼저 본다. 방향이 정해진 흐름에 붙어서, 그 흐름이 살아 있는 동안만 자리를 지킨다."</span>
-        <span class="src">— 전 챕터에서 반복 강조하는 핵심</span>
+        <span class="q">"돈은 종목명에서 나오지 않습니다. 돈은 자리, 비중, 시간, 손절선이 맞물릴 때 남습니다."</span>
+        <span class="src">— 프롤로그, 이 책 전체를 관통하는 문장</span>
       </div>
 
       <div class="legend">
-        <div class="prod" style="--pc:var(--spy)">
-          <h3>SPY</h3><div class="base">S&amp;P500 ETF</div>
-          <div class="role">넓은 시장 추세 · 안정형 스윙</div>
-          <div class="char">가장 넓은 미국 시장. 흔들림 적고 추세가 오래 간다. 서두르지 않아도 된다.</div>
+        <div class="prod" style="--pc:var(--tqqq)">
+          <h3>TQQQ</h3><div class="base">나스닥100 3배</div>
+          <div class="role">기술주 추세 · 기본 축</div>
+          <div class="char">나스닥100을 따라간다. 빅테크가 세게 움직이면 계좌가 빠르게 움직인다. 20일선 위에서만 산다.</div>
         </div>
-        <div class="prod" style="--pc:var(--qqq)">
-          <h3>QQQ</h3><div class="base">나스닥100 ETF</div>
-          <div class="role">기술주 추세 · 공격형 스윙</div>
-          <div class="char">기술주 비중이 커서 상승장에서 더 크게 오르고 조정에서 더 크게 눌린다. 힘이 실릴 때만 탄다.</div>
+        <div class="prod" style="--pc:var(--soxl)">
+          <h3>SOXL</h3><div class="base">반도체 3배</div>
+          <div class="role">가장 빠르고 가장 거칢</div>
+          <div class="char">가장 많이 오르지만 가장 빨리 무너진다. 단타=5일선, 스윙=20일선. 익절 신호를 미리 정한다.</div>
         </div>
-        <div class="prod" style="--pc:var(--iwm)">
-          <h3>IWM</h3><div class="base">러셀2000 ETF</div>
-          <div class="role">위험선호 신호 · 후행 가속형</div>
-          <div class="char">위험선호 강해질 때 가장 늦게, 가장 세게 달린다. 넓은 위험선호가 확인될 때만 무게를 싣는다.</div>
+        <div class="prod" style="--pc:var(--upro)">
+          <h3>UPRO</h3><div class="base">S&amp;P500 3배</div>
+          <div class="role">느리지만 오래 버팀</div>
+          <div class="char">시장 전체가 같이 갈 때 힘을 낸다. 섹터 5개 중 3개 이상 동반 상승을 확인하고 탄다.</div>
         </div>
       </div>
     </header>
@@ -553,7 +522,7 @@ body{padding-left:var(--rail)}
     </div>
 
     <script type="application/json" id="verdict-data">
-{"score": 2, "scorecard": [{"label": "S&P500 선물 방향", "ok": false, "why": "ES=F -0.78%"}, {"label": "나스닥 선물 방향", "ok": false, "why": "NQ=F -1.10%"}, {"label": "변동성 안정(전일 10% 미만)", "ok": true, "why": "^VIX +8.07%"}, {"label": "10년물 안정(0.1%p 미만)", "ok": true, "why": "^TNX 5.24 (전일 5.18, +0.06%p)"}], "verdicts": [{"prod": "SPY", "color": "🔵", "grade": "🟡 소액만", "reason": "스코어 2 — 확인 매수 수준", "eod_checks": {"above20": {"ok": true, "label": "^GSPC 7683.69 / 20일선 7671.07 (+0.2%)"}, "hold20": {"ok": true, "label": "^GSPC 20일선 위 6거래일 연속 (기준 3)"}, "breakout": {"ok": false, "label": "전고점 위 0거래일 유지"}, "leaders": {"ok": false, "label": "0/5개 상승 (AAPL-0.8% · MSFT-1.4% · AMZN-1.4% · GOOGL-0.3% · JPM-1.9%)"}}, "avoid": [], "avoid_keys": [], "filter_ok": true, "vol_ok": false, "intraday": [], "metrics": {"vix": "^VIX +8.07%", "run5": "최근 5일 -1.0%", "wick": "고점 대비 종가 -0.5%", "vol_sell": "거래량 0.96배 (당일/20일평균)", "ma5_gap": "5일선 769.07 대비 이격 -0.4%", "filter": "^GSPC 7683.69 / 20일선 7671.07 (+0.2%)", "vol": "거래량 0.96배 (당일/20일평균)"}, "close": 765.6099853515625, "ma20": 765.1634979248047, "chg": -0.744148624625904}, {"prod": "QQQ", "color": "🟢", "grade": "🟡 소액만", "reason": "스코어 2 — 확인 매수 수준", "eod_checks": {"above20": {"ok": true, "label": "^NDX 30276.81 / 20일선 29662.76 (+2.1%)"}, "hold20": {"ok": true, "label": "^NDX 20일선 위 8거래일 연속 (기준 3)"}, "pullback": {"ok": true, "label": "최근 고점 이후 4거래일 눌림"}, "leaders": {"ok": false, "label": "1/5개 상승 (AAPL-0.8% · MSFT-1.4% · NVDA+1.7% · AMZN-1.4% · META-4.8%)"}}, "avoid": [], "avoid_keys": [], "filter_ok": true, "vol_ok": false, "intraday": [], "metrics": {"vix": "^VIX +8.07%", "run5": "최근 5일 -0.7%", "wick": "고점 대비 종가 -0.7%", "vol_sell": "거래량 1.24배 (당일/20일평균)", "ma5_gap": "5일선 742.16 대비 이격 -0.8%", "filter": "^NDX 30276.81 / 20일선 29662.76 (+2.1%)", "vol": "거래량 0.96배 (당일/20일평균)"}, "close": 736.530029296875, "ma20": 721.8794982910156, "chg": -1.0705131904801881}, {"prod": "IWM", "color": "🟠", "grade": "🚫 진입 금지", "reason": "필터 미충족 — 추세 없음", "eod_checks": {"above20": {"ok": false, "label": "^RUT 2817.91 / 20일선 2895.07 (-2.7%)"}, "hold20": {"ok": false, "label": "^RUT 20일선 위 0거래일 연속 (기준 3)"}, "leaders": {"ok": false, "label": "0/5개 상승 (AAPL-0.8% · MSFT-1.4% · AMZN-1.4% · GOOGL-0.3% · JPM-1.9%)"}, "breakout": {"ok": false, "label": "전고점 위 0거래일 유지"}}, "avoid": [], "avoid_keys": [], "filter_ok": false, "vol_ok": false, "intraday": [], "metrics": {"vix": "^VIX +8.07%", "run5": "최근 5일 -1.9%", "wick": "고점 대비 종가 -0.7%", "vol_sell": "거래량 1.07배 (당일/20일평균)", "ma5_gap": "5일선 282.56 대비 이격 -0.9%", "filter": "^RUT 2817.91 / 20일선 2895.07 (-2.7%)", "vol": "거래량 0.96배 (당일/20일평균)"}, "close": 280.0199890136719, "ma20": 287.82350463867186, "chg": -0.6915672584279416}], "reentry": {}, "ts": "2026-09-29T07:12:18.548574+09:00", "extras": {}, "intraday_state": "pending"}
+{"score": 0, "scorecard": [], "verdicts": [], "ts": null, "extras": {}}
 </script>
 
     <!-- STEP 1: Definition table -->
@@ -564,31 +533,36 @@ body{padding-left:var(--rail)}
       <table>
         <thead><tr><th>원문 표현 (애매)</th><th>정량 정의 (명확)</th><th>구분</th></tr></thead>
         <tbody>
-          <tr><td>"추세가 살아났다고 본다"</td><td>지수 종가가 <b>20일선 위</b> + 이후 <b>2거래일</b> 동안 다시 안 깸 (2-1 · 2-2 · 2-3)</td><td><span class="tag a">저자</span></td></tr>
-          <tr><td>"거래량이 전일보다 크게 늘며 힘이 실릴 때"</td><td>당일 거래량 <b>전일 대비 1.5배 이상</b> + 종가가 고점 근처 마감 (3-2)</td><td><span class="tag a">저자</span></td></tr>
-          <tr><td>"이미 많이 오른 자리는 추격하지 않는다"</td><td>최근 <b>5거래일 동안 20% 넘게</b> 오른 자리 → 진입 금지 (3-1)</td><td><span class="tag a">저자</span></td></tr>
-          <tr><td>"변동성이 튀는 날은 추격하지 않는다"</td><td><b>VIX 전일 대비 10% 이상</b> 급등 → 장 초반 추격 중단 (1-2)</td><td><span class="tag a">저자</span></td></tr>
-          <tr><td>"금리가 빠르게 오르면 위험자산은 흔들린다"</td><td>10년물 국채금리 전일 대비 <b>0.1%p 넘게</b> 급등 → 진입 미룸 (1-3)</td><td><span class="tag a">저자</span></td></tr>
-          <tr><td>"3개의 조건이 함께 맞을 때 비중을 키울 자리"</td><td>대표 대형주 <b>3개 이상</b> 같은 방향 + 필터 통과 + 진입 조건 충족 (1-4)</td><td><span class="tag a">저자</span></td></tr>
-          <tr><td>"위에서 털리는 신호" — 윗꼬리</td><td>고점 대비 종가 <b>4% 이상</b> 밀려 마감 → 비중 줄이거나 새로 사지 않음 (3-2)</td><td><span class="tag a">저자</span></td></tr>
-          <tr><td>"5일선에서 크게 벌어지면 단기 과열"</td><td>종가가 <b>5일선</b>에서 크게 벌어짐 → 눌림 기다림. 이격 임계는 수치만 표기하고 판단은 사람이 함 (3-1)</td><td><span class="tag o">운영</span></td></tr>
-          <tr><td>"전고점을 2거래일 버티는 자리"</td><td>전고점 돌파 후 <b>2거래일</b> 버티는지 확인 후 비중 추가 (2-1 · 2-4)</td><td><span class="tag a">저자</span></td></tr>
-          <tr><td>"파는 규칙을 사는 규칙보다 먼저 정한다"</td><td>수익 구간에서 일부 먼저 매도 · 손실선 닿으면 이유 재론 없이 먼저 축소 (3-3)</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"단기 매수세가 살아 있다 / 스윙 생존선"</td><td>지수 종가가 <b>20일선 위</b> + 회복 후 <b>2거래일</b> 유지, 중기 체력은 <b>60일선</b> (3-2 · 5-2 · 4-4)</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"이미 많이 오른 자리 추격 금지"</td><td>SOXL 기준 <b>5거래일 20% 이상</b> 급등, 호재 뉴스에도 <b>5거래일 15% 이상</b> 오른 자리 (2-3 · 4-5)</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"이미 뜨거운 장"</td><td>최근 <b>10거래일 중 상승일 7일 이상</b> (2-3)</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"레버리지가 힘 받는 장"</td><td>최근 <b>20거래일 중 상승일 13일 이상</b> (1-2)</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"VIX가 튀는 날은 추격하지 않는다"</td><td><b>VIX 전일 대비 10% 이상</b> 급등 → 추격 매수 중단 (2-4)</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"금리가 급하게 오르는 날"</td><td>10년물 국채금리 하루 <b>0.1%포인트</b> 이상 급등 (2-5)</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"위에서 털리는 신호"</td><td>장중 고점 대비 <b>4% 이상</b> 밀려 마감(윗꼬리) · 거래량 <b>전일 1.5배 이상</b>인데 종가 밀림 (4-5 · 4-3 · 7-4)</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"익은 감 따듯 구간별로 나눠 판다"</td><td>TQQQ <b>7~10%</b>/<b>15~20%</b>에서 각 30% 매도, 잔량 40%는 5·10일선 지키는 동안 · SOXL 1차 <b>10~12%</b> (7-5)</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"계좌 방화선"</td><td>전체 <b>-5%</b> 신규 중단 · <b>-8%</b> 레버리지 절반 축소 · <b>-12%</b> 재설계 (6-4)</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"하락 구간별 대응"</td><td><b>-10%</b> 경고(매수 이유 검문) · <b>-20%</b> 구조조정 · <b>-30%</b> 생존 대응 (9-2)</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"분할로 들어간다"</td><td>1차 <b>25%</b> · 2차 <b>30%</b> · 3차 <b>45%</b> — 총금액을 먼저 쪼갠다 (3-4)</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"환율이 높다를 숫자로"</td><td>현재 환율이 <b>최근 20거래일 평균</b> 위로 크게 벌어지면 전액 환전 금지·금액 축소 (8-1)</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"시초가에 바로 사면 당한다"</td><td>장 시작 <b>30분</b> 대기 → 시초가 위 유지 + 첫 눌림 저점 높임 확인 후 진입 (7-2)</td><td><span class="tag a">저자</span></td></tr>
+          <tr><td>"5일선에서 크게 벌어지면 과열"</td><td>5일선 이격 과다 → 눌림 대기. 이격 임계 수치는 저자 미명시, 판단은 사람이 함 (2-3)</td><td><span class="tag o">운영</span></td></tr>
         </tbody>
       </table>
     </div>
     </details>
 
     <!-- STEP 1: pre-market scorecard -->
-    <h2 id="sheet-step1"><span class="step">STEP 1</span>장 시작 전 스코어카드 <span class="tag a">1-1~1-3</span></h2>
-    <p class="subtle">4개 지표 각 양호 시 1점. <b>🤖 오늘 값으로 자동 체크됨</b> — 직접 수정하면 점수·판정이 즉시 다시 계산됩니다.</p>
-    <div class="card" id="scorecard" data-ref="1-1 1-2 1-3">
-      <label class="chk"><input type="checkbox" data-sc><span class="txt">S&amp;P500 선물 방향 양호 <small>전일 대비 플러스 유지</small><small class="scwhy"></small></span></label>
-      <label class="chk"><input type="checkbox" data-sc><span class="txt">나스닥 선물 방향 양호 <small>전일 대비 플러스 유지</small><small class="scwhy"></small></span></label>
-      <label class="chk"><input type="checkbox" data-sc><span class="txt">변동성 안정(전일 10% 미만) <small>VIX 전일 대비 +10% 미만, 급하게 안 튐</small><small class="scwhy"></small></span></label>
-      <label class="chk"><input type="checkbox" data-sc><span class="txt">10년물 안정(0.1%p 미만) <small>미국 10년물 금리 전일 대비 +0.1%p 미만</small><small class="scwhy"></small></span></label>
-      <div class="verdict" id="scVerdict"><span class="big score">0 / 4</span><span id="scMsg">지표를 체크하세요</span></div>
-      <p class="subtle" style="margin:10px 0 0">4개 지표 모두 양호하면 진입 준비. 하나라도 흔들리면 관망. 환경 점검은 종목 선택보다 먼저.</p>
+    <h2 id="sheet-step1"><span class="step">STEP 1</span>장 시작 전 스코어카드 <span class="tag a">2-6 · 2-5</span></h2>
+    <p class="subtle">장전 10분, 5개 지표 각 양호 시 1점. <b>🤖 오늘 값으로 자동 체크됨</b> — 직접 수정하면 점수·판정이 즉시 다시 계산됩니다.</p>
+    <div class="card" id="scorecard" data-ref="2-6 2-5">
+      <label class="chk"><input type="checkbox" data-sc><span class="txt">나스닥 선물 양호 <small>전일 대비 플러스 — 위치(고점 유지)는 직접 확인</small><small class="scwhy"></small></span></label>
+      <label class="chk"><input type="checkbox" data-sc><span class="txt">S&amp;P500 선물 양호 <small>전일 종가 위에서 버팀</small><small class="scwhy"></small></span></label>
+      <label class="chk"><input type="checkbox" data-sc><span class="txt">VIX 안정 <small>전일 대비 +10% 미만</small><small class="scwhy"></small></span></label>
+      <label class="chk"><input type="checkbox" data-sc><span class="txt">10년물 금리 안정 <small>하루 +0.1%포인트 미만</small><small class="scwhy"></small></span></label>
+      <label class="chk"><input type="checkbox" data-sc><span class="txt">달러인덱스 안정 <small>달러 강세 + 금리·VIX 동시 불편이면 관망</small><small class="scwhy"></small></span></label>
+      <div class="verdict" id="scVerdict"><span class="big score">0 / 5</span><span id="scMsg">지표를 체크하세요</span></div>
+      <p class="subtle" style="margin:10px 0 0">5개 중 4개 이상 양호하면 진입 준비, 3개면 소액만, 그 아래는 관망. 환경 점검은 종목 선택보다 먼저.</p>
     </div>
 
     <!-- STEP 3: entry checklist (오늘 자동판정 흡수) -->
@@ -600,9 +574,9 @@ body{padding-left:var(--rail)}
     <p class="subtle" style="margin-top:8px">💡 각 종목 판정 카드 아래에 <b>매수 즉시 걸어둘 청산·손절 라인</b>이 함께 표시됩니다. 전체 계좌 손실선(-5% 신규중단 · -8% 노출 절반축소 · -12% 재설계)은 공통.</p>
 
     <!-- STEP 4: position calculator -->
-    <h2 id="sheet-step3"><span class="step">STEP 3</span>비중 · 분할 계산기 <span class="tag a">2-4 · 규칙 MODES</span></h2>
-    <p class="subtle">총 투자금과 모드를 넣으면 종목별 배분·현금·3분할 금액이 계산됩니다. (배분비율은 저자의 5,000만 원 예시 기준)</p>
-    <div class="card" data-ref="2-4">
+    <h2 id="sheet-step3"><span class="step">STEP 3</span>비중 · 분할 계산기 <span class="tag a">6-2 · 3-4 · 규칙 MODES</span></h2>
+    <p class="subtle">총 투자금과 모드를 넣으면 종목별 배분·현금·3분할 금액이 계산됩니다. (배분비율은 저자의 6-2 포트폴리오 예시를 % 로 환산)</p>
+    <div class="card" data-ref="6-2">
       <div class="calcrow">
         <label>총 투자금(만원)</label>
         <input type="number" id="capital" value="5000" min="0" step="100">
@@ -624,13 +598,13 @@ body{padding-left:var(--rail)}
     </div>
 
     <!-- 내 계좌 실제 비중 점검  -->
-    <h2 id="sheet-step3b"><span class="step">STEP 3-B</span>지금 내 계좌 점검 <span class="tag a">2-4 · 프롤로그</span></h2>
+    <h2 id="sheet-step3b"><span class="step">STEP 3-B</span>지금 내 계좌 점검 <span class="tag a">6-3 · 10-1</span></h2>
     <p class="subtle">현재 평가액을 넣으면 <b>종목 집중도·현금비중</b>을 계산해 경고선에 걸리는지 판정합니다. 입력값은 이 브라우저에만 저장됩니다.</p>
-    <div class="card" data-ref="2-4">
+    <div class="card" data-ref="6-3">
       <div class="subgrid">
-        <div class="f2"><label>SPY 평가액(만원)</label><input type="number" id="hSPY" data-save min="0" step="10" placeholder="0"></div>
-        <div class="f2"><label>QQQ 평가액(만원)</label><input type="number" id="hQQQ" data-save min="0" step="10" placeholder="0"></div>
-        <div class="f2"><label>IWM 평가액(만원)</label><input type="number" id="hIWM" data-save min="0" step="10" placeholder="0"></div>
+        <div class="f2"><label>TQQQ 평가액(만원)</label><input type="number" id="hTQQQ" data-save min="0" step="10" placeholder="0"></div>
+        <div class="f2"><label>SOXL 평가액(만원)</label><input type="number" id="hSOXL" data-save min="0" step="10" placeholder="0"></div>
+        <div class="f2"><label>UPRO 평가액(만원)</label><input type="number" id="hUPRO" data-save min="0" step="10" placeholder="0"></div>
         <div class="f2"><label>현금(만원)</label><input type="number" id="hCASH" data-save min="0" step="10" placeholder="0"></div>
       </div>
       <div class="calcrow" style="margin-top:12px">
@@ -643,20 +617,20 @@ body{padding-left:var(--rail)}
       </div>
       <div id="posOut" style="margin-top:12px"></div>
       <div id="posWarn"></div>
-      <div class="grouplabel f" style="margin:20px 0 2px" data-ref="3-3">🔥 익절 기준 — 추세 확인 후 비중 조정</div>
+      <div class="grouplabel f" style="margin:20px 0 2px" data-ref="4-3">🔥 익절·전환 기준 — 과열 신호 나올 때 화력 낮추기</div>
       <p class="subtle" style="margin:2px 0 0">보유 수익률을 넣으면 <b>익절·비중 축소 판단</b>에 참고할 수치가 계산됩니다.</p>
       <div class="subgrid">
-        <div class="f2"><label>SPY 보유 수익률(%)</label><input type="number" id="rSPY" data-save step="0.1" placeholder="예: 8.5"></div>
-        <div class="f2"><label>QQQ 보유 수익률(%)</label><input type="number" id="rQQQ" data-save step="0.1" placeholder="예: 12.0"></div>
+        <div class="f2"><label>TQQQ 보유 수익률(%)</label><input type="number" id="rTQQQ" data-save step="0.1" placeholder="예: 8.5"></div>
+        <div class="f2"><label>SOXL 보유 수익률(%)</label><input type="number" id="rSOXL" data-save step="0.1" placeholder="예: 12.0"></div>
       </div>
       <div id="xferOut"></div>
 
     </div>
 
     <!-- 주 1회 비중조정 리듬  -->
-    <h2 id="sheet-step3c"><span class="step">STEP 3-C</span>비중조정은 주 1회</h2>
+    <h2 id="sheet-step3c"><span class="step">STEP 3-C</span>비중조정은 주 1회 <span class="tag a">10-3</span></h2>
     <p class="subtle">전체 비중 조정은 <b>주 1회</b>만. 주중에는 손절·익절 실행만 하고 비중은 건드리지 않습니다.</p>
-    <div class="card" data-ref="2-4">
+    <div class="card" data-ref="10-3">
       <div id="weekOut" class="note">아직 기록 없음 — 첫 비중조정을 끝내면 아래 버튼을 누르세요.</div>
       <div class="calcrow" style="margin-top:12px">
         <div class="pick"><button id="weekDone" type="button">오늘 비중조정 완료로 기록</button><button id="weekClear" type="button">기록 지우기</button></div>
@@ -669,7 +643,7 @@ body{padding-left:var(--rail)}
     <p class="subtle">다섯 칸을 다 못 채우면 준비 안 된 매매입니다. 특히 <b>줄일 자리·판단 기간</b>이 비면 매수 금지.</p>
     <div class="card">
       <div class="calcrow" style="margin:0 0 14px">
-        <label>⓪ 이번 매매는 <span class="tag a">3-3</span></label>
+        <label>⓪ 이번 매매는 <span class="tag a">4-4</span></label>
         <div class="pick" id="ttype">
           <button data-t="단타">단타 (5일선)</button>
           <button data-t="스윙">스윙 (20일선)</button>
@@ -683,7 +657,7 @@ body{padding-left:var(--rail)}
         <div class="field"><label>④ 판단 기간</label><input data-req placeholder="예: 스윙 5~8거래일, 20일 내 재판단"></div>
         <div class="field"><label>⑤ 환율 상태</label><input data-req placeholder="예: 현재 1,380 / 20일평균 1,355 (+25원 → 1차만 환전)"></div>
       </div>
-      <div class="grouplabel f" style="margin:18px 0 2px" data-ref="에필로그">💱 환전 판정</div>
+      <div class="grouplabel f" style="margin:18px 0 2px" data-ref="8-5">💱 환전 판정</div>
       <p class="subtle" style="margin:2px 0 0">환전 타이밍과 매수 타이밍은 <b>따로</b> 봅니다. 두 숫자만 넣으면 이번에 몇 칸까지 환전할지 판정합니다.</p>
       <div class="subgrid">
         <div class="f2"><label>현재 원/달러</label><input type="number" id="fxNow" data-save min="0" step="1" placeholder="1380"></div>
@@ -694,8 +668,7 @@ body{padding-left:var(--rail)}
       <div class="verdict" id="memoVerdict" style="margin-top:12px"><span id="memoMsg">다섯 칸을 채우세요</span></div>
     </div>
 
-    <!-- STEP 5: 폭락 후 재진입 게이트 (rules.json COMMON.reentry → 공통 렌더, 하드코딩 없음)
-         reentry 규칙이 없는 책은 SSOT 가 이 섹션을 숨긴다. -->
+    <!-- STEP 5: 폭락 후 재진입 게이트 (rules.json COMMON.reentry → 공통 렌더, 하드코딩 없음) -->
     <section id="reentrySection">
     <h2 id="sheet-step5"><span class="step">STEP 5</span>폭락 후 재진입 게이트</h2>
     <p class="subtle">평시 진입(STEP 2)과 <b>다른 체크리스트</b>입니다. 폭락·급락 뒤 다시 들어갈 때만 사용합니다. 자동 판정 항목은 <b>오늘 값으로 잠기고</b>, <b>✋ 표시는 직접 확인</b>합니다. 첫 바닥은 사지 않습니다.</p>
@@ -717,7 +690,7 @@ body{padding-left:var(--rail)}
       <div id="wdOut" style="margin-top:12px"></div>
       <p class="subtle" style="margin:10px 0 0">출금 분리율 — 실현수익의 <b>30%</b>, 한 달 실현이 <b>1,000만원을 넘으면 40%</b>를 계좌 밖으로 뺍니다. 손실 매매도 똑같이 기록합니다.</p>
 
-      <div class="grouplabel f" style="margin:20px 0 2px" data-ref="에필로그">📒 두 장부 — 달러수익 vs 원화수익</div>
+      <div class="grouplabel f" style="margin:20px 0 2px" data-ref="8-2">📒 두 장부 — 달러수익 vs 원화수익</div>
       <p class="subtle" style="margin:2px 0 0">같은 매매도 달러로는 벌고 원화로는 잃을 수 있습니다. 네 숫자를 남깁니다.</p>
       <div class="subgrid">
         <div class="f2"><label>매수가($)</label><input type="number" id="jBuy" data-save min="0" step="0.01" placeholder="78.91"></div>
@@ -727,7 +700,7 @@ body{padding-left:var(--rail)}
       </div>
       <div id="jOut" class="note">네 숫자를 넣으면 달러수익률·원화수익률이 갈라져 보입니다.</div>
 
-      <div class="grouplabel f" style="margin:20px 0 2px" data-ref="에필로그">😴 수익 직후 휴식</div>
+      <div class="grouplabel f" style="margin:20px 0 2px" data-ref="10-4">😴 수익 직후 휴식</div>
       <p class="subtle" style="margin:2px 0 0">수익을 확정한 직후 2거래일은 신규 진입을 쉽니다. 가장 자신 있을 때가 가장 크게 잃는 구간입니다.</p>
       <div id="restOut" class="note">기록 없음</div>
       <div class="calcrow" style="margin-top:10px">
@@ -740,9 +713,9 @@ body{padding-left:var(--rail)}
     <p class="subtle">책을 덮기 전 직접 쓰는 다섯 문장입니다. <b>여기가 비어 있으면 위의 모든 판정은 남의 기준</b>입니다.</p>
     <div class="card">
       <div class="memo" id="final5" data-ref="에필로그">
-        <div class="field"><label>① SPY를 살 조건</label><input id="f5a" data-save data-f5 placeholder="예: S&P500 20일선 위 2거래일 + 대형주 3개↑ + 회피 0"></div>
-        <div class="field"><label>② QQQ 추격 안 할 조건</label><input id="f5b" data-save data-f5 placeholder="예: 5거래일 20%↑ 이상이면 무조건 쉰다"></div>
-        <div class="field"><label>③ IWM 진입 조건</label><input id="f5c" data-save data-f5 placeholder="예: 넓은 위험선호 확인 + 대형주 3개↑ + 필터 통과"></div>
+        <div class="field"><label>① TQQQ를 살 조건</label><input id="f5a" data-save data-f5 placeholder="예: S&P500 20일선 위 2거래일 + 대형주 3개↑ + 회피 0"></div>
+        <div class="field"><label>② SOXL 추격 안 할 조건</label><input id="f5b" data-save data-f5 placeholder="예: 5거래일 20%↑ 이상이면 무조건 쉰다"></div>
+        <div class="field"><label>③ UPRO 진입 조건</label><input id="f5c" data-save data-f5 placeholder="예: S&P500 20일선 위 + 섹터 5개 중 3개↑ + 60일선 체력 확인"></div>
         <div class="field"><label>④ 전체 손실 허용선</label><input id="f5d" data-save data-f5 placeholder="예: 계좌 -5%에서 신규 중단, -8%에서 절반 축소"></div>
         <div class="field"><label>⑤ 수익 출금 기준</label><input id="f5e" data-save data-f5 placeholder="예: 실현수익 30%는 무조건 출금, 손절은 미루지 않는다"></div>
       </div>
@@ -759,117 +732,459 @@ body{padding-left:var(--rail)}
 
 
 <script type="application/json" id="coverage-data">
-{"map": {"프롤로그": {"status": "mindset", "note": "전 챕터 공통 원칙 모음(추세=위치 우선, 20일선 생존선, 과열 금지, 분할진입, 파는 규칙 우선). 개별 정량규칙은 각 소절에 반영. 원칙 자체는 마인드셋."}, "1-1": {"status": "reflected", "step": "STEP1", "note": "S&P500 선물·나스닥 선물 방향 양호 = STEP1 스코어카드 ①②항목. 반영됨."}, "1-2": {"status": "reflected", "step": "STEP1", "note": "VIX 전일 대비 +10% 이상 급등 = STEP1 스코어카드 ③ 변동성 안정 항목 + 각 종목 avoid(vix). 반영됨."}, "1-3": {"status": "reflected", "step": "STEP1", "note": "10년물 금리 전일 대비 +0.1%p 이상 급등 = STEP1 스코어카드 ④ 10년물 안정 항목 + SCORECARD point_change. 반영됨."}, "1-4": {"status": "reflected", "step": "STEP2-entry", "note": "대표 대형주 3개 이상 같은 방향 = SPY·QQQ·IWM entry leaders 항목. 반영됨."}, "1-5": {"status": "mindset", "note": "아침 10분 루틴(선물→변동성→금리→달러 순서) 개념. STEP1 스코어카드 5개 항목 체크 흐름으로 반영. 루틴 자체는 마인드셋."}, "2-1": {"status": "reflected", "step": "STEP2-filter", "note": "S&P500 종가 20일선 위 + 2거래일 유지 = SPY filter(above20, hold20). 전고점 돌파 후 2거래일 버팀 = SPY entry(breakout). 반영됨."}, "2-2": {"status": "reflected", "step": "STEP2-filter", "note": "나스닥100 종가 20일선 위 + 2거래일 유지 = QQQ filter(above20, hold20). 강한 상승 뒤 2~4거래일 눌림 끝 반등 = QQQ entry(pullback). 대형주 3개↑ = entry leaders. 반영됨."}, "2-3": {"status": "reflected", "step": "STEP2-filter", "note": "러셀2000 종가 20일선 위 + 2거래일 유지 = IWM filter(above20, hold20). 대표 대형주 3개↑ + 넓은 위험선호 확인 = IWM entry(leaders, breakout). 반영됨."}, "2-4": {"status": "reflected", "step": "STEP3", "note": "1차(25~30%)/2차(30%)/3차(40~45%) 분할매수 = STEP3 계산기 컬럼(25%/30%/45%). 전고점 2거래일 버팀 확인 = entry breakout. 반영됨."}, "3-1": {"status": "reflected", "step": "STEP2-avoid", "note": "최근 5거래일 20% 넘게 상승 = 각 종목 avoid(run5). 5일선 이격 = 각 종목 caution(ma5_gap). 반영됨."}, "3-2": {"status": "reflected", "step": "STEP2-avoid", "note": "고점 대비 종가 4% 이상 밀림(윗꼬리) = avoid(wick). 거래량 전일 1.5배 이상 + 종가 고점 아래 = avoid(vol_sell). 거래량 전일 1.5배 이상 + 종가 고점 근처 = COMMON entry(vol). 반영됨."}, "3-3": {"status": "reflected", "step": "STEP2-exit", "note": "수익 구간 일부 먼저 매도 + 추세 살아있는 동안 잔량 = exit 1차 익절. 정해둔 손실선에 닿으면 먼저 축소 = exit 손절. 반영됨."}, "에필로그": {"status": "mindset", "note": "규칙이 사람을 이긴다 — 감정이 아니라 규칙이 판단하게 하는 것. STEP7 나만의 최종 기준 5개에 반영."}}}
+{"map": {"프롤로그": {"status": "mindset", "note": "자리·비중·시간·손절선이 맞물릴 때 돈이 남는다는 전 챕터 공통 원칙. 개별 정량규칙은 각 소절에 반영. 원칙 자체는 마인드셋."}, "1-1": {"status": "mindset", "note": "레버리지 ETF는 구간을 사는 상품이라는 구조 설명. 하루 손실액 계산 습관은 STEP3·10-1 루틴으로 이어지나 소절 자체는 마인드셋."}, "1-2": {"status": "reflected", "step": "STEP2-entry", "note": "최근 20거래일 중 상승일 13일 이상 = COMMON entry(count_up_days ^NDX n20 t13). 반영됨."}, "1-3": {"status": "reflected", "step": "STEP2-exit", "note": "시간 손절(3~5·10~20·40~60거래일, -10%/-25% 감내 비중) = TQQQ exit '시간 손절' 항목. 반영됨."}, "1-4": {"status": "mindset", "note": "지수 ETF(시간)와 레버리지 ETF(속도)의 운용 문법 차이, 계좌 칸 나누기·이름표. 행동 원칙이라 마인드셋."}, "1-5": {"status": "reflected", "step": "STEP2-avoid", "note": "돈삭제 의심 4신호(상승일 6일 미만·낙폭 우위·돌파 3거래일 내 반납·VIX 바닥권 20% 급등, 2개 이상) = COMMON avoid 그룹(groupNeed 2). 낙폭 우위·VIX 바닥권은 로직 미구현(🚧) 표시. 반영됨."}, "2-1": {"status": "reflected", "step": "STEP2-entry", "note": "30분 대기·시초가 지지·첫 눌림 저점·빅테크 3개 이상(7종 중) 2/3 확인 = TQQQ entry 장중 3항목(above_open·higher_low·count_up, 장중 확인). 반영됨."}, "2-2": {"status": "reflected", "step": "STEP2-filter", "note": "S&P500 20일선/60일선/전고점 3구간 판정 = UPRO filter(above20·hold20·above60) + entry(breakout 2~3거래일). 반영됨."}, "2-3": {"status": "reflected", "step": "STEP2-avoid", "note": "과열 4판정(10거래일 상승일 7일·5거래일 20% 급등·5일선 이격·6개 중 4개 동조) = SOXL avoid(hot10·run20)·caution(ma5_gap)·entry(breadth6·pullback). 반영됨."}, "2-4": {"status": "reflected", "step": "STEP2-avoid", "note": "VIX 전일 대비 10% 이상 급등 시 추격 금지 = 전 종목 avoid(vix) + 스코어카드 ③(20% 경고 부기). 반영됨."}, "2-5": {"status": "reflected", "step": "STEP1", "note": "10년물 하루 0.1%포인트 기준 = 스코어카드 ④(point_change ^TNX). 이틀 연속 상승은 직접 확인으로 부기. 금리·달러·VIX 동시 압력은 스코어카드 합산으로 반영됨."}, "2-6": {"status": "reflected", "step": "STEP1", "note": "장전 10분 5지표(나스닥 선물·S&P500 선물·VIX·10년물·달러인덱스) 점수화, 4점 공격/3점 소액/2점 이하 관망 = SCORECARD 5항목 + GRADE(go4·small3). 반영됨."}, "2-7": {"status": "reflected", "step": "STEP2-avoid", "note": "뉴스 전 5거래일 상승률·5일선 이격·첫 30분 고점 확인 = 회피(run5/run20)·주의(ma5_gap·gapwait)·장중 30분 항목과 동일 판정. 반영됨."}, "3-1": {"status": "reflected", "step": "STEP2-entry", "note": "살 자리 3(20일선 회복·돌파 후 지지·2~4거래일 눌림 끝 반등)과 피할 자리 3(급등 5거래일 추격·20일선 아래 첫 양봉·윗꼬리 반복) = TQQQ filter/entry/caution + note 3문장. 첫 양봉 판별은 수동(주의 문구). 반영됨."}, "3-2": {"status": "reflected", "step": "STEP2-filter", "note": "나스닥100 20일선 종가+2거래일 유지, 60일선 위 = TQQQ filter(above20·hold20·above60). 기울기 판독은 수동. 반영됨."}, "3-3": {"status": "reflected", "step": "STEP3", "note": "돌파 전 20~30%(예: 25%)·당일 종가 확인·돌파 후 2~3거래일 지지에 50% = 분할 계산기 + TQQQ entry(breakout). 반영됨."}, "3-4": {"status": "reflected", "step": "STEP3", "note": "분할 3단계 25%/30%/45% + 단계별 금지 규칙 = STEP3 계산기 + COMMON exit '분할 3단계'. 반영됨."}, "3-5": {"status": "reflected", "step": "STEP2-exit", "note": "실적 발표 전 5거래일 이상 상승+수익 10% 이상 → 30~50% 축소 = TQQQ exit '실적 시즌'. 발표일 확인은 수동(무료 이벤트 피드 없음). 반영됨."}, "4-1": {"status": "reflected", "step": "STEP2-exit", "note": "최대 보유 거래일(3/5~8/20거래일)·수익 반납률 30%/50%·5~10거래일 20% 익절 = SOXL exit(시간 손절·반납 경고·2차 익절). 반영됨."}, "4-2": {"status": "reflected", "step": "STEP2-entry", "note": "엔비디아·AMD·브로드컴 중 2개 이상(엔비디아 포함) = SOXL entry(leaders3) + note 3줄. 반영됨."}, "4-3": {"status": "reflected", "step": "STEP2-avoid", "note": "급등 후 3일 익절 신호(윗꼬리·거래량 1.5배+종가 밀림·주도주 이탈) = SOXL avoid(wick·vol_sell) + exit 익절 3단계(10~12%/15~20%/40%). 반영됨."}, "4-4": {"status": "reflected", "step": "STEP2-filter", "note": "5일선(단타)·20일선(스윙) 기준선 2개 = SOXL filter(above5·above20). 반영됨."}, "4-5": {"status": "reflected", "step": "STEP2-avoid", "note": "5거래일 15% 이상 상승 후 호재·장중 고점 대비 4% 밀림 = SOXL avoid(run15·wick). 뉴스 온도 자체는 정성(수동). 반영됨."}, "5-1": {"status": "reflected", "step": "STEP2-entry", "note": "시장 폭(섹터 5개 중 3개)·20일선 위·감당 금액 = UPRO entry(sectors)+filter. 금액 감당은 STEP3 몫. 반영됨."}, "5-2": {"status": "reflected", "step": "STEP2-filter", "note": "20일선 종가 회복+2거래일 유지+60일선+업종 확산(5개 중 3개) = UPRO filter/entry. 반영됨."}, "5-3": {"status": "reflected", "step": "STEP2-avoid", "note": "금융·산업재 5거래일 약세(방어주 뒤에 숨는 장) = UPRO avoid 그룹(weak_fin·weak_ind) + exit 축소 30%/60일선 추가 30%. 나쁜 금리 하락 해석은 수동. 반영됨."}, "5-4": {"status": "reflected", "step": "STEP2-entry", "note": "순환매 판단(섹터 5개 중 4개 확대/2개 이하 현금) = UPRO note + entry(sectors). 반영됨."}, "5-5": {"status": "reflected", "step": "STEP2-exit", "note": "수익 10%+과열 → 30% UPRO 전환, 수익 15%+주도주 2개 약화 → 50% = UPRO exit '전환 수용'. 반영됨."}, "6-1": {"status": "mindset", "note": "1:1:1은 위험 복제라는 원칙 — 흔들림 기준 비중은 MODES(STEP3)로 구현되나 소절 자체는 원칙 설명이라 마인드셋."}, "6-2": {"status": "reflected", "step": "STEP3", "note": "공격/균형/방어 배분(5,000만 원 기준 저자 금액) = MODES 3모드(비율 환산). 반영됨."}, "6-3": {"status": "reflected", "step": "STEP3", "note": "현금 30% 기본(강세 20%·위험 40% 이상) = MODES cash + 9-4 연동. 반영됨."}, "6-4": {"status": "reflected", "step": "STEP2-exit", "note": "손실선 3겹: 전체 -5/-8/-12%, SOXL 6%·TQQQ -7%·UPRO 20일선 이탈, 최고 수익 40% 반납 = COMMON/각 종목 exit. 반영됨."}, "6-5": {"status": "reflected", "step": "STEP2-exit", "note": "기준 생존 여부로 추가매수/손절 구분(TQQQ 20일선 2거래일 회복 실패 등) = exit 손절 항목 + 9-1 물타기 3문장. 반영됨."}, "7-1": {"status": "reflected", "step": "STEP2-entry", "note": "시초가 함정 5패턴 → 30분 대기 + 세 줄 확인 = TQQQ entry 장중 항목·caution(gapwait). 반영됨."}, "7-2": {"status": "reflected", "step": "STEP2-entry", "note": "30분 판별(시초가 지지·첫 눌림 저점·주도주 3개, 2개 이상) = 장중 항목(above_open·higher_low·count_up). 30분봉 몸통·거래량 질은 수동. 반영됨."}, "7-3": {"status": "reflected", "step": "STEP2-avoid", "note": "갭상승 날 첫 30분 저점 확인 전 추격 금지 = TQQQ·SOXL caution(gapwait, gap_up 자동 감지 + 저점 확인은 장중). 반영됨."}, "7-4": {"status": "reflected", "step": "STEP2-avoid", "note": "거래량 전일 1.5배 기준 + 종가 위치 = avoid(vol_sell)·COMMON entry(vol). 하락일 거래량 비교는 수동. 반영됨."}, "7-5": {"status": "reflected", "step": "STEP2-exit", "note": "익절 구간(7~10%/10~12%에서 30%, 15~20%에서 30%, 잔량 40% 추세 확인, 반납 40% 절반 축소) = 각 종목 exit. 반영됨."}, "7-6": {"status": "reflected", "step": "STEP2-exit", "note": "가격 기준(-5/-7/-10%)+구조 기준(20일선·대표주 2개·2거래일) 이중 손절, 부분 손절 30→50% = exit 손절 항목들. 반영됨."}, "8-1": {"status": "reflected", "step": "STEP4", "note": "환율 20거래일 평균 대비 위치 판정 = COMMON avoid(fx_high, KRW=X ma_distance 20) + STEP4 환전 모듈. 원 단위 임계는 저자 예시라 수치 보고 직접. 반영됨."}, "8-2": {"status": "reflected", "step": "STEP4", "note": "달러/원화 두 장부 기록(매수·매도 환율, 이중 수익률) = STEP4 메모 칸. 반영됨."}, "8-3": {"status": "mindset", "note": "세금은 수익 확정 순간부터의 비용이라는 원칙(월별 손익 끊기·세금 몫 분리·손실 기록). 무료 데이터로 자동화 불가, 기록 습관이라 마인드셋."}, "8-4": {"status": "mindset", "note": "수수료보다 진입 위치가 큰 비용이라는 순서(자리→금액→환율→수수료). 위치 판정 자체는 각 규칙에 반영, 소절은 원칙."}, "8-5": {"status": "reflected", "step": "STEP4", "note": "환전 3분할·기준 환율(20거래일 평균) 분리 = STEP4 환전 모듈 + fx_high 판정. 반영됨."}, "9-1": {"status": "reflected", "step": "STEP2-exit", "note": "물타기 3문장(이유 생존·-5% 추가 여지·현금 20~30%) = COMMON exit '물타기 3문장'. 반영됨."}, "9-2": {"status": "reflected", "step": "STEP2-exit", "note": "-10/-20/-30% 구간별 대응(경고·구조조정·30/40/30 삼분할) = COMMON exit '손실 구간별'. 반영됨."}, "9-3": {"status": "reflected", "step": "STEP2-exit", "note": "V자 기대 대신 반등 후 3거래일 확인(급등→저점 지지→전일 고점 재도전) = COMMON exit '재진입 3단계' 부기. 반영됨."}, "9-4": {"status": "reflected", "step": "STEP3", "note": "현금 30%/40% 구간 전략 = MODES cash + 6-3. 손절 직후 대기는 10-4의 2거래일 규칙과 연동. 반영됨."}, "9-5": {"status": "reflected", "step": "STEP2-exit", "note": "재진입 3단계(VIX 꺾임·20일선 회복·눌림 지지, 2개 전 큰돈 금지) = COMMON exit '재진입 3단계'. VIX 고점 꺾임 판독은 수동. 반영됨."}, "10-1": {"status": "reflected", "step": "STEP1", "note": "매일 밤 10분 루틴(방향→주도주→공포·금리→가격 위치→내 계좌) = STEP1 스코어카드 순서 + 각 필터. 반영됨."}, "10-2": {"status": "reflected", "step": "STEP4", "note": "매수 전 5줄 메모(이유·금액·줄일 자리·기간·환율) = STEP4 메모 폼. 반영됨."}, "10-3": {"status": "mindset", "note": "비중 조정은 주 1회(손절·익절은 즉시, 구조 변경은 정해진 날) — 운용 습관이라 마인드셋."}, "10-4": {"status": "reflected", "step": "STEP2-exit", "note": "실현수익 30%(큰 달 40%) 분리·수익 직후 2거래일 신규 매수 금지 = COMMON exit '수익 출금'. 반영됨."}, "10-5": {"status": "mindset", "note": "계좌 규모별(1천만/1억) 운용 차이 — 비율이 아니라 절대 손실액 기준. 개별 수치는 저자 예시 금액이라 마인드셋."}, "에필로그": {"status": "mindset", "note": "돈복사는 시스템에서 나온다 — 본인 기준 다섯 개 적기. STEP4 메모·전체 구조로 이어지는 마인드셋."}}}
 </script>
 
 <script type="text/markdown" id="src">
 ## 0. 핵심 원칙 (전 챕터 공통)
 
-- **"추세를 따라가되 위치를 먼저 본다."** (프롤로그) — 방향이 정해진 흐름에 붙어서, 그 흐름이 살아 있는 동안만 자리를 지킨다. 예측이 아니라 확인에 베팅한다.
-- **"20일선은 단기 추세의 생존선이다."** (프롤로그, 2-1, 2-2, 2-3) — 종가로 20일선 위에 있고, 그 위를 최소 2거래일 지켜낼 때만 추세가 재개됐다고 본다.
-- **"이미 많이 오른 자리는 사지 않는다."** (프롤로그, 3-1) — 최근 5거래일 동안 20% 넘게 오른 자리를 추격하지 않는다.
-- **"시장 환경을 먼저 잰다."** (1-5) — 선물 방향, 변동성, 금리, 이 세 가지가 흔들리는 날은 진입을 미룬다.
-- **"한 번에 다 사지 않는다."** (프롤로그, 2-4) — 확신이 아니라 확률에 베팅한다. 3개의 조건이 모일 때 1차로 들어가고 확인되면 늘린다.
-- **"파는 규칙을 사는 규칙보다 먼저 정한다."** (3-3) — 진입 전에 손실선과 익절 구간을 먼저 정해둔다.
-- **"규칙이 사람을 이긴다."** (에필로그) — 감정이 아니라 규칙이 판단하게 만드는 것이 전부다.
+- **"돈은 종목명이 아니라 자리·비중·시간·손절선이 맞물릴 때 남는다."** (프롤로그) — TQQQ·SOXL·UPRO는 이름이 아니라 구조를 아는 사람의 무기다.
+- **"레버리지 ETF는 시간을 사는 상품이 아니라 구간을 사는 상품이다."** (1-1) — 아무 때나 사서 오래 들고 가는 방식은 도구를 잘못 쓰는 것이다.
+- **"매수 버튼을 누르는 기술보다 안 누르는 기준이 먼저다."** (프롤로그, 2-6) — 장전 스코어카드가 관망을 말하면 쉰다. 쉬는 것도 매매다.
+- **"뉴스는 해설이고 가격은 돈의 흔적이다."** (2-7, 4-5) — 가격 위치를 먼저 보고, 뉴스는 그다음에 본다.
+- **"파는 규칙을 사는 규칙보다 먼저 정한다."** (6-4, 7-6) — 손실 허용선 없는 수익 목표는 브레이크 없는 액셀이다.
+- **"현금은 쉬는 돈이 아니라 다음 판단을 살리는 산소다."** (6-3, 9-4) — 하락장에서 가격표를 보는 사람은 현금이 있는 사람뿐이다.
+- **"돈복사는 종목이 아니라 시스템에서 나온다."** (에필로그) — 같은 순서를 반복하는 사람만 짧은 돈복사 구간을 잡는다.
 
-## Chapter 1. 사기 전에 보는 시장 환경 신호
+## Chapter 1. 미국 돈복사 ETF의 진짜 구조
 
-### 1-1. 지수 선물 두 개로 아침의 방향을 읽는다
+### 1-1. TQQQ·SOXL·UPRO를 일반 ETF처럼 사면 계좌가 녹는 이유
 
-미국 장이 열리기 전 S&P500 선물과 나스닥 선물을 먼저 본다. 두 선물이 전일 종가 대비 플러스로 서 있으면 그날의 바탕은 우호적이다. 둘 다 마이너스면 개별 종목이 좋아 보여도 손이 나가는 것을 참는다. 선물은 예측이 아니라 현재의 온도계다. 방향만 확인하면 된다.
+TQQQ는 나스닥, SOXL은 반도체, UPRO는 S&P500의 하루 움직임을 몇 곱절로 따라가도록 설계된 상품이다. 셋은 이름만 비슷할 뿐 흔들림·회복 속도·필요한 심장 크기가 전부 다르다. 일반 지수 ETF에서 먹히던 버티기는 여기서 손실 확대의 핑계가 된다. 금액이 아니라 변동성으로 비중을 계산해야 하고, 매수 전에 하루 손실 예상액부터 계산해야 한다.
 
-- **S&P500 선물** — 넓은 시장 전체의 방향을 대표한다
-- **나스닥 선물** — 기술주 중심의 위험선호를 보여준다
-- 고점을 낮추지 않고 버티는지는 개장 후 직접 본다
+- 일반 ETF는 시간을 사는 상품, 레버리지 ETF는 구간을 사는 상품
+- 방향 없이 흔들리는 장에서는 계좌가 조금씩 깎인다(변동성 누수)
+- 종목 분석보다 "하루 얼마가 사라지면 손이 떨리는가" 계산이 먼저
 
-### 1-2. 변동성이 튀는 날은 추격하지 않는다
+### 1-2. 레버리지 ETF가 상승장에서는 폭발하고 횡보장에서는 지치는 원리
 
-변동성 지수가 전일 대비 **10%** 이상 튀는 날은 시장이 겁을 먹기 시작한 날이다. 이런 날 지수가 반등해도 그것은 대개 속임수다. 변동성이 **10%** 넘게 오른 날의 장 초반 추격 매수는 피한다. 변동성이 다시 가라앉고 지수가 자리를 잡을 때까지 기다린다. 겁먹은 시장에서 레버리지를 키우는 것은 가장 비싼 실수다.
+지수가 같은 방향으로 며칠 연속 움직일 때 레버리지는 수익을 증폭하고, 위아래로 흔들리는 횡보장에서는 흔들림 자체가 비용이 된다. 최근 **20거래일** 동안 상승일과 하락일이 비슷하게 섞였다면 지치는 구간, 상승일이 13일 이상이고 하락일 낙폭이 작다면 레버리지가 힘 받는 장이다.
 
-### 1-3. 금리가 빠르게 오르면 위험자산은 흔들린다
+- 판정: 최근 **20거래일** 중 상승일 13일 이상 → 레버리지 유리 구간
+- 예측으로 들어가면 횡보장에 오래 맞는다 — 상승장이 시작된 흔적을 보고 들어간다
 
-10년물 국채금리가 전일 대비 빠르게 오르는 날은 위험자산에 부담이 된다. 금리가 하루 **0.1%p** 넘게 튀거나 이틀 연속 오르면, 성장주와 지수 모두 눌리기 쉽다. 금리의 방향과 속도를 함께 본다. 절대 수준보다 변화의 속도가 그날의 심리를 흔든다.
+### 1-3. 장기투자라는 말에 속지 않고 보유 기간을 숫자로 자르는 법
 
-### 1-4. 넓은 시장이 같은 방향일 때만 크게 간다
+보유 기간은 감정이 아니라 숫자로 자른다. 가격이 손절선에 닿지 않아도 정한 기간 안에 원하는 움직임이 없으면 빠지는 것이 시간 손절이다. 손실이 났다고 기간을 늘리면 그것은 투자 기간 연장이 아니라 손절 유예다.
 
-지수가 오를 때도 속을 들여다보면 소수 종목만 끌고 가는 날이 있다. 대표 대형주 여러 개가 같은 방향으로 움직이는지를 본다. 대표주 **3개** 이상이 같이 플러스면 힘이 넓게 퍼진 장이고, 그때 비중을 키운다. 한두 개만 끌고 가는 장은 오래 못 간다.
+- 짧은 매매 **3~5거래일** · 중간 **10~20거래일** · 긴 매매 **40~60거래일**
+- 20거래일을 갈 거면 **-10%**, 60거래일을 갈 거면 **-25%**가 와도 버틸 비중이어야 한다
+- 매수 전에 보유 기간과 기간 만료 시 행동(축소/현금화)을 먼저 적는다
 
-### 1-5. 아침 10분 루틴으로 환경을 점검한다
+### 1-4. 미국 지수 ETF와 레버리지 ETF를 완전히 다르게 운용해야 하는 이유
 
-매일 아침 10분 안에 선물 방향, 변동성, 금리를 순서대로 확인한다. 이 세 가지가 모두 안정적이면 그날은 진입을 준비하고, 하나라도 흔들리면 관망한다. 환경 점검은 종목 선택보다 먼저다. 좋은 종목을 나쁜 날에 사는 것이 가장 흔한 실수다.
+QQQ는 자산 배치의 질문을 받고, TQQQ는 "지금 이 구간에 레버리지를 붙여도 되는가"라는 질문을 받아야 한다. 지수 ETF는 시장의 시간을 사고, 레버리지 ETF는 시장의 속도를 빌린다. 속도를 빌렸으면 반납 시점을 알아야 한다. 계좌 안에서 오래 가져갈 자산 칸과 구간을 먹을 자산 칸을 나누고, 이름표(장기투자/구간 매매)를 붙여야 행동이 달라진다.
 
-- 장 시작 전 10분 체크 순서: 선물 방향 → 변동성 → 금리 → 달러
-- 셋 이상 안정 → 진입 준비 / 하나라도 흔들림 → 관망
+- 계좌를 자주 보게 된다는 것 자체가 금액이나 기준이 몸에 안 맞는다는 신호
 
-## Chapter 2. 종목별 진입 위치
+### 1-5. 돈복사처럼 보이는 구간과 돈삭제가 시작되는 구간을 구분하는 법
 
-### 2-1. SPY는 넓은 시장의 추세를 그대로 탄다
+돈삭제 구간은 폭락이 아니라 조용한 조정처럼 시작된다. 의심해야 할 숫자 네 가지 중 두 개 이상이 걸리면 돈복사가 아니라 돈삭제 가능성을 열어둔다.
 
-SPY는 S&P500 지수를 따라간다. 가장 넓은 시장이라 흔들림이 적고 추세가 오래 간다. S&P500 종가가 **20일선** 위에 있을 때만 SPY를 산다. 20일선을 종가로 회복한 뒤 **2거래일** 동안 다시 그 아래로 깨지 않고 버티면 추세가 살아났다고 본다. 전고점을 돌파한 뒤 **2거래일**을 버티는 자리는 비중을 키우기 좋은 자리다.
+- ① 최근 **10거래일** 중 상승일이 6일 이상인지(미만이면 의심)
+- ② 하락일의 낙폭이 상승일의 상승폭보다 큰지
+- ③ 전고점 돌파 후 **3거래일** 안에 다시 아래로 밀렸는지
+- ④ VIX가 바닥권에서 **20%** 이상 튀었는지
+- 네 가지 중 두 개 이상 → 돈삭제 가능성, 신규 진입 보류
 
-- 필터: S&P500 종가가 **20일선 위** + **2거래일** 유지
-- 진입: 전고점 돌파 후 **2거래일** 버팀 확인
-- 서두르지 않아도 된다 — 넓은 시장은 추세가 오래 간다
+## Chapter 2. 매수 전 반드시 보는 7개 시장 신호
 
-### 2-2. QQQ는 기술주의 힘이 실릴 때 탄다
+### 2-1. 나스닥이 살아나는 날과 속임수 반등을 구분하는 법
 
-QQQ는 나스닥100을 따라간다. 기술주 비중이 커서 상승장에서 더 크게 오르고 조정에서 더 크게 눌린다. 나스닥100 종가가 **20일선** 위에 있고, **20일선** 회복 후 **2거래일** 동안 다시 안 깨는지를 확인한 뒤 진입한다. 강한 상승 뒤 **2거래일**에서 **4거래일** 정도의 짧은 눌림이 나오고 다시 고개를 들면, 그 눌림 끝이 좋은 진입 자리다. 기술주는 힘이 실릴 때만 탄다.
+프리마켓 상승 하나만 보고 들어가면 당한다. 장 시작 후 **30분**은 시장이 사람을 흔드는 시간이다. 진짜 반등은 시초가를 지키고, 첫 눌림 저점을 지키며, 빅테크가 넓게 버틴다. 빅테크는 엔비디아·마이크로소프트·애플·아마존·메타·구글·테슬라 중 그날 시장을 끌고 가는 종목을 본다.
 
-- 필터: 나스닥100 종가가 **20일선 위** + **2거래일** 유지
-- 진입: 강한 상승 뒤 짧은 눌림(**2거래일~4거래일**) 끝 반등
-- 기술주 힘이 실린다는 확인: 대표 대형주 **3개** 이상 같은 방향
+- **30분** 뒤 세 줄 확인: 시초가 위인가 · 첫 눌림 저점을 지켰는가 · 빅테크 **3개** 이상 플러스인가
+- 세 줄 중 **2개**가 아니면 매수를 미룬다
+- 속임수 반등: 지수는 오르는데 주도주가 갈라지고 상승 종목 폭이 좁다
 
-### 2-3. IWM은 위험선호가 살아날 때 뒤늦게 달린다
+### 2-2. S&P500 위치로 UPRO 진입 가능 구간을 판단하는 법
 
-IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질 때 가장 늦게, 그러나 가장 세게 달리는 경향이 있다. 러셀2000 종가가 **20일선** 위에 있고 **20일선** 회복 후 **2거래일** 동안 지켜지는지를 본다. 소형주는 대표 대형주가 **3개** 이상 같은 방향으로 서 있을 때 함께 가는 힘이 강하다. 넓은 위험선호가 확인될 때만 IWM에 무게를 싣는다.
+S&P500의 위치를 **20일선**(단기 체온계), **60일선**(중기 체력), 전고점(검문소) 세 개로 본다. **20일선** 아래면 쉬거나 아주 작게, **20일선** 위지만 전고점 아래면 확인 매수만, 전고점 돌파 후 **2~3거래일** 버티면 비중을 키운다. 돌파 후 **2거래일** 안에 다시 밀리면 시장이 준비되지 않은 신호다.
 
-- 필터: 러셀2000 종가가 **20일선 위** + **2거래일** 유지
-- 진입: 대표 대형주 **3개** 이상 같은 방향 확인(넓은 위험선호)
-- IWM은 SPY·QQQ가 먼저 살아나야 뒤따라 간다
+- 분할매수는 날짜가 아니라 구간을 나누는 것 — 같은 구간에서 세 번 사는 것은 분할이 아니다
+- 몇 종목만 끌고 가는 속 빈 지수에서는 UPRO를 크게 싣지 않는다
 
-### 2-4. 분할매수로 고점 물림을 줄인다
+### 2-3. 반도체 지수 흐름으로 SOXL 과열 여부를 잡는 법
 
-세 종목 모두 한 번에 사지 않는다. 필터를 통과하고 진입 조건이 모이면 1차로 들어가고, 전고점을 **2거래일** 버티며 추세가 확인되면 추가한다. **3개**의 조건이 함께 맞을 때가 비중을 키울 자리다. 확인되지 않은 자리에서 미리 크게 사는 것이 물림의 시작이다.
+SOXL은 산업 보고서가 아니라 반도체 지수의 짧은 구간을 사는 상품이다. 과열 판정 네 가지 중 두 개 이상이 걸리면 손을 늦춘다.
 
-- 1차: 필터 통과 + 기본 진입 조건 충족 → 계획 금액의 25~30%
-- 2차: 전고점 돌파 + **2거래일** 버팀 확인 → 30%
-- 3차: 추세 확인(2회 이상) → 나머지 40~45%
-- **확인되지 않은 자리에서 크게 사는 것이 물림의 시작**
+- ① 최근 **10거래일** 중 반도체 지수 상승일 7일 이상이면 이미 뜨겁다
+- ② SOXL이 **5거래일** 동안 **20%** 이상 뛰었으면 신규 진입 조심
+- ③ **5일선**과 가격이 너무 벌어져 있으면 추격 위험(폭은 저자 미명시)
+- ④ 주도주 분산: 반도체 지수·엔비디아·AMD·브로드컴·마이크론·장비주 **6개** 중 **4개** 이상 같은 방향이면 넓은 장, 한두 개만 끌고 가면 조심
+- 급등 후 **2거래일** 눌림에서 전일 저점을 깨지 않고 다시 올라오는지 확인 후 진입
 
-## Chapter 3. 피해야 할 자리와 파는 자리
+### 2-4. VIX가 튀는 날 절대 추격 매수하지 말아야 하는 이유
 
-### 3-1. 이미 많이 오른 자리는 사지 않는다
+VIX가 뛴다는 것은 보험을 사는 사람이 늘어난다는 뜻이다. 화면이 초록색이어도 VIX가 같이 튀면 겉반등·속공포다.
 
-가장 흔한 실수는 이미 오른 것을 뒤늦게 사는 것이다. 최근 **5거래일** 동안 **20%** 넘게 오른 자리는 추격하지 않는다. 종가가 **5일선**에서 크게 벌어져 있으면 단기 과열이다. **5일선**과의 거리가 벌어질수록 되돌림이 나올 확률이 높다. 급하게 벌어진 자리는 눌림을 기다린다.
+- VIX가 전일 대비 **10%** 이상 뛰면 추격 매수 중지
+- **20%** 이상 뛰는데 지수까지 갭상승이면 더 조심 — 비중 축소
+- VIX는 매수 후 확인하는 숫자가 아니라 매수 전 손을 멈추게 하는 숫자
 
-- 회피: 최근 **5거래일 20%** 넘게 상승한 자리
-- 주의: **5일선**에서 크게 벌어진 경우 — 이격 수치만 표기, 판단은 직접
-- 급등 4~5일째 장 초반 추격은 익절 물량을 받아주는 것
+### 2-5. 금리·달러·채권금리가 ETF 수익률을 흔드는 순서
 
-### 3-2. 위에서 털리는 신호가 나오면 발을 뺀다
+채권금리가 먼저 움직이고, 달러가 따라붙고, 주가는 마지막에 표정으로 드러난다. 미국 10년물 국채금리가 하루 **0.1%포인트** 넘게 튀거나 이틀 연속 오르면 성장주와 지수가 눌리기 쉽다. 금리 상승·달러 강세·VIX 상승이 동시에 나오면 세 방향의 압력이다.
 
-하루의 상승률보다 어떻게 마감했는지가 더 중요하다. 고점 대비 종가가 **4%** 이상 밀려 윗꼬리를 남기고 마감하면 위에서 매물이 나왔다는 뜻이다. 거래량이 전일 대비 **1.5배** 이상으로 늘면서 종가가 고점 아래로 밀리면, 그것은 힘이 아니라 매도다. 이런 날은 비중을 줄이거나 새로 사지 않는다.
+- 장전 화면 세 개: 미국 10년물 국채금리 · 달러인덱스 · 나스닥 선물
+- 매수 전 질문을 바꾼다 — "오를까"가 아니라 "오르기 편한 환경인가"
 
-- 회피: 고점 대비 종가 **4%** 이상 밀려 마감(윗꼬리)
-- 회피: 거래량 전일 **1.5배** 이상 + 종가 고점 아래로 밀림(매물 신호)
-- **하루 종가가 고점 근처라면 힘이 살아있다, 아래라면 매도가 나온 것이다**
+### 2-6. 미국 장 시작 전 10분 만에 체크해야 할 핵심 지표 5개
 
-### 3-3. 나눠서 팔고, 손절은 미루지 않는다
+**10분** 안에 같은 순서로 **5개**만 본다: 나스닥 선물, S&P500 선물, VIX, 미국 10년물 국채금리, 달러인덱스. 각 1점씩 점수를 매겨 4점 이상 공격 가능, 3점 소액만, 2점 이하 관망.
 
-익절은 한 번에 하지 않는다. 수익이 나면 일부를 먼저 덜어내고, 추세가 살아 있는 동안 나머지를 끌고 간다. 반대로 손절은 미루지 않는다. 정해둔 손실선에 닿으면 이유를 다시 따지지 말고 먼저 줄인다. 레버리지가 실린 자리일수록 회복은 더디고 손실은 빠르다. 파는 규칙을 사는 규칙보다 먼저 정한다.
+- 나스닥 선물: 플러스 여부보다 고점을 낮추는지(힘의 방향)
+- S&P500 선물: 전일 종가 위에서 버티는지(시장 전체 체력)
+- VIX: 전일 대비 **10%** 이상이면 장 초반 추격 금지, **20%** 이상이면 비중 축소
+- 10년물 금리: 하루 변화폭과 이틀 연속 상승 여부
+- 달러인덱스: 강세면 위험자산 부담 — 금리·VIX와 동시 불편이면 쉼
+- SOXL을 볼 때는 반도체 대표주(엔비디아와 브로드컴 또는 AMD)를 추가로 본다
 
-- 1차 익절: 수익 구간에서 일부 먼저 매도 → 추세 살아 있는 동안 잔량 보유
-- 손절: 정해둔 손실선에 닿으면 이유 재론 없이 먼저 축소
-- **"파는 규칙을 사는 규칙보다 먼저 정한다"** — 진입 전 손실선과 익절선을 적어둔다
+### 2-7. 뉴스보다 가격 위치가 먼저 움직이는 이유
 
-## 에필로그. 규칙이 사람을 이긴다
+큰돈은 기사 제목 전에 가격에 흔적을 남긴다. 뉴스를 보면 바로 사지 말고 세 가지를 먼저 확인한다: 뉴스 전 **5거래일** 동안 이미 얼마나 올랐는지, 가격이 **5일선**과 얼마나 벌어졌는지, 뉴스 후 첫 **30분** 고점을 지키는지. 이 중 두 개가 불편하면 그 뉴스는 매수 신호가 아니라 조심 신호다.
 
-시장은 매일 새로운 이야기를 들려주지만, 이기는 방법은 늘 같다. 방향이 정해진 흐름에 붙고, 위치가 나쁘면 참고, 환경이 흔들리면 물러난다. 감정이 아니라 규칙이 판단하게 만드는 것, 그것이 이 책의 전부다.
+## Chapter 3. TQQQ 운용법
 
-- 정해둔 규칙을 지키는 것이 가장 어렵고 가장 중요하다
-- "오늘 내가 지킨 규칙은 무엇인가"가 "오늘 얼마 벌었나"보다 먼저다
-- 규칙이 없는 매매는 운이고, 규칙이 있는 매매는 기술이다
+### 3-1. TQQQ를 살 수 있는 3가지 위치와 피해야 할 3가지 위치
+
+살 수 있는 자리: 하락 후 **20일선**을 종가로 회복하는 자리(작게 1차), 전고점 돌파 후 무너지지 않는 자리, 강한 상승 뒤 짧은 눌림(**2~4거래일**)이 끝나고 **5일선**이나 **10일선** 근처에서 다시 고개 드는 자리. 피해야 할 자리: 급등 4~5일째 장 초반 추격, **20일선** 아래 첫 양봉, 전고점 근처 윗꼬리 반복.
+
+- 매수 전 3문장: **20일선** 위인가 · 최근 **5거래일** 이미 너무 올랐는가 · 전고점 윗꼬리가 반복되는가
+- **3개** 중 **2개**가 불편하면 매수를 미룬다
+- 눌림 구간에서는 하락일 거래량이 과하게 터지면 안 된다
+
+### 3-2. 나스닥100 상승 초입을 잡는 20일선·60일선 활용법
+
+**20일선**은 단기 생존선, **60일선**은 중기 체력선이다. 나스닥100이 종가로 **20일선** 위에 서고 최소 **2거래일** 버티는지 본다. **60일선** 아래에서 **20일선**만 넘는 것은 회복 시도, **60일선** 위에서 넘는 것은 추세 재개다. 두 선의 기울기가 아래로 꺾여 있으면 반등이어도 조심한다.
+
+- 필터: 나스닥100 종가 **20일선** 위 + **2거래일** 유지 + **60일선** 위
+- **20일선** 아래·**60일선** 아래면 쉬거나 아주 작게, **20일선** 위·**60일선** 아래면 짧게만
+
+### 3-3. 전고점 돌파 전후로 비중을 다르게 가져가는 법
+
+돌파 전에는 기대만 있고 확인이 없다(계획의 **20~30%**만). 돌파 당일은 흥분과 속임수가 섞인다(종가 확인 전 크게 넣지 않는다). 돌파 후 **2~3거래일** 버티면 신뢰가 생긴다(그때 크게).
+
+- 배분 예: 돌파 전 **25%** · 돌파 당일 종가 확인 **25%** · 돌파 후 지지 확인 **50%**
+- 장중에만 뚫고 종가가 내려오면 실패한 돌파("뚫은 척")
+- 비중은 확신이 아니라 확인에 붙인다
+
+### 3-4. TQQQ 분할매수 3단계로 고점 물림을 줄이는 법
+
+분할매수는 시장이 내 판단을 확인해줄 때마다 돈을 더 넣는 방식이다. 날짜만 나누는 것은 같은 생각을 세 번 반복하는 것일 뿐이다.
+
+- 총금액을 **25%**, **30%**, **45%**로 먼저 쪼개 적는다
+- 1단계 탐색(첫 질문) → 2단계 확인(기준 유지 시) → 3단계 추세(시장이 두 번 이상 확인해준 뒤)
+- 1차 후 기준이 깨지면 추가매수 금지 · 2차 후 전일 저점을 깨면 비중 축소 · 3차 후 수익이 나면 일부 익절
+- 기준이 깨졌는데 추가하면 분할매수가 아니라 물타기다
+
+### 3-5. 빅테크 실적 시즌에 TQQQ 비중을 줄여야 하는 순간
+
+실적 시즌에는 맞히려 하지 말고 노출을 줄인다. 발표 전 나스닥100이 **5거래일** 이상 오른 상태에서 수익 **10%** 이상이면 **30~50%** 축소를 미리 계획한다. 발표 전 VIX가 같이 오르거나 주도주가 갈라지면 더 줄인다.
+
+- 좋은 실적도 기대를 못 넘으면 매도 이유가 된다(재료 소멸)
+- 손실 중이면 발표 전 추가매수로 승부 보지 않는다 — 발표일은 캘린더로 직접 확인
+
+## Chapter 4. SOXL 운용법
+
+### 4-1. SOXL은 왜 가장 많이 오르지만 가장 빨리 무너지는가
+
+기대가 큰 섹터는 작은 실망에도 예민하다. SOXL은 수익을 지키는 기술이 없으면 벌어도 남지 않는다.
+
+- 최대 보유 거래일을 먼저 적는다: 단타 **3거래일** · 짧은 스윙 **5~8거래일** · 추세 매매라도 **20거래일** 안에 재판단
+- **5~10거래일** 안에 **20%** 이상 수익이면 일부 익절을 고민한다
+- 수익 반납률: 최고 수익 대비 **30%** 반납이면 경고, **50%** 반납이면 일부라도 줄인다
+- 대표주(엔비디아·AMD·브로드컴·마이크론·장비주) 중 **3개** 이상 약해지면 비중 축소
+
+### 4-2. 엔비디아·AMD·브로드컴 흐름으로 SOXL 방향을 읽는 법
+
+SOXL은 엔비디아 팬클럽 상품이 아니다. 엔비디아는 방향, AMD는 위험 선호, 브로드컴은 확산을 보여준다. 대장만 뛰고 부대가 못 따라오는 대장 독주장은 오래 못 버틴다.
+
+- 매수 전 3줄: 엔비디아가 시초가 위인가 · AMD가 전일 저점을 지키는가 · 브로드컴이 전고점 근처에서 밀리지 않는가
+- 세 종목 중 **2개** 이상(엔비디아 포함)이 같은 방향으로 버텨야 진입
+- 장중 플러스보다 종가의 태도가 중요하다
+
+### 4-3. 반도체 급등 후 3일 안에 판단해야 할 익절 신호
+
+급등 후 첫 **3거래일** 안에 시장의 태도가 드러난다. 익절 신호: 윗꼬리(장중 강했는데 종가 밀림), 거래량 전일 **1.5배** 이상 터졌는데 종가 밀림, 주도주 **2개** 이상 전일 저점 이탈, 좋은 뉴스에도 더 못 가는 가격, 과열된 본인 감정.
+
+- 익절은 구간별로: 수익 **10~12%**에서 **30%**, **15~20%**에서 추가 **30%**, 남은 **40%**만 추세 따라
+- 화면에 찍힌 최고 수익은 아직 내 돈이 아니다 — 팔아야 내 돈이 된다
+
+### 4-4. SOXL 단타와 스윙을 나누는 기준선 2개
+
+단타와 스윙은 수익률 목표가 아니라 기준선으로 나눈다. **5일선**은 단타의 호흡, **20일선**은 스윙의 생존선이다. **5일선** 기준으로 들어갔으면 **5일선**이 깨질 때 인정하고, **20일선** 기준으로 들어갔으면 처음부터 금액을 줄인다. 손실 중에 기준선을 바꾸는 것은 자기 위로다.
+
+- 매수 전 한 문장: "이번 매매는 **5일선** 단타인가, **20일선** 스윙인가"
+- **20일선** 아래 첫 반등은 스윙으로 들고 가기에 아직 약하다
+
+### 4-5. 반도체 뉴스가 좋을 때 오히려 조심해야 하는 이유
+
+좋은 뉴스는 매도 대기자의 핑계가 될 때가 많다(호재 매물). 사면 안 되는 날: 최근 **5거래일** **15%** 이상 오른 뒤, 갭상승 후 윗꼬리가 긴 날, 엔비디아만 강하고 나머지가 약한 날, VIX가 같이 튀는 날.
+
+- 장중 고점 대비 **4%** 이상 밀려 마감하면 위에서 팔린 것
+- 뉴스 확인 순서: SOXL 최근 상승률 → 장 마감 위치 → 대표주 **2개** 이상 동반 여부
+
+## Chapter 5. UPRO 운용법
+
+### 5-1. UPRO가 TQQQ보다 느리지만 오래 버틸 수 있는 이유
+
+UPRO는 시장의 폭을 산다. S&P500에는 기술주 외에 금융·헬스케어·산업재·소비재가 섞여 있어 특정 섹터가 흔들려도 전체가 바로 무너지지 않는다. 다만 "방심형 레버리지"다 — 점잖아 보여서 큰돈을 넣게 만든다.
+
+- 오래 버티는 조건: S&P500이 **20일선** 위 · 섹터 **5개** 중 **3개** 이상 동반 상승 · 하루 변동을 감당할 금액
+- 상승률보다 상승 종목의 폭을 본다 — 얇은 상승에서는 크게 싣지 않는다
+
+### 5-2. S&P500 상승장 초입에서 UPRO를 담는 법
+
+하루 양봉은 상승장 초입이 아니다. 초입의 조건: S&P500이 **20일선**을 종가로 회복하고, 이후 **2거래일** 동안 다시 깨지 않고, 상승 업종이 넓어져야 한다(기술·금융·산업재·헬스케어·소비재 섹터 **5개** 중 **3개** 이상). **60일선**이 아래에서 받쳐주면 신뢰가 올라간다.
+
+- 필터: **20일선** 종가 회복 + **2거래일** 유지 + **60일선** 위
+- 진입: 섹터 **3개** 이상 동반 상승 확인 후, 전고점 돌파 후 **2~3거래일** 버티면 비중 확대
+- 회복하자마자 **20일선**을 다시 깨면 아직 약한 시장
+
+### 5-3. 경기침체 우려가 나올 때 UPRO 비중을 줄이는 법
+
+줄여야 할 신호: 방어주만 살아나는 장(금융·산업재가 약하고 필수소비재·헬스케어·유틸리티만 버팀), 금융·산업재가 **5거래일** 이상 약세, 실적 전망 하향이 업종 전체로 확산, 나쁜 금리 하락(금리가 내려가는데 주식이 못 오름), **20일선**을 깨고 반등해도 회복 못 함.
+
+- 금융·산업재가 **5거래일** 이상 약하고 방어주만 버티면 보유분 **30%** 축소
+- **60일선**까지 위협받으면 추가 **30%** 축소
+- 뉴스가 무서워지기 전에 업종 흐름을 보고 먼저 줄인다
+
+### 5-4. 대형주 순환매가 시작될 때 UPRO가 유리해지는 구간
+
+나스닥이 쉬는데 S&P500이 덜 빠지면 돈이 시장 밖으로 나간 게 아니라 옆 칸으로 이동한 것이다. 금융·산업재가 같이 저점을 높이고, 방어주가 상승으로 움직이면 순환매다. 순환매(돈이 옆으로)와 하락장(돈이 밖으로)을 헷갈리면 안 된다.
+
+- 섹터 **5개** 중 **4개**가 살아 있으면 UPRO 비중 확대, **2개** 이하면 현금 확대
+- 조건 셋: S&P500 **20일선** 위 · **3개** 이상 섹터 동반 · 나스닥 약세가 시장 전체로 안 번짐
+- VIX가 튀고 달러가 강해지는 날은 순환매가 아니라 위험 회피일 가능성
+
+### 5-5. TQQQ·SOXL이 부담될 때 UPRO로 리스크를 낮추는 법
+
+"불 끄지 말고 화력 낮추기" — 완전히 빠지는 게 아니라 속도를 줄인다. 단 시장 전체가 약해지는 장에서는 UPRO도 대피소가 아니다(현금이 답).
+
+- TQQQ·SOXL 수익 **10%** 이상 + VIX 급등 또는 전고점 윗꼬리 → **30%**를 UPRO로 전환
+- 수익 **15%** 이상 + 주도주 **2개** 이상 약화 → **50%**까지 전환
+- 전환도 한 번에 하지 않는다 — 일부 전환 + 일부 현금
+
+## Chapter 6. 3배 ETF 포트폴리오 설계
+
+### 6-1. TQQQ·SOXL·UPRO를 1:1:1로 사면 위험한 이유
+
+세 상품 모두 미국 상승 롱 레버리지라 방향이 같다 — 이름 셋을 사도 마음은 몰빵이다. 같은 금액이 같은 위험이 아니다. 반도체가 가장 거칠고, 나스닥이 다음, S&P500이 상대적으로 넓다. 금액이 아니라 흔들림 기준으로 SOXL은 작게, TQQQ는 중간, UPRO는 시장 폭이 넓을 때 상대적으로 크게 간다.
+
+- 숫자만 균형 계좌는 하락장에서 가장 거친 종목이 전체 심리를 끌고 내려간다
+- 손절 순서를 미리 정하지 않으면 공포 순서로 팔게 된다
+
+### 6-2. 공격형·균형형·방어형 포트폴리오를 다르게 짜는 법
+
+포트폴리오는 성격이 아니라 하루 손실 감당액으로 짠다. 총 5,000만 원 기준 저자 배분:
+
+- 공격형: TQQQ 1,700만 · SOXL 1,200만 · UPRO 900만 · 현금 1,200만 — 공격형도 SOXL이 TQQQ보다 작아야 한다
+- 균형형: TQQQ 1,300만 · SOXL 700만 · UPRO 1,300만 · 현금 1,700만
+- 방어형: TQQQ 700만 · SOXL 300만 · UPRO 1,500만 · 현금 2,500만
+- 시장 온도에 따라 모드를 오간다 — 강하면 공격형, 반도체 과열이면 균형형, VIX가 튀면 방어형
+
+### 6-3. 현금 30%를 남겨야 계좌가 살아나는 이유
+
+현금은 다음 진입권이다. **30%**는 최소 두 번 나눠 들어갈 여지를 준다. 시장이 강하고 지수가 살아 있으면 **20%**까지 낮출 수 있고, VIX가 튀고 지수가 무너지면 **40%** 이상으로 높인다.
+
+- 현금 없는 계좌는 좋은 자리가 와도 본전 계산기만 두드린다
+- 손절이 리셋이 되려면 손절 후 다시 들어갈 현금이 있어야 한다
+
+### 6-4. 수익률보다 먼저 정해야 할 최대 손실 허용선
+
+수익률 목표보다 "얼마 깨지면 멈출까"를 먼저 적는다. 손실선은 세 겹: 원금 기준, 종목별, 최고 수익 대비 반납선.
+
+- 전체 계좌: **-5%**면 신규 매수 중단 · **-8%**면 레버리지 노출 절반 축소 · **-12%**면 전체 재설계
+- 종목별: SOXL은 **6%**에서 절반 축소 · TQQQ는 **-7%**에서 재판단 · UPRO는 S&P500 **20일선** 이탈 시 축소
+- 최고 수익 대비 **40%** 반납하면 일부 익절 확정
+- 손실선은 매수 전에 정한다 — 매수 후 정하는 손실선은 느슨해진다
+
+### 6-5. 계좌가 흔들릴 때 추가매수와 손절을 구분하는 법
+
+기준이 살아 있으면 작게 더 사고, 기준이 죽었으면 줄인다 — 이 문장이 전부다. 가격이 내려왔다는 이유만으로 더 넣으면 물타기다.
+
+- 매수 전 첫 매수 이유를 한 줄로 적는다("나스닥 **20일선** 회복", "대표주 동반 강세" 등)
+- TQQQ: **20일선**을 다시 깨고 **2거래일** 이상 회복 못 하면 축소가 먼저
+- SOXL: 대표주 **2개** 이상 무너지면 축소 · UPRO: 업종 확산이 무너지면 축소
+- 추가매수 전 최악 손실액을 계산한다 — 계산 없는 추가매수는 충동이다
+
+## Chapter 7. 매수·매도 타이밍 시스템
+
+### 7-1. 시초가에 바로 사면 당하는 5가지 패턴
+
+시초가 **30분**은 전날 감정과 프리마켓 기대가 한꺼번에 터지는 구간이다. 당하는 패턴: 갭상승 후 윗꼬리, 프리마켓 착시(거래량이 얇다), 첫 거래량 폭발 후 정지, 지수와 주도주의 엇갈림, 장 초반 수익 착각.
+
+- 장 시작 후 **30분**은 주문창을 닫는다
+- 세 줄: 시초가를 지켰는지 · 첫 눌림 저점을 높였는지 · 주도주 **3개** 이상 같은 방향인지 — **2개** 이상이면 후보
+
+### 7-2. 미국 장 초반 30분을 보고 들어가는 법
+
+초반 **30분**은 매수 시간이 아니라 판별 시간이다. 시초가를 지키는지, 첫 눌림의 저점이 올라가는지, 주도주 **3개**(TQQQ는 빅테크, SOXL은 엔비디아·AMD·브로드컴, UPRO는 기술·금융·산업재)가 버티는지, 첫 30분봉 윗꼬리가 긴지, 거래량이 가격을 밀어주는지 본다.
+
+- **30분** 안에 끝나는 상승은 따라가도 먹을 게 없다 — 진짜 강한 장은 30분 뒤에도 자리를 준다
+- 세 문장 중 **2개** 이상 좋을 때만 매수 후보로 올린다
+
+### 7-3. 갭상승 날 추격매수하지 않고 눌림을 기다리는 법
+
+갭상승은 공중 진입이다 — 지지선이 멀다. 갭 자체가 아니라 갭 이후의 태도가 신호다.
+
+- 첫 **30분** 고점·저점을 표시하고, 첫 저점을 깨지 않고 시초가 위로 다시 올라올 때 소액 진입
+- 주도주 **2개** 이상이 시초가 위에서 버티는지 확인
+- 갭상승 날 매수 금액은 평소 계획의 삼분의 일 이하로 시작
+
+### 7-4. 하루 상승률보다 거래량을 먼저 봐야 하는 이유
+
+상승률은 결과이고 거래량은 그 결과를 만든 손을 보여준다. 거래량은 위치와 같이 본다 — 아래에서 터지면 힘, 위에서 터지면 출구.
+
+- 세 가지: 거래량이 전일 **1.5배** 이상 늘었는지 · 종가가 고점 근처에서 끝났는지 · 하락일 거래량이 상승일보다 커지는지
+- 거래량이 터졌는데 종가가 밀리면 매도자가 이긴 날 — 다음 날 추격 금지
+
+### 7-5. 익은 감으로 하지 말고 구간별로 나누는 법
+
+익절은 감이 아니라 구간으로 한다. 전부 들고 있으면 욕심이 되고, 전부 팔면 미련이 된다.
+
+- 1차: TQQQ·UPRO는 수익 **7~10%**, SOXL은 **10~12%** 구간에서 **30%** 매도
+- 2차: **15~20%** 구간에서 추가 **30%**
+- 잔량 **40%**: TQQQ는 **5일선**·**10일선**, SOXL은 대표주 **3개** 중 **2개** 생존, UPRO는 **20일선**과 업종 폭 유지를 보며 끌고 간다
+- 최고 수익 대비 **30%** 반납은 경고, **40%** 반납이면 남은 물량 절반 축소
+- 금액 목표("1,000만 원 채우면 판다")는 시장과 무관한 욕심의 숫자다
+
+### 7-6. 손절을 늦추면 레버리지 ETF에서 복구가 어려워지는 이유
+
+손절은 가격 기준과 구조 기준을 따로 적는다. 손실률이 작아도 구조가 죽으면 줄인다. **-20%** 손실은 원금 회복에 **25%** 수익이 필요하고, 그보다 먼저 사람의 손이 얼어붙는다.
+
+- 가격 기준: **-5%**, **-7%**, **-10%** 같은 손실률
+- 구조 기준: 나스닥 **20일선** 이탈 · 반도체 대표주 **2개** 이상 전일 저점 이탈 · S&P500 **20일선** **2거래일** 연속 이탈
+- 부분 손절: **-5%**에서 **30%** 축소 → 구조 이탈 시 **50%** 축소 → **20일선** 회복 실패 시 추가 축소
+- 평단 감옥: 평단을 낮추려 넣은 돈이 계좌를 잠근다
+
+## Chapter 8. 환율·세금·수수료까지 계산하는 실전 운용
+
+### 8-1. 환율이 높을 때 미국 ETF를 사도 되는지 판단하는 법
+
+한국 투자자는 ETF 가격과 달러 가격을 동시에 산다. "환율이 높다"는 감이 아니라 위치로 판단한다 — 최근 **20거래일** 평균보다 얼마나 높은지, 급하게 오른 것인지.
+
+- 환율이 **20거래일** 평균 위로 크게 벌어져 있으면 전액 환전 금지 — 매수 금액을 줄인다
+- 매수 전 네 숫자를 적는다: 현재 환율 · **20거래일** 평균 · 내 평균 환전 환율 · 매수가 기준 환율
+- 환율이 높은 날의 질문은 "살까 말까"가 아니라 "얼마나 작게 들어갈까"
+
+### 8-2. 원화 수익과 달러 수익을 따로 계산해야 하는 이유
+
+미국 ETF 계좌는 장부가 두 개다(달러 장부·원화 장부). 달러 수익률만 보면 실제 남는 돈을 착각한다. ETF 실력으로 번 돈과 환율 덕에 커진 돈(환율빨 수익)을 분리해야 다음 판단이 정확해진다.
+
+- 매매일지에 매수 환율·매도 환율·달러 수익률·원화 수익률 네 칸을 적는다
+
+### 8-3. 미국 ETF 매매 수익에서 세금을 미리 계산하는 법
+
+해외 상장 ETF 매매 차익은 양도소득세 계산 대상이다. 세금은 수익 확정 순간부터 따라붙는 그림자다(숨은 출금).
+
+- 실현손익을 월별로 끊어 적는다 — 연말에 한꺼번에 보면 늦다
+- 수익이 나면 세금 몫을 다음 매매 가능 금액에서 제외한다
+- 손실 매매도 기록한다 — 기억은 수익만 남긴다
+- 연말의 무리한 매매(세금 앞 발악)를 경계한다
+
+### 8-4. 수수료보다 더 무서운 것은 잘못된 진입 위치
+
+수수료는 눈에 보이는 작은 비용, 나쁜 진입 위치는 늦게 보이는 큰 비용이다. 순서는 자리 → 금액 → 환율 → 수수료다.
+
+- 주문 전 "진입 위치 비용"을 계산한다 — 지금 가격에서 몇 % 불리해지면 얼마가 사라지는가
+- 좋은 조건으로 나쁜 자리를 사는 것은 좋은 거래가 아니다
+
+### 8-5. 환전 타이밍과 매수 타이밍을 분리하는 법
+
+환전은 달러를 사는 매매, ETF 매수는 자산을 사는 매매다. 같은 날 묶으면 둘 다 좋은 자리를 한 번에 맞혀야 한다.
+
+- 달러를 3칸으로 나눠 만든다 — 환율이 편할 때 미리, 내려오면 추가, 나머지는 ETF 자리와 연결
+- 기준 환율을 적어둔다: **20거래일** 평균보다 크게 높으면 일부만 환전
+- 달러를 샀다고 ETF를 사야 하는 것은 아니다 — 달러는 준비금이다
+
+## Chapter 9. 하락장에서 살아남는 방어 전략
+
+### 9-1. 레버리지 ETF에서 물타기가 계좌를 망치는 순간
+
+물타기(평단 미용)는 틀린 판단에 더 큰 돈을 묶는다. 기준 살아 있는 하락만 추가매수 후보다.
+
+- 물타기 전 3문장: 처음 매수 이유가 살아 있는가 · 추가 후 **-5%** 더 나와도 손실 허용선 안인가 · 추가 후에도 현금이 **20~30%** 남는가
+- 하나라도 아니면 중단 — 손이 먼저 가면 늦는다, 문장으로 막는다
+- **-10%**를 넘으면 머리보다 배가 말한다 — 그 전에 기준을 정한다
+
+### 9-2. -10%, -20%, -30% 구간별 대응 시나리오
+
+손실률 구간마다 다른 사람이 되어야 한다. **-10%**는 경고(처음 매수 이유 검문), **-20%**는 구조 재판단(비중 축소·현금 확보 — 원금 회복에 **25%** 필요), **-30%**는 생존(전량 복구 생각을 버리고 물량 삼분할).
+
+- **-30%** 구간: **30%**는 바로 축소 · **40%**는 반등 시 축소 · **30%**만 구조 회복 확인하며 보유
+- "일단 기다리자"가 아니라 조건 있는 기다림(**20일선** 회복 등)만 전략이다
+
+### 9-3. V자 반등을 기대하다가 손실이 커지는 이유
+
+하락장 첫 강한 양봉은 숏커버링일 수 있다. V자 반등은 하루짜리 이벤트가 아니다 — 저점 상승·거래량 유지·주도주 회복이 같이 나와야 한다.
+
+- 크게 오른 날 바로 사지 말고 **3거래일**을 본다: 첫날 급등 → 둘째 날 저점 지지 → 셋째 날 전일 고점 재도전
+- 첫날만 강하고 둘째 날 밀리면 추격하지 않는다
+- 바닥의 일부를 포기하고 회복의 중간을 먹는 편이 현실적이다
+
+### 9-4. 현금 보유가 수익 전략이 되는 구간
+
+현금이 수익 전략이 되는 구간: 과열됐지만 아직 안 무너진 때(수익 일부를 미리 현금화), VIX가 튀는데 지수는 버틸 때, 좋은 뉴스에도 가격이 못 갈 때, 손절 직후(바로 복구 매매 금지).
+
+- 현금 **30%**면 최소 두 번 나눠 판단할 수 있고, **40%**면 급락장에서도 숨을 쉰다
+- 현금 보유는 재진입 조건과 붙어 있어야 한다 — 조건 없는 현금은 공포일 뿐
+
+### 9-5. 폭락장 이후 다시 진입하는 3단계 기준
+
+재진입은 바닥 맞히기가 아니라 조건 확인이다. 순서대로 온다: 공포 진정 → 가격 회복 → 눌림 지지.
+
+- 3줄: VIX가 고점에서 꺾였는가 · 지수가 **20일선**을 회복했는가 · 회복 후 첫 눌림에서 저점을 지켰는가
+- **2개** 맞기 전에는 큰돈 금지, 하나면 소액 탐색만, 셋 다 맞으면 비중 확대
+- SOXL은 반등률이 커 보여 가장 위험하다 — 대표주 **2개** 이상이 저점을 높일 때만
+
+## Chapter 10. 미국 돈복사 ETF 실천 루틴
+
+### 10-1. 매일 밤 10분으로 끝내는 미국장 체크 루틴
+
+**10분** 안에 같은 순서로 본다: 시장 방향(나스닥·S&P500 선물의 고점/저점 방향) → 주도주(상품별 **5개** 지표의 주도주) → 공포와 금리(VIX **10%**·**20%** 기준, 10년물) → 가격 위치(**20일선** 기준) → 내 계좌(과노출·현금·추가 시 하루 손실액).
+
+- 루틴의 목적은 예언이 아니라 무리하게 들어가면 안 되는 날을 거르는 것
+- 순서가 없으면 정보는 소음이 된다 — 사고 싶은 근거만 골라보게 된다
+
+### 10-2. 매수 전 작성해야 할 5줄 투자 메모
+
+매수 전 5줄: 왜 사는지(가격 기준으로) · 얼마를 넣는지 · 어디서 줄일지 · 며칠 안에 판단할지 · 환율은 어떤지. 이 중 하나라도 못 쓰면 준비가 안 된 매매다.
+
+- "좋아 보여서"는 이유가 아니라 기분이다
+- 줄일 자리와 판단 기간을 못 쓰는 매매는 감정 매매다
+- 메모는 손실이 났을 때 변명을 잡아낸다 — 매매 유통기한을 적는다
+
+### 10-3. 계좌 비중을 주 1회만 조정해야 하는 이유
+
+손절·익절은 기준이 나오면 바로 하되, 계좌 전체 구조는 정해진 날에만 다시 잡는다. 매일 비중을 바꾸면 매수가가 나빠지고, 판단 기준이 흐려지고, 복기가 불가능해진다(젓가락 계좌).
+
+- 조정일을 하나 정한다(주말 또는 월요일 장전) — 시장 위치·내 계좌 손상도·현금 비중 세 가지로 본다
+- 개별 악재 대응은 짧게, 구조 변경은 정해진 날에
+
+### 10-4. 수익 난 뒤 더 크게 잃지 않는 출금 전략
+
+수익을 계좌 안에 그대로 두면 다음 손실의 연료가 된다(수익금 재도박). 수익 확정 시 세 칸으로 나눈다: 세금 예상분 · 출금(분리)금 · 재투자 가능금.
+
+- 실현수익의 **30%**는 분리한다 — 1,000만 원 이상 수익이 난 달은 **40%**
+- 수익 직후 **2거래일**은 신규 매수 금지(자존감이 커져 있는 시간)
+- 계좌 최고점이 갱신되면 일부를 뺀다 — 빼놓은 돈만 내 돈이다
+
+### 10-5. 1억 계좌와 1천만 원 계좌의 운용법을 다르게 짜는 법
+
+계좌가 커지면 비율이 아니라 절대 손실액을 먼저 본다. 1천만 원 계좌는 손버릇을 만드는 학습 계좌(실험 비용을 정해 매매마다 이유를 적는다), 1억 계좌는 생존과 출금 중심(현금을 크게, SOXL부터 줄이고, 매매 횟수를 줄인다).
+
+- 같은 비율이라도 금액의 무게가 다르다 — 몸은 비율이 아니라 금액으로 반응한다
+- 큰 계좌일수록 분할매수는 기술이 아니라 생존 장치다
+
+## 에필로그. 돈복사는 종목이 아니라 시스템에서 나온다
+
+같은 TQQQ를 사도 결과가 갈리는 이유는 상품이 아니라 시스템 차이다. 시스템이 없는 사람은 매번 새로 판단하고, 판단할 때마다 감정이 들어온다. 기준을 세우고 기다리는 것만 전략이다. 시스템은 감정을 없애는 게 아니라, 감정이 주문 버튼까지 가는 길을 막아준다.
+
+- 책을 덮기 전 본인 기준 다섯 개를 적는다: TQQQ를 살 수 있는 조건 · SOXL을 절대 추격하지 않을 조건 · UPRO로 비중을 낮출 조건 · 전체 계좌 손실 허용선 · 수익금 출금 기준
+- 수익을 크게 내는 매매는 가끔 나오지만, 손실을 작게 만드는 습관은 매일 필요하다
+- 적어놓은 기준만 계좌 앞에서 살아남는다
 </script>
 
 <script type="application/json" id="metric-registry">{}</script>
@@ -877,314 +1192,548 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
 <script type="application/json" id="rules">
 {
   "DATA": {
-    "SPY": {
-      "v": "--spy",
-      "need": 2,
-      "filter": [
-        {
-          "t": "S&P500 종가가 20일선 위",
-          "ref": "2-1",
-          "ek": "above20",
-          "src": "📊 야후 EOD · ^GSPC 종가 vs 20일선",
-          "bkey": "20일선 위"
-        },
-        {
-          "t": "20일선 회복 후 2거래일 동안 다시 안 깸",
-          "ref": "2-1",
-          "ek": "hold20",
-          "src": "📊 야후 EOD · ^GSPC 종가가 20일선 위를 며칠 연속 지켰나 (회복일+2거래일=3)",
-          "bkey": "2거래일 동안 다시 안 깸"
-        }
-      ],
-      "entry": [
-        {
-          "t": "전고점 돌파 후 2거래일 버티는 자리",
-          "ref": "2-4",
-          "src": "📊 야후 EOD · SPY 전고점 돌파 후 며칠 지지",
-          "bkey": "2거래일 버티는 자리",
-          "ek": "breakout"
-        },
-        {
-          "t": "대표 대형주 3개 이상 같은 방향",
-          "ref": "1-4",
-          "src": "📊 야후 EOD · 대형주 등락 개수",
-          "bkey": "3개 이상 같은 방향",
-          "ek": "leaders"
-        }
-      ],
-      "avoid": [
-        {
-          "t": "변동성 전일 대비 10% 이상 급등",
-          "ref": "1-2",
-          "k": "vix",
-          "src": "📊 야후 EOD · ^VIX 전일비",
-          "bkey": "10% 이상 튀면"
-        },
-        {
-          "t": "최근 5거래일 20% 이상 급등(추격 위험)",
-          "ref": "3-1",
-          "k": "run5",
-          "src": "📊 야후 EOD · SPY 최근 5일 수익률",
-          "bkey": "5거래일 동안 20% 넘게"
-        },
-        {
-          "t": "고점 대비 종가 4% 이상 밀림(윗꼬리)",
-          "ref": "3-2",
-          "k": "wick",
-          "src": "📊 야후 EOD · 고가 대비 종가",
-          "bkey": "4% 이상 밀려 마감"
-        },
-        {
-          "t": "거래량 전일 1.5배 이상 + 종가 고점 아래(매물)",
-          "ref": "3-2",
-          "k": "vol_sell",
-          "src": "📊 야후 EOD · 전일比 거래량 배수 + 종가 고점比",
-          "bkey": "1.5배 이상 늘면서 종가 밀림"
-        }
-      ],
-      "note": "진입 2조건 이상 + 필터 통과 + 회피 0 → 1차 분할 진입",
-      "caution": [
-        {
-          "t": "5일선에서 크게 벌어짐(단기 과열)",
-          "ref": "3-1",
-          "k": "ma5_gap",
-          "src": "📊 야후 EOD · 종가 vs 5일선 이격 (몇 %부터인지는 저자 미명시 — 수치 보고 직접)",
-          "bkey": "5일선과의 거리"
-        }
-      ],
-      "exit": [
-        {
-          "L": "1차 익절",
-          "v": "수익 구간에서 일부 먼저 매도 → 추세 살아 있는 동안 잔량 보유"
-        },
-        {
-          "L": "손절",
-          "v": "정해둔 손실선에 닿으면 이유 재론 없이 먼저 축소 (파는 규칙을 사는 규칙보다 먼저)"
-        }
-      ]
-    },
-    "QQQ": {
-      "v": "--qqq",
+    "TQQQ": {
+      "v": "--tqqq",
       "need": 2,
       "filter": [
         {
           "t": "나스닥100 종가가 20일선 위",
-          "ref": "2-2",
+          "ref": "3-2",
           "ek": "above20",
           "src": "📊 야후 EOD · ^NDX 종가 vs 20일선",
-          "bkey": "20일선 위"
+          "bkey": "20일선"
         },
         {
-          "t": "20일선 회복 후 2거래일 동안 다시 안 깸",
-          "ref": "2-2",
+          "t": "20일선 회복 후 최소 2거래일 유지(종가)",
+          "ref": "3-2",
           "ek": "hold20",
-          "src": "📊 야후 EOD · ^NDX 종가가 20일선 위를 며칠 연속 지켰나 (회복일+2거래일=3)",
-          "bkey": "2거래일 동안 다시 안 깸"
+          "src": "📊 야후 EOD · ^NDX 종가가 20일선 위를 연속으로 지킨 날수",
+          "bkey": "2거래일"
+        },
+        {
+          "t": "나스닥100이 60일선 위(중기 체력)",
+          "ref": "3-2",
+          "ek": "above60",
+          "src": "📊 야후 EOD · ^NDX 종가 vs 60일선",
+          "bkey": "60일선"
         }
       ],
       "entry": [
         {
-          "t": "강한 상승 뒤 짧은 눌림(2거래일~4거래일) 끝 반등",
-          "ref": "2-2",
-          "src": "📊 야후 EOD · QQQ 최근 고점 이후 눌림 거래일수",
-          "bkey": "2거래일에서 4거래일 눌림",
-          "ek": "pullback"
+          "t": "전고점 돌파 후 2~3거래일 버티는 자리",
+          "ref": "3-3",
+          "ek": "breakout",
+          "src": "📊 야후 EOD · ^NDX 전고점 돌파 후 지지 일수",
+          "bkey": "2~3거래일"
         },
         {
-          "t": "대표 대형주 3개 이상 같은 방향",
-          "ref": "1-4",
-          "src": "📊 야후 EOD · 대형 기술주 등락 개수",
-          "bkey": "3개 이상 같은 방향",
-          "ek": "leaders"
+          "t": "강한 상승 뒤 짧은 눌림(2~4거래일) 끝 반등",
+          "ref": "3-1",
+          "ek": "pullback",
+          "src": "📊 야후 EOD · TQQQ 최근 고점 이후 눌림 일수",
+          "bkey": "2~4거래일"
+        },
+        {
+          "t": "장 시작 30분 대기 후 시초가 위 유지",
+          "ref": "7-2",
+          "ik": "open30",
+          "src": "👁 장중 · 첫 30분 시초가 지지 여부",
+          "bkey": "30분"
+        },
+        {
+          "t": "첫 눌림에서 저점을 높였는지",
+          "ref": "7-2",
+          "ik": "hlow",
+          "src": "👁 장중 · 첫 눌림 저점 위치",
+          "bkey": "저점"
+        },
+        {
+          "t": "빅테크 3개 이상 같은 방향(플러스 유지)",
+          "ref": "2-1",
+          "ik": "bigtech",
+          "src": "👁 장중 · 저자가 나열한 7종(엔비디아·마이크로소프트·애플·아마존·메타·구글·테슬라) 중 플러스 수",
+          "bkey": "3개"
         }
       ],
       "avoid": [
         {
-          "t": "변동성 전일 대비 10% 이상 급등",
-          "ref": "1-2",
+          "t": "변동성(VIX) 전일 대비 10% 이상 급등",
+          "ref": "2-4",
           "k": "vix",
           "src": "📊 야후 EOD · ^VIX 전일비",
-          "bkey": "10% 이상 튀면"
-        },
-        {
-          "t": "최근 5거래일 20% 이상 급등(추격 위험)",
-          "ref": "3-1",
-          "k": "run5",
-          "src": "📊 야후 EOD · QQQ 최근 5일 수익률",
-          "bkey": "5거래일 동안 20% 넘게"
-        },
-        {
-          "t": "고점 대비 종가 4% 이상 밀림(윗꼬리)",
-          "ref": "3-2",
-          "k": "wick",
-          "src": "📊 야후 EOD · 고가 대비 종가",
-          "bkey": "4% 이상 밀려 마감"
+          "bkey": "10%"
         },
         {
           "t": "거래량 전일 1.5배 이상 + 종가 고점 아래(매물)",
-          "ref": "3-2",
+          "ref": "7-4",
           "k": "vol_sell",
-          "src": "📊 야후 EOD · 전일比 거래량 배수 + 종가 고점比",
-          "bkey": "1.5배 이상 늘면서 종가 밀림"
+          "src": "📊 야후 EOD · 전일比 거래량 배수 + 종가 위치",
+          "bkey": "1.5배"
         }
       ],
-      "note": "진입 2조건 이상 + 필터 통과 + 회피 0 → 1차 분할 진입",
       "caution": [
         {
-          "t": "5일선에서 크게 벌어짐(단기 과열)",
+          "t": "최근 5거래일 이미 급등한 자리 추격(폭은 저자 미명시)",
           "ref": "3-1",
-          "k": "ma5_gap",
-          "src": "📊 야후 EOD · 종가 vs 5일선 이격 (몇 %부터인지는 저자 미명시 — 수치 보고 직접)",
-          "bkey": "5일선과의 거리"
+          "k": "run5",
+          "src": "📊 야후 EOD · TQQQ 최근 5일 수익률 — 몇 %부터인지는 저자 미명시, 수치 보고 직접",
+          "bkey": "5거래일",
+          "advisory": true
+        },
+        {
+          "t": "전고점 근처 윗꼬리 반복(밀림 폭은 저자 미명시)",
+          "ref": "3-1",
+          "k": "wick",
+          "src": "📊 야후 EOD · 고가 대비 종가 밀림 — 수치 보고 직접",
+          "bkey": "윗꼬리",
+          "advisory": true
+        },
+        {
+          "t": "갭상승 출발 — 첫 30분 저점 확인 전 추격 금지",
+          "ref": "7-3",
+          "k": "gapwait",
+          "src": "📊 야후 EOD · TQQQ 시초가 vs 전일 종가(갭 여부) · 첫 30분 저점은 장중 확인",
+          "bkey": "30분"
         }
       ],
+      "note": "매수 전 3문장 — 20일선 위인가 · 최근 5거래일 이미 급등했나 · 전고점 윗꼬리 반복인가. 3개 중 2개 불편하면 미룬다 (3-1)",
       "exit": [
         {
+          "L": "시간 손절",
+          "v": "짧은 매매 3~5거래일 · 중간 10~20거래일 · 긴 40~60거래일 안에 판단. 긴 매매는 중간에 -10%(20거래일)·-25%(60거래일)가 와도 버틸 비중일 때만 (1-3)"
+        },
+        {
           "L": "1차 익절",
-          "v": "수익 구간에서 일부 먼저 매도 → 추세 살아 있는 동안 잔량 보유"
+          "v": "수익 7~10% 구간에서 30% 매도 (7-5)"
+        },
+        {
+          "L": "2차 익절",
+          "v": "수익 15~20% 구간에서 추가 30% (7-5)"
+        },
+        {
+          "L": "잔량 40%",
+          "v": "나스닥이 5일선·10일선 지키는 동안만 보유 — 이탈 시 정리 (7-5)"
         },
         {
           "L": "손절",
-          "v": "정해둔 손실선에 닿으면 이유 재론 없이 먼저 축소"
+          "v": "-7%에서 재판단 (6-4) · 20일선 종가 이탈 후 2거래일 이상 회복 실패면 축소 (7-6)"
+        },
+        {
+          "L": "실적 시즌",
+          "v": "발표 전 5거래일 이상 오른 상태 + 수익 10% 이상이면 30~50% 축소 — 발표일은 직접 확인 (3-5)"
+        },
+        {
+          "L": "반납 경고",
+          "v": "최고 수익 대비 40% 반납하면 남은 물량 절반 축소 (7-5)"
         }
       ]
     },
-    "IWM": {
-      "v": "--iwm",
+    "SOXL": {
+      "v": "--soxl",
       "need": 2,
       "filter": [
         {
-          "t": "러셀2000 종가가 20일선 위",
-          "ref": "2-3",
+          "t": "반도체 지수가 20일선 위(스윙 생존선)",
+          "ref": "4-4",
           "ek": "above20",
-          "src": "📊 야후 EOD · ^RUT 종가 vs 20일선",
-          "bkey": "20일선 위"
+          "src": "📊 야후 EOD · ^SOX 종가 vs 20일선 — '반도체 지수'의 심볼 특정은 운영 판단(사람 승인)",
+          "bkey": "20일선"
         },
         {
-          "t": "20일선 회복 후 2거래일 동안 다시 안 깸",
-          "ref": "2-3",
-          "ek": "hold20",
-          "src": "📊 야후 EOD · ^RUT 종가가 20일선 위를 며칠 연속 지켰나 (회복일+2거래일=3)",
-          "bkey": "2거래일 동안 다시 안 깸"
+          "t": "SOXL이 5일선 위(단타 호흡)",
+          "ref": "4-4",
+          "ek": "above5",
+          "src": "📊 야후 EOD · SOXL 종가 vs 5일선",
+          "bkey": "5일선"
         }
       ],
       "entry": [
         {
-          "t": "대표 대형주 3개 이상 같은 방향(넓은 위험선호)",
-          "ref": "1-4",
-          "src": "📊 야후 EOD · 대형주 등락 개수",
-          "bkey": "3개 이상 같은 방향",
-          "ek": "leaders"
+          "t": "엔비디아·AMD·브로드컴 중 2개 이상 플러스",
+          "ref": "4-2",
+          "ek": "leaders3",
+          "src": "📊 야후 EOD · NVDA·AMD·AVGO 등락 개수 — '엔비디아 포함' 여부는 직접 확인",
+          "bkey": "2개"
         },
         {
-          "t": "전고점 돌파 후 2거래일 버티는 자리",
-          "ref": "2-4",
-          "src": "📊 야후 EOD · IWM 전고점 돌파 후 며칠 지지",
-          "bkey": "2거래일 버티는 자리",
-          "ek": "breakout"
+          "t": "반도체 6개 중 4개 이상 같은 방향(넓은 상승)",
+          "ref": "2-3",
+          "ek": "breadth6",
+          "src": "📊 야후 EOD · 반도체 지수·엔비디아·AMD·브로드컴·마이크론·장비주 — 장비주=AMAT 선정은 운영 판단(저자 미특정)",
+          "bkey": "4개"
+        },
+        {
+          "t": "급등 후 눌림(2거래일)이 끝나고 다시 올라오는 자리",
+          "ref": "2-3",
+          "ek": "pullback",
+          "src": "📊 야후 EOD · SOXL 최근 고점 이후 눌림 일수",
+          "bkey": "2거래일"
         }
       ],
       "avoid": [
         {
-          "t": "변동성 전일 대비 10% 이상 급등",
-          "ref": "1-2",
+          "t": "변동성(VIX) 전일 대비 10% 이상 급등",
+          "ref": "2-4",
           "k": "vix",
           "src": "📊 야후 EOD · ^VIX 전일비",
-          "bkey": "10% 이상 튀면"
+          "bkey": "10%"
         },
         {
-          "t": "최근 5거래일 20% 이상 급등(추격 위험)",
-          "ref": "3-1",
-          "k": "run5",
-          "src": "📊 야후 EOD · IWM 최근 5일 수익률",
-          "bkey": "5거래일 동안 20% 넘게"
+          "t": "단기 급등 자리 추격(앞사람 익절 물량 받아주기)",
+          "ref": "2-3",
+          "k": "run20|run15",
+          "bkey": "추격",
+          "src": "📊 야후 EOD · SOXL 최근 5일 수익률",
+          "subs": [
+            {
+              "t": "5거래일 동안 20% 이상 급등",
+              "ref": "2-3",
+              "k": "run20",
+              "bkey": "20%",
+              "src": "📊 야후 EOD · SOXL 5일 수익률"
+            },
+            {
+              "t": "호재 뉴스에도 최근 5거래일 15% 이상 오른 자리",
+              "ref": "4-5",
+              "k": "run15",
+              "bkey": "15%",
+              "src": "📊 야후 EOD · SOXL 5일 수익률"
+            }
+          ]
         },
         {
-          "t": "고점 대비 종가 4% 이상 밀림(윗꼬리)",
-          "ref": "3-2",
+          "t": "최근 10거래일 중 상승일 7일 이상(이미 뜨거운 상태)",
+          "ref": "2-3",
+          "k": "hot10",
+          "src": "📊 야후 EOD · ^SOX 상승일 수",
+          "bkey": "10거래일"
+        },
+        {
+          "t": "장중 고점 대비 4% 이상 밀려 마감(윗꼬리)",
+          "ref": "4-5",
           "k": "wick",
           "src": "📊 야후 EOD · 고가 대비 종가",
-          "bkey": "4% 이상 밀려 마감"
+          "bkey": "4%"
         },
         {
-          "t": "거래량 전일 1.5배 이상 + 종가 고점 아래(매물)",
-          "ref": "3-2",
+          "t": "거래량 전일 1.5배 이상 늘었는데 종가 밀림(위에서 털림)",
+          "ref": "4-3",
           "k": "vol_sell",
-          "src": "📊 야후 EOD · 전일比 거래량 배수 + 종가 고점比",
-          "bkey": "1.5배 이상 늘면서 종가 밀림"
+          "src": "📊 야후 EOD · 전일比 거래량 배수 + 종가 위치",
+          "bkey": "1.5배"
         }
       ],
-      "note": "소형주는 넓은 위험선호가 확인될 때만 무게를 싣는다",
       "caution": [
         {
-          "t": "5일선에서 크게 벌어짐(단기 과열)",
-          "ref": "3-1",
+          "t": "5일선과 거리 과다(단기 과열 — 몇 %부터인지 저자 미명시)",
+          "ref": "2-3",
           "k": "ma5_gap",
-          "src": "📊 야후 EOD · 종가 vs 5일선 이격 (몇 %부터인지는 저자 미명시 — 수치 보고 직접)",
-          "bkey": "5일선과의 거리"
+          "src": "📊 야후 EOD · SOXL 종가 vs 5일선 이격 — 수치 보고 직접",
+          "bkey": "5일선",
+          "advisory": true
+        },
+        {
+          "t": "갭상승 출발 — 첫 30분 저점 확인 전 추격 금지",
+          "ref": "7-3",
+          "k": "gapwait",
+          "src": "📊 야후 EOD · SOXL 시초가 vs 전일 종가(갭 여부) · 첫 30분 저점은 장중 확인",
+          "bkey": "30분"
         }
       ],
+      "note": "매수 전 3줄 — 엔비디아 시초가 위인가 · AMD 전일 저점 지키나 · 브로드컴 전고점서 밀리지 않나. 2개 미만이면 줄인다 (4-2)",
       "exit": [
         {
+          "L": "시간 손절",
+          "v": "단타 3거래일 · 짧은 스윙 5~8거래일 · 강한 추세 매매라도 20거래일 안에 반드시 재판단 (4-1)"
+        },
+        {
           "L": "1차 익절",
-          "v": "수익 구간에서 일부 먼저 매도 → 추세 살아 있는 동안 잔량 보유"
+          "v": "수익 10~12% 구간에서 30% 매도 (7-5)"
+        },
+        {
+          "L": "2차 익절",
+          "v": "수익 15~20% 구간에서 추가 30% — 5~10거래일 안에 20% 이상 수익이면 더 서두른다 (7-5 · 4-1)"
+        },
+        {
+          "L": "잔량 40%",
+          "v": "반도체 대표주 3개 중 2개 이상 살아 있는 동안만 보유 (7-5)"
         },
         {
           "L": "손절",
-          "v": "정해둔 손실선에 닿으면 이유 재론 없이 먼저 축소"
+          "v": "6%에서 절반 축소 (6-4) · 주도주 2개 이상이 전일 저점 이탈하면 축소 (7-6)"
+        },
+        {
+          "L": "반납 경고",
+          "v": "최고 수익 대비 30% 반납이면 경고 · 50% 반납이면 강한 축소 후보 (4-1)"
+        }
+      ]
+    },
+    "UPRO": {
+      "v": "--upro",
+      "need": 2,
+      "filter": [
+        {
+          "t": "S&P500 종가가 20일선 위(종가로 회복)",
+          "ref": "5-2",
+          "ek": "above20",
+          "src": "📊 야후 EOD · ^GSPC 종가 vs 20일선",
+          "bkey": "20일선"
+        },
+        {
+          "t": "회복 후 2거래일 동안 20일선 다시 안 깸",
+          "ref": "5-2",
+          "ek": "hold20",
+          "src": "📊 야후 EOD · ^GSPC 종가가 20일선 위를 연속으로 지킨 날수",
+          "bkey": "2거래일"
+        },
+        {
+          "t": "S&P500이 60일선 위(중기 체력이 받쳐줌)",
+          "ref": "5-2",
+          "ek": "above60",
+          "src": "📊 야후 EOD · ^GSPC 종가 vs 60일선",
+          "bkey": "60일선"
+        }
+      ],
+      "entry": [
+        {
+          "t": "섹터 5개 중 3개 이상 동반 상승(업종 확산)",
+          "ref": "5-2",
+          "ek": "sectors",
+          "src": "📊 야후 EOD · 기술·금융·산업재·헬스케어·소비재 — 섹터 ETF 5종 선정은 운영 판단(저자 미특정)",
+          "bkey": "3개"
+        },
+        {
+          "t": "전고점 돌파 후 2~3거래일 버티면 비중 확대",
+          "ref": "2-2",
+          "ek": "breakout",
+          "src": "📊 야후 EOD · ^GSPC 전고점 돌파 후 지지 일수",
+          "bkey": "2~3거래일"
+        }
+      ],
+      "avoid": [
+        {
+          "t": "변동성(VIX) 전일 대비 10% 이상 급등",
+          "ref": "2-4",
+          "k": "vix",
+          "src": "📊 야후 EOD · ^VIX 전일비",
+          "bkey": "10%"
+        },
+        {
+          "t": "경기침체 신호 — 방어주 뒤에 숨는 장",
+          "ref": "5-3",
+          "k": "weak_fin|weak_ind",
+          "bkey": "방어",
+          "src": "📊 야후 EOD · 금융·산업재 5일 흐름",
+          "groupNeed": 2,
+          "subs": [
+            {
+              "t": "금융 섹터 5거래일 약세 흐름(수익률 마이너스)",
+              "ref": "5-3",
+              "k": "weak_fin",
+              "bkey": "5거래일",
+              "src": "📊 야후 EOD · XLF 5일 수익률"
+            },
+            {
+              "t": "산업재 섹터 5거래일 약세 흐름(수익률 마이너스)",
+              "ref": "5-3",
+              "k": "weak_ind",
+              "bkey": "5거래일",
+              "src": "📊 야후 EOD · XLI 5일 수익률"
+            }
+          ]
+        }
+      ],
+      "caution": [],
+      "note": "순환매 판단 — 섹터 5개 중 4개가 살아 있으면 UPRO 비중 확대, 2개 이하면 현금 확대 (5-4)",
+      "exit": [
+        {
+          "L": "1차 익절",
+          "v": "수익 7~10% 구간에서 30% 매도 (7-5)"
+        },
+        {
+          "L": "축소",
+          "v": "S&P500이 20일선을 깨고 금융·산업재가 같이 약하면 30% 축소 · 60일선까지 위협받으면 추가 30% (5-3)"
+        },
+        {
+          "L": "전환 수용",
+          "v": "TQQQ·SOXL 수익 10% 이상 + 과열 신호면 30%를 UPRO로 · 수익 15% 이상 + 주도주 2개 약화면 50%까지 (5-5)"
+        },
+        {
+          "L": "반납 경고",
+          "v": "최고 수익 대비 40% 반납하면 남은 물량 절반 축소 (7-5)"
         }
       ]
     },
     "COMMON": {
       "entry": [
         {
-          "t": "거래량 전일 1.5배 이상 + 종가 고점 근처",
-          "ref": "3-2",
-          "src": "📊 야후 EOD · 당일 거래량 vs 전일 거래량",
-          "bkey": "1.5배 이상 늘었나"
+          "t": "거래량 전일 1.5배 이상 + 종가 고점 근처(힘 있는 상승)",
+          "ref": "7-4",
+          "src": "📊 야후 EOD · TQQQ 당일 거래량 vs 전일 거래량",
+          "bkey": "1.5배"
+        },
+        {
+          "t": "최근 20거래일 중 상승일 13일 이상(레버리지가 힘 받는 장)",
+          "ref": "1-2",
+          "src": "📊 야후 EOD · ^NDX 상승일 수 — 대상 지수 선정은 운영 판단(저자 미특정)",
+          "bkey": "20거래일"
         }
       ],
-      "avoid": []
+      "avoid": [
+        {
+          "t": "돈삭제 의심 신호(네 가지 중 두 개 이상)",
+          "ref": "1-5",
+          "k": "down6|updown|failbrk|vixlow",
+          "bkey": "돈삭제",
+          "src": "📊 야후 EOD · 1-5의 의심 숫자 네 가지",
+          "groupNeed": 2,
+          "subs": [
+            {
+              "t": "최근 10거래일 중 상승일 6일 미만",
+              "ref": "1-5",
+              "k": "down6",
+              "bkey": "10거래일",
+              "src": "📊 야후 EOD · ^NDX 상승일 수 — 대상 지수 선정은 운영 판단"
+            },
+            {
+              "t": "하락일 낙폭이 상승일 상승폭보다 큼",
+              "ref": "1-5",
+              "k": "updown",
+              "bkey": "낙폭",
+              "src": "🚧 jhts EOD 데이터로 계산 가능하나 판정 로직 미구현",
+              "mtype": "updown_magnitude"
+            },
+            {
+              "t": "전고점 돌파 후 3거래일 안에 돌파선 아래로 밀림",
+              "ref": "1-5",
+              "k": "failbrk",
+              "bkey": "3거래일",
+              "src": "📊 야후 EOD · ^NDX 돌파 후 지지 일수"
+            },
+            {
+              "t": "VIX가 바닥권에서 20% 이상 급등",
+              "ref": "1-5",
+              "k": "vixlow",
+              "bkey": "20%",
+              "src": "🚧 '바닥권' 기준 로직 미구현(jhts EOD 데이터는 있음)",
+              "mtype": "rise_from_low"
+            }
+          ]
+        },
+        {
+          "t": "환율이 최근 20거래일 평균 위로 크게 벌어짐(전액 환전 금지·금액 축소)",
+          "ref": "8-1",
+          "k": "fx_high",
+          "src": "📊 야후 EOD · KRW=X vs 20일선 이격 — '크게'의 폭은 저자가 원 단위 예시라 수치 보고 직접",
+          "bkey": "20거래일",
+          "advisory": true
+        }
+      ],
+      "exit": [
+        {
+          "L": "계좌 방화선",
+          "v": "전체 -5%면 신규 매수 중단 · -8%면 레버리지 노출 절반 축소 · -12%면 전체 재설계 (6-4)"
+        },
+        {
+          "L": "손실 구간별",
+          "v": "-10% 경고(처음 매수 이유 검문) · -20% 구조조정(비중 축소·현금 확보) · -30% 생존(물량 30%·40%·30% 삼분할) (9-2)"
+        },
+        {
+          "L": "물타기 3문장",
+          "v": "처음 이유가 살아 있나 · 추가 후 -5% 더 나와도 허용선 안인가 · 현금 20~30% 남나 — 하나라도 아니면 중단 (9-1)"
+        },
+        {
+          "L": "분할 3단계",
+          "v": "1차 25% · 2차 30% · 3차 45% — 총금액을 먼저 쪼개 적는다 (3-4)"
+        },
+        {
+          "L": "재진입 3단계",
+          "v": "VIX가 고점에서 꺾임 · 지수 20일선 회복 · 눌림 지지 — 2개 맞기 전 큰돈 금지, V자 기대 대신 반등 후 3거래일 확인 (9-5 · 9-3)"
+        },
+        {
+          "L": "수익 출금",
+          "v": "실현수익 30% 분리(1,000만 원 이상 수익 달은 40%) · 수익 직후 2거래일 신규 매수 금지 (10-4)"
+        }
+      ],
+      "reentry": [
+        {
+          "t": "공포 진정 — VIX가 고점에서 꺾여 내려오기 시작",
+          "ref": "9-5",
+          "k": "fear",
+          "bkey": "공포",
+          "src": "📊 야후 EOD · ^VIX 전일 대비 하락(고점에서 꺾임)"
+        },
+        {
+          "t": "가격 회복 — 지수 종가가 20일선 위로 복귀",
+          "ref": "9-5",
+          "k": "ma20back",
+          "bkey": "20일선",
+          "src": "📊 야후 EOD · ^GSPC 종가 vs 20일선 (지수 선정은 운영 판단)"
+        },
+        {
+          "t": "눌림 지지 — 회복 후 첫 눌림에서 전저점을 지키는지",
+          "ref": "9-5",
+          "bkey": "눌림",
+          "src": "✋ 직접 · 회복 후 눌림 저점 지지·전고점 재도전은 다중일 차트 판독",
+          "mtype": "manual_confirm"
+        },
+        {
+          "t": "거래량 동반 — 반등일 거래량이 직전 하락일보다 큼",
+          "ref": "9-3",
+          "bkey": "거래량",
+          "src": "✋ 직접 · 반등일 vs 직전 하락일 단일일 거래량 비교(무료 EOD 미노출)",
+          "mtype": "manual_confirm"
+        },
+        {
+          "t": "(경고) 대표 대형주가 아직 전일 저점을 낮추는 중 — 걸리면 진입 금지",
+          "ref": "9-5",
+          "bkey": "저점",
+          "src": "✋ 직접 · 대표주 3개 중 2개 이상 저점을 높이는지(9-5)는 종목별 저점 패턴 판독 — 무료 EOD 자동 임계 없음",
+          "warn": true,
+          "mtype": "manual_confirm"
+        }
+      ]
     }
   },
   "MODES": {
     "공격": {
-      "SPY": 30,
-      "QQQ": 30,
-      "IWM": 20,
-      "cash": 20
+      "TQQQ": 34,
+      "SOXL": 24,
+      "UPRO": 18,
+      "cash": 24
     },
     "균형": {
-      "SPY": 34,
-      "QQQ": 20,
-      "IWM": 12,
+      "TQQQ": 26,
+      "SOXL": 14,
+      "UPRO": 26,
       "cash": 34
     },
     "방어": {
-      "SPY": 30,
-      "QQQ": 12,
-      "IWM": 6,
-      "cash": 52
+      "TQQQ": 14,
+      "SOXL": 6,
+      "UPRO": 30,
+      "cash": 50
     }
   },
   "SCSRC": [
-    "📊 야후 EOD · ES=F S&P500 선물 전일비 · '고점 낮추지 않음'은 직접 확인",
-    "📊 야후 EOD · NQ=F 나스닥100 선물 전일비 · '고점 낮추지 않음'은 직접 확인",
-    "📊 야후 EOD · ^VIX 전일비",
-    "📊 야후 EOD · ^TNX 전일 대비 %p"
+    "📊 야후 EOD · NQ=F 전일비 · '고점을 계속 낮추는지'는 직접 확인",
+    "📊 야후 EOD · ES=F 전일비",
+    "📊 야후 EOD · ^VIX 전일비 — 20% 이상이면 그날은 경고등",
+    "📊 야후 EOD · ^TNX 전일 대비 — '이틀 연속 상승'은 직접 확인",
+    "📊 야후 EOD · DX-Y.NYB 전일비 — '안정'의 정량화(전일 대비 상승 아님)는 운영 판단"
   ],
   "STEPNAME": {
-    "STEP1": "STEP1 스코어카드",
+    "STEP1": "STEP1 장전 10분 스코어카드(5개 지표)",
     "STEP2-filter": "STEP2 필터",
     "STEP2-entry": "STEP2 진입",
     "STEP2-avoid": "STEP2 회피",
     "STEP2-exit": "STEP2 청산",
-    "STEP3": "STEP3 계산기",
-    "STEP4": "STEP4 메모"
+    "STEP3": "STEP3 비중 계산기(공격·균형·방어)",
+    "STEP4": "STEP4 메모·환전"
   }
 }
 </script>
-<script type="application/json" id="symbols">["AAPL", "AMZN", "ES=F", "GOOGL", "IWM", "JPM", "META", "MSFT", "NQ=F", "NVDA", "QQQ", "SPY", "^GSPC", "^NDX", "^RUT", "^TNX", "^VIX"]</script>
+<script type="application/json" id="symbols">["AAPL", "AMAT", "AMD", "AMZN", "AVGO", "DX-Y.NYB", "ES=F", "GOOGL", "KRW=X", "META", "MSFT", "MU", "NQ=F", "NVDA", "SOXL", "TQQQ", "TSLA", "XLF", "XLI", "XLK", "XLP", "XLV", "^GSPC", "^NDX", "^SOX", "^TNX", "^VIX"]</script>
 
 <!-- INJECT:playbook-ui -->
 <script>
@@ -1890,8 +2439,8 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
   });
 
   /* ---- STEP 3-B: 내 계좌 실제 비중 (6-3 · 10-1 · 9-4) ---- */
-  var hEls = {SPY:document.getElementById('hSPY'), QQQ:document.getElementById('hQQQ'),
-              IWM:document.getElementById('hIWM'), CASH:document.getElementById('hCASH')};
+  var hEls = {TQQQ:document.getElementById('hTQQQ'), SOXL:document.getElementById('hSOXL'),
+              UPRO:document.getElementById('hUPRO'), CASH:document.getElementById('hCASH')};
   var regimeWrap = document.getElementById('regime');
   var posOut = document.getElementById('posOut'), posWarn = document.getElementById('posWarn');
   var modeGap = document.getElementById('modeGap');
@@ -1918,33 +2467,33 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
   function renderPos(){
     if(!posOut) return;
     var v = {}, total = 0;
-    ['SPY','QQQ','IWM','CASH'].forEach(function(k){ v[k] = num(hEls[k]) || 0; total += v[k]; });
+    ['TQQQ','SOXL','UPRO','CASH'].forEach(function(k){ v[k] = num(hEls[k]) || 0; total += v[k]; });
     if(total <= 0){
       posOut.innerHTML = '<p class="subtle" style="margin:0">평가액을 넣으면 집중도·현금비중 판정이 나옵니다.</p>';
       posWarn.innerHTML = ''; modeGap.style.display = 'none';
       return;
     }
-    var w = {}; ['SPY','QQQ','IWM','CASH'].forEach(function(k){ w[k] = v[k]/total*100; });
-    var hot = w.SPY + w.QQQ;                  // 가장 거친 두 칸
+    var w = {}; ['TQQQ','SOXL','UPRO','CASH'].forEach(function(k){ w[k] = v[k]/total*100; });
+    var hot = w.TQQQ + w.SOXL;                  // 가장 거친 두 칸
     var reg = curRegime();
     var dayLoss = total * 0.05;                 // 10-1 하루 -5% 절대액
 
     posOut.innerHTML =
       '<div class="kv"><span>총 자산</span><b>' + fmt(total) + '만</b></div>' +
-      '<div class="kv"><span>SPY</span><b>' + fmt(v.SPY) + '만 · ' + w.SPY.toFixed(1) + '%</b></div>' +
-      '<div class="kv"><span>QQQ</span><b>' + fmt(v.QQQ) + '만 · ' + w.QQQ.toFixed(1) + '%</b></div>' +
-      '<div class="kv"><span>IWM</span><b>' + fmt(v.IWM) + '만 · ' + w.IWM.toFixed(1) + '%</b></div>' +
+      '<div class="kv"><span>TQQQ</span><b>' + fmt(v.TQQQ) + '만 · ' + w.TQQQ.toFixed(1) + '%</b></div>' +
+      '<div class="kv"><span>SOXL</span><b>' + fmt(v.SOXL) + '만 · ' + w.SOXL.toFixed(1) + '%</b></div>' +
+      '<div class="kv"><span>UPRO</span><b>' + fmt(v.UPRO) + '만 · ' + w.UPRO.toFixed(1) + '%</b></div>' +
       '<div class="kv"><span>현금</span><b>' + fmt(v.CASH) + '만 · ' + w.CASH.toFixed(1) + '%</b></div>' +
-      '<div class="kv"><span>SPY+QQQ (거친 칸 합)</span><b>' + hot.toFixed(1) + '%</b></div>' +
+      '<div class="kv"><span>TQQQ+SOXL (거친 칸 합)</span><b>' + hot.toFixed(1) + '%</b></div>' +
       '<div class="kv"><span>하루 -5% 나면</span><b>-' + fmt(dayLoss) + '만</b></div>';
 
     var msgs = [];
     if(hot >= 50 && w.CASH <= 10){
-      msgs.push(['bad', '🚨 <b>판단이 꼬이는 자리</b> — SPY+QQQ 합 ' + hot.toFixed(1) + '% (50%↑)인데 현금 ' +
+      msgs.push(['bad', '🚨 <b>판단이 꼬이는 자리</b> — TQQQ+SOXL 합 ' + hot.toFixed(1) + '% (50%↑)인데 현금 ' +
         w.CASH.toFixed(1) + '% (10%↓). 신규 진입 금지, <b>축소가 먼저</b>입니다. 거친 칸부터 30% 줄여 현금을 ' +
         reg.cash + '%까지 올리세요.']);
     } else if(hot >= 50){
-      msgs.push(['warn', '⚠ SPY+QQQ 합 ' + hot.toFixed(1) + '% — 거친 칸이 절반을 넘었습니다. 추가 진입은 IWM 또는 현금으로.']);
+      msgs.push(['warn', '⚠ TQQQ+SOXL 합 ' + hot.toFixed(1) + '% — 거친 칸이 절반을 넘었습니다. 추가 진입은 UPRO 또는 현금으로.']);
     }
     if(w.CASH < reg.cash){
       var need = (reg.cash - w.CASH)/100 * total;
@@ -1963,7 +2512,7 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
     var MODES = JSON.parse(document.getElementById('rules').textContent).MODES;   // SSOT: rules.json MODES (하드코딩 제거)
     var m = MODES[curMode()];
     if(m){
-      var gaps = ['SPY','QQQ','IWM'].map(function(k){
+      var gaps = ['TQQQ','SOXL','UPRO'].map(function(k){
         var d = w[k] - m[k];
         return k + ' ' + (d>=0?'+':'') + d.toFixed(1) + '%p';
       }).join(' · ') + ' · 현금 ' + (w.CASH - m.cash >= 0 ? '+' : '') + (w.CASH - m.cash).toFixed(1) + '%p';
@@ -1973,7 +2522,7 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
         ' <span style="color:var(--mute)">(+면 초과 보유. 조정은 주 1회만)</span>';
     }
   }
-  ['SPY','QQQ','IWM','CASH'].forEach(function(k){ hEls[k] && hEls[k].addEventListener('input', renderPos); });
+  ['TQQQ','SOXL','UPRO','CASH'].forEach(function(k){ hEls[k] && hEls[k].addEventListener('input', renderPos); });
   document.querySelectorAll('#modes button').forEach(function(b){ b.addEventListener('click', renderPos); });
   var capEl = document.getElementById('capital');
   capEl && capEl.addEventListener('input', renderPos);
@@ -2278,7 +2827,7 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
 
 <script>
 /* ============================================================
-   5-5/3-5 화력 낮추기(IWM·현금 이관) 판정
+   5-5/3-5 화력 낮추기(UPRO·현금 이관) 판정
    ============================================================ */
 (function(){
   'use strict';
@@ -2290,16 +2839,16 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
   (function(){
     var out = document.getElementById('xferOut');
     if(!out) return;
-    var els = {SPY: document.getElementById('rSPY'), QQQ: document.getElementById('rQQQ')};
-    var hold = {SPY: document.getElementById('hSPY'), QQQ: document.getElementById('hQQQ')};
+    var els = {TQQQ: document.getElementById('rTQQQ'), SOXL: document.getElementById('rSOXL')};
+    var hold = {TQQQ: document.getElementById('hTQQQ'), SOXL: document.getElementById('hSOXL')};
 
     function num(el){ var v = parseFloat(el && el.value); return isFinite(v) ? v : null; }
     function fmt(n){ return Math.round(n).toLocaleString('ko-KR'); }
     function vFor(p){ return (VD && VD.verdicts) ? VD.verdicts.find(function(x){ return x.prod === p; }) : null; }
 
-    // 시장 전체 약세? (S&P500 20일선 아래 + VIX 튐 → IWM 말고 현금)
+    // 시장 전체 약세? (S&P500 20일선 아래 + VIX 튐 → UPRO 말고 현금)
     function marketWeak(){
-      var u = vFor('IWM');
+      var u = vFor('UPRO');
       var below = !!(u && u.close && u.ma20 && u.close < u.ma20);
       var vixJump = false;
       (VD && VD.verdicts || []).forEach(function(x){
@@ -2334,13 +2883,13 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
     }
 
     function render(){
-      var rows = ['SPY','QQQ'].map(judge).filter(Boolean);
+      var rows = ['TQQQ','SOXL'].map(judge).filter(Boolean);
       if(!rows.length){
         out.innerHTML = '<p class="subtle" style="margin:10px 0 0">보유 수익률을 넣으면 이관 판정이 나옵니다.</p>';
         return;
       }
       var mw = marketWeak();
-      var dest = mw.weak ? '현금' : 'IWM';
+      var dest = mw.weak ? '현금' : 'UPRO';
       var html = '';
       rows.forEach(function(x){
         if(!x.pct){
@@ -2358,12 +2907,12 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
              + [mw.below ? 'S&P500 20일선 아래' : '', mw.vixJump ? 'VIX +10%↑' : ''].filter(Boolean).join(' · ')
              + ') — <b>약세장에선 어느 종목도 대피소가 아닙니다 — 현금을 늘리세요.</b></div>';
       } else {
-        html += '<div class="note">줄인 금액을 전부 IWM에 넣지 않습니다 — 저자 예시는 일부만 IWM, 나머지는 현금.</div>';
+        html += '<div class="note">줄인 금액을 전부 UPRO에 넣지 않습니다 — 저자 예시는 일부만 UPRO, 나머지는 현금.</div>';
       }
       out.innerHTML = html;
     }
 
-    ['SPY','QQQ'].forEach(function(p){
+    ['TQQQ','SOXL'].forEach(function(p){
       if(els[p]) els[p].addEventListener('input', render);
       if(hold[p]) hold[p].addEventListener('input', render);
     });
