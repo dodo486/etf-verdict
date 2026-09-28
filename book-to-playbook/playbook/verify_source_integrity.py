@@ -33,11 +33,16 @@
 ## 사용
 
     python -m playbook.verify_source_integrity              # 검사 (다르면 종료코드 1)
-    python -m playbook.verify_source_integrity --accept     # 원문을 의도적으로 고쳤을 때 기준 갱신
+    python -m playbook.verify_source_integrity --accept --why "사유"  # 원문을 의도적으로 고쳤을 때 기준 갱신
     python -m playbook.verify_source_integrity --show trend # 해당 책이 가진 라벨 목록 출력
 
 기준값은 `source_baseline.json`에 저장되며 **커밋 대상**이다.
-새 책을 추가하면 처음 한 번 `--accept` 로 기준을 등록한다.
+새 책을 추가하면 처음 한 번 `--accept --why "사유"` 로 기준을 등록한다.
+
+`--accept` 는 원문 해시 기준을 덮어쓰는 가장 위험한 인간 승인 지점이다.
+`--why "사유"` 없이는 갱신을 거부한다 — 사유가 기록되지 않는 accept 는
+진짜 원문 수정과 무심코 누른 accept 를 구분할 방법을 없앤다.
+사유는 `source_baseline.json` 의 `accept_log` 배열에 타임스탬프와 함께 append 된다.
 """
 import hashlib
 import io
@@ -45,6 +50,7 @@ import json
 import os
 import re
 import sys
+from datetime import datetime
 
 from shared import paths  # noqa: F401  (경로·UTF-8 출력 고정)
 from shared.paths import BASE
@@ -194,10 +200,21 @@ NAMES = {"src": "플레이북 본문(#src)", "def_table": "규칙 근거표",
 
 def main(argv):
     accept = "--accept" in argv
+    why = None
+    if "--why" in argv:
+        i = argv.index("--why")
+        why = argv[i + 1] if i + 1 < len(argv) else None
     show = None
     if "--show" in argv:
         i = argv.index("--show")
         show = argv[i + 1] if i + 1 < len(argv) else None
+
+    # --accept 없이 --why 만 있는 건 허용(무해). --accept 와 함께 쓸 때만 필수.
+    if accept and not why:
+        print("오류: --accept 사용 시 --why \"<사유>\" 가 필요합니다.", file=sys.stderr)
+        print("  예) python -m playbook.verify_source_integrity --accept --why \"오탈자 수정\"", file=sys.stderr)
+        print("사유 없는 기준 갱신은 거부됩니다 — 진짜 원문 수정과 실수를 구분할 수 없습니다.", file=sys.stderr)
+        return 1
 
     pages = book_pages()
     if not pages:
@@ -263,8 +280,15 @@ def main(argv):
         return 1
 
     if accept:
-        save_baseline(cur)
+        # 감사 기록: accept_log 는 slug 키와 충돌하지 않는 전용 최상위 키.
+        # cur 에는 slug 키만 들어있으므로 load_baseline() 의 accept_log 를 직접 넣는다.
+        existing_log = load_baseline().get("accept_log", [])
+        log_entry = {"ts": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"), "why": why}
+        to_save = dict(cur)
+        to_save["accept_log"] = existing_log + [log_entry]
+        save_baseline(to_save)
         print("\n기준 갱신 완료 → %s" % os.path.basename(BASELINE))
+        print("  감사 기록: %s — %s" % (log_entry["ts"], why))
         for slug in sorted(pages):
             # 무엇을 기준으로 박았는지 남긴다. 0개를 조용히 박으면 그게 보호 상실이다.
             rl = load_rules(slug)

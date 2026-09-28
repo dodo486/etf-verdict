@@ -163,7 +163,7 @@ def publish_git(r, do_push=True):
 # logs/verify-history.jsonl — 발행마다 한 줄. 숫자는 verify_contract.py /
 # verify_rules_vs_spec.py 가 --json 으로 이미 계산해 낸 것을 그대로 옮긴다.
 # 여기서 다시 세지 않는다 — 두 곳의 셈이 갈리면 그게 오늘 하루 종일 잡은 실패 양식이다.
-HISTORY_FIELDS = ("gap", "violations", "exempt", "leaks", "fabrications")  # 악화(값 증가)를 감시하는 항목
+HISTORY_FIELDS = ("gap", "violations", "exempt", "leaks", "fabrications", "qualitative")  # 악화(값 증가)를 감시하는 항목
 
 
 def verify_json_stats(module):

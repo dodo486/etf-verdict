@@ -38,6 +38,11 @@ coverage-data 에 `status:"reflected"` 라고 써넣으면 그대로 ✅가 찍�
 강제하고, 허용 분류(설명·예시·표기차이·단위·UI) 밖이면 면제로 인정하지 않는다.
 **'구현이 다름'은 분류가 아니다.** 그건 gap 으로 내리거나 구현할 일이다.
 
+mindset 분류 의심 검사(mindset_audit)도 포함된다. status==mindset 인 소절의 원문에
+정량 토큰이 있으면 "규칙일 가능성"으로 세운다. 단, TOKEN_RE 가 없는 정성 규칙
+("추세가 꺾이면 매도" 등)을 잘못 mindset 으로 분류한 경우는 이 검사로 잡을 수 없다 —
+숫자 없는 오분류는 여전히 사람의 눈에 의존한다.
+
 ## 사용
 
     python -m checklist.verify_coverage              # 검사 (미해명 누락 있으면 exit 1)
@@ -381,6 +386,62 @@ def analyze(slug, path, rules=None):
     return rows
 
 
+def mindset_audit(slug, path):
+    """mindset 분류 의심 검사 — 정량 토큰이 있는 소절을 mindset 으로 분류했는지 본다.
+
+    ## 왜
+
+    status=="mindset"(💭원칙)인 소절은 토큰 대조(analyze)를 통째로 건너뛴다.
+    저자가 숫자로 말한 실제 규칙이 mindset 으로 잘못 분류돼 있으면 모든 검사를
+    조용히 빠져나간다 — '분류 자체가 탈출구'가 되는 구멍이다.
+
+    ## 로직
+
+    status=="mindset" 인 소절의 원문(#src)에 TOKEN_RE 로 뽑히는 토큰이 있으면
+    "규칙일 가능성 — reflected/gap 으로 재분류 또는 면제 필요"로 위반으로 세운다.
+    토큰 단위 면제 버킷: coverage_exempt.json 의 <slug>._mindset.
+    키 형식: "<소절키>::<토큰>". 소절의 모든 토큰이 면제되면 그 소절은 통과.
+
+    ## 한계 (정직하게)
+
+    TOKEN_RE 가 없는 정성 규칙("추세가 꺾이면 매도" 등)을 잘못 mindset 으로
+    분류한 경우는 이 검사로 잡을 수 없다. 숫자가 없어도 규칙인 소절의 오분류는
+    여전히 사람의 눈에 의존한다.
+    """
+    html = io.open(path, encoding="utf-8").read()
+    m = re.search(r'<script type="application/json" id="coverage-data">\s*(\{.*?\})\s*</script>',
+                  html, re.S)
+    if not m:
+        return None
+    cov = json.loads(m.group(1))["map"]
+    ms = re.search(r'<script type="text/markdown" id="src">(.*?)</script>', html, re.S)
+    if not ms:
+        return None
+    secs = split_sections(ms.group(1))
+    ex_bucket = (load_exempt().get(slug, {}) or {}).get("_mindset") or {}
+    exs = exempt_entries(ex_bucket)[0]   # {<소절키>::<토큰>: {kind, why}}
+
+    rows = []
+    for key, c in cov.items():
+        if c.get("status") != "mindset":
+            continue
+        body = secs.get(key)
+        if body is None:
+            continue                     # 본문 없는 소절(프롤로그 등)은 건너뜀
+        toks = []
+        for t in TOKEN_RE.findall(body):
+            t = norm(t[0] if isinstance(t, tuple) else t)
+            if t and t not in toks:
+                toks.append(t)
+        if not toks:
+            continue                     # 토큰 없음 → 의심 없음
+        unresolved = [t for t in toks if ("%s::%s" % (key, t)) not in exs]
+        exempted = [t for t in toks if ("%s::%s" % (key, t)) in exs]
+        rows.append({"key": key, "tokens": toks,
+                     "unresolved": unresolved, "exempt": exempted})
+    return rows
+
+
 def reverse_audit(slug, path, rules=None):
     """역방향 — 시트에는 있는데 **원문에는 없는** 수치(=지어낸 규칙) 찾기.
 
@@ -642,6 +703,18 @@ def main(argv):
             for x in revbad:
                 print("  ⚠ %s" % x["tok"])
         total_bad += len(revbad)
+
+        # mindset 분류 의심 — 정량 토큰이 있는 소절을 mindset 으로 잘못 분류했는지
+        mind = mindset_audit(slug, path) or []
+        mindbad = [r for r in mind if r.get("unresolved")]
+        if mindbad:
+            print("%s — mindset 분류인데 정량 토큰이 있는 소절 %d개 (재분류 또는 면제 필요)"
+                  % (slug, len(mindbad)))
+            for r in mindbad:
+                print("  ⚠ %-6s 미해결 토큰: %s" % (r["key"], ", ".join(r["unresolved"])))
+                print("       면제하려면 coverage_exempt.json 의 %s._mindset 에 \"%s::<토큰>\": {kind, why}"
+                      % (slug, r["key"]))
+        total_bad += len(mindbad)
 
         bad = [r for r in rows if r.get("unresolved") or r.get("err")]
         total_bad += len(bad)

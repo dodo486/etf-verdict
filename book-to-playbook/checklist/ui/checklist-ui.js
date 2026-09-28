@@ -15,7 +15,7 @@
   const scMsg = document.getElementById('scMsg');
   function scUpdate(){
     const n = scBoxes.filter(b=>b.checked).length;
-    scV.querySelector('.score').textContent = n+' / 5';
+    scV.querySelector('.score').textContent = n+' / '+scBoxes.length;
     scV.classList.remove('go','small','no');
     if(n>=4){scV.classList.add('go'); scMsg.textContent='공격 가능 — 진입 조건 충족 시 계획대로 매수';}
     else if(n===3){scV.classList.add('small'); scMsg.textContent='소액만 — 확인 매수 수준으로 축소';}

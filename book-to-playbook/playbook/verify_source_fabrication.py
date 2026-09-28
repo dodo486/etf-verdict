@@ -65,10 +65,21 @@
     2  검사 불가 — 계약 구조(rules.json / ref / source_index)를 못 채운 책 — **경고**
        (발행은 막지 않음. supply 처럼 아직 rules.json 이 없는 책이 여기 해당)
 
+## 정성 규칙 가시화
+
+정량 토큰이 0개인 저자-귀속 규칙(정성 규칙)은 고아 검사(ref 실존)만 받고
+창작 여부를 기계로 판정할 수 없다 — 숫자가 없으니 토큰 대조 자체가 불가능하다.
+그런 규칙을 조용히 통과시키면 얼마나 많은 규칙이 검증되지 않은 채로 발행되는지
+알 수 없다. 그래서 검사 결과에 "정성 규칙 N개 — 기계 검증 범위 밖, 수동 확인 대상"
+요약과 각 규칙의 ref·라벨(앞 60자) 목록을 반드시 출력한다(위반이 아니므로 exit 코드는
+바뀌지 않는다). 이 목록이 매 발행마다 보이는 것이 수동 검토의 최소한의 강제다.
+`--json` 출력에는 `qualitative` 키(책별 정성 규칙 수)가 추가되고, run.py HISTORY_FIELDS
+에 포함되어 발행마다 추이가 기록된다 — 늘어나면 "악화"로 경고된다.
+
 ## 사용
 
     python -m playbook.verify_source_fabrication          # 검사 (창작 있으면 exit 1)
-    python -m playbook.verify_source_fabrication --json    # {slug:{claims,orphans,ungrounded,fabrications}}
+    python -m playbook.verify_source_fabrication --json    # {slug:{claims,orphans,ungrounded,fabrications,qualitative}}
     python -m playbook.verify_source_fabrication --show 3-2 # 그 소절의 규칙·토큰·근거 상세
 """
 import io
@@ -187,8 +198,9 @@ def exempt_rejected(slug):
 # ---------------------------------------------------------------- 검사
 def check_book(slug):
     """한 책의 창작 검사. 돌려주는 것:
-        (status, stats, findings, rejected_exempts)
+        (status, stats, findings, rejected_exempts, qualitative)
     status: 0=통과 · 1=창작 있음 · 2=검사 불가(계약 미충족)
+    qualitative: 정량 토큰이 0개인 저자-귀속 규칙 목록 [{ref, label}, ...]
     """
     rp = rules_path(slug)
     src_tok = source_tokens(slug)
@@ -200,14 +212,15 @@ def check_book(slug):
     if src_tok is None:
         why.append("source_index.json 없음(원문 토큰 지문이 없어 근거를 대조할 수 없음)")
     if why:
-        return 2, {"reason": " · ".join(why)}, [], []
+        return 2, {"reason": " · ".join(why)}, [], [], []
 
     rules = list(iter_rules(load_json(rp)))
     if not rules:
-        return 2, {"reason": "rules.json 에 규칙(라벨 t)이 하나도 없음"}, [], []
+        return 2, {"reason": "rules.json 에 규칙(라벨 t)이 하나도 없음"}, [], [], []
 
     ex = exempt_of(slug)
     findings = []
+    qualitative = []   # 정량 토큰이 0개인 저자-귀속 규칙 목록
     claims = orphans = ungrounded = 0
 
     for rule in rules:
@@ -235,7 +248,11 @@ def check_book(slug):
 
         # ---- 검사 2 — 근거 없는 토큰
         have = src_tok[ref]
-        for tok in tokens_of_text(label):
+        toks = tokens_of_text(label)
+        if not toks:
+            # 정량 토큰이 없는 규칙 — 숫자 창작은 기계로 못 잡음, 수동 확인 대상
+            qualitative.append({"ref": ref, "label": label})
+        for tok in toks:
             if tok in have:
                 continue
             if ex.get("%s::%s" % (ref, tok)):
@@ -249,9 +266,10 @@ def check_book(slug):
     rejected = [("%s" % tok, why) for tok, why in exempt_rejected(slug)]
     fabrications = orphans + ungrounded
     stats = {"claims": claims, "orphans": orphans,
-             "ungrounded": ungrounded, "fabrications": fabrications}
+             "ungrounded": ungrounded, "fabrications": fabrications,
+             "qualitative": len(qualitative)}
     status = 1 if (fabrications or rejected) else 0
-    return status, stats, findings, rejected
+    return status, stats, findings, rejected, qualitative
 
 
 # ---------------------------------------------------------------- 상세(--show)
@@ -307,22 +325,26 @@ def main(argv):
     fab_total = 0          # 창작(고아+근거없음)
     blocked = 0            # 검사 불가 — '통과'가 아니다
     skipped = []
+    qual_total = []        # (slug, ref, label) — 정성 규칙 전체 목록
     # --json: 책마다 카운트. None = 검사 자체가 안 돌았다(검사 불가) — 0(돌았고 없음)과 다르다.
     book_stats = {}
 
     for b in books():
         slug = b["slug"]
-        status, stats, findings, rejected = check_book(slug)
+        status, stats, findings, rejected, qualitative = check_book(slug)
 
         if status == 2:
             out("· %-8s 검사 불가 — %s" % (slug, stats.get("reason")))
             blocked += 1
             book_stats[slug] = {"claims": None, "orphans": None,
-                                "ungrounded": None, "fabrications": None}
+                                "ungrounded": None, "fabrications": None,
+                                "qualitative": None}
             skipped.append((slug, stats.get("reason")))
             continue
 
         book_stats[slug] = stats
+        qual_total.extend({"slug": slug, "ref": q["ref"], "label": q["label"]}
+                          for q in qualitative)
         out("%s — 저자 주장 %d개(%s) · 원문 소절 토큰 지문 대조"
             % (slug, stats["claims"], rel(rules_path(slug))))
 
@@ -354,6 +376,11 @@ def main(argv):
         print("창작 %d건 · 검사 불가 %d권" % (fab_total, blocked))
         for slug, reason in skipped:
             print("  · %-8s %s" % (slug, reason))
+        if qual_total:
+            print("-" * 74)
+            print("정성 규칙(정량 토큰 0) %d개 — 기계 검증 범위 밖, 수동 확인 대상" % len(qual_total))
+            for q in qual_total:
+                print("  · %-6s %s" % (q["ref"], q["label"][:60]))
         if fab_total:
             print("-" * 74)
             print("플레이북이 책에 없는 걸 저자 말인 양 지어냈다. 처리 방법은 셋뿐이다.")

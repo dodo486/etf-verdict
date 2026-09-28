@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""체크리스트 ↔ 수집요청 대조 — 구간 ③ 의 층1. 모든 책 공통.
+"""체크리스트 ↔ 수집요청 대조 — 구간 ③ 의 층1+층2. 모든 책 공통.
 
 ## 왜 있나
 
@@ -28,15 +28,22 @@
                                               그 ref 의 spec 항목들에 다 있는가
     검사 2 (창작)  spec 항목 ──ref──▶ 소절 본문  spec 의 정량 파라미터가
                                               그 소절 원문에 실제로 있는가
+    검사 3 (심볼)  사전 표현 ──▶ spec 심볼      사전에 등록된 표현↔심볼 승인이
+                                              spec 의 실제 심볼과 일치하는가
+    검사 4 (방향)  규칙 라벨 방향어 ↔ metric.op  라벨의 방향 어휘와 op 선언이
+                                              서로 모순되지 않는가(rules.json 자기모순)
 
 토큰 추출은 `shared.tokens.TOKEN_RE` 를 **import** 한다(복붙하면 두 검사기의
 토큰 정의가 갈라진다).
 
 ## 한계 (정직하게)
 
-층1은 **수치만** 본다. 심볼이 맞는지(`^NDX` 지수 vs `NQ=F` 선물)는 못 본다 —
-심볼↔저자표현 사전은 사람이 승인해야 하는 물건이라 층2의 몫이다. 못 보는 건
-'미적용'으로 **찍어서 보여준다.** 조용히 통과시키지 않는다.
+층1은 **수치만** 본다.
+층2(검사3)는 사전(verify.symbol_lexicon)이 있을 때만 돈다. 사전 자체(표현→심볼 선택)가
+옳은지는 사람 승인의 몫이고, 검사는 사전↔spec 의 일관성과 사전의 원문 인용 형식만
+강제한다. 표현이 항목명에 안 나오면 3c 는 못 짝짓고 3b 만 적용된다.
+검사4는 어휘 사전 기반이라 방향어가 없는 라벨은 못 보고, 문맥 의존적 표현은 오탐이
+날 수 있다(오탐은 면제(`_rules_vs_spec_direction`)로 처리, 어휘를 임의로 빼지 않는다).
 
 ## 사용
 
@@ -76,6 +83,16 @@ RULE_TEXT_SKIP = ("ref", "src")
 #   (없는 키) : 단위를 모른다 → 숫자만 대조(느슨함. 오탐이 나면 사유를 적어 면제)
 PERIOD_KEYS = ("ma", "n", "base", "ref", "days", "window", "period", "lookback", "bars")
 PERIOD_UNITS = ("일선", "거래일", "영업일", "일")
+
+# ---------------------------------------------------------------- 검사 4 — 방향 어휘
+# 상방(UP): '위'는 '위험' 안의 '위'를 제외하기 위해 부정 전방탐색을 씀.
+DIR_UP_RE = re.compile(r"위(?!험)|이상|돌파|상회|회복|↑")
+DIR_DOWN_RE = re.compile(r"아래|밑|이하|미만|하회|이탈|깨|깸|↓")
+# 하방어 앞 3자 이내의 부정(안/않) → 하방어를 상방으로 반전
+DIR_NEG_RE = re.compile(r"[안않]")
+# op → 방향 매핑
+DIR_OP_UP = frozenset(("above", ">", ">="))
+DIR_OP_DOWN = frozenset(("below", "<", "<="))
 
 
 # ---------------------------------------------------------------- 입력
@@ -122,9 +139,10 @@ def exempt_of(slug, bucket):
 
 
 def exempt_rejected(slug):
-    """이 검사기가 읽는 두 버킷에서 **인정되지 않은** 면제 목록."""
+    """이 검사기가 읽는 네 버킷에서 **인정되지 않은** 면제 목록."""
     out = []
-    for bucket in ("_rules_vs_spec", "_rules_vs_spec_spec"):
+    for bucket in ("_rules_vs_spec", "_rules_vs_spec_spec",
+                   "_rules_vs_spec_symbols", "_rules_vs_spec_direction"):
         d = (load_exempt().get(slug, {}) or {}).get(bucket)
         for tok, why in exempt_entries(d)[1]:
             out.append(("%s / %s" % (bucket, tok), why))
@@ -377,6 +395,215 @@ def check_invention(slug, items, sheet_secs, valid_keys):
     return out
 
 
+# ---------------------------------------------------------------- 검사 3 — 심볼(층2)
+
+# reason 이 소절 키 인용으로 시작하는 형식: "1-1: ..." · "프롤로그: ..." · "에필로그: ..."
+REASON_KEY_RE = re.compile(r"^\s*([0-9]+-[0-9]+|프롤로그|에필로그)\s*:")
+
+
+def item_symbols(item):
+    """spec 항목의 수집 심볼 — metric.symbol(문자열) 과 metric.symbols(목록) 둘 다."""
+    m = item.get("metric") or {}
+    out = []
+    s = m.get("symbol")
+    if isinstance(s, str) and s:
+        out.append(s)
+    sl = m.get("symbols")
+    if isinstance(sl, list):
+        for x in sl:
+            if isinstance(x, str) and x and x not in out:
+                out.append(x)
+    return out
+
+
+def phrase_matches(text, lex):
+    """텍스트에 등장하는 사전 표현 집합(최장일치 — 포함관계인 짧은 매치 제거).
+
+    "S&P500 선물 방향"에서 "S&P500 선물"이 잡히면 그 안의 "S&P500"은 버린다.
+    단 서로 다른 위치에 있으면 둘 다 유지한다.
+    """
+    # (start, end, 표현) 전체 수집
+    hits = []
+    for phrase in lex:
+        pat = re.compile(re.escape(phrase))
+        for m in pat.finditer(text):
+            hits.append((m.start(), m.end(), phrase))
+    # 어떤 hit 이 다른 hit 의 범위 안에 완전히 포함되면 제거(진부분집합 범위)
+    kept = []
+    for i, (s1, e1, p1) in enumerate(hits):
+        dominated = False
+        for j, (s2, e2, p2) in enumerate(hits):
+            if i == j:
+                continue
+            if s2 <= s1 and e1 <= e2 and (s2, e2) != (s1, e1):
+                dominated = True
+                break
+        if not dominated:
+            kept.append(p1)
+    return set(kept)
+
+
+def check_symbols(slug, items, lex, valid_keys):
+    """검사3 — 심볼 대조(층2). 위반 dict 리스트 반환.
+
+    3a: 사전 항목 형식 검사(symbols 비어있지 않음 · reason 소절 키 인용 · 키 실존).
+    3b: 사전 미등록 심볼(사전 전체의 승인 심볼에 없는 spec 심볼).
+    3c: 표현↔심볼 대조(항목명에 나타난 표현의 승인 심볼 집합에 항목 심볼이 없음).
+    """
+    ex = exempt_of(slug, "_rules_vs_spec_symbols")
+    out = []
+
+    # ---- 3a 사전 근거 검사
+    for phrase, entry in lex.items():
+        tok = "lexicon::%s" % phrase
+        if ex.get(tok):
+            continue
+        if not isinstance(entry, dict):
+            out.append({"kind": "lex_fmt", "phrase": phrase,
+                        "why": "사전 항목이 dict 가 아님 — {symbols:[...], reason:\"...\"} 이어야 함"})
+            continue
+        syms = entry.get("symbols")
+        if not isinstance(syms, list) or not any(isinstance(s, str) and s for s in syms):
+            out.append({"kind": "lex_sym", "phrase": phrase,
+                        "why": "symbols 가 비어있거나 문자열 목록이 아님 — 승인 심볼이 없는 사전 항목"})
+            continue
+        reason = entry.get("reason")
+        if not isinstance(reason, str) or not REASON_KEY_RE.match(reason):
+            out.append({"kind": "lex_reason", "phrase": phrase,
+                        "why": ("reason 이 소절 키 인용('N-n: …')으로 시작하지 않음 — "
+                                "근거 없는 사전 항목 (현재: %r)" % (reason or ""))})
+            continue
+        # reason 에서 인용된 소절 키가 실존하는지
+        if valid_keys is not None:
+            m = REASON_KEY_RE.match(reason)
+            cited = m.group(1) if m else None
+            if cited and cited not in valid_keys:
+                out.append({"kind": "lex_key", "phrase": phrase,
+                            "why": "reason 인용 소절 키 '%s' 가 source_index 에 없음" % cited})
+
+    # ---- 사전 전체의 승인 심볼 합집합
+    approved = set()
+    for entry in lex.values():
+        if isinstance(entry, dict):
+            for s in (entry.get("symbols") or []):
+                if isinstance(s, str) and s:
+                    approved.add(s)
+
+    # ---- 3b 미등록 심볼 + 3c 표현↔심볼 대조
+    unknown_reported = set()   # 3b 에서 보고한 심볼은 3c 에서 중복 보고 안 함
+    for it in items:
+        if it.get("source") == "manual":
+            continue
+        syms = item_symbols(it)
+        name = it.get("item") or "?"
+
+        # 3b
+        for s in syms:
+            tok = "symbol::%s" % s
+            if ex.get(tok):
+                continue
+            if s not in approved:
+                out.append({"kind": "sym_unknown", "item": it,
+                            "why": "사전에 없는 심볼 %s — 저자 표현↔심볼 승인 없이 수집 중" % s})
+                unknown_reported.add(s)
+
+        # 3c
+        matched = phrase_matches(name, lex)
+        if not matched:
+            continue   # 표현이 없으면 3b 가 최소 방어선
+        allowed = set()
+        for phrase in matched:
+            entry = lex.get(phrase)
+            if isinstance(entry, dict):
+                for s in (entry.get("symbols") or []):
+                    if isinstance(s, str) and s:
+                        allowed.add(s)
+        for s in syms:
+            if s in unknown_reported:
+                continue   # 3b 에서 이미 보고
+            tok = "%s::%s" % (name, s)
+            if ex.get(tok):
+                continue
+            if s not in allowed:
+                out.append({"kind": "sym_mismatch", "item": it,
+                            "why": ("심볼 %s — 항목명에 나온 표현 %s 의 승인 심볼 {%s}에 없음"
+                                    % (s, "/".join(sorted(matched)),
+                                       ",".join(sorted(allowed)) or "(없음)"))})
+    return out
+
+
+# ---------------------------------------------------------------- 검사 4 — 방향(라벨 방향어 ↔ metric.op)
+
+def _label_direction(text):
+    """라벨 텍스트에서 방향 집합 {UP, DOWN} 을 추출한다.
+
+    부정 반전: 하방어 바로 앞 3자 이내에 '안'/'않' 이 있으면 그 하방어를 UP 으로 반전.
+    예) "다시 안 깸" → DOWN 어 '깸' 앞에 '안' → UP 집합에 추가.
+    반환: frozenset — 원소 없으면 방향어 없음, {UP, DOWN} 혼재.
+    """
+    dirs = set()
+    for _ in DIR_UP_RE.finditer(text):
+        dirs.add("UP")
+    for m in DIR_DOWN_RE.finditer(text):
+        start = m.start()
+        window = text[max(0, start - 3):start]
+        if DIR_NEG_RE.search(window):
+            dirs.add("UP")   # 부정 반전 → 상방
+        else:
+            dirs.add("DOWN")
+    return frozenset(dirs)
+
+
+def check_direction(slug, rules):
+    """검사4 — rules.json 자기모순: 라벨 방향어 집합과 metric.op 방향의 대조.
+
+    - op 가 DIR_OP_UP / DIR_OP_DOWN 에 없는 규칙은 판정 대상이 아님(skip).
+    - 방향어 없음 또는 혼재({UP,DOWN}) → 판정 불가(indeterminate). 위반 아님.
+    - {UP} 인데 op=DOWN, 또는 {DOWN} 인데 op=UP → 위반.
+    반환: (violations, indeterminate_count)
+    """
+    ex = exempt_of(slug, "_rules_vs_spec_direction")
+    viols = []
+    indet = 0
+
+    for rule in rules:
+        metric = rule["raw"].get("metric") or {}
+        op = metric.get("op")
+        if op in DIR_OP_UP:
+            op_dir = "UP"
+        elif op in DIR_OP_DOWN:
+            op_dir = "DOWN"
+        else:
+            continue   # op 없거나 판정 대상 아님
+
+        text = rule["text"]
+        dirs = _label_direction(text)
+
+        if len(dirs) != 1:
+            # 방향어 없음(0) 또는 혼재(2) → 판정 불가
+            indet += 1
+            continue
+
+        lbl_dir = next(iter(dirs))
+        if lbl_dir == op_dir:
+            continue   # 일치 — 이상 없음
+
+        tok = "%s::%s" % (rule["ref"], text[:60])
+        if ex.get(tok):
+            continue
+
+        viols.append({
+            "kind": "direction",
+            "rule": rule,
+            "lbl_dir": lbl_dir,
+            "op_dir": op_dir,
+            "why": ("라벨 방향=%s, op 방향=%s — 자기모순 (op=%r, 라벨: %s)"
+                    % (lbl_dir, op_dir, op, text[:60])),
+        })
+
+    return viols, indet
+
+
 # ---------------------------------------------------------------- 미적용 검사
 def unapplied(book):
     """층1이 **못 보는** 것을 이름 붙여 남긴다. 못 본 건 통과가 아니다."""
@@ -388,8 +615,8 @@ def unapplied(book):
                     "남의 장 소절을 출처로 삼았는지 못 본다"))
     if not cfg.get("symbol_lexicon"):
         out.append(("심볼 대조(저자 표현 ↔ 수집 심볼)",
-                    "books.json 의 verify.symbol_lexicon 없음 — '선물'이라 쓴 소절에 "
-                    "지수 심볼을 붙였는지 못 본다(층2: 사람 승인 사전)"))
+                    "books.json 의 verify.symbol_lexicon 없음 — 사전이 없어 "
+                    "검사3(심볼 대조)을 못 돈다(층2: 사람 승인 사전을 채워야 활성화됨)"))
     return out
 
 
@@ -411,6 +638,8 @@ def show_ref(slug, ref, rules, items, sections):
         print("    - %s  source=%s" % (i.get("item"), i.get("source")))
         print("      파라미터: %s" % (", ".join(
             "%s=%s" % (p, fmt_num(v)) for p, _k, v in metric_params(i)) or "(없음)"))
+        syms = item_symbols(i)
+        print("      심볼    : %s" % (", ".join(syms) or "(없음)"))
 
 
 def main(argv):
@@ -502,6 +731,37 @@ def main(argv):
         bad += len(inv)
         book_bad += len(inv)
 
+        # ---- 검사 3 — 심볼(층2): symbol_lexicon 이 있을 때만
+        lex = (book.get("verify") or {}).get("symbol_lexicon") or {}
+        if lex:
+            sym_viols = check_symbols(slug, items, lex, valid_keys)
+            out("  [검사3 심볼] 사전 표현 %d개 · spec 심볼 문제 %d개"
+                % (len(lex), len(sym_viols)))
+            for x in sym_viols:
+                kind = x["kind"]
+                if kind.startswith("lex_"):
+                    label = "lexicon::%s" % x["phrase"]
+                    out("    ⚠ %-52s %s" % (label[:52], x["why"]))
+                else:
+                    label = (x["item"].get("item") or "?")
+                    out("    ⚠ %-52s %s" % (label[:52], x["why"]))
+            bad += len(sym_viols)
+            book_bad += len(sym_viols)
+
+        # ---- 검사 4 — 방향(라벨 방향어 ↔ metric.op)
+        dir_viols, dir_indet = check_direction(slug, rules)
+        op_targets = sum(
+            1 for r in rules
+            if (r["raw"].get("metric") or {}).get("op") in (DIR_OP_UP | DIR_OP_DOWN)
+        )
+        out("  [검사4 방향] 대상 규칙 %d개 · 모순 %d건 · 판정 불가 %d건"
+            % (op_targets, len(dir_viols), dir_indet))
+        for x in dir_viols:
+            out("    ✗ %-58s %s" % (x["rule"]["text"][:58], x["why"]))
+            out("      └ 규칙 위치: %s" % x["rule"]["path"])
+        bad += len(dir_viols)
+        book_bad += len(dir_viols)
+
         book_violations[slug] = book_bad
 
         # ---- 못 보는 것 — 통과로 찍지 않는다
@@ -528,6 +788,8 @@ def main(argv):
             print("  ③ 규칙이 아닌 숫자라면 coverage_exempt.json 의 "
                   "`_rules_vs_spec` / `_rules_vs_spec_spec` 에 "
                   "**분류(kind)와 사유(why)를 적어** 면제한다")
+            print("  심볼 위반(검사3): 사전(verify.symbol_lexicon)에 소절 키 인용과 함께 "
+                  "표현→심볼을 등록하거나, 수집 심볼이 저자 표현과 다르면 spec 을 수정한다")
             print(exempt_help())
             print("규칙 문구(저자 문구)를 spec 에 맞춰 고치는 건 선택지가 아니다.")
         if blocked:
