@@ -323,8 +323,8 @@ def evaluate(metric):
 if __name__ == "__main__":
     import json
     import os
-    from shared.paths import BASE
-    spec = json.load(open(os.path.join(BASE, "books", "trend", "data_spec.json"),
+    from shared.paths import BASE, default_slug
+    spec = json.load(open(os.path.join(BASE, "books", default_slug(), "data_spec.json"),
                           encoding="utf-8"))["items"]
     for it in spec:
         m = it.get("metric") or {}
