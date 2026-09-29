@@ -41,6 +41,19 @@ def series(symbol):
         return {"sym": symbol, "error": "시세 조회 실패: %s" % e}
 
 
+def prev_volume(symbol):
+    """전일 거래량 — daily_features 는 당일(vol)·20일평균(vol20)만 주므로,
+    '전일 대비' 판정용 전일 거래량은 md.candles(일봉 이력)의 직전 캔들에서 꺼낸다.
+    (야후 EOD OHLCV 에 거래량이 들어있어 구할 수 있는 데이터다 — ✋직접 대상 아님.)"""
+    if not AVAILABLE:
+        return None
+    try:
+        cs = md.candles(symbol) or []
+        return cs[-2].volume if len(cs) >= 2 else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 # ---------------------------------------------------------------- 여러 종목 폭(breadth)
 # 교차종목 사실도 시세팀이 계산한다 — 여기선 창구로 위임(판정·문턱은 소비자).
 def breadth_up(symbols):

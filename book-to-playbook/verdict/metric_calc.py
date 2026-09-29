@@ -171,14 +171,25 @@ def upper_wick(m):
 
 
 def volume_ratio(m):
+    """당일 거래량 ÷ 기준거래량. 기준(baseline)은 선언에서 읽는다 — 코드가 몰래 정하지 않는다.
+      · 'prev'(기본) = 전일 거래량. 저자들이 쓰는 '전일 N배' 언어의 기본값.
+      · 'ma20'       = 20일평균 거래량. 저자가 '20일/평균'이라 명시할 때만.
+    (옛 코드는 baseline 없이 20일평균으로 하드코딩돼 저자 '전일'과 어긋났다 — 그 버그를 없앤다.)"""
     sym = m["symbol"]
     d = _series(sym)
-    vol, vol20 = _num(d, "vol"), _num(d, "vol20")
-    if not vol or not vol20:
+    vol = _num(d, "vol")
+    if not vol:
         return {"value": None, "pass": None, "text": "%s 거래량 데이터 없음" % sym}
-    r = vol / vol20
+    baseline = m.get("baseline", "prev")
+    if baseline == "ma20":
+        base, blabel = _num(d, "vol20"), "20일평균"
+    else:
+        base, blabel = md_feed.prev_volume(sym), "전일"
+    if not base:
+        return {"value": None, "pass": None, "text": "%s 기준거래량(%s) 없음" % (sym, blabel)}
+    r = vol / base
     return {"value": r, "pass": _pass_min(r, m),
-            "text": "거래량 %.2f배 (당일/20일평균)" % r}
+            "text": "거래량 %.2f배 (당일/%s)" % (r, blabel)}
 
 
 def count_up_days(m):
@@ -379,6 +390,26 @@ def evaluate(metric):
     d = _decide(res.get("value"), metric)
     if d is not None:
         res["pass"] = d
+    # 데이터 원천 링크 — 값 텍스트에 심볼이 있으면 프런트(withSrc)가 야후로 링크한다.
+    # 계산기마다 심볼을 넣고/빼고가 제각각이라 링크가 끊기는 값이 생겼다. 값을 만드는
+    # 유일한 지점에서 심볼이 없으면 앞에 붙여, 어떤 계산기든 링크되게 한다(포맷 개별 손질 X).
+    sym = metric.get("symbol")
+    txt = res.get("text") or ""
+    if sym and txt and sym not in txt:
+        txt = "%s %s" % (sym, txt)
+        res["text"] = txt
+    # 보강 값(_compose): 이 계산기가 안 덮는 aspect(예: 종가 위치)를 그 aspect 계산기로
+    # '값만' 구해 텍스트에 이어붙인다. evaluate 가 유일 생산지라 어느 채널에서 불리든 따라붙는다.
+    # pass 는 안 건드린다(보강은 표시·정성 판단용) — 게이트는 주 계산기가 정한다.
+    for c in (metric.get("_compose") or []):
+        sub = c.get("metric") or {}
+        if sub.get("type"):
+            stext = evaluate(sub).get("text")          # 재귀 — 하위도 심볼이 붙는다
+            if stext:
+                if sym and stext.startswith(sym + " "):  # 같은 종목이면 심볼 중복 제거
+                    stext = stext[len(sym) + 1:]
+                res["text"] = txt + " · " + stext
+                txt = res["text"]
     return res
 
 

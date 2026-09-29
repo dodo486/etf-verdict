@@ -553,7 +553,7 @@ body{padding-left:var(--rail)}
     </div>
 
     <script type="application/json" id="verdict-data">
-{"score": 2, "scorecard": [{"label": "나스닥 선물 양호(전일 대비 플러스)", "ok": false, "why": "NQ=F -1.10%"}, {"label": "S&P500 선물 양호(전일 종가 위에서 버팀)", "ok": false, "why": "ES=F -0.77%"}, {"label": "VIX 안정(전일 대비 10% 미만)", "ok": true, "why": "^VIX +8.07%"}, {"label": "10년물 금리 안정(하루 0.1%포인트 미만)", "ok": true, "why": "^TNX 5.24 (전일 5.18, +0.06%p)"}, {"label": "달러인덱스 안정(강세 아님)", "ok": false, "why": "DX-Y.NYB +0.20%"}], "verdicts": [{"prod": "TQQQ", "color": "🔵", "grade": "⚪ 관망", "reason": "스코어 2 — 신규 진입 보류", "eod_checks": {"above20": {"ok": true, "label": "^NDX 30276.81 / 20일선 29662.76 (+2.1%)"}, "hold20": {"ok": true, "label": "^NDX 20일선 위 8거래일 연속 (기준 3)"}, "above60": {"ok": true, "label": "^NDX 30276.81 / 60일선 29328.31 (+3.2%)"}, "breakout": {"ok": false, "label": "전고점 위 0거래일 유지"}, "pullback": {"ok": false, "label": "^NDX 눌림 4일(≤4) · 당일 -1.1% (반등 아님)"}}, "avoid": [], "avoid_keys": [], "filter_ok": true, "vol_ok": false, "intraday": [], "metrics": {"vix": "^VIX +8.07%", "vol_sell": "거래량 1.17배 (당일/20일평균)", "down6": "^NDX 10일 중 7일 상승", "failbrk": "전고점 위 0거래일 유지", "fx_high": "20일선 1358.25 대비 이격 +0.1%", "run5": "최근 5일 -2.4%", "wick": "고점 대비 종가 -2.0%", "gapwait": "시가 78.30 / 전일종가 79.60 · 갭 -1.6%", "filter": "^NDX 30276.81 / 20일선 29662.76 (+2.1%)", "vol": "거래량 1.17배 (당일/20일평균)"}, "close": 77.04000091552734, "ma20": 73.08550071716309, "chg": -3.21607739656683}, {"prod": "SOXL", "color": "🟠", "grade": "🚫 진입 금지", "reason": "필터 미충족 — 추세 없음", "eod_checks": {"above20": {"ok": true, "label": "^SOX 12465.24 / 20일선 11843.29 (+5.3%)"}, "above5": {"ok": false, "label": "SOXL 142.29 / 5일선 147.65 (-3.6%)"}, "leaders3": {"ok": false, "label": "1/3개 상승 (NVDA+1.7% · AMD-3.6% · AVGO-0.9%)"}, "breadth6": {"ok": false, "label": "2/6개 상승 (^SOX-1.6% · NVDA+1.7% · AMD-3.6% · AVGO-0.9% · MU-2.6% · AMAT+0.4%)"}, "pullback": {"ok": false, "label": "^SOX 눌림 4일(≤2) · 당일 -1.6% (반등 아님) · 전일저점 이탈"}}, "avoid": ["최근 10거래일 중 상승일 7일 이상(이미 뜨거운 상태) — ^SOX 10일 중 7일 상승", "장중 고점 대비 4% 이상 밀려 마감(윗꼬리) — 고점 대비 종가 -5.1%"], "avoid_keys": ["hot10", "wick"], "filter_ok": false, "vol_ok": false, "intraday": [], "metrics": {"vix": "^VIX +8.07%", "run20": "최근 5일 +0.3%", "run15": "최근 5일 +0.3%", "hot10": "^SOX 10일 중 7일 상승", "wick": "고점 대비 종가 -5.1%", "vol_sell": "거래량 1.18배 (당일/20일평균)", "down6": "^NDX 10일 중 7일 상승", "failbrk": "전고점 위 0거래일 유지", "fx_high": "20일선 1358.25 대비 이격 +0.1%", "ma5_gap": "5일선 147.65 대비 이격 -3.6%", "gapwait": "시가 148.14 / 전일종가 151.45 · 갭 -2.2%", "filter": "^SOX 12465.24 / 20일선 11843.29 (+5.3%)", "vol": "거래량 1.17배 (당일/20일평균)"}, "close": 142.2899932861328, "ma20": 123.09499893188476, "chg": -6.048203266217161}, {"prod": "UPRO", "color": "🟢", "grade": "⛔ 보류", "reason": "회피 신호 1개 — 눌림 대기", "eod_checks": {"above20": {"ok": true, "label": "^GSPC 7683.69 / 20일선 7671.07 (+0.2%)"}, "hold20": {"ok": true, "label": "^GSPC 20일선 위 6거래일 연속 (기준 3)"}, "above60": {"ok": true, "label": "^GSPC 7683.69 / 60일선 7621.60 (+0.8%)"}, "sectors": {"ok": false, "label": "2/5개 상승 (XLK-0.9% · XLF-1.2% · XLI-1.0% · XLV+0.3% · XLP+0.3%)"}, "breakout": {"ok": false, "label": "전고점 위 0거래일 유지"}}, "avoid": ["경기침체 신호 — 방어주 뒤에 숨는 장 (금융 섹터 5거래일 약세 흐름(수익률 마이너스) — 최근 5일 -3.1%; 산업재 섹터 5거래일 약세 흐름(수익률 마이너스) — 최근 5일 -0.7%)"], "avoid_keys": ["weak_fin", "weak_ind"], "filter_ok": true, "vol_ok": false, "intraday": [], "metrics": {"vix": "^VIX +8.07%", "weak_fin": "최근 5일 -3.1%", "weak_ind": "최근 5일 -0.7%", "down6": "^NDX 10일 중 7일 상승", "failbrk": "전고점 위 0거래일 유지", "fx_high": "20일선 1358.25 대비 이격 +0.1%", "filter": "^GSPC 7683.69 / 20일선 7671.07 (+0.2%)", "vol": "거래량 1.17배 (당일/20일평균)"}, "close": 148.75, "ma20": 148.83150177001954, "chg": -2.26675231104992}], "reentry": {"fear": {"ok": false, "label": "^VIX +8.07%"}, "ma20back": {"ok": true, "label": "^GSPC 7683.69 / 20일선 7671.07 (+0.2%)"}}, "ts": "2026-09-29T07:12:28.202472+09:00", "extras": {}, "intraday_state": "pending"}
+{"score": 4, "scorecard": [{"label": "나스닥 선물 양호(전일 대비 플러스)", "ok": true, "why": "NQ=F +0.30%"}, {"label": "S&P500 선물 양호(전일 종가 위에서 버팀)", "ok": true, "why": "ES=F +0.02%"}, {"label": "VIX 안정(전일 대비 10% 미만)", "ok": true, "why": "^VIX -1.62%"}, {"label": "10년물 금리 안정(하루 0.1%포인트 미만)", "ok": true, "why": "^TNX 5.24 (전일 5.24, -0.00%p)"}, {"label": "달러인덱스 안정(강세 아님)", "ok": false, "why": "DX-Y.NYB +0.18%"}], "verdicts": [{"prod": "TQQQ", "color": "🔵", "grade": "✅ 매수 후보", "reason": "필터 통과 · 스코어 4 → 1차 분할 진입 준비", "eod_checks": {"above20": {"ok": true, "label": "^NDX 30297.60 / 20일선 29704.79 (+2.0%)"}, "hold20": {"ok": true, "label": "^NDX 20일선 위 9거래일 연속 (기준 3)"}, "above60": {"ok": true, "label": "^NDX 30297.60 / 60일선 29338.30 (+3.3%)"}, "breakout": {"ok": false, "label": "^NDX 전고점 위 0거래일 유지"}, "pullback": {"ok": false, "label": "^NDX 눌림 5일(≤4) · 반등 +0.1%"}}, "avoid": [], "avoid_keys": [], "filter_ok": true, "vol_ok": false, "intraday": ["장 시작 30분 대기 후 시초가 위 유지", "첫 눌림에서 저점을 높였는지", "빅테크 3개 이상 같은 방향(플러스 유지)"], "metrics": {"vix": "^VIX -1.62%", "vol_sell": "TQQQ 거래량 0.15배 (당일/전일) · 고점 대비 종가 -1.4%", "down6": "^NDX 10일 중 8일 상승", "failbrk": "^NDX 전고점 위 0거래일 유지", "fx_high": "KRW=X 20일선 1358.00 대비 이격 -0.2%", "run5": "TQQQ 최근 5일 -4.6%", "wick": "TQQQ 고점 대비 종가 -1.4%", "gapwait": "TQQQ 시가 78.13 / 전일종가 77.04 · 갭 +1.4%", "filter": "^NDX 30297.60 / 20일선 29704.79 (+2.0%)", "vol": "TQQQ 거래량 0.15배 (당일/전일) · 고점 대비 종가 -1.4%"}, "close": 77.13500213623047, "ma20": 73.34625091552735, "chg": 0.12331414794152422}, {"prod": "SOXL", "color": "🟠", "grade": "⛔ 보류", "reason": "회피 신호 1개 — 눌림 대기", "eod_checks": {"above20": {"ok": true, "label": "^SOX 12646.07 / 20일선 11898.84 (+6.3%)"}, "above5": {"ok": true, "label": "SOXL 147.19 / 5일선 146.70 (+0.3%)"}, "leaders3": {"ok": true, "label": "3/3개 상승 (NVDA+0.5% · AMD+0.3% · AVGO+2.8%)"}, "breadth6": {"ok": true, "label": "6/6개 상승 (^SOX+1.4% · NVDA+0.5% · AMD+0.3% · AVGO+2.8% · MU+0.6% · AMAT+4.4%)"}, "pullback": {"ok": false, "label": "^SOX 눌림 5일(≤2) · 반등 +1.5% · 전일저점 지킴"}}, "avoid": ["최근 10거래일 중 상승일 7일 이상(이미 뜨거운 상태) — ^SOX 10일 중 7일 상승"], "avoid_keys": ["hot10"], "filter_ok": true, "vol_ok": false, "intraday": [], "metrics": {"vix": "^VIX -1.62%", "run20": "SOXL 최근 5일 -3.1%", "run15": "SOXL 최근 5일 -3.1%", "hot10": "^SOX 10일 중 7일 상승", "wick": "SOXL 고점 대비 종가 -1.5%", "vol_sell": "SOXL 거래량 0.18배 (당일/전일) · 고점 대비 종가 -1.5%", "down6": "^NDX 10일 중 8일 상승", "failbrk": "^NDX 전고점 위 0거래일 유지", "fx_high": "KRW=X 20일선 1358.00 대비 이격 -0.2%", "ma5_gap": "SOXL 5일선 146.70 대비 이격 +0.3%", "gapwait": "SOXL 시가 148.14 / 전일종가 142.29 · 갭 +4.1%", "filter": "^SOX 12646.07 / 20일선 11898.84 (+6.3%)", "vol": "TQQQ 거래량 0.15배 (당일/전일) · 고점 대비 종가 -1.4%"}, "close": 147.19000244140625, "ma20": 124.81499900817872, "chg": 3.4436779720833535}, {"prod": "UPRO", "color": "🟢", "grade": "⛔ 보류", "reason": "회피 신호 1개 — 눌림 대기", "eod_checks": {"above20": {"ok": true, "label": "^GSPC 7686.22 / 20일선 7671.08 (+0.2%)"}, "hold20": {"ok": true, "label": "^GSPC 20일선 위 7거래일 연속 (기준 3)"}, "above60": {"ok": true, "label": "^GSPC 7686.22 / 60일선 7624.08 (+0.8%)"}, "sectors": {"ok": true, "label": "4/5개 상승 (XLK+0.1% · XLF+0.2% · XLI+0.9% · XLV+0.0% · XLP-0.7%)"}, "breakout": {"ok": false, "label": "^GSPC 전고점 위 0거래일 유지"}}, "avoid": ["경기침체 신호 — 방어주 뒤에 숨는 장 (금융 섹터 5거래일 약세 흐름(수익률 마이너스) — XLF 최근 5일 -0.9%; 산업재 섹터 5거래일 약세 흐름(수익률 마이너스) — XLI 최근 5일 -0.0%)"], "avoid_keys": ["weak_fin", "weak_ind"], "filter_ok": true, "vol_ok": false, "intraday": [], "metrics": {"vix": "^VIX -1.62%", "weak_fin": "XLF 최근 5일 -0.9%", "weak_ind": "XLI 최근 5일 -0.0%", "down6": "^NDX 10일 중 8일 상승", "failbrk": "^NDX 전고점 위 0거래일 유지", "fx_high": "KRW=X 20일선 1358.00 대비 이격 -0.2%", "filter": "^GSPC 7686.22 / 20일선 7671.08 (+0.2%)", "vol": "TQQQ 거래량 0.15배 (당일/전일) · 고점 대비 종가 -1.4%"}, "close": 148.8300018310547, "ma20": 148.7595016479492, "chg": 0.053782743566176475}], "reentry": {"fear": {"ok": true, "label": "^VIX -1.62%"}, "ma20back": {"ok": true, "label": "^GSPC 7686.22 / 20일선 7671.08 (+0.2%)"}}, "ts": "2026-09-29T22:42:00.982870+09:00", "extras": {}, "intraday_state": "pending"}
 </script>
 
     <!-- STEP 1: Definition table -->
@@ -766,6 +766,7 @@ body{padding-left:var(--rail)}
 {"map": {"프롤로그": {"status": "mindset", "note": "자리·비중·시간·손절선이 맞물릴 때 돈이 남는다는 전 챕터 공통 원칙. 개별 정량규칙은 각 소절에 반영. 원칙 자체는 마인드셋."}, "1-1": {"status": "mindset", "note": "레버리지 ETF는 구간을 사는 상품이라는 구조 설명. 하루 손실액 계산 습관은 STEP3·10-1 루틴으로 이어지나 소절 자체는 마인드셋."}, "1-2": {"status": "reflected", "step": "STEP2-entry", "note": "최근 20거래일 중 상승일 13일 이상 = COMMON entry(count_up_days ^NDX n20 t13). 반영됨."}, "1-3": {"status": "reflected", "step": "STEP2-exit", "note": "시간 손절(3~5·10~20·40~60거래일, -10%/-25% 감내 비중) = TQQQ exit '시간 손절' 항목. 반영됨."}, "1-4": {"status": "mindset", "note": "지수 ETF(시간)와 레버리지 ETF(속도)의 운용 문법 차이, 계좌 칸 나누기·이름표. 행동 원칙이라 마인드셋."}, "1-5": {"status": "reflected", "step": "STEP2-avoid", "note": "돈삭제 의심 4신호(상승일 6일 미만·낙폭 우위·돌파 3거래일 내 반납·VIX 바닥권 20% 급등, 2개 이상) = COMMON avoid 그룹(groupNeed 2). 낙폭 우위·VIX 바닥권은 로직 미구현(🚧) 표시. 반영됨."}, "2-1": {"status": "reflected", "step": "STEP2-entry", "note": "30분 대기·시초가 지지·첫 눌림 저점·빅테크 3개 이상(7종 중) 2/3 확인 = TQQQ entry 장중 3항목(above_open·higher_low·count_up, 장중 확인). 반영됨."}, "2-2": {"status": "reflected", "step": "STEP2-filter", "note": "S&P500 20일선/60일선/전고점 3구간 판정 = UPRO filter(above20·hold20·above60) + entry(breakout 2~3거래일). 반영됨."}, "2-3": {"status": "reflected", "step": "STEP2-avoid", "note": "과열 4판정(10거래일 상승일 7일·5거래일 20% 급등·5일선 이격·6개 중 4개 동조) = SOXL avoid(hot10·run20)·caution(ma5_gap)·entry(breadth6·pullback). 반영됨."}, "2-4": {"status": "reflected", "step": "STEP2-avoid", "note": "VIX 전일 대비 10% 이상 급등 시 추격 금지 = 전 종목 avoid(vix) + 스코어카드 ③(20% 경고 부기). 반영됨."}, "2-5": {"status": "reflected", "step": "STEP1", "note": "10년물 하루 0.1%포인트 기준 = 스코어카드 ④(point_change ^TNX). 이틀 연속 상승은 직접 확인으로 부기. 금리·달러·VIX 동시 압력은 스코어카드 합산으로 반영됨."}, "2-6": {"status": "reflected", "step": "STEP1", "note": "장전 10분 5지표(나스닥 선물·S&P500 선물·VIX·10년물·달러인덱스) 점수화, 4점 공격/3점 소액/2점 이하 관망 = SCORECARD 5항목 + GRADE(go4·small3). 반영됨."}, "2-7": {"status": "reflected", "step": "STEP2-avoid", "note": "뉴스 전 5거래일 상승률·5일선 이격·첫 30분 고점 확인 = 회피(run5/run20)·주의(ma5_gap·gapwait)·장중 30분 항목과 동일 판정. 반영됨."}, "3-1": {"status": "reflected", "step": "STEP2-entry", "note": "살 자리 3(20일선 회복·돌파 후 지지·2~4거래일 눌림 끝 반등)과 피할 자리 3(급등 5거래일 추격·20일선 아래 첫 양봉·윗꼬리 반복) = TQQQ filter/entry/caution + note 3문장. 첫 양봉 판별은 수동(주의 문구). 반영됨."}, "3-2": {"status": "reflected", "step": "STEP2-filter", "note": "나스닥100 20일선 종가+2거래일 유지, 60일선 위 = TQQQ filter(above20·hold20·above60). 기울기 판독은 수동. 반영됨."}, "3-3": {"status": "reflected", "step": "STEP3", "note": "돌파 전 20~30%(예: 25%)·당일 종가 확인·돌파 후 2~3거래일 지지에 50% = 분할 계산기 + TQQQ entry(breakout). 반영됨."}, "3-4": {"status": "reflected", "step": "STEP3", "note": "분할 3단계 25%/30%/45% + 단계별 금지 규칙 = STEP3 계산기 + COMMON exit '분할 3단계'. 반영됨."}, "3-5": {"status": "reflected", "step": "STEP2-exit", "note": "실적 발표 전 5거래일 이상 상승+수익 10% 이상 → 30~50% 축소 = TQQQ exit '실적 시즌'. 발표일 확인은 수동(무료 이벤트 피드 없음). 반영됨."}, "4-1": {"status": "reflected", "step": "STEP2-exit", "note": "최대 보유 거래일(3/5~8/20거래일)·수익 반납률 30%/50%·5~10거래일 20% 익절 = SOXL exit(시간 손절·반납 경고·2차 익절). 반영됨."}, "4-2": {"status": "reflected", "step": "STEP2-entry", "note": "엔비디아·AMD·브로드컴 중 2개 이상(엔비디아 포함) = SOXL entry(leaders3) + note 3줄. 반영됨."}, "4-3": {"status": "reflected", "step": "STEP2-avoid", "note": "급등 후 3일 익절 신호(윗꼬리·거래량 1.5배+종가 밀림·주도주 이탈) = SOXL avoid(wick·vol_sell) + exit 익절 3단계(10~12%/15~20%/40%). 반영됨."}, "4-4": {"status": "reflected", "step": "STEP2-filter", "note": "5일선(단타)·20일선(스윙) 기준선 2개 = SOXL filter(above5·above20). 반영됨."}, "4-5": {"status": "reflected", "step": "STEP2-avoid", "note": "5거래일 15% 이상 상승 후 호재·장중 고점 대비 4% 밀림 = SOXL avoid(run15·wick). 뉴스 온도 자체는 정성(수동). 반영됨."}, "5-1": {"status": "reflected", "step": "STEP2-entry", "note": "시장 폭(섹터 5개 중 3개)·20일선 위·감당 금액 = UPRO entry(sectors)+filter. 금액 감당은 STEP3 몫. 반영됨."}, "5-2": {"status": "reflected", "step": "STEP2-filter", "note": "20일선 종가 회복+2거래일 유지+60일선+업종 확산(5개 중 3개) = UPRO filter/entry. 반영됨."}, "5-3": {"status": "reflected", "step": "STEP2-avoid", "note": "금융·산업재 5거래일 약세(방어주 뒤에 숨는 장) = UPRO avoid 그룹(weak_fin·weak_ind) + exit 축소 30%/60일선 추가 30%. 나쁜 금리 하락 해석은 수동. 반영됨."}, "5-4": {"status": "reflected", "step": "STEP2-entry", "note": "순환매 판단(섹터 5개 중 4개 확대/2개 이하 현금) = UPRO note + entry(sectors). 반영됨."}, "5-5": {"status": "reflected", "step": "STEP2-exit", "note": "수익 10%+과열 → 30% UPRO 전환, 수익 15%+주도주 2개 약화 → 50% = UPRO exit '전환 수용'. 반영됨."}, "6-1": {"status": "mindset", "note": "1:1:1은 위험 복제라는 원칙 — 흔들림 기준 비중은 MODES(STEP3)로 구현되나 소절 자체는 원칙 설명이라 마인드셋."}, "6-2": {"status": "reflected", "step": "STEP3", "note": "공격/균형/방어 배분(5,000만 원 기준 저자 금액) = MODES 3모드(비율 환산). 반영됨."}, "6-3": {"status": "reflected", "step": "STEP3", "note": "현금 30% 기본(강세 20%·위험 40% 이상) = MODES cash + 9-4 연동. 반영됨."}, "6-4": {"status": "reflected", "step": "STEP2-exit", "note": "손실선 3겹: 전체 -5/-8/-12%, SOXL 6%·TQQQ -7%·UPRO 20일선 이탈, 최고 수익 40% 반납 = COMMON/각 종목 exit. 반영됨."}, "6-5": {"status": "reflected", "step": "STEP2-exit", "note": "기준 생존 여부로 추가매수/손절 구분(TQQQ 20일선 2거래일 회복 실패 등) = exit 손절 항목 + 9-1 물타기 3문장. 반영됨."}, "7-1": {"status": "reflected", "step": "STEP2-entry", "note": "시초가 함정 5패턴 → 30분 대기 + 세 줄 확인 = TQQQ entry 장중 항목·caution(gapwait). 반영됨."}, "7-2": {"status": "reflected", "step": "STEP2-entry", "note": "30분 판별(시초가 지지·첫 눌림 저점·주도주 3개, 2개 이상) = 장중 항목(above_open·higher_low·count_up). 30분봉 몸통·거래량 질은 수동. 반영됨."}, "7-3": {"status": "reflected", "step": "STEP2-avoid", "note": "갭상승 날 첫 30분 저점 확인 전 추격 금지 = TQQQ·SOXL caution(gapwait, gap_up 자동 감지 + 저점 확인은 장중). 반영됨."}, "7-4": {"status": "reflected", "step": "STEP2-avoid", "note": "거래량 전일 1.5배 기준 + 종가 위치 = avoid(vol_sell)·COMMON entry(vol). 하락일 거래량 비교는 수동. 반영됨."}, "7-5": {"status": "reflected", "step": "STEP2-exit", "note": "익절 구간(7~10%/10~12%에서 30%, 15~20%에서 30%, 잔량 40% 추세 확인, 반납 40% 절반 축소) = 각 종목 exit. 반영됨."}, "7-6": {"status": "reflected", "step": "STEP2-exit", "note": "가격 기준(-5/-7/-10%)+구조 기준(20일선·대표주 2개·2거래일) 이중 손절, 부분 손절 30→50% = exit 손절 항목들. 반영됨."}, "8-1": {"status": "reflected", "step": "STEP4", "note": "환율 20거래일 평균 대비 위치 판정 = COMMON avoid(fx_high, KRW=X ma_distance 20) + STEP4 환전 모듈. 원 단위 임계는 저자 예시라 수치 보고 직접. 반영됨."}, "8-2": {"status": "reflected", "step": "STEP4", "note": "달러/원화 두 장부 기록(매수·매도 환율, 이중 수익률) = STEP4 메모 칸. 반영됨."}, "8-3": {"status": "mindset", "note": "세금은 수익 확정 순간부터의 비용이라는 원칙(월별 손익 끊기·세금 몫 분리·손실 기록). 무료 데이터로 자동화 불가, 기록 습관이라 마인드셋."}, "8-4": {"status": "mindset", "note": "수수료보다 진입 위치가 큰 비용이라는 순서(자리→금액→환율→수수료). 위치 판정 자체는 각 규칙에 반영, 소절은 원칙."}, "8-5": {"status": "reflected", "step": "STEP4", "note": "환전 3분할·기준 환율(20거래일 평균) 분리 = STEP4 환전 모듈 + fx_high 판정. 반영됨."}, "9-1": {"status": "reflected", "step": "STEP2-exit", "note": "물타기 3문장(이유 생존·-5% 추가 여지·현금 20~30%) = COMMON exit '물타기 3문장'. 반영됨."}, "9-2": {"status": "reflected", "step": "STEP2-exit", "note": "-10/-20/-30% 구간별 대응(경고·구조조정·30/40/30 삼분할) = COMMON exit '손실 구간별'. 반영됨."}, "9-3": {"status": "reflected", "step": "STEP2-exit", "note": "V자 기대 대신 반등 후 3거래일 확인(급등→저점 지지→전일 고점 재도전) = COMMON exit '재진입 3단계' 부기. 반영됨."}, "9-4": {"status": "reflected", "step": "STEP3", "note": "현금 30%/40% 구간 전략 = MODES cash + 6-3. 손절 직후 대기는 10-4의 2거래일 규칙과 연동. 반영됨."}, "9-5": {"status": "reflected", "step": "STEP2-exit", "note": "재진입 3단계(VIX 꺾임·20일선 회복·눌림 지지, 2개 전 큰돈 금지) = COMMON exit '재진입 3단계'. VIX 고점 꺾임 판독은 수동. 반영됨."}, "10-1": {"status": "reflected", "step": "STEP1", "note": "매일 밤 10분 루틴(방향→주도주→공포·금리→가격 위치→내 계좌) = STEP1 스코어카드 순서 + 각 필터. 반영됨."}, "10-2": {"status": "reflected", "step": "STEP4", "note": "매수 전 5줄 메모(이유·금액·줄일 자리·기간·환율) = STEP4 메모 폼. 반영됨."}, "10-3": {"status": "mindset", "note": "비중 조정은 주 1회(손절·익절은 즉시, 구조 변경은 정해진 날) — 운용 습관이라 마인드셋."}, "10-4": {"status": "reflected", "step": "STEP2-exit", "note": "실현수익 30%(큰 달 40%) 분리·수익 직후 2거래일 신규 매수 금지 = COMMON exit '수익 출금'. 반영됨."}, "10-5": {"status": "mindset", "note": "계좌 규모별(1천만/1억) 운용 차이 — 비율이 아니라 절대 손실액 기준. 개별 수치는 저자 예시 금액이라 마인드셋."}, "에필로그": {"status": "mindset", "note": "돈복사는 시스템에서 나온다 — 본인 기준 다섯 개 적기. STEP4 메모·전체 구조로 이어지는 마인드셋."}}}
 </script>
 
+<script type="application/json" id="source-data">{}</script>
 <script type="text/markdown" id="src">
 ## 0. 핵심 원칙 (전 챕터 공통)
 
@@ -1908,6 +1909,42 @@ UPRO는 시장의 폭을 산다. S&P500에는 기술주 외에 금융·헬스케
     });
   })();
 
+  // ── 소절 원문보기 (책 무관 · 검수여부 무관) ──────────────────────────────
+  //   #source-data(소절 ref → 책 원문)를 각 소절 헤딩에 '원문' 토글로 붙인다.
+  //   원문 파일이 있는 책만 실제 원문이 뜨고, 없는 책은 '원문 미제공'으로 표시.
+  (function(){
+    var SRC = {}; try { SRC = JSON.parse(document.getElementById('source-data').textContent) || {}; } catch(e){}
+    var st = document.createElement('style');
+    st.textContent =
+      '.pb-src-btn{margin-left:8px;font-size:11px;padding:2px 8px;border:1px solid var(--line,#ccc);'
+      +'border-radius:10px;background:transparent;color:var(--mute,#888);cursor:pointer;vertical-align:middle}'
+      +'.pb-src-btn:hover{color:inherit;border-color:var(--accent,#888)}'
+      +'.pb-src-btn.on{background:var(--accent,#3fae7a);color:#fff;border-color:transparent}'
+      +'.pb-src-panel{margin:6px 0 12px;padding:12px 14px;border-left:3px solid var(--accent,#3fae7a);'
+      +'background:var(--s2,rgba(127,127,127,.08));border-radius:0 8px 8px 0;white-space:pre-wrap;'
+      +'font-size:13.5px;line-height:1.7;color:var(--text,inherit)}'
+      +'.pb-src-panel.empty{color:var(--mute,#999);font-style:italic;border-left-color:var(--line,#ccc)}';
+    document.head.appendChild(st);
+    Array.prototype.forEach.call(document.querySelectorAll('#content h3.sec'), function(h){
+      var m = (h.textContent||'').match(/^\s*(\d+-\d+|프롤로그|에필로그)/); if(!m) return;
+      var ref = m[1], text = SRC[ref];
+      var btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'pb-src-btn'; btn.textContent = '원문';
+      var panel = document.createElement('div');
+      panel.className = 'pb-src-panel' + (text ? '' : ' empty');
+      panel.textContent = text || '원문 미제공 (이 책은 원문 파일이 없습니다)';
+      panel.style.display = 'none';
+      btn.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        var show = panel.style.display === 'none';
+        panel.style.display = show ? 'block' : 'none';
+        btn.classList.toggle('on', show);
+      });
+      h.appendChild(btn);
+      h.parentNode.insertBefore(panel, h.nextSibling);
+    });
+  })();
+
   document.getElementById('nav').innerHTML = nav.map(n=>
     '<li><a class="navlink" href="#'+n.id+'"><span class="n">'+esc(n.num)+'</span><span>'+esc(n.title)+'</span></a></li>'
   ).join('');
@@ -1939,6 +1976,89 @@ UPRO는 시장의 폭을 산다. S&P500에는 기술주 외에 금융·헬스케
   const btn = document.getElementById('menubtn');
   const side = document.getElementById('side');
   if(btn) btn.addEventListener('click',()=>side.classList.toggle('open'));
+
+  // ── 본문 단어 검색 (책 무관 · 검수여부 무관) ──────────────────────────────
+  //   #content 텍스트에서 단어를 찾아 하이라이트, 매치 든 챕터를 펼치고, 이전/다음 점프.
+  //   스타일도 여기서 주입한다(페이지 CSS 손 안 대고 모든 책에 전파).
+  (function(){
+    const content = document.getElementById('content');
+    if(!content) return;
+    const st = document.createElement('style');
+    st.textContent =
+      '.pb-search-bar{position:sticky;top:0;z-index:20;display:flex;gap:6px;align-items:center;'
+      +'padding:8px 0;margin-bottom:6px;background:var(--bg,#fff)}'
+      +'.pb-search-bar input{flex:1;min-width:0;padding:7px 10px;border:1px solid var(--line,#ccc);'
+      +'border-radius:8px;font-size:14px;background:var(--surface,#fff);color:inherit}'
+      +'.pb-search-bar button{padding:6px 9px;border:1px solid var(--line,#ccc);border-radius:8px;'
+      +'background:transparent;color:inherit;cursor:pointer;font-size:13px}'
+      +'.pb-search-bar .pbs-count{font-size:12px;color:var(--mute,#888);min-width:44px;text-align:center}'
+      +'mark.pb-s{background:#ffe58a;color:inherit;border-radius:2px;padding:0 1px}'
+      +'mark.pb-s.cur{background:#ff9f43;box-shadow:0 0 0 2px rgba(255,159,67,.4)}';
+    document.head.appendChild(st);
+
+    const bar = document.createElement('div');
+    bar.className = 'pb-search-bar';
+    bar.innerHTML = '<input type="search" placeholder="본문에서 단어 검색…" aria-label="본문 검색">'
+      + '<span class="pbs-count"></span>'
+      + '<button class="pbs-prev" title="이전(Shift+Enter)">↑</button>'
+      + '<button class="pbs-next" title="다음(Enter)">↓</button>';
+    content.parentNode.insertBefore(bar, content);
+    const input = bar.querySelector('input');
+    const cnt = bar.querySelector('.pbs-count');
+    let marks = [], idx = -1;
+
+    function unmark(){
+      content.querySelectorAll('mark.pb-s').forEach(m=>{
+        m.parentNode.replaceChild(document.createTextNode(m.textContent), m);
+      });
+      content.normalize(); marks = []; idx = -1;
+    }
+    function textNodes(){
+      const w = document.createTreeWalker(content, NodeFilter.SHOW_TEXT, {
+        acceptNode: n => (n.parentNode && /^(SCRIPT|STYLE|MARK)$/.test(n.parentNode.nodeName))
+          ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+      const out = []; while(w.nextNode()) out.push(w.currentNode); return out;
+    }
+    function focusMark(){
+      marks.forEach(m=>m.classList.remove('cur'));
+      const m = marks[idx]; if(!m) return;
+      m.classList.add('cur');
+      m.scrollIntoView({block:'center', behavior:'smooth'});
+      cnt.textContent = (idx+1)+' / '+marks.length;
+    }
+    function step(d){ if(!marks.length) return; idx = (idx+d+marks.length)%marks.length; focusMark(); }
+    function search(q){
+      unmark();
+      if(!q){ cnt.textContent = ''; return; }
+      const ql = q.toLowerCase();
+      textNodes().forEach(function(node){
+        const txt = node.nodeValue, low = txt.toLowerCase();
+        let i = low.indexOf(ql); if(i < 0) return;
+        const frag = document.createDocumentFragment(); let last = 0;
+        while(i >= 0){
+          if(i > last) frag.appendChild(document.createTextNode(txt.slice(last, i)));
+          const mk = document.createElement('mark'); mk.className = 'pb-s';
+          mk.textContent = txt.slice(i, i+q.length);
+          frag.appendChild(mk); marks.push(mk);
+          last = i + q.length; i = low.indexOf(ql, last);
+        }
+        if(last < txt.length) frag.appendChild(document.createTextNode(txt.slice(last)));
+        node.parentNode.replaceChild(frag, node);
+      });
+      marks.forEach(m=>{ const d = m.closest('details'); if(d) d.open = true; });
+      cnt.textContent = marks.length ? ('1 / '+marks.length) : '없음';
+      idx = marks.length ? 0 : -1;
+      if(idx === 0) focusMark();
+    }
+    let deb;
+    input.addEventListener('input', ()=>{ clearTimeout(deb); deb = setTimeout(()=>search(input.value.trim()), 120); });
+    input.addEventListener('keydown', e=>{
+      if(e.key === 'Enter'){ e.preventDefault(); step(e.shiftKey ? -1 : 1); }
+      else if(e.key === 'Escape'){ input.value = ''; search(''); }
+    });
+    bar.querySelector('.pbs-next').addEventListener('click', ()=>step(1));
+    bar.querySelector('.pbs-prev').addEventListener('click', ()=>step(-1));
+  })();
 })();
 
 </script>

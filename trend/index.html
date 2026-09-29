@@ -553,7 +553,7 @@ body{padding-left:var(--rail)}
     </div>
 
     <script type="application/json" id="verdict-data">
-{"score": 2, "scorecard": [{"label": "S&P500 선물 방향", "ok": false, "why": "ES=F -0.78%"}, {"label": "나스닥 선물 방향", "ok": false, "why": "NQ=F -1.10%"}, {"label": "변동성 안정(전일 10% 미만)", "ok": true, "why": "^VIX +8.07%"}, {"label": "10년물 안정(0.1%p 미만)", "ok": true, "why": "^TNX 5.24 (전일 5.18, +0.06%p)"}], "verdicts": [{"prod": "SPY", "color": "🔵", "grade": "🟡 소액만", "reason": "스코어 2 — 확인 매수 수준", "eod_checks": {"above20": {"ok": true, "label": "^GSPC 7683.69 / 20일선 7671.07 (+0.2%)"}, "hold20": {"ok": true, "label": "^GSPC 20일선 위 6거래일 연속 (기준 3)"}, "breakout": {"ok": false, "label": "전고점 위 0거래일 유지"}, "leaders": {"ok": false, "label": "0/5개 상승 (AAPL-0.8% · MSFT-1.4% · AMZN-1.4% · GOOGL-0.3% · JPM-1.9%)"}}, "avoid": [], "avoid_keys": [], "filter_ok": true, "vol_ok": false, "intraday": [], "metrics": {"vix": "^VIX +8.07%", "run5": "최근 5일 -1.0%", "wick": "고점 대비 종가 -0.5%", "vol_sell": "거래량 0.96배 (당일/20일평균)", "ma5_gap": "5일선 769.07 대비 이격 -0.4%", "filter": "^GSPC 7683.69 / 20일선 7671.07 (+0.2%)", "vol": "거래량 0.96배 (당일/20일평균)"}, "close": 765.6099853515625, "ma20": 765.1634979248047, "chg": -0.744148624625904}, {"prod": "QQQ", "color": "🟢", "grade": "🟡 소액만", "reason": "스코어 2 — 확인 매수 수준", "eod_checks": {"above20": {"ok": true, "label": "^NDX 30276.81 / 20일선 29662.76 (+2.1%)"}, "hold20": {"ok": true, "label": "^NDX 20일선 위 8거래일 연속 (기준 3)"}, "pullback": {"ok": true, "label": "최근 고점 이후 4거래일 눌림"}, "leaders": {"ok": false, "label": "1/5개 상승 (AAPL-0.8% · MSFT-1.4% · NVDA+1.7% · AMZN-1.4% · META-4.8%)"}}, "avoid": [], "avoid_keys": [], "filter_ok": true, "vol_ok": false, "intraday": [], "metrics": {"vix": "^VIX +8.07%", "run5": "최근 5일 -0.7%", "wick": "고점 대비 종가 -0.7%", "vol_sell": "거래량 1.24배 (당일/20일평균)", "ma5_gap": "5일선 742.16 대비 이격 -0.8%", "filter": "^NDX 30276.81 / 20일선 29662.76 (+2.1%)", "vol": "거래량 0.96배 (당일/20일평균)"}, "close": 736.530029296875, "ma20": 721.8794982910156, "chg": -1.0705131904801881}, {"prod": "IWM", "color": "🟠", "grade": "🚫 진입 금지", "reason": "필터 미충족 — 추세 없음", "eod_checks": {"above20": {"ok": false, "label": "^RUT 2817.91 / 20일선 2895.07 (-2.7%)"}, "hold20": {"ok": false, "label": "^RUT 20일선 위 0거래일 연속 (기준 3)"}, "leaders": {"ok": false, "label": "0/5개 상승 (AAPL-0.8% · MSFT-1.4% · AMZN-1.4% · GOOGL-0.3% · JPM-1.9%)"}, "breakout": {"ok": false, "label": "전고점 위 0거래일 유지"}}, "avoid": [], "avoid_keys": [], "filter_ok": false, "vol_ok": false, "intraday": [], "metrics": {"vix": "^VIX +8.07%", "run5": "최근 5일 -1.9%", "wick": "고점 대비 종가 -0.7%", "vol_sell": "거래량 1.07배 (당일/20일평균)", "ma5_gap": "5일선 282.56 대비 이격 -0.9%", "filter": "^RUT 2817.91 / 20일선 2895.07 (-2.7%)", "vol": "거래량 0.96배 (당일/20일평균)"}, "close": 280.0199890136719, "ma20": 287.82350463867186, "chg": -0.6915672584279416}], "reentry": {}, "ts": "2026-09-29T07:12:18.548574+09:00", "extras": {}, "intraday_state": "pending"}
+{"score": 4, "scorecard": [{"label": "S&P500 선물 방향", "ok": true, "why": "ES=F +0.04%"}, {"label": "나스닥 선물 방향", "ok": true, "why": "NQ=F +0.32%"}, {"label": "변동성 안정(전일 10% 미만)", "ok": true, "why": "^VIX -1.62%"}, {"label": "10년물 안정(0.1%p 미만)", "ok": true, "why": "^TNX 5.24 (전일 5.24, -0.00%p)"}], "verdicts": [{"prod": "SPY", "color": "🔵", "grade": "✅ 매수 후보", "reason": "필터 통과 · 스코어 4 → 1차 분할 진입 준비", "eod_checks": {"above20": {"ok": true, "label": "^GSPC 7686.19 / 20일선 7671.08 (+0.2%)"}, "hold20": {"ok": true, "label": "^GSPC 20일선 위 7거래일 연속 (기준 3)"}, "breakout": {"ok": false, "label": "SPY 전고점 위 0거래일 유지"}, "leaders": {"ok": false, "label": "1/5개 상승 (AAPL-1.6% · MSFT-0.9% · AMZN-0.0% · GOOGL-0.6% · JPM+0.4%)"}}, "avoid": [], "avoid_keys": [], "filter_ok": true, "vol_ok": false, "intraday": [], "metrics": {"vix": "^VIX -1.62%", "run5": "SPY 최근 5일 -1.0%", "wick": "SPY 고점 대비 종가 -0.2%", "vol_sell": "SPY 거래량 0.06배 (당일/전일) · 고점 대비 종가 -0.2%", "ma5_gap": "SPY 5일선 767.53 대비 이격 -0.2%", "filter": "^GSPC 7686.19 / 20일선 7671.08 (+0.2%)", "vol": "SPY 거래량 0.06배 (당일/전일) · 고점 대비 종가 -0.2%"}, "close": 765.6900024414062, "ma20": 765.0954986572266, "chg": 0.010451416697106784}, {"prod": "QQQ", "color": "🟢", "grade": "✅ 매수 후보", "reason": "필터 통과 · 스코어 4 → 1차 분할 진입 준비", "eod_checks": {"above20": {"ok": true, "label": "^NDX 30297.00 / 20일선 29704.76 (+2.0%)"}, "hold20": {"ok": true, "label": "^NDX 20일선 위 9거래일 연속 (기준 3)"}, "pullback": {"ok": false, "label": "QQQ 눌림 5일(≤4) · 반등 +0.0%"}, "leaders": {"ok": false, "label": "2/5개 상승 (AAPL-1.6% · MSFT-0.9% · NVDA+0.5% · AMZN-0.0% · META+1.1%)"}}, "avoid": [], "avoid_keys": [], "filter_ok": true, "vol_ok": false, "intraday": [], "metrics": {"vix": "^VIX -1.62%", "run5": "QQQ 최근 5일 -1.4%", "wick": "QQQ 고점 대비 종가 -0.5%", "vol_sell": "QQQ 거래량 0.06배 (당일/전일) · 고점 대비 종가 -0.5%", "ma5_gap": "QQQ 5일선 740.04 대비 이격 -0.4%", "filter": "^NDX 30297.00 / 20일선 29704.76 (+2.0%)", "vol": "SPY 거래량 0.06배 (당일/전일) · 고점 대비 종가 -0.2%"}, "close": 736.8699951171875, "ma20": 722.8849975585938, "chg": 0.04615776774737166}, {"prod": "IWM", "color": "🟠", "grade": "🚫 진입 금지", "reason": "필터 미충족 — 추세 없음", "eod_checks": {"above20": {"ok": false, "label": "^RUT 2817.91 / 20일선 2895.07 (-2.7%)"}, "hold20": {"ok": false, "label": "^RUT 20일선 위 0거래일 연속 (기준 3)"}, "leaders": {"ok": false, "label": "1/5개 상승 (AAPL-1.6% · MSFT-0.9% · AMZN-0.0% · GOOGL-0.6% · JPM+0.4%)"}, "breakout": {"ok": false, "label": "IWM 전고점 위 0거래일 유지"}}, "avoid": [], "avoid_keys": [], "filter_ok": false, "vol_ok": false, "intraday": [], "metrics": {"vix": "^VIX -1.62%", "run5": "IWM 최근 5일 -2.2%", "wick": "IWM 고점 대비 종가 -0.0%", "vol_sell": "IWM 거래량 0.07배 (당일/전일) · 고점 대비 종가 -0.0%", "ma5_gap": "IWM 5일선 281.30 대비 이격 -0.1%", "filter": "^RUT 2817.91 / 20일선 2895.07 (-2.7%)", "vol": "SPY 거래량 0.06배 (당일/전일) · 고점 대비 종가 -0.2%"}, "close": 280.94500732421875, "ma20": 287.17425537109375, "chg": 0.3303400995782881}], "reentry": {}, "ts": "2026-09-29T22:42:06.387197+09:00", "extras": {}, "intraday_state": "pending"}
 </script>
 
     <!-- STEP 1: Definition table -->
@@ -762,6 +762,7 @@ body{padding-left:var(--rail)}
 {"map": {"프롤로그": {"status": "mindset", "note": "전 챕터 공통 원칙 모음(추세=위치 우선, 20일선 생존선, 과열 금지, 분할진입, 파는 규칙 우선). 개별 정량규칙은 각 소절에 반영. 원칙 자체는 마인드셋."}, "1-1": {"status": "reflected", "step": "STEP1", "note": "S&P500 선물·나스닥 선물 방향 양호 = STEP1 스코어카드 ①②항목. 반영됨."}, "1-2": {"status": "reflected", "step": "STEP1", "note": "VIX 전일 대비 +10% 이상 급등 = STEP1 스코어카드 ③ 변동성 안정 항목 + 각 종목 avoid(vix). 반영됨."}, "1-3": {"status": "reflected", "step": "STEP1", "note": "10년물 금리 전일 대비 +0.1%p 이상 급등 = STEP1 스코어카드 ④ 10년물 안정 항목 + SCORECARD point_change. 반영됨."}, "1-4": {"status": "reflected", "step": "STEP2-entry", "note": "대표 대형주 3개 이상 같은 방향 = SPY·QQQ·IWM entry leaders 항목. 반영됨."}, "1-5": {"status": "mindset", "note": "아침 10분 루틴(선물→변동성→금리→달러 순서) 개념. STEP1 스코어카드 5개 항목 체크 흐름으로 반영. 루틴 자체는 마인드셋."}, "2-1": {"status": "reflected", "step": "STEP2-filter", "note": "S&P500 종가 20일선 위 + 2거래일 유지 = SPY filter(above20, hold20). 전고점 돌파 후 2거래일 버팀 = SPY entry(breakout). 반영됨."}, "2-2": {"status": "reflected", "step": "STEP2-filter", "note": "나스닥100 종가 20일선 위 + 2거래일 유지 = QQQ filter(above20, hold20). 강한 상승 뒤 2~4거래일 눌림 끝 반등 = QQQ entry(pullback). 대형주 3개↑ = entry leaders. 반영됨."}, "2-3": {"status": "reflected", "step": "STEP2-filter", "note": "러셀2000 종가 20일선 위 + 2거래일 유지 = IWM filter(above20, hold20). 대표 대형주 3개↑ + 넓은 위험선호 확인 = IWM entry(leaders, breakout). 반영됨."}, "2-4": {"status": "reflected", "step": "STEP3", "note": "1차(25~30%)/2차(30%)/3차(40~45%) 분할매수 = STEP3 계산기 컬럼(25%/30%/45%). 전고점 2거래일 버팀 확인 = entry breakout. 반영됨."}, "3-1": {"status": "reflected", "step": "STEP2-avoid", "note": "최근 5거래일 20% 넘게 상승 = 각 종목 avoid(run5). 5일선 이격 = 각 종목 caution(ma5_gap). 반영됨."}, "3-2": {"status": "reflected", "step": "STEP2-avoid", "note": "고점 대비 종가 4% 이상 밀림(윗꼬리) = avoid(wick). 거래량 전일 1.5배 이상 + 종가 고점 아래 = avoid(vol_sell). 거래량 전일 1.5배 이상 + 종가 고점 근처 = COMMON entry(vol). 반영됨."}, "3-3": {"status": "reflected", "step": "STEP2-exit", "note": "수익 구간 일부 먼저 매도 + 추세 살아있는 동안 잔량 = exit 1차 익절. 정해둔 손실선에 닿으면 먼저 축소 = exit 손절. 반영됨."}, "에필로그": {"status": "mindset", "note": "규칙이 사람을 이긴다 — 감정이 아니라 규칙이 판단하게 하는 것. STEP7 나만의 최종 기준 5개에 반영."}}}
 </script>
 
+<script type="application/json" id="source-data">{"1-1": "1-1. 지수 선물 두 개로 아침의 방향을 읽는다\n\n미국 장이 열리기 전, 나는 두 개의 지수 선물을 먼저 본다. 첫 번째는 S&P500 선물이다.\n넓은 시장 전체의 방향을 대표한다. 두 번째는 나스닥 선물이다. 기술주 중심의 위험선호를\n보여준다. 두 선물이 전일 종가 대비 플러스로 서 있으면 그날의 바탕은 우호적이다. 반대로\n둘 다 마이너스면 개별 종목이 좋아 보여도 손이 나가는 것을 참는다. 선물은 예측이 아니라\n현재의 온도계다. 방향만 확인하면 된다. 고점을 낮추지 않고 버티는지는 개장 후 직접 본다.", "1-2": "1-2. 변동성이 튀는 날은 추격하지 않는다\n\n변동성 지수가 전일 대비 10% 이상 튀는 날은 시장이 겁을 먹기 시작한 날이다. 이런 날\n지수가 반등해도 그것은 대개 속임수다. 변동성이 10% 넘게 오른 날의 장 초반 추격 매수는\n피한다. 변동성이 다시 가라앉고 지수가 자리를 잡을 때까지 기다린다. 겁먹은 시장에서\n레버리지를 키우는 것은 가장 비싼 실수다.", "1-3": "1-3. 금리가 빠르게 오르면 위험자산은 흔들린다\n\n10년물 국채금리가 전일 대비 빠르게 오르는 날은 위험자산에 부담이 된다. 금리가 하루\n0.1%p 넘게 튀거나 이틀 연속 오르면, 성장주와 지수 모두 눌리기 쉽다. 금리의 방향과\n속도를 함께 본다. 절대 수준보다 변화의 속도가 그날의 심리를 흔든다.", "1-4": "1-4. 넓은 시장이 같은 방향일 때만 크게 간다\n\n지수가 오를 때도 속을 들여다보면 소수 종목만 끌고 가는 날이 있다. 나는 대표\n대형주 여러 개가 같은 방향으로 움직이는지를 본다. 대표주 3개 이상이 같이 플러스면\n힘이 넓게 퍼진 장이고, 그때 비중을 키운다. 한두 개만 끌고 가는 장은 오래 못 간다.", "1-5": "1-5. 아침 10분 루틴으로 환경을 점검한다\n\n매일 아침 나는 10분 안에 선물 방향, 변동성, 금리를 순서대로 확인한다. 이 세 가지가\n모두 안정적이면 그날은 진입을 준비하고, 하나라도 흔들리면 관망한다. 환경 점검은\n종목 선택보다 먼저다. 좋은 종목을 나쁜 날에 사는 것이 가장 흔한 실수다.\n\nChapter 2. 종목별 진입 위치", "2-1": "2-1. SPY는 넓은 시장의 추세를 그대로 탄다\n\nSPY는 S&P500 지수를 따라간다. 가장 넓은 시장이라 흔들림이 적고 추세가 오래 간다.\n나는 S&P500 종가가 20일선 위에 있을 때만 SPY를 산다. 20일선을 종가로 회복한 뒤\n2거래일 동안 다시 그 아래로 깨지 않고 버티면 추세가 살아났다고 본다. 전고점을 돌파한\n뒤 2거래일을 버티는 자리는 비중을 키우기 좋은 자리다. 넓은 시장은 급하지 않으니\n서두르지 않아도 된다.", "2-2": "2-2. QQQ는 기술주의 힘이 실릴 때 탄다\n\nQQQ는 나스닥100을 따라간다. 기술주 비중이 커서 상승장에서 더 크게 오르고 조정에서\n더 크게 눌린다. 나스닥100 종가가 20일선 위에 있고, 20일선 회복 후 2거래일 동안 다시\n안 깨는지를 확인한 뒤 진입한다. 강한 상승 뒤 2거래일에서 4거래일 정도의 짧은 눌림이\n나오고 다시 고개를 들면, 그 눌림 끝이 좋은 진입 자리다. 기술주는 힘이 실릴 때만 탄다.", "2-3": "2-3. IWM은 위험선호가 살아날 때 뒤늦게 달린다\n\nIWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질 때 가장 늦게, 그러나\n가장 세게 달리는 경향이 있다. 러셀2000 종가가 20일선 위에 있고 20일선 회복 후\n2거래일 동안 지켜지는지를 본다. 소형주는 대표 대형주가 3개 이상 같은 방향으로 서\n있을 때 함께 가는 힘이 강하다. 넓은 위험선호가 확인될 때만 IWM에 무게를 싣는다.", "2-4": "2-4. 분할매수로 고점 물림을 줄인다\n\n세 종목 모두 한 번에 사지 않는다. 필터를 통과하고 진입 조건이 모이면 1차로 들어가고,\n전고점을 2거래일 버티며 추세가 확인되면 추가한다. 3개의 조건이 함께 맞을 때가\n비중을 키울 자리다. 확인되지 않은 자리에서 미리 크게 사는 것이 물림의 시작이다.\n\nChapter 3. 피해야 할 자리와 파는 자리", "3-1": "3-1. 이미 많이 오른 자리는 사지 않는다\n\n가장 흔한 실수는 이미 오른 것을 뒤늦게 사는 것이다. 최근 5거래일 동안 20% 넘게\n오른 자리는 추격하지 않는다. 또한 종가가 5일선에서 크게 벌어져 있으면 단기 과열이다.\n5일선과의 거리가 벌어질수록 되돌림이 나올 확률이 높다. 급하게 벌어진 자리는 눌림을\n기다린다.", "3-2": "3-2. 위에서 털리는 신호가 나오면 발을 뺀다\n\n하루의 상승률보다 어떻게 마감했는지가 더 중요하다. 고점 대비 종가가 4% 이상 밀려\n윗꼬리를 남기고 마감하면 위에서 매물이 나왔다는 뜻이다. 거래량이 전일 대비 1.5배\n이상으로 늘면서 종가가 고점 아래로 밀리면, 그것은 힘이 아니라 매도다. 이런 날은\n비중을 줄이거나 새로 사지 않는다.", "3-3": "3-3. 나눠서 팔고, 손절은 미루지 않는다\n\n익절은 한 번에 하지 않는다. 수익이 나면 일부를 먼저 덜어내고, 추세가 살아 있는 동안\n나머지를 끌고 간다. 반대로 손절은 미루지 않는다. 정해둔 손실선에 닿으면 이유를 다시\n따지지 말고 먼저 줄인다. 레버리지가 실린 자리일수록 회복은 더디고 손실은 빠르다.\n파는 규칙을 사는 규칙보다 먼저 정한다.\n\n에필로그: 규칙이 사람을 이긴다\n\n시장은 매일 새로운 이야기를 들려주지만, 이기는 방법은 늘 같다. 방향이 정해진 흐름에\n붙고, 위치가 나쁘면 참고, 환경이 흔들리면 물러난다. 감정이 아니라 규칙이 판단하게\n만드는 것, 그것이 이 책의 전부다."}</script>
 <script type="text/markdown" id="src">
 ## 0. 핵심 원칙 (전 챕터 공통)
 
@@ -1328,6 +1329,42 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
     });
   })();
 
+  // ── 소절 원문보기 (책 무관 · 검수여부 무관) ──────────────────────────────
+  //   #source-data(소절 ref → 책 원문)를 각 소절 헤딩에 '원문' 토글로 붙인다.
+  //   원문 파일이 있는 책만 실제 원문이 뜨고, 없는 책은 '원문 미제공'으로 표시.
+  (function(){
+    var SRC = {}; try { SRC = JSON.parse(document.getElementById('source-data').textContent) || {}; } catch(e){}
+    var st = document.createElement('style');
+    st.textContent =
+      '.pb-src-btn{margin-left:8px;font-size:11px;padding:2px 8px;border:1px solid var(--line,#ccc);'
+      +'border-radius:10px;background:transparent;color:var(--mute,#888);cursor:pointer;vertical-align:middle}'
+      +'.pb-src-btn:hover{color:inherit;border-color:var(--accent,#888)}'
+      +'.pb-src-btn.on{background:var(--accent,#3fae7a);color:#fff;border-color:transparent}'
+      +'.pb-src-panel{margin:6px 0 12px;padding:12px 14px;border-left:3px solid var(--accent,#3fae7a);'
+      +'background:var(--s2,rgba(127,127,127,.08));border-radius:0 8px 8px 0;white-space:pre-wrap;'
+      +'font-size:13.5px;line-height:1.7;color:var(--text,inherit)}'
+      +'.pb-src-panel.empty{color:var(--mute,#999);font-style:italic;border-left-color:var(--line,#ccc)}';
+    document.head.appendChild(st);
+    Array.prototype.forEach.call(document.querySelectorAll('#content h3.sec'), function(h){
+      var m = (h.textContent||'').match(/^\s*(\d+-\d+|프롤로그|에필로그)/); if(!m) return;
+      var ref = m[1], text = SRC[ref];
+      var btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'pb-src-btn'; btn.textContent = '원문';
+      var panel = document.createElement('div');
+      panel.className = 'pb-src-panel' + (text ? '' : ' empty');
+      panel.textContent = text || '원문 미제공 (이 책은 원문 파일이 없습니다)';
+      panel.style.display = 'none';
+      btn.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        var show = panel.style.display === 'none';
+        panel.style.display = show ? 'block' : 'none';
+        btn.classList.toggle('on', show);
+      });
+      h.appendChild(btn);
+      h.parentNode.insertBefore(panel, h.nextSibling);
+    });
+  })();
+
   document.getElementById('nav').innerHTML = nav.map(n=>
     '<li><a class="navlink" href="#'+n.id+'"><span class="n">'+esc(n.num)+'</span><span>'+esc(n.title)+'</span></a></li>'
   ).join('');
@@ -1359,6 +1396,89 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
   const btn = document.getElementById('menubtn');
   const side = document.getElementById('side');
   if(btn) btn.addEventListener('click',()=>side.classList.toggle('open'));
+
+  // ── 본문 단어 검색 (책 무관 · 검수여부 무관) ──────────────────────────────
+  //   #content 텍스트에서 단어를 찾아 하이라이트, 매치 든 챕터를 펼치고, 이전/다음 점프.
+  //   스타일도 여기서 주입한다(페이지 CSS 손 안 대고 모든 책에 전파).
+  (function(){
+    const content = document.getElementById('content');
+    if(!content) return;
+    const st = document.createElement('style');
+    st.textContent =
+      '.pb-search-bar{position:sticky;top:0;z-index:20;display:flex;gap:6px;align-items:center;'
+      +'padding:8px 0;margin-bottom:6px;background:var(--bg,#fff)}'
+      +'.pb-search-bar input{flex:1;min-width:0;padding:7px 10px;border:1px solid var(--line,#ccc);'
+      +'border-radius:8px;font-size:14px;background:var(--surface,#fff);color:inherit}'
+      +'.pb-search-bar button{padding:6px 9px;border:1px solid var(--line,#ccc);border-radius:8px;'
+      +'background:transparent;color:inherit;cursor:pointer;font-size:13px}'
+      +'.pb-search-bar .pbs-count{font-size:12px;color:var(--mute,#888);min-width:44px;text-align:center}'
+      +'mark.pb-s{background:#ffe58a;color:inherit;border-radius:2px;padding:0 1px}'
+      +'mark.pb-s.cur{background:#ff9f43;box-shadow:0 0 0 2px rgba(255,159,67,.4)}';
+    document.head.appendChild(st);
+
+    const bar = document.createElement('div');
+    bar.className = 'pb-search-bar';
+    bar.innerHTML = '<input type="search" placeholder="본문에서 단어 검색…" aria-label="본문 검색">'
+      + '<span class="pbs-count"></span>'
+      + '<button class="pbs-prev" title="이전(Shift+Enter)">↑</button>'
+      + '<button class="pbs-next" title="다음(Enter)">↓</button>';
+    content.parentNode.insertBefore(bar, content);
+    const input = bar.querySelector('input');
+    const cnt = bar.querySelector('.pbs-count');
+    let marks = [], idx = -1;
+
+    function unmark(){
+      content.querySelectorAll('mark.pb-s').forEach(m=>{
+        m.parentNode.replaceChild(document.createTextNode(m.textContent), m);
+      });
+      content.normalize(); marks = []; idx = -1;
+    }
+    function textNodes(){
+      const w = document.createTreeWalker(content, NodeFilter.SHOW_TEXT, {
+        acceptNode: n => (n.parentNode && /^(SCRIPT|STYLE|MARK)$/.test(n.parentNode.nodeName))
+          ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+      const out = []; while(w.nextNode()) out.push(w.currentNode); return out;
+    }
+    function focusMark(){
+      marks.forEach(m=>m.classList.remove('cur'));
+      const m = marks[idx]; if(!m) return;
+      m.classList.add('cur');
+      m.scrollIntoView({block:'center', behavior:'smooth'});
+      cnt.textContent = (idx+1)+' / '+marks.length;
+    }
+    function step(d){ if(!marks.length) return; idx = (idx+d+marks.length)%marks.length; focusMark(); }
+    function search(q){
+      unmark();
+      if(!q){ cnt.textContent = ''; return; }
+      const ql = q.toLowerCase();
+      textNodes().forEach(function(node){
+        const txt = node.nodeValue, low = txt.toLowerCase();
+        let i = low.indexOf(ql); if(i < 0) return;
+        const frag = document.createDocumentFragment(); let last = 0;
+        while(i >= 0){
+          if(i > last) frag.appendChild(document.createTextNode(txt.slice(last, i)));
+          const mk = document.createElement('mark'); mk.className = 'pb-s';
+          mk.textContent = txt.slice(i, i+q.length);
+          frag.appendChild(mk); marks.push(mk);
+          last = i + q.length; i = low.indexOf(ql, last);
+        }
+        if(last < txt.length) frag.appendChild(document.createTextNode(txt.slice(last)));
+        node.parentNode.replaceChild(frag, node);
+      });
+      marks.forEach(m=>{ const d = m.closest('details'); if(d) d.open = true; });
+      cnt.textContent = marks.length ? ('1 / '+marks.length) : '없음';
+      idx = marks.length ? 0 : -1;
+      if(idx === 0) focusMark();
+    }
+    let deb;
+    input.addEventListener('input', ()=>{ clearTimeout(deb); deb = setTimeout(()=>search(input.value.trim()), 120); });
+    input.addEventListener('keydown', e=>{
+      if(e.key === 'Enter'){ e.preventDefault(); step(e.shiftKey ? -1 : 1); }
+      else if(e.key === 'Escape'){ input.value = ''; search(''); }
+    });
+    bar.querySelector('.pbs-next').addEventListener('click', ()=>step(1));
+    bar.querySelector('.pbs-prev').addEventListener('click', ()=>step(-1));
+  })();
 })();
 
 </script>

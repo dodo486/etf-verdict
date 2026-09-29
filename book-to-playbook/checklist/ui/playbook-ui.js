@@ -138,6 +138,42 @@
     });
   })();
 
+  // ── 소절 원문보기 (책 무관 · 검수여부 무관) ──────────────────────────────
+  //   #source-data(소절 ref → 책 원문)를 각 소절 헤딩에 '원문' 토글로 붙인다.
+  //   원문 파일이 있는 책만 실제 원문이 뜨고, 없는 책은 '원문 미제공'으로 표시.
+  (function(){
+    var SRC = {}; try { SRC = JSON.parse(document.getElementById('source-data').textContent) || {}; } catch(e){}
+    var st = document.createElement('style');
+    st.textContent =
+      '.pb-src-btn{margin-left:8px;font-size:11px;padding:2px 8px;border:1px solid var(--line,#ccc);'
+      +'border-radius:10px;background:transparent;color:var(--mute,#888);cursor:pointer;vertical-align:middle}'
+      +'.pb-src-btn:hover{color:inherit;border-color:var(--accent,#888)}'
+      +'.pb-src-btn.on{background:var(--accent,#3fae7a);color:#fff;border-color:transparent}'
+      +'.pb-src-panel{margin:6px 0 12px;padding:12px 14px;border-left:3px solid var(--accent,#3fae7a);'
+      +'background:var(--s2,rgba(127,127,127,.08));border-radius:0 8px 8px 0;white-space:pre-wrap;'
+      +'font-size:13.5px;line-height:1.7;color:var(--text,inherit)}'
+      +'.pb-src-panel.empty{color:var(--mute,#999);font-style:italic;border-left-color:var(--line,#ccc)}';
+    document.head.appendChild(st);
+    Array.prototype.forEach.call(document.querySelectorAll('#content h3.sec'), function(h){
+      var m = (h.textContent||'').match(/^\s*(\d+-\d+|프롤로그|에필로그)/); if(!m) return;
+      var ref = m[1], text = SRC[ref];
+      var btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'pb-src-btn'; btn.textContent = '원문';
+      var panel = document.createElement('div');
+      panel.className = 'pb-src-panel' + (text ? '' : ' empty');
+      panel.textContent = text || '원문 미제공 (이 책은 원문 파일이 없습니다)';
+      panel.style.display = 'none';
+      btn.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        var show = panel.style.display === 'none';
+        panel.style.display = show ? 'block' : 'none';
+        btn.classList.toggle('on', show);
+      });
+      h.appendChild(btn);
+      h.parentNode.insertBefore(panel, h.nextSibling);
+    });
+  })();
+
   document.getElementById('nav').innerHTML = nav.map(n=>
     '<li><a class="navlink" href="#'+n.id+'"><span class="n">'+esc(n.num)+'</span><span>'+esc(n.title)+'</span></a></li>'
   ).join('');
@@ -169,4 +205,87 @@
   const btn = document.getElementById('menubtn');
   const side = document.getElementById('side');
   if(btn) btn.addEventListener('click',()=>side.classList.toggle('open'));
+
+  // ── 본문 단어 검색 (책 무관 · 검수여부 무관) ──────────────────────────────
+  //   #content 텍스트에서 단어를 찾아 하이라이트, 매치 든 챕터를 펼치고, 이전/다음 점프.
+  //   스타일도 여기서 주입한다(페이지 CSS 손 안 대고 모든 책에 전파).
+  (function(){
+    const content = document.getElementById('content');
+    if(!content) return;
+    const st = document.createElement('style');
+    st.textContent =
+      '.pb-search-bar{position:sticky;top:0;z-index:20;display:flex;gap:6px;align-items:center;'
+      +'padding:8px 0;margin-bottom:6px;background:var(--bg,#fff)}'
+      +'.pb-search-bar input{flex:1;min-width:0;padding:7px 10px;border:1px solid var(--line,#ccc);'
+      +'border-radius:8px;font-size:14px;background:var(--surface,#fff);color:inherit}'
+      +'.pb-search-bar button{padding:6px 9px;border:1px solid var(--line,#ccc);border-radius:8px;'
+      +'background:transparent;color:inherit;cursor:pointer;font-size:13px}'
+      +'.pb-search-bar .pbs-count{font-size:12px;color:var(--mute,#888);min-width:44px;text-align:center}'
+      +'mark.pb-s{background:#ffe58a;color:inherit;border-radius:2px;padding:0 1px}'
+      +'mark.pb-s.cur{background:#ff9f43;box-shadow:0 0 0 2px rgba(255,159,67,.4)}';
+    document.head.appendChild(st);
+
+    const bar = document.createElement('div');
+    bar.className = 'pb-search-bar';
+    bar.innerHTML = '<input type="search" placeholder="본문에서 단어 검색…" aria-label="본문 검색">'
+      + '<span class="pbs-count"></span>'
+      + '<button class="pbs-prev" title="이전(Shift+Enter)">↑</button>'
+      + '<button class="pbs-next" title="다음(Enter)">↓</button>';
+    content.parentNode.insertBefore(bar, content);
+    const input = bar.querySelector('input');
+    const cnt = bar.querySelector('.pbs-count');
+    let marks = [], idx = -1;
+
+    function unmark(){
+      content.querySelectorAll('mark.pb-s').forEach(m=>{
+        m.parentNode.replaceChild(document.createTextNode(m.textContent), m);
+      });
+      content.normalize(); marks = []; idx = -1;
+    }
+    function textNodes(){
+      const w = document.createTreeWalker(content, NodeFilter.SHOW_TEXT, {
+        acceptNode: n => (n.parentNode && /^(SCRIPT|STYLE|MARK)$/.test(n.parentNode.nodeName))
+          ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+      const out = []; while(w.nextNode()) out.push(w.currentNode); return out;
+    }
+    function focusMark(){
+      marks.forEach(m=>m.classList.remove('cur'));
+      const m = marks[idx]; if(!m) return;
+      m.classList.add('cur');
+      m.scrollIntoView({block:'center', behavior:'smooth'});
+      cnt.textContent = (idx+1)+' / '+marks.length;
+    }
+    function step(d){ if(!marks.length) return; idx = (idx+d+marks.length)%marks.length; focusMark(); }
+    function search(q){
+      unmark();
+      if(!q){ cnt.textContent = ''; return; }
+      const ql = q.toLowerCase();
+      textNodes().forEach(function(node){
+        const txt = node.nodeValue, low = txt.toLowerCase();
+        let i = low.indexOf(ql); if(i < 0) return;
+        const frag = document.createDocumentFragment(); let last = 0;
+        while(i >= 0){
+          if(i > last) frag.appendChild(document.createTextNode(txt.slice(last, i)));
+          const mk = document.createElement('mark'); mk.className = 'pb-s';
+          mk.textContent = txt.slice(i, i+q.length);
+          frag.appendChild(mk); marks.push(mk);
+          last = i + q.length; i = low.indexOf(ql, last);
+        }
+        if(last < txt.length) frag.appendChild(document.createTextNode(txt.slice(last)));
+        node.parentNode.replaceChild(frag, node);
+      });
+      marks.forEach(m=>{ const d = m.closest('details'); if(d) d.open = true; });
+      cnt.textContent = marks.length ? ('1 / '+marks.length) : '없음';
+      idx = marks.length ? 0 : -1;
+      if(idx === 0) focusMark();
+    }
+    let deb;
+    input.addEventListener('input', ()=>{ clearTimeout(deb); deb = setTimeout(()=>search(input.value.trim()), 120); });
+    input.addEventListener('keydown', e=>{
+      if(e.key === 'Enter'){ e.preventDefault(); step(e.shiftKey ? -1 : 1); }
+      else if(e.key === 'Escape'){ input.value = ''; search(''); }
+    });
+    bar.querySelector('.pbs-next').addEventListener('click', ()=>step(1));
+    bar.querySelector('.pbs-prev').addEventListener('click', ()=>step(-1));
+  })();
 })();

@@ -30,6 +30,7 @@ from shared.paths import BASE
 from shared.notify import send_telegram, send_desktop
 from shared.rules_io import load_rules
 from verdict import metric_calc
+from verdict import verify_metric_semantics
 
 
 def book_title(slug):
@@ -295,6 +296,9 @@ def render(slug):
     """top 계약을 만든다: {score, scorecard, verdicts, reentry, extras, ts}."""
     metric_calc.clear_cache()
     rules = load_rules(slug)
+    # 구간3 표준 처리 — 어긋난 계산기(창작/누락/미선언)를 사람 없이 자동 해소:
+    #   올바른 계산기가 있으면 자동 교체, 못 맞추면 격리(틀린 값 방지). 판정 이전에 한다.
+    verify_metric_semantics.resolve_inplace(rules, slug)
     score, rows = scorecard(rules)
     total = len(rows)
     go, small = _grade_thresholds(rules, total)

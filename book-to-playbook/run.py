@@ -317,7 +317,8 @@ def main(argv):
     # 앞이 깨지면 뒤의 결과도 그 위에서 흔들리므로, 좁은 것부터 넓은 것 순.
     checks = ["verify_teams", "playbook.verify_source_integrity",
               "playbook.verify_source_fabrication", "checklist.verify_coverage",
-              "verify_contract", "verdict.verify_rules_vs_spec", "verify_editable_auto"]
+              "verify_contract", "verdict.verify_rules_vs_spec",
+              "verdict.verify_metric_semantics", "verify_editable_auto"]
     codes = {}
     for script in checks:
         code, out, err = r.verify(script)
@@ -353,6 +354,9 @@ def main(argv):
         blocking.append("verdict.verify_rules_vs_spec — 체크리스트↔수집요청 위반(누락/창작)")
     elif codes["verdict.verify_rules_vs_spec"] == 2:
         r.say("!! verdict.verify_rules_vs_spec: 검사 불가(경고) — 발행은 막지 않음")
+    if codes.get("verdict.verify_metric_semantics", 0) != 0:
+        r.say("!! verdict.verify_metric_semantics: 계산기 어긋남 감지 — 런타임에서 "
+              "자동교체(🤖)/격리(🚧)로 안전 처리됨(틀린 값은 안 나감). 발행은 막지 않음.")
 
     # ---- 추이 기록 — 통과든 실패든 항상 남긴다(오늘의 실패도 내일 비교할 기준이 된다)
     try:

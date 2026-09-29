@@ -51,6 +51,45 @@ def _merge_intraday(data, intraday_js):
     return data
 
 
+def _source_sections(slug):
+    """books/<slug>/source_index.json 의 source_file(책 원문)을 소절(ref)로 분해 → {ref: 원문}.
+    원문 파일이 repo 에 없으면(실제 책 미커밋 등) 빈 {} — 프런트가 '원문 미제공'으로 처리한다.
+    자작/공개 원문이 있는 책만 소절 원문이 노출된다(없는 책은 아무것도 새로 드러나지 않음)."""
+    try:
+        idx = json.loads(read_text(os.path.join(BASE, "books", slug, "source_index.json")))
+    except Exception:
+        return {}
+    sf = idx.get("source_file", "")
+    p = sf if os.path.isabs(sf) else os.path.join(BASE, sf)
+    if not sf or not os.path.exists(p):
+        return {}
+    secs, key, buf = {}, None, []
+    for line in read_text(p).split("\n"):
+        m = re.match(r"^\s*(\d+-\d+|프롤로그|에필로그)[.\s]", line)
+        if m:
+            if key:
+                secs[key] = "\n".join(buf).strip()
+            key, buf = m.group(1), [line]
+        elif key is not None:
+            buf.append(line)
+    if key:
+        secs[key] = "\n".join(buf).strip()
+    return secs
+
+
+def _inject_source(html, slug):
+    """소절 원문을 #source-data JSON 블록으로 페이지에 심는다(playbook-ui 의 '원문' 버튼이 읽음)."""
+    body = json.dumps(_source_sections(slug), ensure_ascii=False).replace("</", "<\\/")
+    block = '<script type="application/json" id="source-data">%s</script>\n' % body
+    # 치환 문자열은 lambda 로 준다 — 일반 문자열이면 re 가 JSON 의 \n·\t 이스케이프를
+    # 역참조/제어문자로 해석해 JSON 이 깨진다.
+    if 'id="source-data"' in html:
+        return re.sub(r'<script type="application/json" id="source-data">.*?</script>\n?',
+                      lambda _m: block, html, flags=re.S)
+    return re.sub(r'<script type="text/markdown" id="src">',
+                  lambda m: block + m.group(0), html, count=1)
+
+
 def publish(slug):
     """한 책을 발행한다. 라이브 책이면 최신 판정을 병합한다. 성공 시 True."""
     src = playbook_src(slug)
@@ -101,6 +140,9 @@ def publish(slug):
         html = inject(html, slug)
     except Exception as e:
         print("레일 주입 실패(무시):", e, file=sys.stderr)
+
+    # 소절 원문 주입(책 무관) — 원문 파일 있는 책만 실제 원문, 없으면 빈 데이터('원문 미제공')
+    html = _inject_source(html, slug)
 
     outd = ensure_dir(public_book_dir(slug))
     write_text(os.path.join(outd, "index.html"), html)
