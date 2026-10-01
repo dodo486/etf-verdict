@@ -175,6 +175,8 @@ def _scenario_node(cfg, sc):
     if sec in cond.SECTIONS:
         return cfg[sec]
     if sec == "caution":
+        if not sc.get("rule"):                    # 규칙을 모르고 쓴 사례 = '어느 조심이든 걸려 금액을 줄이나'
+            return {"any": [r["when"] for r in cfg["caution"]]}
         hit = [r for r in cfg["caution"] if r["label"] == sc.get("rule")]
         return hit[0]["when"] if len(hit) == 1 else None
     if sec == "sizing":
@@ -425,7 +427,17 @@ def adopt(slug):
                       "review": {k: v.get("winner") for k, v in (review.get("sections") or {}).items()}}
     if (old.get("source") or {}).get("exit_review"):
         tree["source"]["exit_review"] = old["source"]["exit_review"]
-    tree.pop("unexpressed", None)
+    # 두 추출자가 '표현 못 한 규칙'으로 남긴 것을 합쳐 둔다 — 화면의 소절별 반영 현황이 '왜 체크리스트에 없는지'를 보인다.
+    un, seen = [], set()
+    for t in (ta, tb):
+        for u in t.get("unexpressed") or []:
+            if str(u.get("reason", "")).startswith("매도 규칙"):
+                continue                       # 매도 규칙은 exit 후보(exit_a/b)가 따로 옮긴다 — 못 옮긴 게 아니다
+            k = (u.get("ref"), u.get("rule"))
+            if k not in seen:
+                seen.add(k)
+                un.append(u)
+    tree["unexpressed"] = un
     cond.validate_tree(tree)
     write_text(os.path.join(BASE, "books", slug, "tree.json"), json.dumps(tree, ensure_ascii=False, indent=1))
     print("채택 트리 → books/%s/tree.json (%s)" % (slug, tree["source"]["review"] or "전 칸 일치"))
@@ -537,17 +549,24 @@ def check_exits(slug, tree, years, review):
                 line += "  ❌ 심판 기록 없음"
             else:
                 line += "  -> 심판: %s" % d["winner"]
-        # 채택 규칙은 승자(일치한 상품은 a)와 같은 거래를 내야 한다
-        win_name = (d or {}).get("winner", "a") if r["diff"] else "a"
-        if win_name in ("a", "b"):
-            win = ea if win_name == "a" else eb
-            cal = [c.date for c in hist.get(p) or []]
-            starts = _entry_starts(tree, p, hist, cal, years)
-            mine = trades_mod.simulate(tree, p, hist, cal, starts, tree["products"][p].get("exit") or [])
-            theirs = trades_mod.simulate(tree, p, hist, cal, starts, _exit_rules(win, p))
-            if [_trade_key(t) for t in mine] != [_trade_key(t) for t in theirs]:
-                stop.append("%s.exit 채택 규칙이 %s 와 다르게 동작" % (p, win_name))
-                line += "  ❌ 채택 != %s" % win_name
+        elif d and d.get("winner") in ("b", "custom"):
+            if not d.get("why"):
+                stop.append("%s.exit 심판 사유 없음" % p)
+            line += "  -> 심판: %s (두 추출이 같아도 원문 판단으로 바꿈)" % d["winner"]
+        # 채택 규칙은 승자(심판 기록이 없으면 a)와 같은 거래를 내야 한다
+        win_name = (d or {}).get("winner", "a")
+        if win_name == "custom":
+            src = eb if d.get("defs_from") == "b" else ea
+            want = [dict(x, when=_inline(x["when"], src.get("defs") or {})) for x in d.get("custom_rules") or []]
+        else:
+            want = _exit_rules(ea if win_name == "a" else eb, p)
+        cal = [c.date for c in hist.get(p) or []]
+        starts = _entry_starts(tree, p, hist, cal, years)
+        mine = trades_mod.simulate(tree, p, hist, cal, starts, tree["products"][p].get("exit") or [])
+        theirs = trades_mod.simulate(tree, p, hist, cal, starts, want)
+        if [_trade_key(t) for t in mine] != [_trade_key(t) for t in theirs]:
+            stop.append("%s.exit 채택 규칙이 %s 와 다르게 동작" % (p, win_name))
+            line += "  ❌ 채택 != %s" % win_name
         print(line)
     return stop
 

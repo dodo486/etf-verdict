@@ -655,18 +655,22 @@ def validate_sizing(sz, defs, path):
         validate(sz["weight"], defs, path + ".weight")
         if _uses_pos(sz["weight"], defs):
             raise CondError("%s.weight: pos 를 쓸 수 없다" % path)
-    trs = _rule_list(sz["tranches"], TRANCHE_KEYS, path + ".tranches", ("label", "frac"))
+    trs = _rule_list(sz["tranches"], TRANCHE_KEYS, path + ".tranches", ("label",))
+    if trs and len({t.get("frac") is None for _, t in trs}) > 1:
+        raise CondError("%s.tranches: frac 은 전부 숫자이거나 전부 null(저자 미명시)이어야 한다" % path)
     for k, (pp, t) in enumerate(trs):
+        if "frac" not in t:
+            raise CondError("%s: frac 을 명시한다(저자가 비율을 안 줬으면 null)" % pp)
         f = t["frac"]
-        if not (isinstance(f, (int, float)) and not isinstance(f, bool) and 0 < f <= 1):
-            raise CondError("%s.frac: 0 초과 1 이하" % pp)
+        if f is not None and not (isinstance(f, (int, float)) and not isinstance(f, bool) and 0 < f <= 1):
+            raise CondError("%s.frac: 0 초과 1 이하 또는 null" % pp)
         if k == 0 and "when" in t:
             raise CondError("%s: 1차는 when 없이 매수 신호 날 산다" % pp)
         if k > 0:
             if "when" not in t:
                 raise CondError("%s: 2차 이후는 when 이 필요하다" % pp)
             validate(t["when"], defs, pp + ".when")
-    if trs and abs(sum(t["frac"] for _, t in trs) - 1) > 1e-6:
+    if trs and trs[0][1]["frac"] is not None and abs(sum(t["frac"] for _, t in trs) - 1) > 1e-6:
         raise CondError("%s.tranches: frac 합이 1 이어야 한다(%g)" % (path, sum(t["frac"] for _, t in trs)))
 
 

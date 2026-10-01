@@ -26,7 +26,6 @@
 import http.server
 import json
 import os
-import re
 import subprocess
 import sys
 import threading
@@ -41,12 +40,9 @@ SSE_TICK = float(os.environ.get("PLAYBOOK_TICK", "15"))  # 초 — SSE tick 주�
 
 # 어느 책을 라이브로 띄울지는 books.json 에서 온다(코드에 특정 책을 박지 않는다).
 # BOOK_SLUG 로 덮어쓸 수 있고, 기본은 첫 live 책.
-from shared.paths import BASE, default_slug, book_engine, playbook_src   # noqa: E402
+from shared.paths import BASE, default_slug, book_engine   # noqa: E402
 SLUG = os.environ.get("BOOK_SLUG") or default_slug()
-PAGE_SRC = playbook_src(SLUG)
 DAILY_ENGINE = book_engine(SLUG, "daily")
-VERDICT_RE = re.compile(
-    r'(<script type="application/json" id="verdict-data">)(.*?)(</script>)', re.S)
 
 # ------------------------------------------------------------------ 판정 계산부
 # (HTTP 배관과 분리 — 서버리스 함수로 그대로 이관 가능한 순수 호출부)
@@ -69,12 +65,7 @@ def _run_verdict():
         raise RuntimeError((p.stderr or b"").decode("utf-8", "replace")[:400]
                            or "verdict 계산 실패(코드 %d)" % p.returncode)
     data = json.loads(p.stdout.decode("utf-8"))
-    # 라이브 모드임을 프런트가 알 수 있게 소스 라벨을 동봉(정직한 신선도 표기용)
-    data["source"] = "jhts(marketdata)"
-    data["live"] = True
-    # 서버는 EOD 판정만 계산한다(장중 KIS 자동판정은 M2에서 제거됨).
-    # 프런트의 장중 뱃지가 '수집 실패'로 오해하지 않도록 대기 상태로 표시.
-    data.setdefault("intraday_state", "pending")
+    data["live"] = True          # 라이브 모드임을 프런트가 알 수 있게(정직한 신선도 표기용)
     return data
 
 
@@ -99,47 +90,15 @@ def compute_verdict(force=False):
 
 
 def render_page():
-    """최신 판정을 #verdict-data 에 구워 넣은 책 페이지 HTML.
-
-    서버 루트(/)를 바로 열어도 최신값이 보이도록. 폴링/SSE 코드는 페이지 안에
-    이미 들어 있어(정적 스냅샷과 동일 파일) 이후엔 스스로 갱신한다.
-    """
-    html = open(PAGE_SRC, encoding="utf-8").read()
-    # 발행 파이프라인과 동일하게 조립한다 — #rules(체크리스트 데이터)·공유 UI(ui/*.js)·
-    # 좌측 책 레일(nav)을 여기서 얹는다. 특히 rules 를 주입하지 않으면 페이지에 구워진
-    # 옛 #rules 사본(드리프트)이 서빙돼 최신 books/<slug>/rules.json 의 병합·수정이 안 보인다.
-    try:
-        from checklist.inject_rules import inject as _inject_rules
-        html = _inject_rules(html, SLUG)
-    except Exception:
-        pass
-    try:
-        from checklist.inject_ui import inject as _inject_ui
-        html = _inject_ui(html)
-    except Exception:
-        pass
-    # 지표 레지스트리 주입 — 체크리스트가 mtype 으로 🤖자동/🚧미구현/✋직접을 구분해 보이게 한다.
-    try:
-        import re as _re
-        _reg = open(os.path.join(BASE, "verdict", "metric_registry.json"),
-                    encoding="utf-8").read()
-        html = _re.sub(r'(<script type="application/json" id="metric-registry">).*?(</script>)',
-                       lambda m: m.group(1) + _reg + m.group(2), html, count=1, flags=_re.S)
-    except Exception:
-        pass
-    try:
-        from publish import inject_nav
-        html = inject_nav.inject(html, SLUG)
-    except Exception:
-        pass
+    """최신 판정(내 포지션 포함 — 로컬 화면이라)을 구워 넣은 책 페이지 HTML.
+    조립은 정적 발행과 같은 publish_pages.assemble 하나로 한다. 판정 계산이 실패해도 페이지는 내보낸다
+    (프런트가 폴링으로 재시도)."""
+    from publish.publish_pages import assemble
     try:
         data, _ = compute_verdict()
-        blob = json.dumps(data, ensure_ascii=False)
-        html = VERDICT_RE.sub(lambda m: m.group(1) + "\n" + blob + "\n" + m.group(3), html)
     except Exception:
-        # 계산 실패해도 스냅샷 페이지는 그대로 내보낸다(프런트가 폴링으로 재시도).
-        pass
-    return html.encode("utf-8")
+        data = None
+    return assemble(SLUG, data, public=False).encode("utf-8")
 
 
 # ------------------------------------------------------------------ HTTP 배관

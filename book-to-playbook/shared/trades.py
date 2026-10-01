@@ -3,7 +3,7 @@
 """거래 시뮬레이터 — 매수 신호 + 분할(sizing.tranches) + 매도 규칙(exit) → 거래 목록 (책 무관).
 
 규약
-  · 물량 단위 = 한 상품에 계획한 전체 물량 1.0. 분할이 없으면 1차에 1.0 을 다 산다.
+  · 물량 단위 = 한 상품에 계획한 전체 물량 1.0. 분할이 없거나 비율이 저자 미명시(frac null)면 1차에 1.0 을 다 산다.
   · 1차: 매수 신호가 시작된 날 T 의 다음 날 시가(T+1)에 frac₁ 만큼. 한 상품에 포지션은 하나 — 보유 중의 신호는 건너뛴다.
   · 2차 이후: 매일 종가에 다음 차수의 when 을 평가해 참이면 다음 날 시가에 그 frac 만큼(차례대로, 각 한 번).
       같은 날 매도 규칙이 걸렸으면 그날은 사지 않는다.
@@ -34,13 +34,21 @@ def exits_of(tree, prod):
 
 
 def tranches_of(tree, prod):
-    return (tree["products"][prod].get("sizing") or {}).get("tranches") or FULL
+    """시뮬레이션에 쓰는 분할 — 저자가 비율을 안 줬으면(frac null) 전량 한 번으로 계산한다
+    (비율을 지어내지 않는다 — 결과에 tranche_note 로 표시)."""
+    trs = (tree["products"][prod].get("sizing") or {}).get("tranches") or FULL
+    return FULL if trs[0].get("frac") is None else trs
+
+
+def tranche_note(tree, prod):
+    trs = (tree["products"][prod].get("sizing") or {}).get("tranches") or []
+    return "분할 비율 저자 미명시 — 전량 한 번 매수로 계산" if trs and trs[0].get("frac") is None else None
 
 
 def simulate(tree, prod, hist, cal, starts, exits, tranches=None):
     """starts = 신호 시작일 인덱스 목록 → 거래 목록. tranches 생략 = 트리의 분할."""
     tranches = tranches if tranches is not None else tranches_of(tree, prod)
-    tranches = tranches or FULL
+    tranches = FULL if (not tranches or tranches[0].get("frac") is None) else tranches
     cs = {c.date: c for c in hist.get(prod) or []}
     opens = [cs[d].open if d in cs else None for d in cal]
     closes = [cs[d].close if d in cs else None for d in cal]

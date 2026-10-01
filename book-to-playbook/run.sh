@@ -2,7 +2,6 @@
 # macOS / Linux 래퍼 — 실제 동작은 run.py(OS 중립)가 한다.
 # launchd/cron 에서 이 파일을 그대로 호출하면 된다.
 #   ./run.sh            (EOD)
-#   ./run.sh intraday   (장중)
 set -u
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

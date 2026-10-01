@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""라이브 책의 플레이북 원본(<slug>-playbook.html)의 verdict-data JSON 블록을 최신
-판정으로 교체해 PUBLIC/<slug>/index.html 로 출력. GitHub Pages 자동 갱신용.
-(디자인/내용은 원본 그대로 승계)
+"""책 페이지 조립·발행 — <slug>-playbook.html 에 최신 판정(verdict-data)과 공유 UI 를 얹어
+PUBLIC/<slug>/index.html 로 출력한다. GitHub Pages 자동 갱신용. 조립(assemble)은 로컬 실시간
+서버(serve)와 같은 함수 하나다 — 두 화면이 다르게 조립되지 않게.
 
 어느 책인지는 books.json 에서 온다(코드에 특정 책을 박지 않는다):
   · 인자 있으면 그 slug, 없으면 live:true 인 책 전부.
@@ -15,40 +15,6 @@ from shared.paths import (BASE, book_meta, live_slugs, playbook_src, public_book
 
 VERDICT_RE = re.compile(
     r'(<script type="application/json" id="verdict-data">)(.*?)(</script>)', re.S)
-
-
-def _merge_intraday(data, intraday_js):
-    """장중 자동판정 병합 + 수집상태 판정(ok / pending(대기) / error(실패))."""
-    intraday_state = "pending"   # 기본: 아직 안 걷힘
-    if os.path.exists(intraday_js):
-        try:
-            from datetime import datetime, timezone
-            iv = json.loads(read_text(intraday_js))
-            ts = iv.get("ts")
-            age_h = 999
-            if ts:
-                age_h = (datetime.now(timezone.utc)
-                         - datetime.fromisoformat(ts).astimezone(timezone.utc)).total_seconds() / 3600
-            st = iv.get("status")
-            if st == "error":
-                intraday_state = "error" if age_h <= 72 else "pending"
-                data["intraday_error"] = iv.get("reason")
-                data["intraday_ts"] = ts
-            elif st == "ok" and age_h <= 12:
-                intraday_state = "ok"
-                data["intraday_ts"] = ts
-                for v in data.get("verdicts", []):
-                    v["intraday_auto"] = iv.get("intraday", {}).get(v["prod"])
-            else:
-                intraday_state = "pending"
-                if ts:
-                    data["intraday_ts"] = ts
-        except Exception as e:
-            intraday_state = "error"
-            data["intraday_error"] = "병합 오류: %s" % e
-            print("장중 데이터 병합 실패:", e, file=sys.stderr)
-    data["intraday_state"] = intraday_state
-    return data
 
 
 def _source_sections(slug):
@@ -111,63 +77,46 @@ def _inject_backtest(html, slug):
     return html.replace("</body>", block + "</body>", 1)
 
 
+def assemble(slug, data, public=True):
+    """책 페이지 한 장을 조립한다 — 정적 발행(publish)과 로컬 실시간 서버(serve)가 같이 쓰는 단일 경로.
+    판정(#verdict-data) · 공유 UI(ui/*.js) · 책 레일 · 소절 원문 · 백테스트 탭을 얹는다.
+    public=True 면 내 포지션(로컬 개인 파일에서 온 값)을 판정에서 뺀다 — 공개 페이지에 싣지 않는다."""
+    html = read_text(playbook_src(slug))
+    if data is not None:
+        if public:
+            data = dict(data, verdicts=[{k: x for k, x in v.items() if k != "positions"}
+                                        for v in data.get("verdicts", [])])
+            data.pop("positions_note", None)
+        if not VERDICT_RE.search(html):
+            raise ValueError("verdict-data 블록을 찾지 못함(%s)" % slug)
+        blob = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
+        html = VERDICT_RE.sub(lambda m: m.group(1) + blob + m.group(3), html)
+    from checklist.inject_ui import inject as _inject_ui
+    html = _inject_ui(html)
+    from publish.inject_nav import inject as _inject_nav
+    html = _inject_nav(html, slug)
+    html = _inject_source(html, slug)
+    return _inject_backtest(html, slug)
+
+
 def publish(slug):
-    """한 책을 발행한다. 라이브 책이면 최신 판정을 병합한다. 성공 시 True."""
+    """한 책을 발행한다. 라이브 책이면 최신 판정(latest-verdict-<slug>.json)을 싣는다. 성공 시 True."""
     src = playbook_src(slug)
     if not os.path.exists(src):
         print("· %-8s 플레이북 원본 없음(%s) — 건너뜀" % (slug, os.path.basename(src)), file=sys.stderr)
         return True   # 없는 책은 이 스크립트 대상이 아님(실패로 치지 않는다)
-    meta = book_meta(slug)
-    html = read_text(src)
-
-    # 규칙 사본 드리프트 게이트 — JSON(단일 진실)과 HTML 사본이 갈라졌으면 발행 중단.
-    from checklist.inject_rules import gate as _rules_gate
-    _ok, _lines = _rules_gate(html, slug)
-    for _l in _lines:
-        print(_l, file=sys.stderr if not _ok else sys.stdout)
-    if not _ok:
-        print("규칙 드리프트(%s) — 발행을 멈춥니다." % slug, file=sys.stderr)
-        return False
-
-    # 라이브 책만 최신 판정(verdict-data) 병합. 비-라이브 책은 정적 페이지 그대로.
-    if meta.get("live"):
-        # 자기 책의 판정 파일을 읽는다 — 공용 파일 하나를 돌려쓰면 다른 live 책의
-        # 판정이 이 페이지에 병합된다. 구버전 단일 파일은 폴백으로만.
+    data = None
+    if book_meta(slug).get("live"):
         js = os.path.join(BASE, "latest-verdict-%s.json" % slug)
         if not os.path.exists(js):
-            js = os.path.join(BASE, "latest-verdict.json")
-        if os.path.exists(js):
-            # 장중 판정 파일 — 옛 KIS 클라이언트가 쓰던 kis-intraday.json 을 중립 이름으로
-            # 바꿨다(KIS 잔재 정리). 지금은 만드는 쪽이 없어 항상 '대기(pending)'로 나가고,
-            # 장중 엔진이 재설계되면 이 파일을 쓰는 것으로 다시 잇는다.
-            data = _merge_intraday(json.loads(read_text(js)),
-                                   os.path.join(BASE, "intraday-verdict.json"))
-            data_str = json.dumps(data, ensure_ascii=False)
-            if not VERDICT_RE.search(html):
-                print("verdict-data 블록을 찾지 못함(%s)" % slug, file=sys.stderr)
-                return False
-            html = VERDICT_RE.sub(lambda m: m.group(1) + "\n" + data_str + "\n" + m.group(3), html)
-
-    # 책-무관 검수 모드 UI JS 주입 (SSOT = checklist/ui/*.js — 한 번 고치면 모든 책에 전파)
+            print("판정 파일 없음(%s) — run.py daily 가 먼저 돌아야 한다" % os.path.basename(js), file=sys.stderr)
+            return False
+        data = json.loads(read_text(js))
     try:
-        from checklist.inject_ui import inject as _inject_ui
-        html = _inject_ui(html)
-    except Exception as e:
-        print("검수 UI 주입 실패(무시):", e, file=sys.stderr)
-
-    # 책 전환 사이드 레일 주입
-    try:
-        from publish.inject_nav import inject
-        html = inject(html, slug)
-    except Exception as e:
-        print("레일 주입 실패(무시):", e, file=sys.stderr)
-
-    # 소절 원문 주입(책 무관) — 원문 파일 있는 책만 실제 원문, 없으면 빈 데이터('원문 미제공')
-    html = _inject_source(html, slug)
-
-    # 백테스트 탭(데이터 있는 책만)
-    html = _inject_backtest(html, slug)
-
+        html = assemble(slug, data, public=True)
+    except ValueError as e:
+        print(str(e), file=sys.stderr)
+        return False
     outd = ensure_dir(public_book_dir(slug))
     write_text(os.path.join(outd, "index.html"), html)
     open(os.path.join(PUBLIC, ".nojekyll"), "a").close()

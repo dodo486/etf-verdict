@@ -406,9 +406,12 @@ def t_trades():
                         [{"label": "반", "when": {"ge": [R, 5]}, "sell": {"remaining": 0.5}}], trs)[0]
     check([b["date"] for b in t["buys"]] == [cal[1], cal[4]],      # 2일 매도 신호 → 3일 시가 매수 안 함, 3일 신호 → 4일 매수
           "매도가 걸린 날은 추가 매수 안 함 %r" % t["buys"])
-    # 분할이 없으면 한 번에 전량(옛 규약과 같은 결과)
+    # 분할이 없으면 한 번에 전량(옛 규약과 같은 결과) · 비율이 저자 미명시(null)여도 전량(비율을 지어내지 않는다)
     t = trades.simulate(tree, "X", hist, cal, [0], [], [])[0]
     check([b["qty"] for b in t["buys"]] == [1.0], "분할 없음 = 전량")
+    nul = [{"label": "1차", "frac": None}, {"label": "2차", "frac": None, "when": {"ge": [R, 5]}}]
+    t = trades.simulate(tree, "X", hist, cal, [0], [], nul)[0]
+    check([b["qty"] for b in t["buys"]] == [1.0], "분할 비율 미명시 = 전량 한 번")
     # (9) 백테스트 수익률 정의(_fwd): 신호일 i → i+1 시가 진입, i+h 종가
     from verdict import backtest
     cs = [Candle("d%d" % i, 100 + i, 0, 0, 200 + i, 0) for i in range(30)]
@@ -491,6 +494,8 @@ def t_syntax():
                                                {"label": "2", "frac": 0.5, "when": W}]}},
         {"sizing": {"weight": 30, "tranches": [{"label": "1", "frac": 0.5}, {"label": "2", "frac": 0.5}]}},
         {"sizing": {"weight": {"pos": "ret"}, "tranches": []}},
+        {"sizing": {"weight": None, "tranches": [{"label": "1", "frac": None}, {"label": "2", "frac": 0.5, "when": W}]}},
+        {"sizing": {"weight": None, "tranches": [{"label": "1"}]}},                 # frac 미명시
     ]
     for b in bad_cfgs:
         try:
@@ -504,6 +509,8 @@ def t_syntax():
                                      {"label": "2", "frac": 0.75, "when": {"ge": [{"pos": "ret"}, 3]}}]})
     try:
         cond.validate_tree({"products": {"X": good}})
+        cond.validate_tree({"products": {"X": dict(cond.EMPTY_ZONE, sizing={"weight": None, "tranches": [
+            {"label": "1", "frac": None}, {"label": "2", "frac": None, "when": {"manual": "저자 미명시: x"}}]})}})
     except cond.CondError as e:
         FAILS.append("올바른 caution·sizing 이 거부: %s" % e)
 
@@ -532,8 +539,11 @@ def t_grade():
     check(w is None and alt == [14.0, 34.0], "수동 모드 비중은 모름 + 범위 %r %r" % (w, alt))
     node = {"all": [dict(jump, label="급등", ref="1"), {"not": {"label": "수동", "manual": "x"}}]}
     v = pe.view(node, len(xs) - 1)
-    check(len(v) == 1 and v[0]["op"] == "모두" and v[0]["kids"][0]["v"] is True
-          and v[0]["kids"][1]["op"] == "아님" and v[0]["kids"][1]["kids"][0]["manual"] == "x", "view 구조 %r" % v)
+    check(v["op"] == "all" and v["kids"][0]["v"] is True and v["kids"][0]["label"] == "급등"
+          and v["kids"][1]["op"] == "not" and v["kids"][1]["kids"][0]["manual"] == "x", "view 구조 %r" % v)
+    hid = pe.view({"atleast": 1, "of": [jump, {"manual": "y"}]}, len(xs) - 1)
+    check(hid["op"] == "atleast" and hid["n"] == 1 and hid["kids"][0].get("hidden") is True
+          and hid["kids"][0]["v"] is True, "라벨 없는 잎은 hidden 으로 값과 함께 %r" % hid)
 
 
 # ------------------------------------------------------------------ 6. 표현력 회귀(이번 버그 유형)

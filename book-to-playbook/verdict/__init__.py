@@ -1,18 +1,14 @@
 # -*- coding: utf-8 -*-
-"""구간③ 팀 — 체크리스트 → 데이터 수집·판정.
+"""구간③ 팀 — 체크리스트(조건 트리) → 데이터 수집·판정.
 
-체크리스트의 각 항목에 필요한 데이터를 받아 자동 판정한다. 시세는 **오직**
-jhts 시세수집팀(jhts.marketdata)에서만 받는다 — 이 팀의 누구도 시세를 직접
-수집하지 않는다(야후·KIS·스크래핑 금지). 그 창구가 shared/md_feed.py 하나다.
+입력은 둘뿐이다: 구간②가 만든 books/<slug>/tree.json 과 jhts 시세. 수집할 심볼은 트리에서 나오고
+(shared/cond.symbols_of), 시세는 shared/md_feed.histories 하나로 받는다 — 없으면 jhts 에 수집 요청을 남긴다.
 
-  · (시세 창구 md_feed·트리 문법 cond·등급 tree_grade 는 shared/ — 구간②와 같은 코드를 쓴다)
-  · metric_calc.py           data_spec 의 metric 선언 → 값·판정 (md_feed 데이터로)
-  · verdict_engine.py        rules.json 선언 → 종목별 자동판정 (책 무관)
-  · verify_rules_vs_spec.py  체크리스트 ↔ 수집요청 대조 (창작·누락 검사)
-  · verify_auto_coverage.py  '자동 가능한데 ✋직접으로 샌 것' 검사
+  · verdict_engine.py     오늘 판정(여섯 칸) → 알림 + latest-verdict-<slug>.json (화면이 그대로 그린다)
+  · backtest.py           같은 트리로 과거 신호·거래 성적(책 매도·분할 규칙) → 백테스트 탭
+  · verify_primitives.py  검사기 ② — 원시 연산·체결·등급 계산을 기준값·손계산과 대조
 
 팀 경계: 다른 팀(playbook·checklist) 코드를 import 하지 않는다. 공용은 shared/ 만.
 `import jhts` 는 shared/md_feed.py 에서만 허용된다. 네트워크 모듈(urllib 등)은 이 팀
-전체에서 금지다 — 알림 송신은 shared/notify.py 가 맡는다.
-경계는 verify_teams.py 가 기계로 강제한다.
+전체에서 금지다 — 알림 송신은 shared/notify.py 가 맡는다. 경계는 verify_teams.py 가 기계로 강제한다.
 """

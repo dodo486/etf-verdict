@@ -61,22 +61,21 @@ TELEGRAM_CHAT_ID=...
 ## 3. 수동 실행
 
 ```
-python run.py daily        # EOD 판정 → 발행 (장 마감 후)
-python run.py intraday     # 장중 판정 → 발행 (개장+31분)
+python run.py daily        # 판정 → 백테스트 → 발행 (장 마감 후)
 python run.py publish      # 재판정 없이 현재 JSON으로 발행만
 ```
 
 옵션: `--no-git`(커밋/푸시 생략) · `--no-push`(커밋만) · `--quiet`
 
-래퍼도 있다 — macOS/Linux는 `./run.sh [intraday]`, Windows는 `run.cmd [intraday]`.
+래퍼도 있다 — macOS/Linux는 `./run.sh`, Windows는 `run.cmd`.
 파이썬 경로를 고정하고 싶으면 `BOOK_TO_PLAYBOOK_PYTHON` 환경변수를 쓴다.
 
 첫 실행은 `--no-git` 으로 결과를 눈으로 확인한 뒤 자동화에 걸 것.
 
 ## 4. 스케줄 등록
 
-기존 운용 주기: **EOD = 화~토 08:00 (KST)**, **장중 = 미국 개장 +31분**
-(서머타임 23:01 / 표준시 00:01 KST). 아래 시각은 이 기준이며 필요에 맞게 바꾼다.
+운용 주기: **화~토 08:00 (KST)** — 미국 장 마감 후 종가 기준 판정. 필요에 맞게 바꾼다.
+(판정은 봉이 끝난 직후 기준이다. 분봉이 연결되면 같은 daily 를 더 자주 돌리면 된다 — 장중 전용 모드는 없다.)
 
 ### macOS (launchd)
 
@@ -107,8 +106,6 @@ python run.py publish      # 재판정 없이 현재 JSON으로 발행만
 </plist>
 ```
 
-장중용은 같은 형식에 `Label`/인자를 `intraday` 로, 시각을 개장+31분으로 바꾼 별도 plist.
-
 ```bash
 launchctl load  ~/Library/LaunchAgents/com.book-to-playbook.daily.plist
 launchctl list | grep book-to-playbook          # 등록 확인
@@ -124,8 +121,6 @@ launchctl unload ~/Library/LaunchAgents/com.book-to-playbook.daily.plist   # 해
 schtasks /Create /TN "book-to-playbook daily" /SC WEEKLY /D TUE,WED,THU,FRI,SAT /ST 08:00 ^
   /TR "\"D:\book-to-playbook\run.cmd\" daily"
 
-schtasks /Create /TN "book-to-playbook intraday" /SC DAILY /ST 23:01 ^
-  /TR "\"D:\book-to-playbook\run.cmd\" intraday"
 ```
 
 ```cmd
@@ -151,7 +146,8 @@ schtasks /Delete /TN "book-to-playbook daily" /F            :: 해제
 | 증상 | 원인 · 조치 |
 |---|---|
 | 콘솔에 한글이 `???` 로 | 옛 스크립트를 직접 실행한 경우. `run.py` 를 거치면 UTF-8이 강제된다 |
-| `latest-verdict.json 없음 — 발행 중단` | jhts 시세 조회 실패. `logs/cron.log` 의 stderr 확인(jhts 설치·수집 상태) |
-| 장중 항목이 계속 `⚫ 대기` | 장중 자동판정은 재설계 대기 — 현재는 EOD 판정만 자동이다 |
+| 판정이 전부 ❔ 판정 불가 | jhts 시세 조회 실패. `logs/cron.log` 의 stderr, 페이지 상단 '시세 없음 → 수집 요청' 확인 |
+| 🟡 확인 대기만 나온다 | 수동(✋) 조건(개장 전·장중·저자 미명시)이 있어서다 — 체크리스트에서 직접 체크하면 등급이 다시 계산된다 |
+| `판정 파일 없음 — 발행 중단` | `run.py daily` 가 먼저 돌아야 한다(jhts 가 PYTHONPATH 에 있는지 확인) |
 | 발행은 됐는데 사이트가 그대로 | 푸시 안 됨(`--no-push`/origin 없음) 또는 GitHub Pages 반영 지연 |
 | `python` 을 못 찾음(Windows) | `BOOK_TO_PLAYBOOK_PYTHON` 에 python.exe 전체 경로 지정 |

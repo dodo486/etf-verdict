@@ -1,29 +1,25 @@
 // 플레이북(원문) 렌더 — 책 무관 SSOT.
-//   #src(마크다운 원문) → #content 로 굽고, coverage-data(반영여부)·rules(저자조건)를 겹쳐
-//   반영된 저자 조건 bullet 을 노랑(pb-hit)으로 칠하고 클릭 시 그 소절 시트 항목으로 점프시킨다.
-//   좌측 목차(nav)·스크롤 하이라이트·모바일 메뉴도 여기서 배선한다.
+//   #src(마크다운 원문) → #content 로 굽고, 판정 결과(#verdict-data)의 refs(소절별 체크리스트 반영 현황)를
+//   소절 제목에 배지로 겹친다 — 소절이 체크리스트(조건 트리)에 몇 개 조건으로 들어갔는지, 못 들어갔으면 왜인지.
+//   좌측 목차(nav)·스크롤 하이라이트·모바일 메뉴·본문 검색·소절 원문 보기도 여기서 배선한다.
 //
-//   책 하드코딩 없음: DOM id(#src #coverage-data #rules #content #nav .navlink #side #menubtn)와
-//   rules.json 스키마만 안다. 점프는 window.__jumpToSheet(review-ui) 에 위임한다.
-//   고치는 곳은 언제나 이 파일이고, inject_ui.py 가 각 책 페이지에 사본을 심는다.
+//   책 하드코딩 없음: DOM id(#src #verdict-data #content #nav .navlink #side #menubtn)와 판정 출력 계약만 안다.
+//   점프는 window.__jumpToSheet(review-ui) 에 위임한다. 고치는 곳은 언제나 이 파일이다.
 (function(){
   const raw = document.getElementById('src').textContent;
-  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
-  // 시트 반영여부 매핑 (coverage-data JSON, build 시 주입)
-  const COV = (function(){ try { return (JSON.parse(document.getElementById('coverage-data').textContent).map)||{}; } catch(e){ return {}; } })();
-  const RULES = JSON.parse(document.getElementById('rules').textContent);
-  const STEPNAME = RULES.STEPNAME;
-  function covKey(headText){
-    const m = headText.match(/^\s*([0-9]+-[0-9]+|에필로그)/);
-    return m ? m[1] : null;
-  }
-  function covBadge(headText){
-    const k = covKey(headText); if(!k) return '';
-    const c = COV[k]; if(!c) return '';
-    if(c.status==='reflected') return ' <span class="covb ref" title="'+esc(c.note||'')+'">✅ '+esc(STEPNAME[c.step]||'시트 반영')+'</span>';
-    if(c.status==='gap')      return ' <span class="covb gap" title="'+esc(c.note||'')+'">⚠ 시트 미반영</span>';
-    return ' <span class="covb mind" title="'+esc(c.note||'')+'">💭 원칙·배경</span>';
+  const REFS = (function(){ try { return JSON.parse(document.getElementById('verdict-data').textContent).refs || {}; } catch(e){ return {}; } })();
+  const ZW = {filter:'필터', avoid:'회피', entry:'진입', caution:'조심', sizing:'비중·분할', exit:'매도'};
+  function refBadge(headText){
+    const m = headText.match(/^\s*([0-9]+-[0-9]+|프롤로그|에필로그)/); if(!m) return '';
+    const r = REFS[m[1]];
+    if(r && (r.auto + r.manual) > 0){
+      const z = (r.zones||[]).map(x=>ZW[x]||x).join('·');
+      return ' <span class="covb ref" title="체크리스트 '+esc(z)+' — 자동 '+r.auto+' · 수동 '+r.manual+'">✅ '+esc(z)+'</span>';
+    }
+    if(r && r.unexpressed) return ' <span class="covb gap" title="'+esc(r.unexpressed.map(u=>u.rule+' — '+u.reason).join(' / '))+'">⚠ 트리로 못 옮김</span>';
+    return ' <span class="covb mind" title="체크리스트에 해당 조건 없음(원칙·배경이거나 판단 규칙이 아님)">— 체크리스트 없음</span>';
   }
 
   const lines = raw.split('\n');
@@ -81,7 +77,7 @@
     else if(t.startsWith('### ')){
       flushList();
       const ht = t.slice(4);
-      html += '<h3 class="sec">'+inline(ht)+'</h3>';   // 소절 배지 제거 — 대신 반영된 bullet 을 노랑+점프로
+      html += '<h3 class="sec">'+inline(ht)+refBadge(ht)+'</h3>';
     }
     else if(t.startsWith('- ')){
       listBuf.push(t.slice(2));
@@ -97,46 +93,6 @@
   closeChap();
 
   document.getElementById('content').innerHTML = html;
-
-  // 반영된 저자 조건(bullet) → 노랑 글씨 + 클릭 시 그 소절의 체크리스트 항목으로 점프.
-  //   규칙에 bkey(그 조건이 나온 bullet 의 고유 문구)가 있으면, 그 소절 bullet 에서 찾아 링크한다.
-  //   한 조건이 여러 소절에 나오면 xref:[{ref,bkey}] 로 보조 위치도 링크.
-  //   동의어로 subs 에 합쳐진 조건도 각 sub 의 bkey/ref 로 링크한다 —
-  //   점프 목적지(jref)·시트 항목명(t)은 부모 규칙의 것을 그대로 쓴다(sub 는 같은 말이므로 같은 항목으로 착지).
-  //   점프 목적지(jref)는 그 규칙이 사는 소절(primary ref)이다.
-  (function(){
-    var RD = RULES.DATA || {};
-    var bk = [];   // {bkey, ref(bullet 있는 소절), jref(점프 목적지), t}
-    Object.keys(RD).forEach(function(prod){
-      var cfg = RD[prod]; if(!cfg || typeof cfg !== 'object') return;
-      ['filter','entry','avoid','caution','exit'].forEach(function(grp){
-        (cfg[grp] || []).forEach(function(r){
-          if(!r || typeof r !== 'object') return;
-          var t = r.t || r.L || '';
-          if(r.bkey && r.ref) bk.push({bkey:r.bkey, ref:r.ref, jref:r.ref, t:t});
-          (r.xref || []).forEach(function(x){ if(x.bkey && x.ref) bk.push({bkey:x.bkey, ref:x.ref, jref:r.ref, t:t}); });
-          (r.subs || []).forEach(function(s){
-            if(!s || !s.bkey) return;
-            var sref = s.ref || r.ref;   // sub 자체 소절이 있으면 거기서, 없으면 부모 소절에서 찾는다
-            if(sref) bk.push({bkey:s.bkey, ref:sref, jref:r.ref, t:t});
-          });
-        });
-      });
-    });
-    if(!bk.length) return;
-    var curRef = null;
-    Array.prototype.forEach.call(document.querySelectorAll('#content h3.sec, #content li'), function(n){
-      if(n.tagName === 'H3'){ var m=(n.textContent||'').match(/^\s*([0-9]+-[0-9]+|에필로그)/); curRef = m?m[1]:null; return; }
-      var txt = n.textContent || '';
-      var hit = null;
-      for(var i=0;i<bk.length;i++){ if(bk[i].ref===curRef && txt.indexOf(bk[i].bkey)>=0){ hit=bk[i]; break; } }
-      if(hit){
-        n.classList.add('pb-hit');
-        n.setAttribute('title', '시트 항목: ' + hit.t);
-        n.addEventListener('click', function(ev){ ev.stopPropagation(); if(window.__jumpToSheet) window.__jumpToSheet(hit.jref, hit.t.slice(0,32), hit.t); });
-      }
-    });
-  })();
 
   // ── 소절 원문보기 (책 무관 · 검수여부 무관) ──────────────────────────────
   //   #source-data(소절 ref → 책 원문)를 각 소절 헤딩에 '원문' 토글로 붙인다.

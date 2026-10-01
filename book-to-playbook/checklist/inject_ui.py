@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""책-무관 공유 UI JS(들)를 책 페이지 HTML에 주입한다(빌드 시) — `inject_rules.py` 와 같은 자리.
+"""책-무관 공유 UI JS(들)를 책 페이지 HTML에 주입한다(빌드 시).
 
 ## 왜 있나
 
@@ -11,8 +11,9 @@
 그래서 이 UI JS 들은 **파일로 나온다**: `ui/<name>.js` 가 각자의 단일 진실(SSOT)이다.
 버그는 거기서 한 번 고치면 모든 책에 주입돼 퍼진다. 지금 두 구획이 있다:
 
-  * `review-ui`    — 좌우 분할·소절→시트 점프·노란 bullet 매핑·반영 현황 요약표
-  * `checklist-ui` — 탭 전환·스코어카드·진입 체크리스트 렌더·STEP3 계산기·메모
+  * `playbook-ui`  — 플레이북 본문 렌더·소절별 체크리스트 반영 배지·목차·검색·원문 보기
+  * `review-ui`    — 좌우 분할·소절↔체크리스트 점프·반영 현황 요약표
+  * `checklist-ui` — 탭 전환·판정 결과(조건 트리 여섯 칸) 렌더·수동 조건 체크·비중·분할 계산
   * `collect-ui`   — 데이터 수집 현황(소스·갱신 모드 표시)
   * `live-ui`      — 라이브 모드(로컬 서버 /api/verdict 폴링·SSE → 화면 재렌더)
 
@@ -47,8 +48,8 @@ import 해서 `inject(html)` / `check(html)` 로도 쓴다(모든 구획을 한 
 
 ## 빌드 배선
 
-`publish_pages.py` 가 발행 직전 `inject_nav`·`inject_rules` 와 나란히 `inject_ui.inject(html)`
-를 부른다(그 파일 참고). 새 책을 발행 파이프라인에 얹을 때도 같은 자리에 추가한다.
+`publish_pages.assemble()` 이 발행·로컬 서버 양쪽에서 `inject_nav` 와 나란히 `inject_ui.inject(html)` 를
+부른다(그 파일 참고).
 """
 import os
 import re
@@ -86,7 +87,7 @@ def read_text(p):
 
 
 def write_text(p, s):
-    # 항상 UTF-8 + LF (OS 무관 동일 결과 — inject_rules/paths 와 동일 규약)
+    # 항상 UTF-8 + LF (OS 무관 동일 결과 — shared/paths 와 동일 규약)
     with open(p, "w", encoding="utf-8", newline="") as f:
         f.write(s)
 

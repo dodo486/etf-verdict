@@ -1,5 +1,5 @@
 /* ============================================================
-   데이터 수집 현황 — 소스(야후 marketdata) + 갱신 모드(실시간 폴링 / 정적 스냅샷)
+   데이터 수집 현황 — 소스(jhts 시세팀) + 갱신 모드(실시간 폴링 / 정적 스냅샷)
    ============================================================ */
 (function(){
   'use strict';
@@ -41,9 +41,9 @@
     // 라이브 모드 = 로컬 실시간 서버가 /api/verdict 를 제공(정직한 소스/신선도 표기).
     // 정적(GitHub Pages) 모드 = 빌드 때 구운 스냅샷.
     var live = !!(window.__liveMode || VD.live);
-    var src  = VD.source || '야후(marketdata)';
+    var src  = VD.source || 'jhts 시세팀';
 
-    // --- 소스 1: 종가·지표(야후 marketdata) ---
+    // --- 소스 1: 종가·지표(수집 단계 = 조건 트리가 쓰는 심볼 전부) ---
     elEod.innerHTML = eod
       ? '<span>🤖 종가·지표('+src+')</span> <b>'+stamp(eod)+'</b> <span class="cst ok">수집됨</span>'
       : '<span>🤖 종가·지표('+src+')</span> <span class="cst err">없음</span>';

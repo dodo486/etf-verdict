@@ -135,7 +135,7 @@ class ProductEval:
         return out
 
     def view(self, node, i):
-        """화면용 중첩 설명 — 라벨 노드와 논리 묶음만 남긴다(수동은 모름으로 둔 그날 값)."""
+        """화면용 중첩 설명 — 노드 하나당 항목 하나(_view). 수동은 모름으로 둔 그날 값."""
         return _view(node, self.defs, self.ctx[None], i)
 
     def manual_items(self):
@@ -148,38 +148,84 @@ class ProductEval:
         return out
 
 
-def _view(node, defs, ctx, i):
-    """[{label?, ref?, v, manual?, note?, op?, kids?}] — 라벨 없는 잎은 숨기고, 라벨 없는 논리 묶음은
-    묶음 자체(op)만 남긴다. not 아래는 극성이 뒤집힌 문맥으로 평가한다(cond 와 같은 규칙)."""
-    if not isinstance(node, dict):
-        return []
-    if "def" in node and node["def"] in defs and not node.get("label"):
-        return _view(defs[node["def"]], defs, ctx, i)
+LOGICAL = ("all", "any", "atleast", "not")
+
+
+def product_specific(node, defs):
+    """$self/$index/pos 를 쓰는 식은 상품마다 값이 달라진다 — 여러 상품이 '같이 보는' 판단이 아니다."""
+    for n in cond.labeled_all(node, defs):
+        if "px" in n and n.get("sym", "$self") in ("$self", "$index"):
+            return True
+        if "pos" in n:
+            return True
+    return False
+
+
+def _view(node, defs, ctx, i, shared=False):
+    """노드 하나 → 화면 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, hidden?}.
+
+    · 논리 노드(all/any/atleast/not)는 op 와 자식 항목 전부를 담는다 — 화면이 사람이 체크한 수동 조건으로
+      같은 3값 논리를 다시 계산할 수 있게(not 아래 수동은 극성이 뒤집힌다 — cond 와 같은 규칙).
+    · 그 밖의 노드는 그날 값(v)이 고정된 잎이다. 라벨이 없으면 hidden(화면에 안 보이지만 계산엔 쓴다),
+      안쪽에 라벨 달린 노드가 있으면 참고용 kids(op 없음 — 다시 계산하지 않는다)로 붙인다.
+    · 라벨 없는 정의 참조는 정의 본문으로, 라벨 달린 정의 참조는 op "ref"(값 = 유일한 자식)로.
+    · 상품마다 값이 같은 정의(product_specific 아님) 안의 수동 조건은 shared=True — 화면에서 한 번 체크하면
+      그 조건을 쓰는 모든 상품에 같은 답이 들어간다(같은 시장 사실이므로).
+    v 는 수동 = 모름(None)으로 둔 그날 값이다."""
+    if "def" in node and node["def"] in defs and not node.get("label")             and not [k for k in node if k not in cond.META and k != "def"]:
+        body = defs[node["def"]]
+        return _view(body, defs, ctx, i, shared or not product_specific(body, defs))
     op = next((k for k in node if k not in cond.META and k not in ("of", "sym", "tf", "else")), None)
-    kids = []
-    if op in ("all", "any"):
-        for k in node[op]:
-            kids.extend(_view(k, defs, ctx, i))
-    elif op == "atleast":
-        for k in node["of"]:
-            kids.extend(_view(k, defs, ctx, i))
-    elif op == "not":
-        kids = _view(node["not"], defs, ctx.flipped(), i)
-    elif op == "def":
-        kids = _view(defs[node["def"]], defs, ctx, i)
-    if not node.get("label") and not (kids and op in ("all", "any", "atleast", "not")):
-        return kids
     item = {"v": cond.series(node, ctx)[i]}
-    if node.get("label"):
-        item.update(label=node["label"], ref=node.get("ref"))
-    if node.get("note"):
-        item["note"] = node["note"]
+    for k in ("label", "ref", "note"):
+        if node.get(k):
+            item[k] = node[k]
     if op == "manual":
         item["manual"] = node["manual"]
-    if kids:
-        item["kids"] = kids
-        item["op"] = "%d개 이상" % node["atleast"] if op == "atleast" else OP_WORD.get(op, "")
-    return [item]
+        if shared:
+            item["shared"] = True
+    elif op in LOGICAL:
+        kids = node[op] if op in ("all", "any") else (node["of"] if op == "atleast" else [node["not"]])
+        kctx = ctx.flipped() if op == "not" else ctx
+        item["op"] = op
+        if op == "atleast":
+            item["n"] = node["atleast"]
+        item["kids"] = [_view(k, defs, kctx, i, shared) for k in kids]
+    elif op == "def":
+        body = defs[node["def"]]
+        item["op"] = "ref"
+        item["kids"] = [_view(body, defs, ctx, i, shared or not product_specific(body, defs))]
+    else:
+        inner = [_view(k, defs, ctx, i, shared) for k in _labeled_inside(node, defs)]
+        if inner:
+            item["kids"] = inner
+        if not node.get("label"):
+            item["hidden"] = True
+    return item
+
+
+def _labeled_inside(node, defs):
+    """잎 노드 안쪽의 가장 바깥 라벨 노드들(참고 표시용)."""
+    out = []
+
+    def walk(n):
+        if isinstance(n, dict):
+            if n.get("label") or "manual" in n:
+                out.append(n)
+                return
+            if "def" in n and n["def"] in defs:
+                walk(defs[n["def"]])
+                return
+            for k, x in n.items():
+                if k not in cond.META:
+                    walk(x)
+        elif isinstance(n, list):
+            for x in n:
+                walk(x)
+    for k, x in node.items():
+        if k not in cond.META:
+            walk(x)
+    return out
 
 
 def _top_labeled(node, defs):

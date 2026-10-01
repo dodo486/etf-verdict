@@ -118,7 +118,8 @@ def run(slug, days=365, hist=None, tree=None):
             prev = b
         exits, src = trades_mod.exits_of(tree, p)
         tl = trades_mod.simulate(tree, p, hist, cal, starts, exits)
-        trade_res[p] = {"exit_source": src, "stats": trades_mod.stats(tl), "trades": tl}
+        trade_res[p] = {"exit_source": src, "tranche_note": trades_mod.tranche_note(tree, p),
+                        "stats": trades_mod.stats(tl), "trades": tl}
         manual[p] = [{"section": s, "rule": l, "ref": r} for s, l, r in pe.manual_items()]
         if prow and period is None:
             period = [prow[0]["date"], prow[-1]["date"], len(prow)]

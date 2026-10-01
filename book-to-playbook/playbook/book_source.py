@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""책 원문 → 소절 단위 인덱스. "① 책 → 플레이북" 창작/누락 검사의 재료.
+"""책 원문 → 소절 단위 인덱스. 체크리스트(조건 트리)의 ref 가 가리키는 소절 키의 기준.
 
 ## 왜 있나
 
-이 리포의 검사기들(`verify_source_integrity.py` · `verify_coverage.py`)은 전부
-**플레이북 안쪽**만 본다. `#src` 마크다운이 안 바뀌었나, 그 마크다운에 적힌 수치가
-시트 구현에 있나. 정작 그 `#src` 가 **책 원문에 충실한가**는 아무도 안 봤다 —
-원문이 리포 안에 없었기 때문이다.
+체크리스트의 조건마다 붙는 `ref`(원문 소절 키)는 실제로 있는 소절이어야 한다(구조 게이트의
+책 계약이 이 인덱스로 확인한다). 원문 소절 경계·해시를 리포에 남겨, 원문이 바뀌거나 플레이북
+소절이 원문과 어긋나면(`--diff`) 드러나게 한다.
 
 원문은 여기 있다(저작권물이라 리포로 복사하지 않는다).
 
     ./trend-source.md  (slug: trend)
 
 경로는 `book_sources.json` 이 들고 있고 환경변수로 덮어쓴다. 리포에 남는 건
-`books/<slug>/source_index.json` — **소절 키·제목·줄범위·글자수·해시·정량토큰**뿐,
+`books/<slug>/source_index.json` — **소절 키·제목·줄범위·글자수·해시**뿐,
 본문 텍스트는 한 글자도 담지 않는다.
 
 ## 자르는 규칙
@@ -56,8 +55,11 @@ import sys
 from shared import paths  # noqa: F401  (경로·UTF-8 출력 고정)
 from shared.paths import BASE
 
-# 정량 토큰 정규식은 shared/tokens.py 가 기준(SSOT)이다. 복붙하면 두 곳이 갈라진다.
-from shared.tokens import TOKEN_RE, norm
+
+
+def norm(t):
+    """해시·글자수용 표기 정규화(공백 제거, 전각 + → +)."""
+    return re.sub(r"\s+", "", t).replace("＋", "+")
 
 # 원문 위치 설정은 이 팀(①)만 쓰므로 팀 폴더 안에 산다.
 CONFIG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "book_sources.json")
@@ -282,15 +284,6 @@ def parse(slug):
     }
 
 
-def tokens_of(body):
-    out = []
-    for t in TOKEN_RE.findall(body):
-        t = norm(t[0] if isinstance(t, tuple) else t)
-        if t and t not in out:
-            out.append(t)
-    return out
-
-
 def load_sections(slug):
     """{소절키: 본문} — 다른 검사기가 import 해서 쓴다.
 
@@ -315,7 +308,6 @@ def build_index(slug):
             "end_line": s["end_line"],
             "chars": s["chars"],
             "sha256": hashlib.sha256(norm(s["body"]).encode("utf-8")).hexdigest(),
-            "tokens": tokens_of(s["body"]),
         }
         if s.get("title_toc_unmatched"):
             # 목차 제목과 본문 표지가 끝내 안 맞았다. 맞춘 척하지 않고 둘 다 남긴다.
@@ -432,11 +424,6 @@ def _summary(idx):
         print("  제목 불일치    : %d개 (목차 제목과 본문 표지가 안 맞음 — 둘 다 기록)" % len(bad_title))
         for k, s in bad_title:
             print("    · %-8s 본문 「%s」 / 목차 「%s」" % (k, s["title"], s["title_toc"]))
-    ntok = sum(len(s["tokens"]) for s in idx["sections"].values())
-    notok = [k for k, s in idx["sections"].items() if not s["tokens"]]
-    print("  정량 토큰      : 총 %d개 (소절당 평균 %.1f) · 토큰 0개 소절 %d개%s"
-          % (ntok, ntok / max(1, idx["section_count"]), len(notok),
-             (" [%s]" % " ".join(notok)) if notok else ""))
 
 
 def _diff_report(slug):

@@ -1,15 +1,9 @@
 {
   "moneycopy": {
-    "src": "c0fcc80b551225fb",
-    "def_table": "e3b0c44298fc1c14",
-    "labels": "6c5bd8c744c2fb3d",
-    "rule_data": "b1cc4f1e00dec3e2"
+    "src": "62ba8cb855820400"
   },
   "trend": {
-    "src": "cd4813d0bf901881",
-    "def_table": "e3b0c44298fc1c14",
-    "labels": "915edf628755d036",
-    "rule_data": "8464cfdd2db07c8f"
+    "src": "ede45d537332ed29"
   },
   "accept_log": [
     {
@@ -27,6 +21,10 @@
     {
       "ts": "2026-09-29T07:10:19",
       "why": "advisory 4항목 반영"
+    },
+    {
+      "ts": "2026-10-02T07:57:47",
+      "why": "원문 대조 감사로 플레이북 요약 bullet 수정 — 원문에 없는 숫자·칸 배치·조건 제거(trend 25곳: 분할 비율·SPY 진입·IWM 선행 조건 등, moneycopy 41곳). 체크리스트를 조건 트리로 교체하면서 보호 대상을 #src 하나로 축소"
     }
   ]
 }

@@ -1,29 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""선언기반 판정엔진 (책 무관).
+"""판정 엔진 (책 무관) — 구간③. 체크리스트(= 조건 트리 books/<slug>/tree.json)를 오늘 시세에 대 판정한다.
 
-책마다 다른 종목·규칙·스코어카드를 코드에 if 문으로 박지 않는다. 이 파일 하나가
-books/<slug>/rules.json 선언만 읽어 판정을 만든다 — 어떤 책이든 규칙만 뽑으면
-자동판정이 나온다. metric 평가(값·문턱 비교)는 metric_calc(구간③ 계산기)에 위임한다.
+입력은 둘뿐이다: 트리(구간② 산출물)와 jhts 시세(수집 단계 tree_grade.history → md_feed.histories).
+트리의 뜻(등급·금액·분할·매도)은 shared/tree_grade 한 벌이고, 이 파일은 그 결과를 사람과 화면이 읽는
+모양으로 묶기만 한다 — 화면은 트리를 다시 해석하지 않고 이 출력만 그린다.
 
-읽는 선언(rules.json):
-  · DATA{<종목>:{v,need,filter[],entry[],avoid[],caution?,exit?,note}, COMMON:{entry,avoid}}
-  · PRODMETA{<종목>:{color, idx}}   — 표시색 · 필터가 보는 지수 심볼
-  · SCORECARD[{t, ref, metric}]     — 장 시작 전 점수표(N지표) — 시장 환경 표시용, 등급엔 안 쓴다
-
-등급은 조건 트리(books/<slug>/tree.json) 하나에서만 나온다 — shared/tree_grade.py.
-  rules.json 의 metric 선언은 화면 표시용 수치(metrics·eod_checks 등)만 만든다. 등급을 두 곳에서
-  내면 판정이 갈라진다(옛 엔진은 스코어카드로, 시트는 진입 개수로 등급을 내 서로 달랐다).
-  트리가 없는 책은 '❔ 판정 불가(조건 트리 없음)' — 다른 규칙으로 대신 채우지 않는다.
-
-내는 출력 계약(아티팩트/알림이 소비):
-  top     : {score, scorecard[{label,ok,why}], verdicts[], extras, ts}
-  verdict : {prod,color,grade,reason,avoid[],avoid_keys[],filter_ok,
-             eod_checks{ek:{ok,label}}, intraday[], metrics{k:text}, vol_ok,
-             close, ma20, chg, tree{key,date,explain}}
-
-값은 전부 md_feed(시세 창구) 사실을 metric_calc 캐시로 받는다 — 여기서 시세를 새로
-치지 않는다. 규칙마다 metric.source 가 'manual'/'intraday' 면 자동 판정에서 제외한다.
+출력 계약(latest-verdict-<slug>.json · 알림 · 화면이 소비):
+  top     : {slug, title, ts, date, source, cash, common[], verdicts[], refs{}, missing{}, positions_note}
+  common  : [{name, label, ref, v, view}]           상품 여럿이 같이 보는 판단(defs) — 화면 맨 위 한 번
+  verdict : {prod, index, note, date, close, chg, key, grade, reason,
+             zones{filter,avoid,entry: view[]}, opt{..}, pes{..},     조건 칸 셋의 중첩 설명 + 낙관·비관 값
+             caution[{label, ref, scale, v, manual, view}], amount{factor, unspecified, unknown},
+             sizing{label, ref, weight, weight_range, tranches[{label, ref, frac, note, view?}]},
+             exit[{label, ref, sell, note, view}], positions[...]}    positions = 내 포지션(로컬 파일)이 있을 때만
+  refs    : {원문 소절: {auto, manual, zones[], prods[], unexpressed?[{rule, reason}]}}
+            플레이북 소절별 체크리스트 반영 현황 + 트리로 못 옮긴 규칙과 그 사유
+view 는 노드 하나당 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, hidden?} (tree_grade._view)
+— 수동은 '모름'으로 둔 그날 값. 화면은 사람이 체크한 수동 조건으로 같은 3값 논리를 다시 계산한다.
 """
 import json
 import os
@@ -32,10 +26,11 @@ from datetime import datetime, timedelta, timezone
 
 from shared.paths import BASE
 from shared.notify import send_telegram, send_desktop
-from shared.rules_io import load_rules
 from shared import cond, md_feed, tree_grade
-from verdict import metric_calc
-from verdict import verify_metric_semantics
+
+# 트리 판정에 필요한 이력 길이(가장 긴 창 + 여유). backtest.WARMUP_DAYS 와 같은 기준.
+TREE_HISTORY_DAYS = 500
+SOURCE = "jhts 시세팀(일봉)"
 
 
 def book_title(slug):
@@ -50,290 +45,234 @@ def book_title(slug):
     return slug
 
 
-# ------------------------------------------------------------------ 스코어카드
-def scorecard(rules):
-    """SCORECARD 선언 → (score, rows). rows = [{label, ok, why}].
-    각 항목은 자기 metric(op/threshold)으로 pass 를 정한다. 계산 불가(데이터 실패)는
-    ok=False (통과로 치지 않는다). score = ok 개수."""
-    rows = []
-    for item in rules.get("SCORECARD", []):
-        res = metric_calc.evaluate(item.get("metric") or {})
-        rows.append({"label": item.get("t", ""),
-                     "ok": res.get("pass") is True,
-                     "why": res.get("text", "")})
-    return sum(1 for r in rows if r["ok"]), rows
-
-
-# ------------------------------------------------------------------ 선언 평가(순수)
-# 규칙(부모/leaf)의 발화·세분키를 자기 metric(과 subs)으로만 판단 — ref 조회 없음.
-def _auto(m):
-    return bool(m) and m.get("source") not in ("manual", "intraday") and m.get("type") not in (None, "manual")
-
-
-def _fires(rule):
-    """이 규칙이 발화하나 — 자기 metric(과 subs)으로만. 자동 대상 아니면 None.
-
-    subs 합성: 기본 any(하나라도 걸리면 부모 발화). 개수 기반 판정(저자가
-    '네 가지 중 두 개 이상'처럼 셈을 명시)은 groupNeed=N — 평가 가능한 하위 중
-    발화 수가 N 이상일 때만 부모가 발화한다."""
-    subs = rule.get("subs")
-    if subs:
-        vals = [_fires(s) for s in subs]
-        vals = [v for v in vals if v is not None]
-        if not vals:
-            return None
-        need = rule.get("groupNeed")
-        if need:
-            return sum(1 for v in vals if v) >= need
-        return any(vals)
-    m = rule.get("metric")
-    if not _auto(m):
-        return None
-    return metric_calc.evaluate(m)["pass"]
-
-
-def _fired_keys(rule):
-    """발화한 leaf(또는 sub)의 자기 세분키(부모키 아님). 복합키 'a|b'→분해."""
-    subs = rule.get("subs")
-    if subs:
-        out = []
-        for s in subs:
-            out.extend(_fired_keys(s))
-        return out
-    if _fires(rule) is True:
-        k = rule.get("k") or ""
-        return k.split("|") if k else []
-    return []
-
-
-# ------------------------------------------------------------------ 데이터 접근(얇게)
-def _series(sym):
-    return metric_calc._series(sym)
-
-
-def _dir(sym):
-    return metric_calc._dir(sym)
-
-
-def _ok(d):
-    return metric_calc._ok(d)
-
-
-def _num(d, k):
-    return d.get(k) if _ok(d) else None
-
-
-# ------------------------------------------------------------------ 표현층(책 무관)
-# 사람이 읽을 회피 문장·metrics{} 는 전부 규칙 라벨(t) + metric_calc 근거 텍스트에서 만든다.
-def _leaf_text(rule):
-    """leaf 규칙의 사람 문장: 라벨(t) + metric 근거 텍스트."""
-    t = rule.get("t", "")
-    res = metric_calc.evaluate(rule.get("metric") or {})
-    return "%s — %s" % (t, res["text"]) if res.get("text") else t
-
-
-def _avoid_sentence(rule):
-    """발화한 회피 규칙 한 줄. subs 면 발화한 하위조건들을 묶어 보인다."""
-    subs = rule.get("subs")
-    if subs:
-        fired = [_leaf_text(s) for s in subs if _fires(s) is True]
-        detail = "; ".join(x for x in fired if x)
-        return rule.get("t", "") + (" (%s)" % detail if detail else "")
-    return _leaf_text(rule)
-
-
-def _collect_metrics(rules_list, out):
-    """규칙 목록의 leaf metric 근거 텍스트를 out[k] 에 모은다(자동 대상만). subs 재귀."""
-    for r in rules_list:
-        subs = r.get("subs")
-        if subs:
-            _collect_metrics(subs, out)
-            continue
-        m = r.get("metric")
-        if not _auto(m):
-            continue
-        res = metric_calc.evaluate(m)
-        txt = res.get("text") or ""
-        # 미구현/미선언 type 은 값이 없고 안내문만 나온다 — 수치가 아니므로 노출 안 함.
-        if res.get("value") is None and txt.startswith(("미구현", "metric type")):
-            continue
-        if not txt:
-            continue
-        k = r.get("k")
-        if k:
-            for kk in k.split("|"):
-                out[kk] = txt
-
-
-# ------------------------------------------------------------------ 종목별 전체 계약
-def full_verdict(rules, prod):
-    cfg = rules["DATA"][prod]
-    meta = (rules.get("PRODMETA") or {}).get(prod, {})
-    color = meta.get("color", "")
-    p = _series(prod)
-    close, ma20, chg = _num(p, "close"), _num(p, "ma20"), _num(p, "chg")
-
-    # ── 필터: 게이트는 선언(_fires)이 판정
-    filt_vals = [x for x in (_fires(r) for r in cfg.get("filter", [])) if x is not None]
-    filter_ok = bool(filt_vals) and all(filt_vals)
-
-    # ── 회피(종목별 + 시장공통 COMMON): 발화한 규칙의 세분키·사람 문장
-    common = rules.get("DATA", {}).get("COMMON", {})
-    avoid_rules = list(cfg.get("avoid", [])) + list(common.get("avoid", []))
-    av, akeys = [], []
-    for r in avoid_rules:
-        # 발동 여부는 부모 판정(_fires — groupNeed 반영)이 정한다.
-        # _fired_keys 로 정하면 개수 판정 규칙이 하위 1개 발화만으로 발동된다.
-        if _fires(r) is not True:
-            continue
-        keys = _fired_keys(r)
-        if keys:
-            av.append(_avoid_sentence(r))
-            akeys.extend(keys)
-    akeys = list(dict.fromkeys(akeys))   # 순서 유지 dedup
-
-    # ── metrics{}: 항목별 근거 수치(아티팩트가 작은 글씨로). 규칙 k → 텍스트
-    metrics = {}
-    _collect_metrics(cfg.get("filter", []), metrics)
-    _collect_metrics(avoid_rules, metrics)
-    _collect_metrics(cfg.get("entry", []), metrics)
-    # caution(④ 과열 체크)도 근거 수치를 모은다 — 특히 advisory(임계 미명시) 항목은
-    # 자동판정은 못 해도 값은 보여줘야 사람이 판단한다.
-    _collect_metrics(cfg.get("caution", []), metrics)
-    # 필터 요약(UI 의 mt.filter) — 첫 자동 필터 규칙의 근거 텍스트
-    for r in cfg.get("filter", []):
-        if _auto(r.get("metric")):
-            metrics.setdefault("filter", metric_calc.evaluate(r["metric"])["text"])
-            break
-
-    # ── 거래량(COMMON.entry[0]) → vol_ok · metrics['vol']
-    vol_ok = False
-    ce = (common.get("entry") or [])
-    if ce:
-        vm = ce[0].get("metric") or (ce[0].get("metric_candidates") or [{}])[0]
-        if _auto(vm):
-            vres = metric_calc.evaluate(vm)
-            vol_ok = vres.get("pass") is True
-            if vres.get("text"):
-                metrics["vol"] = vres["text"]
-
-    # ── eod_checks{ek:{ok,label}}: ek 를 단 자동 필터/진입 규칙만
-    eod_checks = {}
-    for r in list(cfg.get("filter", [])) + list(cfg.get("entry", [])):
-        ek = r.get("ek")
-        if ek and _auto(r.get("metric")):
-            res = metric_calc.evaluate(r["metric"])
-            eod_checks[ek] = {"ok": res.get("pass") is True, "label": res.get("text", "")}
-
-    # ── 장중 확인(자동 불가) — 필터 통과 & 회피 0 일 때만 노출.
-    #    intraday 로 표시할 규칙 = metric.source == 'intraday' (진입/공통 entry 안).
-    intraday = []
-    if filter_ok and not av:
-        for r in list(cfg.get("entry", [])) + list(common.get("entry", [])):
-            if (r.get("metric") or {}).get("source") == "intraday":
-                intraday.append(r.get("t", ""))
-
-    return {"prod": prod, "color": color,
-            "grade": "❔ 판정 불가", "reason": "조건 트리 없음",     # tree_verdicts 가 덮는다
-            "eod_checks": eod_checks, "avoid": av, "avoid_keys": akeys,
-            "filter_ok": bool(filter_ok), "vol_ok": bool(vol_ok), "intraday": intraday,
-            "metrics": metrics, "close": close, "ma20": ma20, "chg": chg}
-
-
-def reentry_checks(rules):
-    """COMMON.reentry 의 자동 항목만 평가 → {k:{ok,label}}. 프런트가 실시간값·잠금에 쓴다.
-    수동(✋) 항목은 metric 이 없거나 source=manual 이라 여기서 빠진다(프런트가 editable 로 표시)."""
-    common = rules.get("DATA", {}).get("COMMON", {})
+def load_positions(slug):
+    """books/<slug>/positions.json (커밋하지 않는 개인 파일) → {prod: [포지션]}."""
+    p = os.path.join(BASE, "books", slug, "positions.json")
+    if not os.path.exists(p):
+        return {}
     out = {}
-    for r in common.get("reentry", []) or []:
-        k = r.get("k")
-        m = r.get("metric")
-        if not k or not _auto(m):
-            continue
-        res = metric_calc.evaluate(m)
-        out[k] = {"ok": res.get("pass") is True, "label": res.get("text", "")}
+    for x in (json.load(open(p, encoding="utf-8")).get("positions") or []):
+        out.setdefault(x["prod"], []).append(x)
     return out
 
 
-# 트리 판정에 필요한 이력 길이(가장 긴 창 + 여유). backtest.WARMUP_DAYS 와 같은 기준.
-TREE_HISTORY_DAYS = 500
+# ------------------------------------------------------------------ 공통 조건(defs)
+def _def_users(tree):
+    """{정의 이름: 그 정의를 참조하는 상품 집합} — 칸 안에서 {"def": 이름} 을 직접·간접으로 쓰는 상품."""
+    defs = tree.get("defs") or {}
+    users = {}
+
+    def walk(n, p, seen):
+        if isinstance(n, dict):
+            if "def" in n and n["def"] in defs and n["def"] not in seen:
+                users.setdefault(n["def"], set()).add(p)
+                walk(defs[n["def"]], p, seen | {n["def"]})
+            for k, x in n.items():
+                if k not in cond.META:
+                    walk(x, p, seen)
+        elif isinstance(n, list):
+            for x in n:
+                walk(x, p, seen)
+
+    for p, cfg in tree["products"].items():
+        for _z, _l, _r, node in cond.zone_nodes(cfg):
+            walk(node, p, set())
+    return users
 
 
-def tree_verdicts(slug, verdicts):
-    """조건 트리로 등급·사유를 낸다(그날 = 각 상품의 마지막 일봉). verdicts 를 제자리에서 고친다."""
+def common_items(tree, pe):
+    """라벨 달린 정의 중 상품 둘 이상이 같이 보는 것(상품마다 값이 다른 식 제외)."""
+    defs = tree.get("defs") or {}
+    out = []
+    users = _def_users(tree)
+    i = len(pe.cal) - 1
+    for name, node in defs.items():
+        if not (isinstance(node, dict) and node.get("label")):
+            continue
+        if len(users.get(name, ())) < 2 or tree_grade.product_specific(node, defs):
+            continue
+        v = cond.series(node, pe.ctx[None])[i]
+        out.append({"name": name, "label": node["label"], "ref": node.get("ref"), "v": v,
+                    "view": tree_grade._view(node, defs, pe.ctx[None], i, shared=True)})
+    return out
+
+
+# ------------------------------------------------------------------ 원문 소절별 반영 현황
+def ref_map(tree):
+    """{소절: {auto, manual, zones[], prods[]}} — 트리에 ref 로 달린 라벨 노드·규칙을 센다."""
+    defs = tree.get("defs") or {}
+    out = {}
+
+    def add(ref, zone, prod, manual):
+        if not ref:
+            return
+        r = out.setdefault(ref, {"auto": 0, "manual": 0, "zones": [], "prods": []})
+        r["manual" if manual else "auto"] += 1
+        if zone not in r["zones"]:
+            r["zones"].append(zone)
+        if prod not in r["prods"]:
+            r["prods"].append(prod)
+
+    for p, cfg in tree["products"].items():
+        for z, label, ref, node in cond.zone_nodes(cfg):
+            if label:
+                add(ref, z, p, bool(cond.manual_leaves(node, defs)))
+            for n in cond.labeled(node, defs):
+                add(n.get("ref"), z, p, bool(cond.manual_leaves(n, defs)))
+        sz = cfg.get("sizing") or {}
+        for t in sz.get("tranches") or []:
+            if "when" not in t:
+                add(t.get("ref"), "sizing", p, False)
+        if sz.get("weight") is None and sz.get("ref"):
+            add(sz["ref"], "sizing", p, False)
+    for u in tree.get("unexpressed") or []:
+        if u.get("ref"):
+            r = out.setdefault(u["ref"], {"auto": 0, "manual": 0, "zones": [], "prods": []})
+            r.setdefault("unexpressed", []).append({"rule": u.get("rule"), "reason": u.get("reason")})
+    return out
+
+
+# ------------------------------------------------------------------ 상품 하나
+def product_verdict(tree, p, hist, positions):
+    cfg = tree["products"][p]
+    cs = hist.get(p) or []
+    base = {"prod": p, "index": cfg.get("index"), "note": cfg.get("note")}
+    if not cs:
+        req = md_feed.requested().get(p, "-")
+        return dict(base, key="unknown", grade=tree_grade.GRADES["unknown"],
+                    reason="%s 시세 없음(수집 요청 %s)" % (p, req)), None
+    cal = [c.date for c in cs]
+    pe = tree_grade.ProductEval(tree, p, hist, cal)
+    i = len(cal) - 1
+    key, top = pe.grade_key(i), pe.top(i)
+    reason = tree_grade.reason_of(key, top, pe.manual_items())
+    f, unspec, unknown = pe.amount_factor(i)
+    if key in ("buy", "confirm"):
+        if f < 1:
+            reason += " · 금액 ×%.2f" % f
+        if unspec:
+            reason += " · 금액 축소(폭 저자 미명시): " + " · ".join(unspec[:2])
+        if unknown:
+            reason += " · 금액 축소 확인: " + " · ".join(unknown[:2])
+    w, alt = pe.weight_of(i)
+    sz = cfg.get("sizing") or {}
+    prev = cs[-2].close if len(cs) >= 2 else None
+    v = dict(base, date=cal[i], close=cs[-1].close,
+             chg=(cs[-1].close / prev - 1) * 100 if prev else None,
+             key=key, grade=tree_grade.GRADES[key], reason=reason,
+             zones={sec: pe.view(cfg[sec], i) for sec in cond.SECTIONS},
+             opt={sec: pe.opt[sec][i] for sec in cond.SECTIONS},
+             pes={sec: pe.pes[sec][i] for sec in cond.SECTIONS},
+             caution=[dict(st, view=pe.view(r["when"], i), v=st["value"])
+                      for st, r in zip(pe.caution_state(i), cfg["caution"])],
+             amount={"factor": f, "unspecified": unspec, "unknown": unknown},
+             sizing={"label": sz.get("label"), "ref": sz.get("ref"), "note": sz.get("note"),
+                     "weight": w, "weight_range": alt, "weight_set": sz.get("weight") is not None,
+                     "tranches": [dict({k: t[k] for k in ("label", "ref", "frac", "note") if k in t},
+                                       conditional="when" in t,
+                                       view=_static_view(t.get("when"), tree.get("defs") or {}, cfg.get("index")))
+                                  for t in sz.get("tranches") or []]},
+             exit=[{"label": r["label"], "ref": r.get("ref"), "sell": r["sell"], "note": r.get("note"),
+                    "view": _static_view(r["when"], tree.get("defs") or {}, cfg.get("index"))} for r in cfg["exit"]])
+    pos = []
+    for x in positions.get(p, []):
+        st = tree_grade.position_state(tree, p, hist, cal, str(x["entry_date"]), float(x["entry_px"]),
+                                       int(x.get("filled", 1)))
+        pos.append(dict(st, entry_date=x["entry_date"], entry_px=x["entry_px"], filled=x.get("filled", 1)))
+    if pos:
+        v["positions"] = pos
+    return v, pe
+
+
+def _static_view(node, defs, index=None):
+    """포지션 없이 보이는 규칙 설명(값 없음) — 라벨·논리 묶음·수동 사유만."""
+    if node is None:
+        return None
+
+    def strip(it):
+        it = {k: x for k, x in it.items() if k != "v"}
+        if "kids" in it:
+            it["kids"] = [strip(k) for k in it["kids"]]
+        return it
+    ctx = cond.Ctx({}, ["0"], "$none", index, defs, manual_as=None, pos=(0, 1.0))
+    try:
+        return strip(tree_grade._view(node, defs, ctx, 0))
+    except cond.CondError:
+        return None
+
+
+# ------------------------------------------------------------------ 책 하나
+def render(slug):
     tree = tree_grade.load_tree(slug)
+    now = datetime.now(timezone.utc).astimezone()
+    top = {"slug": slug, "title": book_title(slug), "ts": now.isoformat(), "source": SOURCE,
+           "verdicts": [], "common": [], "refs": {}, "missing": {}, "cash": None}
     if tree is None:
-        return verdicts
+        top["error"] = "조건 트리 없음 — books/%s/tree.json 이 있어야 판정한다" % slug
+        return top
     start = (datetime.now() - timedelta(days=TREE_HISTORY_DAYS)).strftime("%Y%m%d")
     hist = tree_grade.history(tree, start)
-    by = {v["prod"]: v for v in verdicts}
+    positions = load_positions(slug)
+    pe0 = None
+    weights, all_known = [], True
     for p in tree["products"]:
-        v = by.get(p)
-        if v is None:
-            v = {"prod": p, "color": "", "avoid": [], "intraday": [], "metrics": {}}
-            verdicts.append(v)
-        cs = hist.get(p) or []
-        if not cs:
-            v.update(grade=tree_grade.GRADES["unknown"], reason="%s 시세 없음" % p)
-            continue
-        pe = tree_grade.ProductEval(tree, p, hist, [c.date for c in cs])
-        i = len(cs) - 1
-        key, ex, top = pe.grade_key(i), pe.explain(i), pe.top(i)
-        v.update(grade=tree_grade.GRADES[key],
-                 reason=tree_grade.reason_of(key, top, pe.manual_items()),
-                 avoid=[l for l, _, val in top["avoid"] if l and val is True],
-                 tree={"key": key, "date": cs[-1].date,
-                       "explain": {sec: [{"label": l, "ref": r, "value": val} for l, r, val in rows]
-                                   for sec, rows in ex.items()}})
-    return verdicts
-
-
-def render(slug):
-    """top 계약을 만든다: {score, scorecard, verdicts, reentry, extras, ts}."""
-    metric_calc.clear_cache()
-    rules = load_rules(slug)
-    # 구간3 표준 처리 — 어긋난 계산기(창작/누락/미선언)를 사람 없이 자동 해소:
-    #   올바른 계산기가 있으면 자동 교체, 못 맞추면 격리(틀린 값 방지). 판정 이전에 한다.
-    verify_metric_semantics.resolve_inplace(rules, slug)
-    score, rows = scorecard(rules)
-    verdicts = [full_verdict(rules, prod)
-                for prod, cfg in rules.get("DATA", {}).items()
-                if isinstance(cfg, dict) and prod != "COMMON"]
-    tree_verdicts(slug, verdicts)
-    now = datetime.now(timezone.utc).astimezone()
-    return {"score": score,
-            "scorecard": [{"label": r["label"], "ok": r["ok"], "why": r["why"]} for r in rows],
-            "verdicts": verdicts, "reentry": reentry_checks(rules),
-            "ts": now.isoformat(), "extras": {}}
+        v, pe = product_verdict(tree, p, hist, positions)
+        top["verdicts"].append(v)
+        pe0 = pe0 or pe
+        sz = v.get("sizing") or {}
+        if sz.get("weight_set"):
+            if sz.get("weight") is None:
+                all_known = False
+            else:
+                weights.append(sz["weight"])
+    if weights and all_known:
+        top["cash"] = max(0.0, 100.0 - sum(weights))
+    top["date"] = max((v.get("date") or "" for v in top["verdicts"]), default=None)
+    if pe0 is not None:
+        top["common"] = common_items(tree, pe0)
+    top["refs"] = ref_map(tree)
+    top["missing"] = {s: md_feed.requested().get(s, "-") for s, cs in hist.items() if not cs}
+    if positions:
+        top["positions_note"] = "내 포지션(books/%s/positions.json) 기준 — 공개 페이지에는 실리지 않는다" % slug
+    return top
 
 
 # ------------------------------------------------------------------ 출력 텍스트 / 알림
-def build_text(top, title=""):
+def _mark(v):
+    return {True: "🟢", False: "🔴"}.get(v, "❔")
+
+
+def build_text(top):
     now = datetime.fromisoformat(top["ts"])
-    score = top["score"]
-    total = len(top["scorecard"])
-    head = "📈 %s  (%s KST)" % (title or "데일리 진입 환경", now.strftime("%Y-%m-%d %H:%M"))
-    L = [head, "장 시작 전 스코어카드: %d/%d" % (score, total)]
-    for r in top["scorecard"]:
-        L.append("   %s %s" % ("🟢" if r["ok"] else "🔴", r["label"]))
-        if r["why"]:
-            L.append("      └ %s" % r["why"])
+    L = ["📈 %s  (%s KST · %s 종가 기준)" % (top.get("title") or top["slug"], now.strftime("%Y-%m-%d %H:%M"),
+                                         top.get("date") or "-")]
+    if top.get("error"):
+        L.append("❔ " + top["error"])
+        return "\n".join(L)
+    if top["common"]:
+        L.append("공통 조건:")
+        for c in top["common"]:
+            L.append("   %s %s" % (_mark(c["v"]), c["label"]))
     L.append("─" * 30)
     for v in top["verdicts"]:
-        if v["grade"] == "데이터오류":
-            L.append("%s: 데이터오류" % v["prod"]); continue
-        L.append("%s %s  %s" % (v.get("color", ""), v["prod"], v["grade"]))
+        L.append("%s  %s" % (v["prod"], v["grade"]))
         L.append("   %s" % v["reason"])
-        if v.get("close") and v.get("ma20"):
-            side = "위" if v["close"] > v["ma20"] else "아래"
-            L.append("   종가 %.2f / 20일선 %.2f (%s), 당일 %+.1f%%"
-                     % (v["close"], v["ma20"], side, v.get("chg") or 0))
-        for a in v.get("avoid", []):
-            L.append("   ⚠ %s" % a)
-        if v.get("intraday"):
-            L.append("   👁 장중 확인: " + " · ".join(v["intraday"]))
+        sz = v.get("sizing") or {}
+        if sz.get("weight") is not None:
+            L.append("   비중 %.0f%%%s" % (sz["weight"], "" if v["amount"]["factor"] >= 1
+                                          else " × 금액 %.2f" % v["amount"]["factor"]))
+        elif sz.get("weight_range"):
+            L.append("   비중 확인 필요: %s%%" % " / ".join("%.0f" % x for x in sz["weight_range"]))
+        for ps in v.get("positions") or []:
+            hit = [e["label"] for e in ps.get("exit", []) if e.get("v") is True]
+            L.append("   보유(%s, %+.1f%%) 매도 신호: %s" % (ps.get("entry_date"), ps.get("ret") or 0,
+                                                     " · ".join(hit) if hit else "없음"))
+    if top.get("cash") is not None:
+        L.append("현금 %.0f%%" % top["cash"])
+    if top.get("missing"):
+        L.append("⚠ 시세 없음(수집 요청): " + ", ".join("%s #%s" % kv for kv in top["missing"].items()))
     L.append("─" * 30)
-    L.append("※ 환경 판정(EOD 기준). 장중 항목은 직접 확인 후 최종 진입. 규칙 출처=저자 명시.")
+    L.append("※ 종가 기준 판정. 🟡 는 수동(장중·저자 미명시) 조건을 직접 확인한 뒤 진입. 규칙 출처 = 저자 명시.")
     return "\n".join(L)
 
 
@@ -346,10 +285,9 @@ def _cli():
         print("사용법: python -m verdict.verdict_engine <slug> [--json] [--no-send]", file=sys.stderr)
         sys.exit(2)
     top = render(slug)
-    title = book_title(slug)
-    text = build_text(top, title)
+    text = build_text(top)
     if "--json" in argv:
-        print(json.dumps(top, ensure_ascii=False, indent=2))
+        print(json.dumps(top, ensure_ascii=False, indent=1))
     else:
         print(text)
     if "--no-send" not in argv:
