@@ -307,10 +307,10 @@ def main(argv):
     #
     #   ① verify_structure          형식·구조(팀 경계·원문 해시·계약·손 박은 체크박스)
     #   ② verdict.verify_primitives 조건 트리 원시함수가 계산을 맞게 하나(실행 검사)
-    #   ③ verdict.verify_behavior   규칙이 원문 뜻대로 동작하나(이중 추출·원문 사례·발화 통계)
+    #   ③ checklist.verify_tree   규칙이 원문 뜻대로 동작하나(이중 추출·원문 사례·발화 통계)
     # 옛 글자 대조 검사(창작·커버리지·규칙↔명세·의미검사)는 의미를 판정하지 못해 관문에서 뺐다
     # (숫자 '2'가 있으면 2거래일 유지가 1일로 판정돼도 통과했다). 등급: 0 통과 · 1 정지 · 2 경고.
-    checks = ["verify_structure", "verdict.verify_primitives", "verdict.verify_behavior"]
+    checks = ["verify_structure", "verdict.verify_primitives", "checklist.verify_tree"]
     codes = {}
     for script in checks:
         code, out, err = r.verify(script)
@@ -324,7 +324,7 @@ def main(argv):
     blocking = []
     labels = {"verify_structure": "형식·구조 위반",
               "verdict.verify_primitives": "원시함수 계산 오류",
-              "verdict.verify_behavior": "규칙 동작 검사 실패(트리 없음·미심판 불일치·원문 사례 불일치 등)"}
+              "checklist.verify_tree": "규칙 동작 검사 실패(트리 없음·미심판 불일치·원문 사례 불일치 등)"}
     for script in checks:
         if codes[script] == 1:
             blocking.append("%s — %s" % (script, labels[script]))

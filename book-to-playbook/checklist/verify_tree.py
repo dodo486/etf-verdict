@@ -21,11 +21,11 @@
 
 종료코드: 0 통과 · 1 정지(트리 없음/문법/미심판 불일치/채택≠승자/사례 실패) · 2 경고만.
 사용:
-  python -m verdict.verify_behavior [slug ...] [--years 3]
-  python -m verdict.verify_behavior <slug> --dump N     판정이 갈린 날 N개씩을 logs/disagree-<slug>.json 으로(심판 입력)
-  python -m verdict.verify_behavior <slug> --adopt      a + 심판 결과(tree_review.json) → tree.json
-  python -m verdict.verify_behavior <slug> --dump-exits N   매도 규칙 a/b 가 다르게 청산한 거래 N개씩(심판 입력)
-  python -m verdict.verify_behavior <slug> --adopt-exits    매도 규칙 심판 결과(tree_review.json exits) → tree.json
+  python -m checklist.verify_tree [slug ...] [--years 3]
+  python -m checklist.verify_tree <slug> --dump N     판정이 갈린 날 N개씩을 logs/disagree-<slug>.json 으로(심판 입력)
+  python -m checklist.verify_tree <slug> --adopt      a + 심판 결과(tree_review.json) → tree.json
+  python -m checklist.verify_tree <slug> --dump-exits N   매도 규칙 a/b 가 다르게 청산한 거래 N개씩(심판 입력)
+  python -m checklist.verify_tree <slug> --adopt-exits    매도 규칙 심판 결과(tree_review.json exits) → tree.json
 """
 import json
 import os
@@ -35,7 +35,7 @@ from datetime import datetime, timedelta
 
 from shared import paths  # noqa: F401  (UTF-8 출력)
 from shared.paths import BASE, LOGS, ensure_dir, live_slugs, write_text
-from verdict import cond, md_feed, trades as trades_mod, tree_grade
+from shared import cond, md_feed, trades as trades_mod, tree_grade
 
 Candle = namedtuple("Candle", "date open high low close volume")
 WARMUP_DAYS = 500

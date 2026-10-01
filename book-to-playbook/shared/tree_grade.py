@@ -15,7 +15,7 @@ import json
 import os
 
 from shared.paths import BASE
-from verdict import cond
+from shared import cond
 
 GRADES = {
     "buy": "✅ 매수 후보",

@@ -29,7 +29,7 @@ import sys
 from datetime import datetime, timedelta
 
 from shared.paths import BASE, LOGS, ensure_dir, write_text
-from verdict import cond, md_feed, trades as trades_mod, tree_grade
+from shared import cond, md_feed, trades as trades_mod, tree_grade
 
 HORIZONS = (5, 10, 20)
 # 트리가 쓰는 가장 긴 창(예: 52주 신고가 252거래일)이 첫날부터 서도록 넉넉히(달력 400일).

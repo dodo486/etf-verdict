@@ -5,7 +5,7 @@
 만드는 계층. 전부 `verdict/` 팀 소속이다.
 
 관련 파일:
-- `verdict/md_feed.py` — **jhts 시세수집팀(jhts.marketdata) 어댑터. 유일한 시세 창구.**
+- `shared/md_feed.py` — **jhts 시세수집팀(jhts.marketdata) 어댑터. 유일한 시세 창구.**
   구간③의 누구도 시세를 직접 수집하지 않는다(야후/KIS/스크래핑 금지 — `verify_teams.py` 가 강제).
 - `verdict/metric_calc.py` — metric 선언 `{type, symbol, ...}` → `{value, pass, text}` 평가기
 - `verdict/metric_registry.json` — type 의 자동/무데이터 분류(SSOT). `verify_auto_coverage` 가 이걸로
@@ -21,7 +21,7 @@
 jhts.marketdata (시세수집팀 · 별도 프로젝트)
       │  candles / quote / index_rate / minute_closes / daily_features / breadth_*
       ▼
-verdict/md_feed.py          ← 유일한 창구. 미설치/실패를 감싸 무크래시로 빈 값 반환
+shared/md_feed.py          ← 유일한 창구. 미설치/실패를 감싸 무크래시로 빈 값 반환
       ▼
 verdict/metric_calc.py      ← 선언 {type, symbol, op, threshold} → {value, pass, text}
       ▼

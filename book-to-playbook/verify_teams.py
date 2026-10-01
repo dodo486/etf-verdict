@@ -19,8 +19,8 @@
 
   규칙 1  팀 폴더(playbook·checklist·verdict)의 모듈은
           stdlib + shared + **자기 팀**만 import 한다. 다른 팀 금지.
-  규칙 2  `import jhts` 는 **verdict/md_feed.py 하나**에서만 허용된다.
-          구간③의 시세는 오롯이 jhts 시세수집팀 창구(md_feed)로만 들어온다.
+  규칙 2  `import jhts` 는 **shared/md_feed.py 하나**에서만 허용된다.
+          파이프라인의 시세는 오롯이 jhts 시세수집팀 창구(md_feed)로만 들어온다.
   규칙 3  팀 폴더에서 네트워크 모듈(urllib.request·http.client·requests·socket
           ·aiohttp·httpx) import 금지 — 시세 자가수집(야후/KIS/스크래핑)이
           다시 자라나는 길목을 막는다. 알림 송신은 shared/notify.py 가,
@@ -47,7 +47,7 @@ NET_MODULES = {"urllib", "http", "requests", "socket", "aiohttp", "httpx"}
 
 # 규칙 2·3·4 의 명시적 예외 — 예외는 여기 한 곳에만 적는다(코드 곳곳에 흩지 않는다).
 ALLOW = {
-    ("verdict", "md_feed.py"): {"jhts"},                    # 유일한 시세 창구
+    ("shared", "md_feed.py"): {"jhts"},                     # 유일한 시세 창구
     ("shared", "notify.py"): {"urllib"},                    # 알림 '송신' 전용(수집 아님)
     ("publish", "serve.py"): {"http", "urllib"},            # 로컬 서버(서빙·URL 파싱)
 }
@@ -100,9 +100,9 @@ def check():
                     bad.append((layer, fn, "공통층이 팀을 import: %s (방향이 거꾸로다)"
                                 % ", ".join(sorted(crossing))))
 
-            # 규칙 2 — jhts 는 verdict/md_feed.py 만
+            # 규칙 2 — jhts 는 shared/md_feed.py 만
             if "jhts" in mods and "jhts" not in allow:
-                bad.append((layer, fn, "jhts 직접 import — 시세 창구는 verdict/md_feed.py 하나다"))
+                bad.append((layer, fn, "jhts 직접 import — 시세 창구는 shared/md_feed.py 하나다"))
 
             # 규칙 3·4 — 네트워크 모듈 금지(명시 예외 제외)
             net = (NET_MODULES & mods) - allow

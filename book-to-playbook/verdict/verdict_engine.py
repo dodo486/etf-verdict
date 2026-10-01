@@ -11,7 +11,7 @@ books/<slug>/rules.json 선언만 읽어 판정을 만든다 — 어떤 책이�
   · PRODMETA{<종목>:{color, idx}}   — 표시색 · 필터가 보는 지수 심볼
   · SCORECARD[{t, ref, metric}]     — 장 시작 전 점수표(N지표) — 시장 환경 표시용, 등급엔 안 쓴다
 
-등급은 조건 트리(books/<slug>/tree.json) 하나에서만 나온다 — verdict/tree_grade.py.
+등급은 조건 트리(books/<slug>/tree.json) 하나에서만 나온다 — shared/tree_grade.py.
   rules.json 의 metric 선언은 화면 표시용 수치(metrics·eod_checks 등)만 만든다. 등급을 두 곳에서
   내면 판정이 갈라진다(옛 엔진은 스코어카드로, 시트는 진입 개수로 등급을 내 서로 달랐다).
   트리가 없는 책은 '❔ 판정 불가(조건 트리 없음)' — 다른 규칙으로 대신 채우지 않는다.
@@ -33,7 +33,8 @@ from datetime import datetime, timedelta, timezone
 from shared.paths import BASE
 from shared.notify import send_telegram, send_desktop
 from shared.rules_io import load_rules
-from verdict import cond, md_feed, metric_calc, tree_grade
+from shared import cond, md_feed, tree_grade
+from verdict import metric_calc
 from verdict import verify_metric_semantics
 
 

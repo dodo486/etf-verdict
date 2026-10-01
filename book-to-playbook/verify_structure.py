@@ -5,7 +5,7 @@
 검증층은 셋이다(나머지 글자 대조 검사는 의미를 판정하지 못해 이 셋으로 대체했다):
   ① verify_structure          — 이 파일. 형식이 맞나
   ② verdict.verify_primitives — 계산이 맞나(원시함수 실행 검사)
-  ③ verdict.verify_behavior   — 원문 뜻대로 동작하나(이중 추출·원문 사례·발화 통계)
+  ③ checklist.verify_tree   — 원문 뜻대로 동작하나(이중 추출·원문 사례·발화 통계)
 
 여기 묶는 넷과 등급(각 스크립트의 종료코드를 그대로 따른다):
   verify_teams                    팀 경계·jhts 단일창구       0 통과 · 그 외 정지

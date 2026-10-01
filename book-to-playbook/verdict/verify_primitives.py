@@ -28,7 +28,7 @@ from collections import namedtuple
 import pandas as pd
 
 from shared import paths  # noqa: F401  (UTF-8 출력)
-from verdict import cond
+from shared import cond
 
 Candle = namedtuple("Candle", "date open high low close volume")
 FAILS = []
@@ -293,7 +293,7 @@ def t_pos(rng):
 
 def t_trades():
     """거래 시뮬레이터 — 손으로 답을 셀 수 있는 시세로 진입·분할 매도·동시 발동·미청산·보유 중 신호 건너뛰기."""
-    from verdict import trades
+    from shared import trades
 
     def mk(rows):
         cal = ["2021%04d" % i for i in range(len(rows))]

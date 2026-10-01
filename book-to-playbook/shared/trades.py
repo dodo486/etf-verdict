@@ -12,7 +12,7 @@
     not 아래면 안쪽을 참으로 둬 결과가 거짓(확인 못 한 조건 때문에 팔지 않는다).
   · 책에 매도 규칙이 없는 상품은 STANDARD(+9% / −5% / 10거래일)로 하고 결과에 '표준 기준(책 아님)'이라 표시한다.
 """
-from verdict import cond
+from shared import cond
 
 STANDARD = [
     {"label": "표준 익절 +9%", "when": {"ge": [{"pos": "ret"}, 9]}, "sell": "all"},
