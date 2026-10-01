@@ -90,6 +90,27 @@ def _inject_source(html, slug):
                   lambda m: block + m.group(0), html, count=1)
 
 
+BACKTEST_BEGIN, BACKTEST_END = "<!-- INJECT:backtest -->", "<!-- /INJECT:backtest -->"
+
+
+def _inject_backtest(html, slug):
+    """백테스트 탭(책 무관): backtest-<slug>.json(verdict.backtest --page) + checklist/ui/backtest-ui.js 를
+    checklist-ui 바로 앞에 심는다 — checklist-ui 가 로드 때 .tab 을 묶기 전에 탭이 생겨야 기존 탭 전환에 묶인다.
+    데이터가 없는 책은 탭을 만들지 않는다(빈 탭을 보이지 않는다). 다시 발행하면 이전 주입분을 갈아끼운다."""
+    html = re.sub(re.escape(BACKTEST_BEGIN) + r".*?" + re.escape(BACKTEST_END) + r"\n?", "", html, flags=re.S)
+    data_p = os.path.join(BASE, "backtest-%s.json" % slug)
+    ui_p = os.path.join(BASE, "checklist", "ui", "backtest-ui.js")
+    if not (os.path.exists(data_p) and os.path.exists(ui_p)):
+        return html
+    body = read_text(data_p).replace("</", "<\\/")
+    block = "%s\n<script type=\"application/json\" id=\"backtest-data\">%s</script>\n<script>\n%s\n</script>\n%s\n" % (
+        BACKTEST_BEGIN, body, read_text(ui_p), BACKTEST_END)
+    anchor = "<!-- INJECT:checklist-ui -->"
+    if anchor in html:
+        return html.replace(anchor, block + anchor, 1)
+    return html.replace("</body>", block + "</body>", 1)
+
+
 def publish(slug):
     """한 책을 발행한다. 라이브 책이면 최신 판정을 병합한다. 성공 시 True."""
     src = playbook_src(slug)
@@ -143,6 +164,9 @@ def publish(slug):
 
     # 소절 원문 주입(책 무관) — 원문 파일 있는 책만 실제 원문, 없으면 빈 데이터('원문 미제공')
     html = _inject_source(html, slug)
+
+    # 백테스트 탭(데이터 있는 책만)
+    html = _inject_backtest(html, slug)
 
     outd = ensure_dir(public_book_dir(slug))
     write_text(os.path.join(outd, "index.html"), html)

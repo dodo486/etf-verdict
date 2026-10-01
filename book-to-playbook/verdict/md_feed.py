@@ -54,6 +54,17 @@ def prev_volume(symbol):
         return None
 
 
+# ---------------------------------------------------------------- 과거 시점(백테스트)
+def history(symbol, start):
+    """start(YYYYMMDD) 이후 일봉 [Candle] 오름차순. 실패/미설치 시 []."""
+    if not AVAILABLE:
+        return []
+    try:
+        return md.candles(symbol, start=start) or []
+    except Exception:  # noqa: BLE001
+        return []
+
+
 # ---------------------------------------------------------------- 여러 종목 폭(breadth)
 # 교차종목 사실도 시세팀이 계산한다 — 여기선 창구로 위임(판정·문턱은 소비자).
 def breadth_up(symbols):

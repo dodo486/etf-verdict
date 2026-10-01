@@ -35,7 +35,10 @@
   // VD 는 #verdict-data 를 다시 읽어 갱신 가능(라이브 모드에서 서버 폴링이 값을 갈아끼운다).
   function readVD(){ try { return JSON.parse(document.getElementById('verdict-data').textContent); } catch(e){ return null; } }
   let VD = readVD();
-  const gradeCls = g => g.includes('매수 후보') ? 'go' : (g.includes('소액') ? 'small' : (g.includes('보류')||g.includes('금지') ? 'no' : ''));
+  // 등급 색: 문구가 아니라 앞머리 기호로 가른다(엔진 tree_grade.GRADES 와 같은 기호 — 문구가 바뀌어도 안 깨진다).
+  //   ✅ 매수 후보=go · 🟡 확인 대기 / ❔ 판정 불가=small(사람이 봐야 함) · 🚫 진입 금지 / ⛔ 보류=no · ⚪ 관망=중립(색 없음)
+  const GRADE_CLS = {'✅':'go', '🟡':'small', '❔':'small', '🚫':'no', '⛔':'no', '⚪':''};
+  const gradeCls = g => { const k = Object.keys(GRADE_CLS).find(e => (g||'').startsWith(e)); return k ? GRADE_CLS[k] : ''; };
   const RULES = JSON.parse(document.getElementById('rules').textContent);
   const DATA = RULES.DATA;
   // 지표 레지스트리 — 조건의 mtype 으로 🤖자동/🚧미구현/✋직접을 파생한다(게이트와 같은 기준, 주제 모름).

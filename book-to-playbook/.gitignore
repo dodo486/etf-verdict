@@ -7,6 +7,7 @@ telegram.env
 latest-verdict.json
 latest-verdict-*.json
 intraday-verdict.json
+backtest-*.json
 
 logs/
 

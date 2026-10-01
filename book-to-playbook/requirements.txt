@@ -1,1 +1,2 @@
 jhts-marketdata>=0.3.0
+pandas>=2.0          # verdict.verify_primitives 의 기준값(원시함수 대조) 전용

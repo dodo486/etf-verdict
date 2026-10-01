@@ -274,6 +274,8 @@ def main(argv):
                 r.say("!! %s: engine.daily 없음 — 건너뜀" % slug); continue
             r.step(daily, [slug])                                              # 1) 알림 포함 본 실행
             r.step(daily, [slug, "--json", "--no-send"], capture_to=latest_path(slug))  # 2) 발행용 JSON
+            # 3) 책 페이지 '백테스트' 탭 데이터(1년·3년). 실패해도 판정 발행은 막지 않는다 — 탭은 지난 결과를 보인다.
+            r.step("verdict.backtest", [slug, "--page"], required=False)
     elif mode == "intraday":
         for slug in live:
             intraday = paths.book_engine(slug, "intraday")
@@ -297,66 +299,39 @@ def main(argv):
     r.step("publish.publish_pages")
     r.step("publish.build_home", required=False)
 
-    # ---- 검사 6종 — 반드시 여기(publish/build_home 직후 · git 커밋/푸시 이전)에서 돈다.
+    # ---- 검사 3종 — 반드시 여기(publish/build_home 직후 · git 커밋/푸시 이전)에서 돈다.
     #
-    # 왜 이 위치인가: 검사기 넷은 모두 PUBLIC/<slug>/index.html(방금 위에서 새로 쓴
-    # 배포본)을 작업본보다 **우선** 읽는다.
-    #   · publish 전에 돌리면 아직 안 바뀐 어제 배포본을 검사한다 — 낡은 결과다.
-    #     (verify_source_integrity 의 stale 가드가 이걸 그 자체로 실패 처리한다)
-    #   · publish 후 · git 커밋 전에 돌리면 "방금 만든 페이지"를 검사하면서도,
-    #     걸렸을 때 그 페이지가 아직 git 에 올라가지 않은 상태다 — 공개 사이트로는
-    #     안 나간다. 그래서 publish_pages/build_home 다음 · publish_git 이전인
-    #     지금 위치가 유일하게 맞다.
+    # 왜 이 위치인가: 구조 게이트의 원문 무결 검사는 PUBLIC/<slug>/index.html(방금 위에서 새로
+    # 쓴 배포본)을 작업본보다 우선 읽는다. publish 후 · git 커밋 전이면 "방금 만든 페이지"를
+    # 검사하면서도, 걸렸을 때 그 페이지가 아직 공개 사이트로 안 나간 상태다.
     #
-    # 순서(사람이 읽는 로그 기준, 판정에는 영향 없음 — 서로 독립):
-    #   팀 경계(코드 구조가 맞는가)가 맨 앞 —
-
-    #   원문 무결(있는 그대로인가) → 원문 창작(플레이북이 저자에게 없는 걸 안 돌렸나)
-    #   → 커버리지(반영 주장이 맞는가) → 계약(형식을 갖췄는가) → 규칙↔수집(층 사이가 맞는가)
-    # 원문 창작은 입력(책→플레이북) 쪽 근거 검사라 원문 무결 바로 뒤에 온다.
-    # 앞이 깨지면 뒤의 결과도 그 위에서 흔들리므로, 좁은 것부터 넓은 것 순.
-    checks = ["verify_teams", "playbook.verify_source_integrity",
-              "playbook.verify_source_fabrication", "checklist.verify_coverage",
-              "verify_contract", "verdict.verify_rules_vs_spec",
-              "verdict.verify_metric_semantics", "verify_editable_auto"]
+    #   ① verify_structure          형식·구조(팀 경계·원문 해시·계약·손 박은 체크박스)
+    #   ② verdict.verify_primitives 조건 트리 원시함수가 계산을 맞게 하나(실행 검사)
+    #   ③ verdict.verify_behavior   규칙이 원문 뜻대로 동작하나(이중 추출·원문 사례·발화 통계)
+    # 옛 글자 대조 검사(창작·커버리지·규칙↔명세·의미검사)는 의미를 판정하지 못해 관문에서 뺐다
+    # (숫자 '2'가 있으면 2거래일 유지가 1일로 판정돼도 통과했다). 등급: 0 통과 · 1 정지 · 2 경고.
+    checks = ["verify_structure", "verdict.verify_primitives", "verdict.verify_behavior"]
     codes = {}
     for script in checks:
         code, out, err = r.verify(script)
         codes[script] = code
-        for t in out.strip().splitlines()[-4:]:
+        for t in out.strip().splitlines()[-6:]:
             r.say("  [%s] %s" % (script, t))
         if err.strip():
             r.say("  [%s] stderr: %s" % (script, err.strip()[:400]))
         r.say("  [%s] 종료코드 %d" % (script, code))
 
-    # ---- 등급 — 거짓(blocking)과 아직 못 채운 것(warning)을 나눈다.
-    #   verify_source_integrity / verify_coverage: 단일 등급. 0=통과, 그 외=발행 정지.
-    #   verify_contract / verify_rules_vs_spec: 자체적으로 0=통과·1=발행 정지(위반/누출)·
-    #     2=경고뿐(계약 미충족/검사 불가) 를 낸다 — 각 스크립트의 등급표 참고.
     blocking = []
-    if codes["verify_teams"] != 0:
-        blocking.append("verify_teams — 팀 경계/jhts 단일창구 위반")
-    if codes["playbook.verify_source_integrity"] != 0:
-        blocking.append("playbook.verify_source_integrity — 저자 원문이 바뀜")
-    if codes["playbook.verify_source_fabrication"] == 1:
-        blocking.append("playbook.verify_source_fabrication — 플레이북이 책에 없는 걸 지어냄(창작)")
-    elif codes["playbook.verify_source_fabrication"] == 2:
-        r.say("!! playbook.verify_source_fabrication: 검사 불가(경고) — 발행은 막지 않음")
-    if codes["checklist.verify_coverage"] != 0:
-        blocking.append("checklist.verify_coverage — 커버리지 배지가 거짓")
-    if codes["verify_contract"] == 1:
-        blocking.append("verify_contract — 규칙 누출(JSON 밖 규칙)")
-    elif codes["verify_contract"] == 2:
-        r.say("!! verify_contract: 계약 미충족(경고) — 발행은 막지 않음")
-    if codes.get("verify_editable_auto", 0) != 0:
-        blocking.append("verify_editable_auto — 자동판정 체크박스가 파이프라인 밖 하드코딩(editable 위험)")
-    if codes["verdict.verify_rules_vs_spec"] == 1:
-        blocking.append("verdict.verify_rules_vs_spec — 체크리스트↔수집요청 위반(누락/창작)")
-    elif codes["verdict.verify_rules_vs_spec"] == 2:
-        r.say("!! verdict.verify_rules_vs_spec: 검사 불가(경고) — 발행은 막지 않음")
-    if codes.get("verdict.verify_metric_semantics", 0) != 0:
-        r.say("!! verdict.verify_metric_semantics: 계산기 어긋남 감지 — 런타임에서 "
-              "자동교체(🤖)/격리(🚧)로 안전 처리됨(틀린 값은 안 나감). 발행은 막지 않음.")
+    labels = {"verify_structure": "형식·구조 위반",
+              "verdict.verify_primitives": "원시함수 계산 오류",
+              "verdict.verify_behavior": "규칙 동작 검사 실패(트리 없음·미심판 불일치·원문 사례 불일치 등)"}
+    for script in checks:
+        if codes[script] == 1:
+            blocking.append("%s — %s" % (script, labels[script]))
+        elif codes[script] == 2:
+            r.say("!! %s: 경고 — 발행은 막지 않음" % script)
+        elif codes[script] != 0:
+            blocking.append("%s — 비정상 종료(%d)" % (script, codes[script]))
 
     # ---- 추이 기록 — 통과든 실패든 항상 남긴다(오늘의 실패도 내일 비교할 기준이 된다)
     try:

@@ -28,10 +28,36 @@ import 할 수 있다 — 팀 사이 인터페이스는 코드가 아니라 산�
                                   │
         템플릿 HTML  ◀── [checklist 조립: rules.json·ui/*.js 주입] ──▶ 책별 웹페이지 (플레이북/시트 2탭)
                                   │
-   rules.json + data_spec ──[verdict: md_feed(jhts) → metric_calc → verdict_engine]──▶ 자동판정
+   tree.json(조건 트리) ──[verdict: md_feed(jhts) → cond → tree_grade → verdict_engine]──▶ 자동판정
                                   │
              books.json ──[publish: build_home / publish_pages / serve]──▶ 홈 + 발행 + 실시간
 ```
+
+## 검증층 — 검사기 3개 (발행 관문, `run.py publish`)
+
+| # | 검사기 | 보는 것 | 방식 |
+|---|---|---|---|
+| ① | `verify_structure` | 형식·구조 — 팀 경계·원문 해시·책 계약·손 박은 체크박스 | 기존 4개 검사를 하나의 관문으로 |
+| ② | `verdict.verify_primitives` | 조건 트리 원시함수가 계산을 맞게 하나 | pandas 기준값 대조·3값 논리 전수·인과성·문법·버그 유형 회귀. 책이 늘어도 크기 고정 |
+| ③ | `verdict.verify_behavior` | 규칙이 원문 뜻대로 **동작**하나 | 독립 추출 2개를 실제 시세 3년으로 비교(갈린 구역은 심판 기록 필수) · 원문 사례 재현 · 발화 통계 |
+
+옛 검사(창작·커버리지·규칙↔명세·의미검사·자동가능)는 원문과 규칙의 **글자**를 대조했다 — 숫자 '2'만 있으면
+'2거래일 유지'가 1일로 판정돼도 통과했고, 어휘 사전에 없는 새 조건은 '찾은 게 없으니 누락 없음'으로 통과했다.
+그래서 관문에서 뺐다(파일은 화면 체크리스트가 rules.json 을 쓰는 동안 남아 있다).
+
+### 규칙은 조건 트리로 (`books/<slug>/tree.json`, 문법: `verdict/COND_DSL.md`)
+
+등급은 트리 하나에서만 나온다(`verdict/tree_grade.py`). 트리를 만드는 절차 — 사람 없이:
+1. 서로 문맥을 공유하지 않는 추출자 2명이 **플레이북(① 산출물)만 보고** `tree_candidates/a.json`·`b.json`
+   (매도 규칙은 `exit_a.json`·`exit_b.json`)을 쓴다. 규칙의 출처는 플레이북이다 — 원문을 다시 읽어 ①의 일을
+   ③에서 되풀이하지 않는다. 플레이북이 원문과 어긋나면 트리가 아니라 **플레이북을 고친다**(감사 → 수정 →
+   `verify_source_integrity --accept --why`).
+2. 다른 작성자가 **원문**만 보고 `scenarios.json`(원문 사례 → 합성 시세 → 기대값)을 쓴다 — 플레이북에서 뽑은
+   트리를 원문 쪽에서 독립적으로 검증하는 장치다.
+3. `python -m verdict.verify_behavior <slug> --dump N` → 판정이 갈린 날의 수치를 심판이 원문과 대조해
+   `tree_review.json` 에 승자(a·b·custom)와 근거를 남긴다. 사례가 틀렸으면 `scenario_overrides`, 원문 그대로라
+   정상인 통계 경고는 `fire_ack` 에 사유를 남긴다.
+4. `python -m verdict.verify_behavior <slug> --adopt` → `tree.json`. 검사기 ③ 이 통과해야 발행된다.
 
 ## 설계 원칙
 
@@ -91,8 +117,12 @@ import 할 수 있다 — 팀 사이 인터페이스는 코드가 아니라 산�
 | `checklist/inject_ui.py` | 공유 UI(`checklist/ui/*.js`) → 책 HTML 주입 |
 | `checklist/verify_coverage.py` | **커버리지 배지 검증** — ✅반영 주장이 사실인가 |
 | `verdict/md_feed.py` | **jhts 시세수집팀 어댑터 — 유일한 시세 창구** |
-| `verdict/metric_calc.py` | data_spec/rules 의 metric 선언 → 값·판정 (책 무관) |
-| `verdict/verdict_engine.py` | `rules.json` 선언 → 자동판정 (책 무관 범용 엔진) |
+| `verdict/cond.py` | **조건 트리 문법·평가기**(책 무관) — 원시 시계열 연산 조합 · 3값(참/거짓/모름) · 하한 · 수동 극성 |
+| `verdict/tree_grade.py` | 트리 → 날짜별 등급(✅/🟡/🚫/⛔/⚪/❔)·사유 |
+| `verdict/verdict_engine.py` | 라이브 판정 — 등급은 tree_grade, 화면 표시 수치는 rules.json metric(metric_calc) |
+| `verdict/metric_calc.py` | rules.json 의 metric 선언 → 화면 표시용 값 (등급엔 안 쓴다) |
+| `verdict/backtest.py` | **신호 백테스트** — 트리로 매일 종가 기준 등급을 재현, 다음날 시가 진입 → 5·10·20일 수익률을 등급별로 |
+| `verify_structure.py` · `verdict/verify_primitives.py` · `verdict/verify_behavior.py` | 검사기 ①②③ (위 '검증층') |
 | `verdict/verify_rules_vs_spec.py` | 체크리스트 ↔ 수집요청 대조(창작·누락) |
 | `verdict/verify_auto_coverage.py` | '자동 가능한데 ✋직접으로 샌 것' 검사 |
 | `shared/` | paths(경로·인코딩) · tokens(정량 토큰) · exempt(면제) · rules_io(규칙 읽기) · pages(페이지 찾기) · notify(알림 발신) |
@@ -124,6 +154,8 @@ import 할 수 있다 — 팀 사이 인터페이스는 코드가 아니라 산�
 python run.py daily        # EOD 판정 → 발행
 python run.py intraday     # 장중 판정 → 발행 (개장+31분)
 python run.py publish      # 재판정 없이 발행만
+python -m verdict.backtest <slug> [--days 365]   # 신호 백테스트 → logs/backtest-<slug>.json
+python -m verdict.backtest <slug> --page         # 책 페이지 "📊 백테스트" 탭 데이터(1년·3년) → backtest-<slug>.json (daily 가 자동 실행, publish_pages 가 주입)
 ```
 
 macOS·Windows 어느 쪽에서도 같은 명령으로 돈다. 설치 위치도 자유다

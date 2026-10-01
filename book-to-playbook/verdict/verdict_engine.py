@@ -9,14 +9,18 @@ books/<slug>/rules.json 선언만 읽어 판정을 만든다 — 어떤 책이�
 읽는 선언(rules.json):
   · DATA{<종목>:{v,need,filter[],entry[],avoid[],caution?,exit?,note}, COMMON:{entry,avoid}}
   · PRODMETA{<종목>:{color, idx}}   — 표시색 · 필터가 보는 지수 심볼
-  · SCORECARD[{t, ref, metric}]     — 장 시작 전 점수표(N지표)
-  · GRADE(선택){go, small}          — 등급 문턱(없으면 지표 수에서 파생)
+  · SCORECARD[{t, ref, metric}]     — 장 시작 전 점수표(N지표) — 시장 환경 표시용, 등급엔 안 쓴다
+
+등급은 조건 트리(books/<slug>/tree.json) 하나에서만 나온다 — verdict/tree_grade.py.
+  rules.json 의 metric 선언은 화면 표시용 수치(metrics·eod_checks 등)만 만든다. 등급을 두 곳에서
+  내면 판정이 갈라진다(옛 엔진은 스코어카드로, 시트는 진입 개수로 등급을 내 서로 달랐다).
+  트리가 없는 책은 '❔ 판정 불가(조건 트리 없음)' — 다른 규칙으로 대신 채우지 않는다.
 
 내는 출력 계약(아티팩트/알림이 소비):
   top     : {score, scorecard[{label,ok,why}], verdicts[], extras, ts}
   verdict : {prod,color,grade,reason,avoid[],avoid_keys[],filter_ok,
              eod_checks{ek:{ok,label}}, intraday[], metrics{k:text}, vol_ok,
-             close, ma20, chg}
+             close, ma20, chg, tree{key,date,explain}}
 
 값은 전부 md_feed(시세 창구) 사실을 metric_calc 캐시로 받는다 — 여기서 시세를 새로
 치지 않는다. 규칙마다 metric.source 가 'manual'/'intraday' 면 자동 판정에서 제외한다.
@@ -24,12 +28,12 @@ books/<slug>/rules.json 선언만 읽어 판정을 만든다 — 어떤 책이�
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from shared.paths import BASE
 from shared.notify import send_telegram, send_desktop
 from shared.rules_io import load_rules
-from verdict import metric_calc
+from verdict import cond, md_feed, metric_calc, tree_grade
 from verdict import verify_metric_semantics
 
 
@@ -101,27 +105,6 @@ def _fired_keys(rule):
     return []
 
 
-def _grade_thresholds(rules, total):
-    """등급 문턱: 선언(GRADE)이 있으면 그것, 없으면 지표 수에서 파생(go=total-1, small=total-2)."""
-    g = rules.get("GRADE") or {}
-    go = g.get("go", max(1, total - 1))
-    small = g.get("small", max(1, total - 2))
-    return go, small
-
-
-def grade_of(filter_ok, avoid_fired, score, go, small):
-    """등급·사유 — filter → avoid → score 순."""
-    if filter_ok is not True:
-        return "🚫 진입 금지", "필터 미충족 — 추세 없음"
-    if avoid_fired:
-        return "⛔ 보류", "회피 신호 — 눌림 대기"
-    if score >= go:
-        return "✅ 매수 후보", "필터 통과 · 스코어 %d → 1차 분할 진입 준비" % score
-    if score >= small:
-        return "🟡 소액만", "스코어 %d — 확인 매수 수준" % score
-    return "⚪ 관망", "스코어 %d — 신규 진입 보류" % score
-
-
 # ------------------------------------------------------------------ 데이터 접근(얇게)
 def _series(sym):
     return metric_calc._series(sym)
@@ -182,7 +165,7 @@ def _collect_metrics(rules_list, out):
 
 
 # ------------------------------------------------------------------ 종목별 전체 계약
-def full_verdict(rules, prod, score, go, small):
+def full_verdict(rules, prod):
     cfg = rules["DATA"][prod]
     meta = (rules.get("PRODMETA") or {}).get(prod, {})
     color = meta.get("color", "")
@@ -241,40 +224,19 @@ def full_verdict(rules, prod, score, go, small):
             res = metric_calc.evaluate(r["metric"])
             eod_checks[ek] = {"ok": res.get("pass") is True, "label": res.get("text", "")}
 
-    # ── 등급·사유
-    if not filter_ok:
-        grade, reason = "🚫 진입 금지", "필터 미충족 — 추세 없음"
-    elif av:
-        grade, reason = "⛔ 보류", "회피 신호 %d개 — 눌림 대기" % len(av)
-    else:
-        grade, reason = grade_of(True, [], score, go, small)
-
-    # ── 장중 확인(자동 불가) — 필터 통과 & 회피 0 & 스코어 하한 이상일 때만 노출.
+    # ── 장중 확인(자동 불가) — 필터 통과 & 회피 0 일 때만 노출.
     #    intraday 로 표시할 규칙 = metric.source == 'intraday' (진입/공통 entry 안).
     intraday = []
-    if filter_ok and not av and score >= small:
+    if filter_ok and not av:
         for r in list(cfg.get("entry", [])) + list(common.get("entry", [])):
             if (r.get("metric") or {}).get("source") == "intraday":
                 intraday.append(r.get("t", ""))
 
-    return {"prod": prod, "color": color, "grade": grade, "reason": reason,
+    return {"prod": prod, "color": color,
+            "grade": "❔ 판정 불가", "reason": "조건 트리 없음",     # tree_verdicts 가 덮는다
             "eod_checks": eod_checks, "avoid": av, "avoid_keys": akeys,
             "filter_ok": bool(filter_ok), "vol_ok": bool(vol_ok), "intraday": intraday,
             "metrics": metrics, "close": close, "ma20": ma20, "chg": chg}
-
-
-def interpret(rules):
-    """선언만으로 낸 결정 dict {prod: {filter_ok, avoid_fired, grade, ...}} — 순수 선언 트랙."""
-    score, _rows = scorecard(rules)
-    total = len(rules.get("SCORECARD", []))
-    go, small = _grade_thresholds(rules, total)
-    out = {}
-    for prod, cfg in rules.get("DATA", {}).items():
-        if not isinstance(cfg, dict) or prod == "COMMON":
-            continue
-        v = full_verdict(rules, prod, score, go, small)
-        out[prod] = v
-    return out
 
 
 def reentry_checks(rules):
@@ -292,6 +254,39 @@ def reentry_checks(rules):
     return out
 
 
+# 트리 판정에 필요한 이력 길이(가장 긴 창 + 여유). backtest.WARMUP_DAYS 와 같은 기준.
+TREE_HISTORY_DAYS = 500
+
+
+def tree_verdicts(slug, verdicts):
+    """조건 트리로 등급·사유를 낸다(그날 = 각 상품의 마지막 일봉). verdicts 를 제자리에서 고친다."""
+    tree = tree_grade.load_tree(slug)
+    if tree is None:
+        return verdicts
+    start = (datetime.now() - timedelta(days=TREE_HISTORY_DAYS)).strftime("%Y%m%d")
+    hist = {s: md_feed.history(s, start) for s in sorted(cond.symbols_of(tree))}
+    by = {v["prod"]: v for v in verdicts}
+    for p in tree["products"]:
+        v = by.get(p)
+        if v is None:
+            v = {"prod": p, "color": "", "avoid": [], "intraday": [], "metrics": {}}
+            verdicts.append(v)
+        cs = hist.get(p) or []
+        if not cs:
+            v.update(grade=tree_grade.GRADES["unknown"], reason="%s 시세 없음" % p)
+            continue
+        pe = tree_grade.ProductEval(tree, p, hist, [c.date for c in cs])
+        i = len(cs) - 1
+        key, ex, top = pe.grade_key(i), pe.explain(i), pe.top(i)
+        v.update(grade=tree_grade.GRADES[key],
+                 reason=tree_grade.reason_of(key, top, pe.manual_items()),
+                 avoid=[l for l, _, val in top["avoid"] if l and val is True],
+                 tree={"key": key, "date": cs[-1].date,
+                       "explain": {sec: [{"label": l, "ref": r, "value": val} for l, r, val in rows]
+                                   for sec, rows in ex.items()}})
+    return verdicts
+
+
 def render(slug):
     """top 계약을 만든다: {score, scorecard, verdicts, reentry, extras, ts}."""
     metric_calc.clear_cache()
@@ -300,11 +295,10 @@ def render(slug):
     #   올바른 계산기가 있으면 자동 교체, 못 맞추면 격리(틀린 값 방지). 판정 이전에 한다.
     verify_metric_semantics.resolve_inplace(rules, slug)
     score, rows = scorecard(rules)
-    total = len(rows)
-    go, small = _grade_thresholds(rules, total)
-    verdicts = [full_verdict(rules, prod, score, go, small)
+    verdicts = [full_verdict(rules, prod)
                 for prod, cfg in rules.get("DATA", {}).items()
                 if isinstance(cfg, dict) and prod != "COMMON"]
+    tree_verdicts(slug, verdicts)
     now = datetime.now(timezone.utc).astimezone()
     return {"score": score,
             "scorecard": [{"label": r["label"], "ok": r["ok"], "why": r["why"]} for r in rows],
