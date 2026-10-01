@@ -46,12 +46,20 @@ def load_tree(slug, name="tree.json"):
     return t
 
 
+class History(dict):
+    """{심볼: 일봉} + minutes{심볼: 1분봉} — 저자 시각(at) 값은 분봉에서 읽는다."""
+    minutes = {}
+
+
 def history(trees, start):
-    """트리(들)가 쓰는 모든 심볼의 일봉 — 수집 단계(md_feed.histories) 하나로 받는다."""
-    syms = set()
+    """트리(들)가 쓰는 모든 심볼의 일봉(+ 저자 시각 값에 쓰는 심볼의 1분봉) — 수집 단계(md_feed) 하나로 받는다."""
+    syms, msyms = set(), set()
     for t in trees if isinstance(trees, list) else [trees]:
         syms |= cond.symbols_of(t)
-    return md_feed.histories(syms, start)
+        msyms |= cond.minute_symbols_of(t)
+    h = History(md_feed.histories(syms, start))
+    h.minutes = {s: md_feed.minutes(s) for s in sorted(msyms)}
+    return h
 
 
 class ProductEval:
@@ -138,12 +146,15 @@ class ProductEval:
         """화면용 중첩 설명 — 노드 하나당 항목 하나(_view). 수동은 모름으로 둔 그날 값."""
         return _view(node, self.defs, self.ctx[None], i)
 
-    def manual_items(self):
+    def manual_items(self, i=None):
+        """사람 확인이 필요한 조건 [(칸, 라벨, ref)] — i 를 주면 그날 관측된 observe 조건은 뺀다."""
         out = []
         for z, _l, _r, node in cond.zone_nodes(self.cfg):
             if z == "exit":
                 continue
             for n in cond.manual_leaves(node, self.defs):
+                if i is not None and "observe" in n and cond.series(n["observe"], self.ctx[None])[i] is not None:
+                    continue
                 out.append((z, n.get("label") or n["manual"], n.get("ref")))
         return out
 
@@ -175,15 +186,19 @@ def _view(node, defs, ctx, i, shared=False):
     if "def" in node and node["def"] in defs and not node.get("label")             and not [k for k in node if k not in cond.META and k != "def"]:
         body = defs[node["def"]]
         return _view(body, defs, ctx, i, shared or not product_specific(body, defs))
-    op = next((k for k in node if k not in cond.META and k not in ("of", "sym", "tf", "else")), None)
+    skip = ("of", "sym", "tf", "at", "else") + (("manual",) if "observe" in node else ())
+    op = next((k for k in node if k not in cond.META and k not in skip), None)
     item = {"v": cond.series(node, ctx)[i]}
     for k in ("label", "ref", "note"):
         if node.get(k):
             item[k] = node[k]
-    if op == "manual":
+    if op in ("manual", "observe"):
         item["manual"] = node["manual"]
         if shared:
             item["shared"] = True
+        if op == "observe":
+            item["observed"] = True              # v 가 있으면 관측값(자동), 없으면 사람 확인
+            item["kids"] = [_view(node["observe"], defs, ctx, i, shared)]
     elif op in LOGICAL:
         kids = node[op] if op in ("all", "any") else (node["of"] if op == "atleast" else [node["not"]])
         kctx = ctx.flipped() if op == "not" else ctx

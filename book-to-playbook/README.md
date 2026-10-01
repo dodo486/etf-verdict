@@ -86,6 +86,7 @@
 
 ```
 python run.py daily        # 판정 → 백테스트 → 발행 → 검사 3종 → (통과 시) git 커밋·푸시
+python run.py watch        # 저자가 말한 시각(예: 개장 10분 전)마다 기다렸다 판정 → 발행 (매일 밤 한 번 띄움)
 python run.py publish      # 재판정 없이 발행만
 python -m verdict.verdict_engine <slug> [--json] [--no-send]   # 오늘 판정
 python -m verdict.backtest <slug> [--days 365] | --page        # 백테스트(로그 / 페이지 탭 데이터)

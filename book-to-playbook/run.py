@@ -8,6 +8,8 @@ homebrew·python.org·Microsoft Store 어느 설치본이든 그대로 동작한
 
 사용법
   python run.py daily        # 판정(체크리스트 = 조건 트리) → 백테스트 → 발행 (장 마감 후)
+  python run.py watch        # 저자가 말한 시각(트리의 at — 예: 개장 10분 전)마다 기다렸다 판정 → 발행
+                             #   그날 미국 정규장 개장 기준으로 계산한다(서머타임 자동). 매일 밤 한 번 띄우면 된다.
   python run.py publish      # 재판정 없이 현재 JSON으로 다시 발행만
 
 옵션
@@ -160,7 +162,9 @@ def publish_git(r, do_push=True):
 def main(argv):
     modes = [a for a in argv if not a.startswith("-")]
     mode = modes[0] if modes else "daily"
-    if mode not in ("daily", "publish"):
+    if mode == "watch":
+        return watch(argv)
+    if mode not in ("daily", "publish", "verdict"):
         print(__doc__)
         return 2
 
@@ -185,15 +189,16 @@ def main(argv):
     live = paths.live_slugs()
     if not live:
         r.say("!! books.json 에 live:true 책이 없음 — 시세 엔진 건너뜀")
-    if mode == "daily":
+    if mode in ("daily", "verdict"):
         for slug in live:
             daily = paths.book_engine(slug, "daily")
             if not daily:
                 r.say("!! %s: engine.daily 없음 — 건너뜀" % slug); continue
             r.step(daily, [slug])                                              # 1) 알림 포함 본 실행
             r.step(daily, [slug, "--json", "--no-send"], capture_to=latest_path(slug))  # 2) 발행용 JSON
-            # 3) 책 페이지 '백테스트' 탭 데이터(1년·3년). 실패해도 판정 발행은 막지 않는다 — 탭은 지난 결과를 보인다.
-            r.step("verdict.backtest", [slug, "--page"], required=False)
+            # 3) 책 페이지 '백테스트' 탭 데이터(1년·3년) — 장 마감 후(daily)만. 실패해도 판정 발행은 막지 않는다.
+            if mode == "daily":
+                r.step("verdict.backtest", [slug, "--page"], required=False)
 
     missing = [s for s in live if not os.path.exists(latest_path(s))]
     if missing:
@@ -251,6 +256,38 @@ def main(argv):
         return 1
     r.say("=== %s 완료" % mode)
     return 0
+
+
+def watch(argv):
+    """저자가 말한 시각마다 판정 — 라이브 책 트리의 at(개장 기준 분)을 모아, 오늘 미국 정규장 개장 기준 그 시각
+    (+1분: 1분봉이 닫히고 들어오는 여유)까지 기다렸다가 판정→발행(백테스트 제외)을 돈다. 주말이면 그냥 끝난다."""
+    import time
+    from datetime import timedelta, timezone
+    from shared import cond, tree_grade
+    offs = set()
+    for slug in paths.live_slugs():
+        t = tree_grade.load_tree(slug)
+        if t:
+            offs.update(cond.at_offsets(t))
+    now = datetime.now(timezone.utc)
+    et_day = (now - timedelta(hours=5)).strftime("%Y%m%d")    # 뉴욕 날짜(대략) — 개장 시각은 et_to_utc 가 정확히
+    if datetime.strptime(et_day, "%Y%m%d").weekday() >= 5:
+        print("watch: 오늘은 미국 정규장이 없다 — 끝")
+        return 0
+    rest = [a for a in argv if a != "watch"]
+    code = 0
+    for off in sorted(offs):
+        due = cond.et_to_utc(et_day, *cond.US_OPEN_ET) + timedelta(minutes=off + 1)
+        wait = (due - datetime.now(timezone.utc)).total_seconds()
+        if wait < -600:
+            print("watch: 개장 %+d분 시각은 이미 지남 — 건너뜀" % off)
+            continue
+        print("watch: 개장 %+d분 판정 — %s(현지 %s)까지 %.0f분 대기"
+              % (off, due.strftime("%H:%M UTC"), due.astimezone().strftime("%H:%M"), max(0, wait) / 60))
+        if wait > 0:
+            time.sleep(wait)
+        code = main(["verdict"] + rest) or code
+    return code
 
 
 if __name__ == "__main__":

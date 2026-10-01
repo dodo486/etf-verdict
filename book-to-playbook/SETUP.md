@@ -62,6 +62,7 @@ TELEGRAM_CHAT_ID=...
 
 ```
 python run.py daily        # 판정 → 백테스트 → 발행 (장 마감 후)
+python run.py watch        # 저자가 말한 시각(개장 10분 전 등)마다 판정 → 발행
 python run.py publish      # 재판정 없이 현재 JSON으로 발행만
 ```
 
@@ -121,6 +122,9 @@ launchctl unload ~/Library/LaunchAgents/com.book-to-playbook.daily.plist   # 해
 schtasks /Create /TN "book-to-playbook daily" /SC WEEKLY /D TUE,WED,THU,FRI,SAT /ST 08:00 ^
   /TR "\"D:\book-to-playbook\run.cmd\" daily"
 
+:: 저자가 말한 시각(개장 10분 전 등)마다 판정 — 21:30 에 띄우면 그날 시각까지 기다렸다 판정한다(서머타임 자동)
+schtasks /Create /TN "book-to-playbook watch" /SC WEEKLY /D MON,TUE,WED,THU,FRI /ST 21:30 ^
+  /TR "\"D:\book-to-playbook\run.cmd\" watch"
 ```
 
 ```cmd

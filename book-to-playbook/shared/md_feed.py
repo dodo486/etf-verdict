@@ -55,6 +55,16 @@ def _request(symbol, start):
         return "요청 실패: %s" % e
 
 
+def minutes(symbol):
+    """1분봉 종가 {YYYYMMDDHHMM(UTC): 종가} — jhts 가 주는 최근 구간(미국 심볼 약 7거래일). 실패/미설치 시 {}."""
+    if not AVAILABLE:
+        return {}
+    try:
+        return md.minute_closes(symbol) or {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def requested():
     """{심볼: 요청 id | 실패 사유} — 시세가 없어 수집을 요청한 심볼."""
     return dict(_REQUESTED)

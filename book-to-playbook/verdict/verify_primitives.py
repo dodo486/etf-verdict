@@ -515,6 +515,55 @@ def t_syntax():
         FAILS.append("올바른 caution·sizing 이 거부: %s" % e)
 
 
+def t_at():
+    """저자 시각 값 — 판정일 다음 정규장 개장 ± 분 시각까지의 마지막 1분봉(판정일 마감 이후), 서머타임, 아직 안 온 시각."""
+    import datetime as dt
+    utc = dt.timezone.utc
+    check(cond.et_to_utc("20261002", 9, 30) == dt.datetime(2026, 10, 2, 13, 30, tzinfo=utc), "서머타임 개장 13:30 UTC")
+    check(cond.et_to_utc("20261215", 9, 30) == dt.datetime(2026, 12, 15, 14, 30, tzinfo=utc), "표준시 개장 14:30 UTC")
+    check(cond.et_to_utc("20260309", 9, 30).hour == 13 and cond.et_to_utc("20260306", 9, 30).hour == 14,
+          "3월 둘째 일요일 전환")
+    check(cond.et_to_utc("20261102", 9, 30).hour == 14 and cond.et_to_utc("20261030", 9, 30).hour == 13,
+          "11월 첫째 일요일 전환")
+    # 판정일 10/01(목) → 다음 정규장 10/02(금) 09:20 ET = 13:20 UTC. 10/01 마감(20:00 UTC) 이후 분봉만.
+    m = {"202610011950": 1.0, "202610012100": 2.0, "202610021315": 3.0, "202610021320": 4.0, "202610021321": 5.0}
+    cal = ["20261001", "20261002"]
+    now = dt.datetime(2026, 10, 2, 20, 0, tzinfo=utc)
+    got = cond.at_series(m, cal, -10, now)
+    check(got[0] == 4.0, "개장 10분 전 값 = 13:20 UTC 분봉 %r" % got)
+    check(got[1] is None, "다음 정규장(월) 시각이 아직 안 옴 → 모름")
+    early = cond.at_series(m, cal, -10, dt.datetime(2026, 10, 2, 13, 0, tzinfo=utc))
+    check(early[0] is None, "그 시각 전이면 지금까지의 값을 쓰지 않는다(모름) %r" % early)
+    check(cond.at_series({"202610011950": 1.0}, cal, -10, now)[0] is None, "판정일 마감 전 분봉만 있으면 모름")
+    # 문법: close 만, 정수 분
+    for b in ({"px": "volume", "at": {"open_offset_min": -10}}, {"px": "close", "at": {"open_offset_min": 1.5}},
+              {"px": "close", "at": {"minutes": -10}}, {"px": "close", "at": -10}):
+        try:
+            cond.validate(b)
+            FAILS.append("잘못된 at 통과: %r" % b)
+        except cond.CondError:
+            pass
+    # 평가: 저자 시각 값 > 판정일 종가 (선물이 전일 종가 위)
+    hist = {"X": [Candle(d, 100, 100, 100, 100, 1000) for d in cal]}
+
+    class H(dict):
+        minutes = {"X": {"202610021320": 101.0}}
+    ctx = cond.Ctx(H(hist), cal, "X", now=now)
+    v = cond.series({"gt": [{"px": "close", "at": {"open_offset_min": -10}}, {"px": "close"}]}, ctx)
+    check(v == [True, None], "선물 개장 전 값 > 전일 종가 %r" % v)
+    # observe — 관측되면 그 값, 관측값이 없으면 수동처럼(manual_as, not 아래 극성 포함)
+    obs = {"observe": {"gt": [{"px": "close", "at": {"open_offset_min": -10}}, {"px": "close"}]}, "manual": "데이터 없음: x"}
+    for m in (True, False, None):
+        c2 = cond.Ctx(H(hist), cal, "X", now=now, manual_as=m)
+        check(cond.series(obs, c2) == [True, m], "observe manual_as=%r" % m)
+        check(cond.series({"not": obs}, c2)[1] == (None if m is None else m), "not observe 극성 manual_as=%r" % m)
+    try:
+        cond.validate({"observe": {"gt": [C, 1]}})
+        FAILS.append("사유 없는 observe 통과")
+    except cond.CondError:
+        pass
+
+
 def t_grade():
     """tree_grade 금액 판정 — 걸린 caution 의 scale 곱, 폭 미명시·확인 필요 구분, 비중 범위, 화면 설명 구조."""
     from shared import tree_grade
@@ -582,7 +631,7 @@ def main():
     for name, fn in (("수치 연산", lambda: t_numeric(rng)), ("3값 논리", t_logic),
                      ("시간 연산", lambda: t_time(rng)), ("하한", t_bounds), ("포지션", lambda: t_pos(rng)), ("거래 시뮬레이터", t_trades),
                      ("인과성", lambda: t_causal(rng)),
-                     ("문법", t_syntax), ("등급·금액", t_grade), ("표현력 회귀", t_regress)):
+                     ("문법", t_syntax), ("저자 시각", t_at), ("등급·금액", t_grade), ("표현력 회귀", t_regress)):
         before = len(FAILS)
         try:
             fn()

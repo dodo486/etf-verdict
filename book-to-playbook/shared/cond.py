@@ -37,6 +37,9 @@
   숫자          3, 1.5            (상수)
   시세          {"px": "close"|"open"|"high"|"low"|"volume", "sym": 심볼?, "tf": 봉?}   sym 기본 "$self",
                 tf 기본 "1d". 봉 길이는 노드 속성일 뿐 — 연결된 데이터가 일봉뿐이라 지금은 "1d" 만 허용.
+                {"px": "close", "sym": 심볼, "at": {"open_offset_min": m}}  저자가 말한 시각의 값 — 그 판정일
+                다음 미국 정규장 개장(뉴욕 09:30) 기준 m분(음수 = 개장 전) 시각까지의 마지막 1분봉 종가.
+                판정일 종가 이후 그 시각 사이의 분봉만 쓴다. 그 시각이 아직 안 왔거나 분봉이 없으면 모름(None).
   산술          {"add"|"sub"|"mul"|"div"|"max"|"min": [a, b]}   max/min = 같은 날 두 값 중 큰/작은 값
                 {"abs": a}
   선택          {"case": [[c1, v1], [c2, v2], ...], "else": v}   위에서부터 처음 참인 c 의 v.
@@ -54,6 +57,9 @@
                 {"minsince"|"maxsince": [c, s]}  c 가 마지막으로 참이었던 날부터 오늘까지 s 의 최저/최고
   여러 종목     {"across": {"syms": [...], "cond": c}}   c 가 참인 종목 수(c 안에서 "$s" = 그 종목)
   수동          {"manual": "사유"}
+  관측·수동     {"observe": c, "manual": "사유"}   c 를 계산할 수 있으면 그 값, 관측값이 없어 모름이면 수동처럼
+                (manual_as) 푼다 — 저자가 말한 시각에 관측하는 조건(개장 전 선물 등): 그 시각이 지났고 분봉이
+                있으면 자동, 과거 분봉이 없는 날·아직 그 시각 전이면 지금처럼 사람 확인.
   포지션        {"pos": "ret"|"days"|"maxret"|"minret"}   매도(exit)·2차 이후 분할 매수 규칙 안에서만.
                 ret = 평균 매입가 대비 오늘 종가 수익률(%), days = 첫 매수일부터 지난 봉(첫 매수일 0),
                 maxret/minret = 첫 매수일~오늘 종가 수익률의 최고/최저. 매수 전 날은 None.
@@ -70,6 +76,8 @@ PX_FIELDS = ("open", "high", "low", "close", "volume")
 POS_FIELDS = ("ret", "days", "maxret", "minret")
 ARITH = ("add", "sub", "mul", "div", "max", "min")
 TIMEFRAMES = ("1d",)      # 연결된 봉 길이 — 분봉이 연결되면 여기만 늘린다(문법은 그대로)
+AT_KEYS = ("open_offset_min",)
+US_OPEN_ET = (9, 30)      # 미국 정규장 개장 — 뉴욕 시각
 WINDOW = ("ma", "ema", "stdev", "highest", "lowest", "sum")
 CMP = ("gt", "ge", "lt", "le")
 STREAK_CAP = 400          # 연속·경과일을 거꾸로 셀 때의 상한(데이터 길이보다 길면 무의미)
@@ -93,9 +101,11 @@ def _op_of(node):
     if node.get("atleast") is not None:
         keys = [k for k in keys if k != "of"]
     if node.get("px") is not None:
-        keys = [k for k in keys if k not in ("sym", "tf")]
+        keys = [k for k in keys if k not in ("sym", "tf", "at")]
     if node.get("case") is not None:
         keys = [k for k in keys if k != "else"]
+    if node.get("observe") is not None:
+        keys = [k for k in keys if k != "manual"]
     if len(keys) != 1:
         raise CondError("노드에 연산이 정확히 하나여야 한다: %r" % sorted(node))
     return keys[0]
@@ -126,6 +136,13 @@ def validate(node, defs=None, path="$"):
             raise CondError("%s.px: 모르는 시세 필드 %r" % (path, v))
         if "sym" in node and not isinstance(node["sym"], str):
             raise CondError("%s.sym: 문자열이어야 한다" % path)
+        if "at" in node:
+            at = node["at"]
+            if v != "close" or not (isinstance(at, dict) and set(at) == set(AT_KEYS)
+                                    and isinstance(at["open_offset_min"], int)
+                                    and not isinstance(at["open_offset_min"], bool)
+                                    and -720 <= at["open_offset_min"] <= 390):
+                raise CondError("%s.at: {\"open_offset_min\": 정수(-720~390)} 이고 px 는 close 여야 한다" % path)
         if "tf" in node and node["tf"] not in TIMEFRAMES:
             raise CondError("%s.tf: 연결되지 않은 봉 %r (연결된 봉 %s) — 그 데이터가 연결될 때까지 manual "
                             "(\"데이터 없음: ...\") 로 둔다" % (path, node["tf"], "/".join(TIMEFRAMES)))
@@ -185,6 +202,10 @@ def validate(node, defs=None, path="$"):
     elif op == "manual":
         if not (isinstance(v, str) and v.strip()):
             raise CondError("%s.manual: 사유 문자열이 필요하다" % path)
+    elif op == "observe":
+        validate(v, defs, path + ".observe")
+        if not (isinstance(node.get("manual"), str) and node["manual"].strip()):
+            raise CondError("%s.observe: 관측값이 없을 때의 수동 사유(manual)가 필요하다" % path)
     elif op == "pos":
         if v not in POS_FIELDS:
             raise CondError("%s.pos: 모르는 포지션 값 %r (허용 %s)" % (path, v, "/".join(POS_FIELDS)))
@@ -199,9 +220,10 @@ def validate(node, defs=None, path="$"):
 class Ctx:
     """평가 문맥. hist={심볼: [Candle(date,open,high,low,close,volume)]}, cal=날짜 목록."""
 
-    def __init__(self, hist, cal, self_sym, index_sym=None, defs=None, manual_as=None, pos=None):
+    def __init__(self, hist, cal, self_sym, index_sym=None, defs=None, manual_as=None, pos=None, now=None):
         """pos = (첫 매수일 인덱스, 평균 매입가 | 날짜별 평균 매입가 목록) — 매도·분할 규칙 평가 때만."""
         self.pos = pos
+        self.now = now            # 저자 시각 값의 '지금'(UTC datetime) — None 이면 실제 지금
         self.hist = hist
         self.cal = list(cal)
         self.self_sym = self_sym
@@ -217,7 +239,8 @@ class Ctx:
         if self.manual_as is None:
             return self
         if self._flip is None:
-            f = Ctx(self.hist, self.cal, self.self_sym, self.index_sym, self.defs, not self.manual_as, self.pos)
+            f = Ctx(self.hist, self.cal, self.self_sym, self.index_sym, self.defs, not self.manual_as, self.pos,
+                    self.now)
             f._px, f._flip = self._px, self
             self._flip = f
         return self._flip
@@ -231,12 +254,70 @@ class Ctx:
             return self.index_sym
         return sym
 
-    def px(self, sym, field):
-        key = (sym, field)
+    def px(self, sym, field, at=None):
+        key = (sym, field, None if at is None else at["open_offset_min"])
         if key not in self._px:
-            by = {c.date: getattr(c, field) for c in (self.hist.get(sym) or [])}
-            self._px[key] = [by.get(d) for d in self.cal]
+            if at is None:
+                by = {c.date: getattr(c, field) for c in (self.hist.get(sym) or [])}
+                self._px[key] = [by.get(d) for d in self.cal]
+            else:
+                self._px[key] = at_series(getattr(self.hist, "minutes", {}).get(sym) or {}, self.cal,
+                                          at["open_offset_min"], self.now)
         return self._px[key]
+
+
+# ------------------------------------------------------------------ 저자 시각(분봉)
+def _nth_sunday(y, m, n):
+    import datetime as _dt
+    d = _dt.date(y, m, 1)
+    d += _dt.timedelta(days=(6 - d.weekday()) % 7)
+    return d + _dt.timedelta(days=7 * (n - 1))
+
+
+def et_to_utc(day, hh, mm):
+    """뉴욕 시각(YYYYMMDD, 시, 분) → UTC datetime. 미국 서머타임 규칙(3월 둘째 일요일 ~ 11월 첫째 일요일)."""
+    import datetime as _dt
+    d = _dt.date(int(day[:4]), int(day[4:6]), int(day[6:8]))
+    dst = _nth_sunday(d.year, 3, 2) <= d < _nth_sunday(d.year, 11, 1)
+    local = _dt.datetime(d.year, d.month, d.day, hh, mm)
+    return (local + _dt.timedelta(hours=4 if dst else 5)).replace(tzinfo=_dt.timezone.utc)
+
+
+def _next_session(cal, i):
+    """판정일 cal[i] 다음 정규장 날 — 달력에 다음 날이 있으면 그날(휴장 반영), 마지막 날이면 다음 평일."""
+    import datetime as _dt
+    if i + 1 < len(cal):
+        return cal[i + 1]
+    d = _dt.date(int(cal[i][:4]), int(cal[i][4:6]), int(cal[i][6:8])) + _dt.timedelta(days=1)
+    while d.weekday() >= 5:
+        d += _dt.timedelta(days=1)
+    return d.strftime("%Y%m%d")
+
+
+def at_series(minutes, cal, offset, now=None):
+    """판정일마다 '다음 정규장 개장 + offset 분' 시각까지의 마지막 1분봉 종가(판정일 종가 이후 분봉만).
+    minutes = {YYYYMMDDHHMM(UTC): 종가}. 그 시각이 아직 안 왔거나 구간에 분봉이 없으면 None."""
+    import datetime as _dt
+    now = now or _dt.datetime.now(_dt.timezone.utc)
+    keys = sorted(minutes)
+    out = []
+    for i, d in enumerate(cal):
+        nxt = _next_session(cal, i)
+        oh, om = US_OPEN_ET
+        target = et_to_utc(nxt, oh, om) + _dt.timedelta(minutes=offset)
+        start = et_to_utc(d, 16, 0)                       # 판정일 정규장 마감 이후
+        if target > now or not keys:
+            out.append(None)
+            continue
+        lo, hi = start.strftime("%Y%m%d%H%M"), target.strftime("%Y%m%d%H%M")
+        val = None
+        for k in reversed(keys):
+            if k <= hi:
+                if k > lo:
+                    val = float(minutes[k])
+                break
+        out.append(val)
+    return out
 
 
 def _num(x):
@@ -317,7 +398,7 @@ def _series(node, ctx, s_sym):
             if s_sym is None:
                 raise CondError("$s 는 across 안에서만 쓴다")
             sym = s_sym
-        return ctx.px(ctx.bind(sym), v)
+        return ctx.px(ctx.bind(sym), v, node.get("at"))
 
     if op in ARITH:
         a, b = S(v[0]), S(v[1])
@@ -551,6 +632,9 @@ def _series(node, ctx, s_sym):
     if op == "manual":
         return [ctx.manual_as] * L
 
+    if op == "observe":
+        return [ctx.manual_as if x is None else x for x in S(v)]
+
     if op == "pos":
         if ctx.pos is None:
             raise CondError("pos 는 매도·분할 규칙 안에서만 쓴다")
@@ -724,6 +808,32 @@ def zone_nodes(cfg):
     for r in cfg.get("exit") or []:
         out.append(("exit", r.get("label"), r.get("ref"), r["when"]))
     return out
+
+
+def _at_nodes(tree):
+    """저자 시각(at) 시세 노드 전부."""
+    nodes = list((tree.get("defs") or {}).values())
+    for cfg in tree["products"].values():
+        nodes.extend(n for _z, _l, _r, n in zone_nodes(cfg))
+    return [n for node in nodes for n in labeled_all(node, tree.get("defs") or {}) if "px" in n and "at" in n]
+
+
+def minute_symbols_of(tree):
+    """저자 시각(at) 값을 쓰는 심볼 — 수집 단계가 이 심볼들의 1분봉을 같이 받는다."""
+    out = set()
+    for n in _at_nodes(tree):
+        s = n.get("sym", "$self")
+        if s.startswith("$"):
+            out.update(cfg.get("index") if s == "$index" else p for p, cfg in tree["products"].items())
+        else:
+            out.add(s)
+    out.discard(None)
+    return out
+
+
+def at_offsets(tree):
+    """트리가 쓰는 저자 시각(개장 기준 분) — 이 시각마다 판정해야 그 값이 들어간다(run.py watch)."""
+    return sorted({n["at"]["open_offset_min"] for n in _at_nodes(tree)})
 
 
 def symbols_of(tree):

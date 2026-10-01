@@ -140,7 +140,12 @@ def compare_tranches(ta, tb, prod, hist, cal, years):
 # ------------------------------------------------------------------ 원문 사례
 def _synthetic(sc, symbols):
     days = int(sc.get("days") or 60)
-    cal = ["2000%04d" % i for i in range(days)]
+    import datetime as _dt
+    cal, d = [], _dt.date(2000, 1, 3)
+    while len(cal) < days:                 # 실제 평일 달력(저자 시각 값이 날짜로 개장 시각을 계산한다)
+        if d.weekday() < 5:
+            cal.append(d.strftime("%Y%m%d"))
+        d += _dt.timedelta(days=1)
     series = sc.get("series") or {}
 
     def fit(xs, fill):
@@ -237,13 +242,18 @@ def _has_manual(n, defs):
 
 
 def _stat_nodes(cfg, defs):
-    """통계 대상 라벨 노드 [(칸, 노드)] — 조건 칸 + 조심 규칙(규칙 자체와 그 안의 라벨 노드)."""
+    """통계 대상 라벨 노드 [(칸, 노드)] — 조건 칸 + 조심 규칙(규칙 자체와 그 안의 라벨 노드).
+    저자 시각 관측(observe) 안쪽은 뺀다 — 과거 분봉이 없는 날은 판정 불가가 정상이다(그날은 수동으로 푼다)."""
     out = [(sec, n) for sec in cond.SECTIONS for n in cond.labeled(cfg[sec], defs)]
     for r in cfg["caution"]:
         if isinstance(r["when"], dict) and not r["when"].get("label"):
             out.append(("caution", dict(r["when"], label=r["label"])))
         out.extend(("caution", n) for n in cond.labeled(r["when"], defs))
-    return out
+    inside = set()
+    for _sec, n in out:
+        if "observe" in n:
+            inside.update(id(x) for x in cond.labeled_all(n["observe"], defs))
+    return [(sec, n) for sec, n in out if id(n) not in inside]
 
 
 def fire_stats(tree, hist, years, ack=None):

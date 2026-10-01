@@ -145,7 +145,7 @@ def product_verdict(tree, p, hist, positions):
     pe = tree_grade.ProductEval(tree, p, hist, cal)
     i = len(cal) - 1
     key, top = pe.grade_key(i), pe.top(i)
-    reason = tree_grade.reason_of(key, top, pe.manual_items())
+    reason = tree_grade.reason_of(key, top, pe.manual_items(i))
     f, unspec, unknown = pe.amount_factor(i)
     if key in ("buy", "confirm"):
         if f < 1:

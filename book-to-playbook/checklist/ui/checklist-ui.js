@@ -39,7 +39,10 @@
   //   아니면 상품마다 하나. path 앞머리(상품 이름 또는 'common')에서 상품을 꺼낸다.
   function mkey(it, path){ return (it.shared ? '*' : path.split('.')[0]) + '|' + it.manual; }
   function ev(it, fill, ans, path){
-    if(it.manual !== undefined){ const a = ans[mkey(it, path)]; return a === undefined ? fill : a; }
+    if(it.manual !== undefined){
+      if(it.observed && it.v !== null && it.v !== undefined) return it.v;   // 저자 시각에 관측됨 — 자동
+      const a = ans[mkey(it, path)]; return a === undefined ? fill : a;
+    }
     if(!it.op) return it.v === undefined ? null : it.v;
     const k = it.kids || [];
     if(it.op === 'not'){ const x = ev(k[0], fill===null?null:!fill, ans, path+'.0'); return x===null?null:!x; }
@@ -88,9 +91,10 @@
       if(!kids) return '';
       return it.op ? '<div class="ck-grp"><div class="ck-op">'+esc(OPW(it))+'</div>'+kids+'</div>' : kids;
     }
-    const isM = it.manual !== undefined;
+    const isM = it.manual !== undefined && !(it.observed && it.v !== null && it.v !== undefined);
     const a = isM ? ans[mkey(it, path)] : undefined;
     const val = isM ? (a === undefined ? null : a) : (it.op ? ev(it, null, ans, path) : it.v);
+    const kidsHtml = (it.observed && isM) ? '' : kids;
     let ctl;
     if(isM){
       ctl = '<span class="ck-man" data-key="'+esc(mkey(it, path))+'"'+(it.shared?' title="여러 상품이 같이 보는 조건 — 한 번 체크하면 모든 상품에 적용"':'')+'>'
@@ -99,11 +103,11 @@
           + (a!==undefined ? '<button data-a="x" title="답 지우기">↺</button>' : '') + '</span>';
     } else ctl = MARK(val);
     const num = (!isM && typeof it.v === 'number') ? ' <span class="dataval">'+fmtV(it.v)+'</span>' : '';
-    const why = isM ? '<div class="ck-why">✋ '+esc(it.manual)+'</div>' : (it.note ? '<div class="ck-why">'+esc(it.note)+'</div>' : '');
+    const why = isM ? '<div class="ck-why">✋ '+esc(it.manual)+'</div>' : (it.note ? '<div class="ck-why">'+esc(it.note)+'</div>' : (it.observed ? '<div class="ck-why">저자가 말한 시각의 값으로 자동 판정</div>' : ''));
     const opl = it.op ? ' <span class="ck-opl">'+esc(OPW(it))+'</span>' : '';
     return '<div class="ck-row'+(isM?' man':' auto')+'" '+(it.ref?'data-ref="'+esc(it.ref)+'"':'')+'>'
       + '<div class="ck-line">'+ctl+'<span class="ck-t">'+esc(it.label || '수동 확인')+opl+num+refChip(it.ref)+'</span></div>'
-      + why + (kids ? '<div class="ck-kids">'+kids+'</div>' : '') + '</div>';
+      + why + (kidsHtml ? '<div class="ck-kids">'+kidsHtml+'</div>' : '') + '</div>';
   }
   function zoneHead(title, want, val){
     const ok = val === null ? '' : (val === want ? ' ok' : ' bad');
