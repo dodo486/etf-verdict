@@ -104,6 +104,14 @@ def t_numeric(rng):
         check(all(same(a[i], ref[i], 1e-7) for i in range(len(xs))), "sub 불일치")
         dz = cond.series({"div": [C, 0]}, ctx)
         check(all(v is None for v in dz), "div 0 은 None 이어야 한다")
+        prev = ps.shift(1)
+        for op, ref in (("max", pd.concat([ps, prev], axis=1).max(axis=1, skipna=False)),
+                        ("min", pd.concat([ps, prev], axis=1).min(axis=1, skipna=False))):
+            got = cond.series({op: [C, {"lag": [C, 1]}]}, ctx)
+            check(all(same(got[i], ref[i], 1e-12) for i in range(len(xs))), "%s 불일치 (trial %d)" % (op, trial))
+        ref = (ps - prev).abs()
+        got = cond.series({"abs": {"sub": [C, {"lag": [C, 1]}]}}, ctx)
+        check(all(same(got[i], ref[i], 1e-7) for i in range(len(xs))), "abs 불일치 (trial %d)" % trial)
     # ema / rsi — 알려진 성질
     ctx = make_ctx([50.0] * 40)
     e = cond.series({"ema": [C, 10]}, ctx)
@@ -167,6 +175,19 @@ def t_logic():
     dbl = {"not": {"not": {"manual": "x"}}}
     for m in (True, False):
         check(cond.series(dbl, make_ctx([1.0], manual_as=m))[0] is m, "not not 수동 = manual_as")
+    # case — 위에서부터 처음 참인 갈래. 앞 갈래가 모름이면 결과도 모름(뒤로 넘어가지 않는다)
+    for c1, c2 in itertools.product(vals, repeat=2):
+        node = {"case": [[{"gt": [1 if c1 else -1, 0]} if c1 is not None else {"manual": "a"}, 10],
+                         [{"gt": [1 if c2 else -1, 0]} if c2 is not None else {"manual": "b"}, 20]], "else": 30}
+        got = cond.series(node, make_ctx([1.0]))[0]
+        exp = 10 if c1 else (None if c1 is None else (20 if c2 else (None if c2 is None else 30)))
+        check(same(got, None if exp is None else float(exp)), "case %r %r → %r (기대 %r)" % (c1, c2, got, exp))
+    # 조건 → 숫자(상승일 1, 아니면 0) 의 합 = count 와 같아야 한다
+    xs = [100.0, 101.0, 100.0, 102.0, 103.0, 101.0, 104.0]
+    up = {"gt": [C, {"lag": [C, 1]}]}
+    s1 = cond.series({"sum": [{"case": [[up, 1]], "else": 0}, 5]}, make_ctx(xs))
+    s2 = cond.series({"count": [up, 5]}, make_ctx(xs))
+    check(all(same(a, b) for a, b in zip(s1, s2)), "sum(case) = count")
 
 
 # ------------------------------------------------------------------ 3. 시간 연산
@@ -273,8 +294,15 @@ def t_pos(rng):
         pre.pos = (e, px)
         if e < 45:
             check(same(cond.series({"pos": "maxret"}, pre)[44], got["maxret"][44], 1e-9), "pos 미래 참조")
+    # 평균 매입가가 날짜별로 바뀌는 경우(분할 매수) — ret 은 그날의 평균 매입가 기준
+    xs = [100.0, 100.0, 110.0, 120.0, 90.0]
+    ctx = make_ctx(xs)
+    ctx.pos = (1, [None, 100.0, 100.0, 105.0, 105.0])
+    got = cond.series({"pos": "ret"}, ctx)
+    check(got[0] is None and same(got[2], 10.0) and same(got[3], (120 / 105 - 1) * 100)
+          and same(got[4], (90 / 105 - 1) * 100), "pos.ret 평균 매입가 목록 %r" % got)
     # pos 는 매수 구역에서 금지, 매도 규칙 형식 검사
-    bad = {"products": {"X": {"filter": {"all": []}, "entry": {"gt": [{"pos": "ret"}, 0]}, "avoid": {"any": []}}}}
+    bad = {"products": {"X": dict(cond.EMPTY_ZONE, entry={"gt": [{"pos": "ret"}, 0]})}}
     try:
         cond.validate_tree(bad)
         FAILS.append("entry 에 pos 가 통과")
@@ -298,7 +326,7 @@ def t_trades():
     def mk(rows):
         cal = ["2021%04d" % i for i in range(len(rows))]
         hist = {"X": [Candle(d, o, max(o, c), min(o, c), c, 1000) for d, (o, c) in zip(cal, rows)]}
-        tree = {"products": {"X": {"filter": {"all": []}, "entry": {"all": []}, "avoid": {"any": []}}}}
+        tree = {"products": {"X": dict(cond.EMPTY_ZONE)}}
         return tree, hist, cal
 
     R = {"pos": "ret"}
@@ -357,7 +385,31 @@ def t_trades():
     check(t["sells"] == [], "manual 매도는 안 걸림")
     t = trades.simulate(tree, "X", hist, cal, [0], [{"label": "nm", "when": {"not": {"manual": "x"}}, "sell": "all"}])[0]
     check(t["sells"] == [], "not 아래 manual 도 매도를 일으키지 않는다(안쪽을 참으로 풀어 not = 거짓)")
-    # (8) 백테스트 수익률 정의(_fwd): 신호일 i → i+1 시가 진입, i+h 종가
+    # (8) 분할 매수 — 1차 25% 1일 시가 100. 2차(종가 ≥ +5%) 2일 종가 106 → 3일 시가 108 에 30%.
+    #     평균 매입가 = (0.25·100 + 0.30·108)/0.55 = 104.36… 4일 종가 115(+10.2%) → 익절(산 물량 전부) 5일 시가 116.
+    rows = [(100, 100), (100, 101), (103, 106), (108, 109), (112, 115), (116, 117), (117, 117)]
+    tree, hist, cal = mk(rows)
+    trs = [{"label": "1차", "frac": 0.25}, {"label": "2차", "frac": 0.30, "when": {"ge": [R, 5]}},
+           {"label": "3차", "frac": 0.45, "when": {"ge": [R, 50]}}]
+    t = trades.simulate(tree, "X", hist, cal, [0],
+                        [{"label": "익절", "when": {"ge": [R, 10]}, "sell": {"initial": 1.0}}], trs)[0]
+    avg = (0.25 * 100 + 0.30 * 108) / 0.55
+    check([(b["date"], b["px"], b["qty"]) for b in t["buys"]] == [(cal[1], 100, 0.25), (cal[3], 108, 0.30)],
+          "분할: 매수 날짜·가격·수량 %r" % t["buys"])
+    check(t["closed"] and [(x["date"], x["px"], round(x["qty"], 6)) for x in t["sells"]] == [(cal[5], 116, 0.55)],
+          "분할: 평균 매입가 기준 +10퍼센트 익절 %r" % t["sells"])
+    check(same(t["ret"], (116 / avg - 1) * 100, 1e-9), "분할: 수익률 = 판 금액 ÷ 산 금액")
+    # 같은 날 매도가 걸리면 그날은 추가 매수하지 않는다
+    rows = [(100, 100), (100, 100), (100, 106), (106, 106), (106, 106)]
+    tree, hist, cal = mk(rows)
+    t = trades.simulate(tree, "X", hist, cal, [0],
+                        [{"label": "반", "when": {"ge": [R, 5]}, "sell": {"remaining": 0.5}}], trs)[0]
+    check([b["date"] for b in t["buys"]] == [cal[1], cal[4]],      # 2일 매도 신호 → 3일 시가 매수 안 함, 3일 신호 → 4일 매수
+          "매도가 걸린 날은 추가 매수 안 함 %r" % t["buys"])
+    # 분할이 없으면 한 번에 전량(옛 규약과 같은 결과)
+    t = trades.simulate(tree, "X", hist, cal, [0], [], [])[0]
+    check([b["qty"] for b in t["buys"]] == [1.0], "분할 없음 = 전량")
+    # (9) 백테스트 수익률 정의(_fwd): 신호일 i → i+1 시가 진입, i+h 종가
     from verdict import backtest
     cs = [Candle("d%d" % i, 100 + i, 0, 0, 200 + i, 0) for i in range(30)]
     check(same(backtest._fwd(cs, 3, 20), (cs[23].close / cs[4].open - 1) * 100, 1e-12), "_fwd 정의")
@@ -374,6 +426,8 @@ CAUSAL_NODES = [
     {"valuewhen": [{"gt": [C, {"highest": [{"lag": [C, 1]}, 10]}]}, {"highest": [{"lag": [C, 1]}, 10]}]},
     {"minsince": [{"gt": [C, {"highest": [{"lag": [C, 1]}, 10]}]}, C]},
     {"atleast": 2, "of": [{"gt": [C, 100]}, {"lt": [{"pct": [C, 1]}, 0]}, {"gt": [C, {"ma": [C, 3]}]}]},
+    {"max": [C, {"ma": [C, 5]}]}, {"abs": {"pct": [C, 1]}},
+    {"case": [[{"gt": [C, {"ma": [C, 5]}]}, {"highest": [C, 3]}]], "else": {"lowest": [C, 3]}},
 ]
 
 
@@ -395,6 +449,8 @@ def t_syntax():
         {"gt": [C]}, {"ma": [C, 0]}, {"ma": [C, 2.5]}, {"px": "price"}, {"foo": 1},
         {"gt": [C, 1], "lt": [C, 2]}, True, {"atleast": 2}, {"def": "없음"},
         {"across": {"syms": [], "cond": C}}, {"manual": ""}, {"gt": [C, 1], "op": "above"},
+        {"px": "close", "tf": "5m"}, {"abs": [C, 1]}, {"case": [[C, 1]]}, {"case": [C, 1], "else": 0},
+        {"max": [C]},
     ]
     for b in bad:
         try:
@@ -408,12 +464,76 @@ def t_syntax():
         cond.validate(good)
     except cond.CondError as e:
         FAILS.append("올바른 노드가 거부: %s" % e)
-    tree = {"products": {"X": {"filter": {"all": []}, "entry": {"any": []}}}}
     try:
-        cond.validate_tree(tree)
-        FAILS.append("avoid 구역 없는 트리가 통과")
-    except cond.CondError:
-        pass
+        cond.validate({"case": [[{"gt": [C, 1]}, 2]], "else": {"px": "close", "tf": "1d"}})
+    except cond.CondError as e:
+        FAILS.append("올바른 case·tf 가 거부: %s" % e)
+    for z in cond.ZONES:
+        cfg = dict(cond.EMPTY_ZONE)
+        cfg.pop(z)
+        try:
+            cond.validate_tree({"products": {"X": cfg}})
+            FAILS.append("%s 칸 없는 트리가 통과" % z)
+        except cond.CondError:
+            pass
+    try:
+        cond.validate_tree({"products": {"X": dict(cond.EMPTY_ZONE)}})
+    except cond.CondError as e:
+        FAILS.append("빈 칸 여섯 개 트리가 거부: %s" % e)
+    W = {"gt": [C, 1]}
+    bad_cfgs = [
+        {"caution": [{"label": "a", "when": W}]},                                # scale 미명시
+        {"caution": [{"label": "a", "when": W, "scale": 1.5}]},
+        {"caution": [{"label": "a", "when": {"gt": [{"pos": "ret"}, 0]}, "scale": 0.5}]},
+        {"sizing": {"weight": 30}},                                               # tranches 미명시
+        {"sizing": {"weight": 30, "tranches": [{"label": "1", "frac": 0.5}, {"label": "2", "frac": 0.4, "when": W}]}},
+        {"sizing": {"weight": 30, "tranches": [{"label": "1", "frac": 0.5, "when": W},
+                                               {"label": "2", "frac": 0.5, "when": W}]}},
+        {"sizing": {"weight": 30, "tranches": [{"label": "1", "frac": 0.5}, {"label": "2", "frac": 0.5}]}},
+        {"sizing": {"weight": {"pos": "ret"}, "tranches": []}},
+    ]
+    for b in bad_cfgs:
+        try:
+            cond.validate_tree({"products": {"X": dict(cond.EMPTY_ZONE, **b)}})
+            FAILS.append("잘못된 칸이 통과: %r" % b)
+        except cond.CondError:
+            pass
+    good = dict(cond.EMPTY_ZONE, caution=[{"label": "a", "when": W, "scale": None}],
+                sizing={"weight": {"case": [[W, 14]], "else": 34},
+                        "tranches": [{"label": "1", "frac": 0.25},
+                                     {"label": "2", "frac": 0.75, "when": {"ge": [{"pos": "ret"}, 3]}}]})
+    try:
+        cond.validate_tree({"products": {"X": good}})
+    except cond.CondError as e:
+        FAILS.append("올바른 caution·sizing 이 거부: %s" % e)
+
+
+def t_grade():
+    """tree_grade 금액 판정 — 걸린 caution 의 scale 곱, 폭 미명시·확인 필요 구분, 비중 범위, 화면 설명 구조."""
+    from shared import tree_grade
+    xs = [100.0] * 30 + [130.0]
+    cal = ["2022%04d" % i for i in range(len(xs))]
+    hist = {"X": [Candle(d, c, c, c, c, 1000) for d, c in zip(cal, xs)]}
+    jump = {"ge": [{"pct": [C, 1]}, 20]}
+    cfg = dict(cond.EMPTY_ZONE,
+               caution=[{"label": "급등 1/3", "when": jump, "scale": 0.3333},
+                        {"label": "급등 반", "when": jump, "scale": 0.5},
+                        {"label": "급등 폭 없음", "when": jump, "scale": None},
+                        {"label": "수동", "when": {"manual": "x"}, "scale": 0.5},
+                        {"label": "안 걸림", "when": {"not": jump}, "scale": 0.1}],
+               sizing={"weight": {"case": [[{"manual": "모드"}, 14]], "else": 34}, "tranches": []})
+    tree = {"products": {"X": cfg}}
+    cond.validate_tree(tree)
+    pe = tree_grade.ProductEval(tree, "X", hist, cal)
+    f, unspec, unknown = pe.amount_factor(len(xs) - 1)
+    check(same(f, 0.3333 * 0.5) and unspec == ["급등 폭 없음"] and unknown == ["수동"],
+          "amount_factor %r %r %r" % (f, unspec, unknown))
+    w, alt = pe.weight_of(len(xs) - 1)
+    check(w is None and alt == [14.0, 34.0], "수동 모드 비중은 모름 + 범위 %r %r" % (w, alt))
+    node = {"all": [dict(jump, label="급등", ref="1"), {"not": {"label": "수동", "manual": "x"}}]}
+    v = pe.view(node, len(xs) - 1)
+    check(len(v) == 1 and v[0]["op"] == "모두" and v[0]["kids"][0]["v"] is True
+          and v[0]["kids"][1]["op"] == "아님" and v[0]["kids"][1]["kids"][0]["manual"] == "x", "view 구조 %r" % v)
 
 
 # ------------------------------------------------------------------ 6. 표현력 회귀(이번 버그 유형)
@@ -452,7 +572,7 @@ def main():
     for name, fn in (("수치 연산", lambda: t_numeric(rng)), ("3값 논리", t_logic),
                      ("시간 연산", lambda: t_time(rng)), ("하한", t_bounds), ("포지션", lambda: t_pos(rng)), ("거래 시뮬레이터", t_trades),
                      ("인과성", lambda: t_causal(rng)),
-                     ("문법", t_syntax), ("표현력 회귀", t_regress)):
+                     ("문법", t_syntax), ("등급·금액", t_grade), ("표현력 회귀", t_regress)):
         before = len(FAILS)
         try:
             fn()

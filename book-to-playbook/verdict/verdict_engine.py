@@ -265,7 +265,7 @@ def tree_verdicts(slug, verdicts):
     if tree is None:
         return verdicts
     start = (datetime.now() - timedelta(days=TREE_HISTORY_DAYS)).strftime("%Y%m%d")
-    hist = {s: md_feed.history(s, start) for s in sorted(cond.symbols_of(tree))}
+    hist = tree_grade.history(tree, start)
     by = {v["prod"]: v for v in verdicts}
     for p in tree["products"]:
         v = by.get(p)

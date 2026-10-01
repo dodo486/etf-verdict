@@ -1,5 +1,5 @@
 {
- "version": 1,
+ "version": 2,
  "source": {
   "book": "moneycopy",
   "extractor": "채택",
@@ -2204,7 +2204,12 @@
       "remaining": 0.5
      }
     }
-   ]
+   ],
+   "caution": [],
+   "sizing": {
+    "weight": null,
+    "tranches": []
+   }
   },
   "SOXL": {
    "index": "^SOX",
@@ -3405,7 +3410,12 @@
       "remaining": 0.5
      }
     }
-   ]
+   ],
+   "caution": [],
+   "sizing": {
+    "weight": null,
+    "tranches": []
+   }
   },
   "UPRO": {
    "index": "^GSPC",
@@ -4900,7 +4910,12 @@
       "remaining": 0.3
      }
     }
-   ]
+   ],
+   "caution": [],
+   "sizing": {
+    "weight": null,
+    "tranches": []
+   }
   }
  }
 }

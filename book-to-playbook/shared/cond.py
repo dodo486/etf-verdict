@@ -35,8 +35,12 @@
 
 문법 (JSON) — 허용 키 밖은 전부 오류(조용히 무시하지 않는다):
   숫자          3, 1.5            (상수)
-  시세          {"px": "close"|"open"|"high"|"low"|"volume", "sym": 심볼?}   sym 기본 "$self"
-  산술          {"add"|"sub"|"mul"|"div": [a, b]}
+  시세          {"px": "close"|"open"|"high"|"low"|"volume", "sym": 심볼?, "tf": 봉?}   sym 기본 "$self",
+                tf 기본 "1d". 봉 길이는 노드 속성일 뿐 — 연결된 데이터가 일봉뿐이라 지금은 "1d" 만 허용.
+  산술          {"add"|"sub"|"mul"|"div"|"max"|"min": [a, b]}   max/min = 같은 날 두 값 중 큰/작은 값
+                {"abs": a}
+  선택          {"case": [[c1, v1], [c2, v2], ...], "else": v}   위에서부터 처음 참인 c 의 v.
+                앞의 c 가 모름(None)이면 결과도 모름(뒤 갈래로 넘어가지 않는다).
   이동/창       {"ma"|"ema"|"stdev"|"highest"|"lowest"|"sum": [s, n]}
                 {"lag": [s, k]}   k 거래일 전 값
                 {"pct": [s, k]}   k 거래일 전 대비 변화율(%)
@@ -50,20 +54,22 @@
                 {"minsince"|"maxsince": [c, s]}  c 가 마지막으로 참이었던 날부터 오늘까지 s 의 최저/최고
   여러 종목     {"across": {"syms": [...], "cond": c}}   c 가 참인 종목 수(c 안에서 "$s" = 그 종목)
   수동          {"manual": "사유"}
-  포지션        {"pos": "ret"|"days"|"maxret"|"minret"}   매도(exit) 규칙 안에서만.
-                ret = 진입가 대비 오늘 종가 수익률(%), days = 진입일부터 지난 거래일(진입일 0),
-                maxret/minret = 진입일~오늘 종가 수익률의 최고/최저. 진입 전 날은 None.
+  포지션        {"pos": "ret"|"days"|"maxret"|"minret"}   매도(exit)·2차 이후 분할 매수 규칙 안에서만.
+                ret = 평균 매입가 대비 오늘 종가 수익률(%), days = 첫 매수일부터 지난 봉(첫 매수일 0),
+                maxret/minret = 첫 매수일~오늘 종가 수익률의 최고/최저. 매수 전 날은 None.
   재사용        {"def": "이름"}         트리 파일 defs 의 식
   메타(아무 노드에) "label", "ref", "id", "note"
 
 심볼: "$self"(그 상품) · "$index"(상품의 기준 지수) · "$s"(across 안의 종목) · 그 외 문자 그대로.
 """
+import json
 import math
 
 META = ("label", "ref", "id", "note")
 PX_FIELDS = ("open", "high", "low", "close", "volume")
 POS_FIELDS = ("ret", "days", "maxret", "minret")
-ARITH = ("add", "sub", "mul", "div")
+ARITH = ("add", "sub", "mul", "div", "max", "min")
+TIMEFRAMES = ("1d",)      # 연결된 봉 길이 — 분봉이 연결되면 여기만 늘린다(문법은 그대로)
 WINDOW = ("ma", "ema", "stdev", "highest", "lowest", "sum")
 CMP = ("gt", "ge", "lt", "le")
 STREAK_CAP = 400          # 연속·경과일을 거꾸로 셀 때의 상한(데이터 길이보다 길면 무의미)
@@ -87,7 +93,9 @@ def _op_of(node):
     if node.get("atleast") is not None:
         keys = [k for k in keys if k != "of"]
     if node.get("px") is not None:
-        keys = [k for k in keys if k != "sym"]
+        keys = [k for k in keys if k not in ("sym", "tf")]
+    if node.get("case") is not None:
+        keys = [k for k in keys if k != "else"]
     if len(keys) != 1:
         raise CondError("노드에 연산이 정확히 하나여야 한다: %r" % sorted(node))
     return keys[0]
@@ -118,6 +126,20 @@ def validate(node, defs=None, path="$"):
             raise CondError("%s.px: 모르는 시세 필드 %r" % (path, v))
         if "sym" in node and not isinstance(node["sym"], str):
             raise CondError("%s.sym: 문자열이어야 한다" % path)
+        if "tf" in node and node["tf"] not in TIMEFRAMES:
+            raise CondError("%s.tf: 연결되지 않은 봉 %r (연결된 봉 %s) — 그 데이터가 연결될 때까지 manual "
+                            "(\"데이터 없음: ...\") 로 둔다" % (path, node["tf"], "/".join(TIMEFRAMES)))
+    elif op == "abs":
+        validate(v, defs, path + ".abs")
+    elif op == "case":
+        if not (isinstance(v, list) and v and all(isinstance(b, list) and len(b) == 2 for b in v)):
+            raise CondError("%s.case: [[조건, 값], ...] 목록이어야 한다" % path)
+        if "else" not in node:
+            raise CondError("%s.case: else 가 필요하다(모든 경우의 값을 명시)" % path)
+        for i, (c, x) in enumerate(v):
+            validate(c, defs, "%s.case[%d][0]" % (path, i))
+            validate(x, defs, "%s.case[%d][1]" % (path, i))
+        validate(node["else"], defs, path + ".else")
     elif op in ARITH or op in CMP:
         two(op)
         validate(v[0], defs, path + "." + op + "[0]")
@@ -178,7 +200,7 @@ class Ctx:
     """평가 문맥. hist={심볼: [Candle(date,open,high,low,close,volume)]}, cal=날짜 목록."""
 
     def __init__(self, hist, cal, self_sym, index_sym=None, defs=None, manual_as=None, pos=None):
-        """pos = (진입일 인덱스, 진입가) — 매도 규칙 평가 때만."""
+        """pos = (첫 매수일 인덱스, 평균 매입가 | 날짜별 평균 매입가 목록) — 매도·분할 규칙 평가 때만."""
         self.pos = pos
         self.hist = hist
         self.cal = list(cal)
@@ -311,6 +333,10 @@ def _series(node, ctx, s_sym):
                     out.append(AtLeast(x - y))
                 else:
                     out.append(None)
+            elif op == "max":
+                out.append(max(x, y))
+            elif op == "min":
+                out.append(min(x, y))
             elif op == "add":
                 out.append(x + y)
             elif op == "sub":
@@ -324,6 +350,26 @@ def _series(node, ctx, s_sym):
     if op in CMP:
         a, b = S(v[0]), S(v[1])
         return [_cmp(op, x, y) for x, y in zip(a, b)]
+
+    if op == "abs":
+        return [abs(x) if _exact(x) else None for x in S(v)]
+
+    if op == "case":
+        conds = [S(c) for c, _ in v]
+        vals = [S(x) for _, x in v]
+        other = S(node["else"])
+        out = []
+        for i in range(L):
+            val = other[i]
+            for c, x in zip(conds, vals):
+                if c[i] is None:
+                    val = None
+                    break
+                if c[i]:
+                    val = x[i]
+                    break
+            out.append(val)
+        return out
 
     if op in WINDOW:
         s, n = S(v[0]), v[1]
@@ -507,10 +553,12 @@ def _series(node, ctx, s_sym):
 
     if op == "pos":
         if ctx.pos is None:
-            raise CondError("pos 는 매도(exit) 규칙 안에서만 쓴다")
-        e, px = ctx.pos
+            raise CondError("pos 는 매도·분할 규칙 안에서만 쓴다")
+        e, cost = ctx.pos                    # cost = 평균 매입가(숫자) 또는 날짜별 평균 매입가 목록(분할 매수)
         close = ctx.px(ctx.self_sym, "close")
-        ret = [((close[i] / px - 1) * 100 if (i >= e and _exact(close[i]) and px) else None) for i in range(L)]
+        px = cost if isinstance(cost, list) else [cost] * L
+        ret = [((close[i] / px[i] - 1) * 100 if (i >= e and _exact(close[i]) and px[i]) else None)
+               for i in range(L)]
         if v == "ret":
             return ret
         if v == "days":
@@ -533,29 +581,44 @@ def _series(node, ctx, s_sym):
 
 
 # ------------------------------------------------------------------ 트리 파일
-SECTIONS = ("filter", "entry", "avoid")
-TREE_TOP = ("version", "defs", "products", "source", "note")
-PRODUCT_KEYS = ("index",) + SECTIONS + ("exit", "exit_note", "note")
+# 상품 한 개의 여섯 칸 (COND_DSL.md 1절). 조건 칸 셋은 등급을, 규칙 칸 셋은 금액·분할·매도를 낸다.
+SECTIONS = ("filter", "entry", "avoid")                 # 조건 칸(등급)
+ZONES = SECTIONS + ("caution", "sizing", "exit")        # 반드시 다 적는 여섯 칸
+TREE_TOP = ("version", "defs", "products", "source", "note", "unexpressed")
+PRODUCT_KEYS = ("index", "note", "exit_note") + ZONES
 EXIT_KEYS = ("label", "ref", "note", "when", "sell")
+CAUTION_KEYS = ("label", "ref", "note", "when", "scale")
+SIZING_KEYS = ("label", "ref", "note", "weight", "tranches")
+TRANCHE_KEYS = ("label", "ref", "note", "frac", "when")
+EMPTY_ZONE = {"filter": {"all": []}, "entry": {"all": []}, "avoid": {"any": []},
+              "caution": [], "sizing": {"weight": None, "tranches": []}, "exit": []}
 
 
 def _uses_pos(node, defs):
     return any("pos" in n for n in labeled_all(node, defs))
 
 
-def validate_exits(rules, defs, path):
-    """매도 규칙 목록: [{label, ref, when, sell}] — sell = "all" | {"initial": f} | {"remaining": f}."""
+def _rule_list(rules, keys, path, need):
+    """규칙 목록 형식 검사 — (경로, 규칙) 을 차례로 돌려준다."""
     if not isinstance(rules, list):
         raise CondError("%s: 목록이어야 한다" % path)
+    out = []
     for k, r in enumerate(rules):
         pp = "%s[%d]" % (path, k)
         if not isinstance(r, dict):
             raise CondError("%s: 객체여야 한다" % pp)
-        bad = set(r) - set(EXIT_KEYS)
+        bad = set(r) - set(keys)
         if bad:
             raise CondError("%s: 모르는 키 %s" % (pp, sorted(bad)))
-        if not r.get("label") or "when" not in r or "sell" not in r:
-            raise CondError("%s: label·when·sell 이 필요하다" % pp)
+        if any(x not in r or r[x] in (None, "") for x in need):
+            raise CondError("%s: %s 이 필요하다" % (pp, "·".join(need)))
+        out.append((pp, r))
+    return out
+
+
+def validate_exits(rules, defs, path):
+    """매도 규칙 목록: [{label, ref, when, sell}] — sell = "all" | {"initial": f} | {"remaining": f}."""
+    for pp, r in _rule_list(rules, EXIT_KEYS, path, ("label", "when", "sell")):
         validate(r["when"], defs, pp + ".when")
         sell = r["sell"]
         ok = sell == "all" or (isinstance(sell, dict) and len(sell) == 1
@@ -566,9 +629,50 @@ def validate_exits(rules, defs, path):
             raise CondError("%s.sell: \"all\" 또는 {\"initial\"|\"remaining\": 0~1} 이어야 한다" % pp)
 
 
+def validate_caution(rules, defs, path):
+    """조심 규칙 목록: [{label, ref, when, scale}] — scale = 0<f<=1(그날 금액에 곱함) | null(저자 미명시)."""
+    for pp, r in _rule_list(rules, CAUTION_KEYS, path, ("label", "when")):
+        validate(r["when"], defs, pp + ".when")
+        if _uses_pos(r["when"], defs):
+            raise CondError("%s.when: pos 는 매도·분할 규칙 안에서만 쓴다" % pp)
+        if "scale" not in r:
+            raise CondError("%s: scale 을 명시한다(폭을 저자가 안 줬으면 null)" % pp)
+        sc = r["scale"]
+        if sc is not None and not (isinstance(sc, (int, float)) and not isinstance(sc, bool) and 0 < sc <= 1):
+            raise CondError("%s.scale: 0 초과 1 이하의 수 또는 null" % pp)
+
+
+def validate_sizing(sz, defs, path):
+    """비중·분할: {weight: 숫자식|null, tranches: [{label, frac, when?}]} — 1차는 when 없음, frac 합 1."""
+    if not isinstance(sz, dict):
+        raise CondError("%s: 객체여야 한다" % path)
+    bad = set(sz) - set(SIZING_KEYS)
+    if bad:
+        raise CondError("%s: 모르는 키 %s" % (path, sorted(bad)))
+    if "weight" not in sz or "tranches" not in sz:
+        raise CondError("%s: weight·tranches 를 명시한다(저자가 안 줬으면 null·[])" % path)
+    if sz["weight"] is not None:
+        validate(sz["weight"], defs, path + ".weight")
+        if _uses_pos(sz["weight"], defs):
+            raise CondError("%s.weight: pos 를 쓸 수 없다" % path)
+    trs = _rule_list(sz["tranches"], TRANCHE_KEYS, path + ".tranches", ("label", "frac"))
+    for k, (pp, t) in enumerate(trs):
+        f = t["frac"]
+        if not (isinstance(f, (int, float)) and not isinstance(f, bool) and 0 < f <= 1):
+            raise CondError("%s.frac: 0 초과 1 이하" % pp)
+        if k == 0 and "when" in t:
+            raise CondError("%s: 1차는 when 없이 매수 신호 날 산다" % pp)
+        if k > 0:
+            if "when" not in t:
+                raise CondError("%s: 2차 이후는 when 이 필요하다" % pp)
+            validate(t["when"], defs, pp + ".when")
+    if trs and abs(sum(t["frac"] for _, t in trs) - 1) > 1e-6:
+        raise CondError("%s.tranches: frac 합이 1 이어야 한다(%g)" % (path, sum(t["frac"] for _, t in trs)))
+
+
 def validate_tree(tree):
-    """트리 파일 전체 검사. 상품마다 filter/entry/avoid 셋 다 명시해야 한다
-    (빠진 구역을 조용히 기본값으로 채우지 않는다)."""
+    """트리 파일 전체 검사. 상품마다 여섯 칸을 다 명시해야 한다
+    (빠진 칸을 조용히 기본값으로 채우지 않는다)."""
     if not isinstance(tree, dict):
         raise CondError("트리 파일은 객체여야 한다")
     bad = set(tree) - set(TREE_TOP)
@@ -577,6 +681,8 @@ def validate_tree(tree):
     defs = tree.get("defs") or {}
     for name, d in defs.items():
         validate(d, defs, "defs.%s" % name)
+        if _uses_pos(d, defs):
+            raise CondError("defs.%s: pos 는 정의에 쓰지 않는다(매도·분할 규칙 안에 직접)" % name)
     prods = tree.get("products")
     if not isinstance(prods, dict) or not prods:
         raise CondError("products 가 비어 있다")
@@ -586,19 +692,38 @@ def validate_tree(tree):
         bad = set(cfg) - set(PRODUCT_KEYS)
         if bad:
             raise CondError("products.%s: 모르는 키 %s" % (p, sorted(bad)))
+        for z in ZONES:
+            if z not in cfg:
+                raise CondError("products.%s.%s: 칸이 없다(조건이 없으면 %s 로 명시)"
+                                % (p, z, json.dumps(EMPTY_ZONE[z], ensure_ascii=False)))
         for sec in SECTIONS:
-            if sec not in cfg:
-                raise CondError("products.%s.%s: 구역이 없다(조건이 없으면 빈 all/any 로 명시)" % (p, sec))
             validate(cfg[sec], defs, "products.%s.%s" % (p, sec))
             if _uses_pos(cfg[sec], defs):
-                raise CondError("products.%s.%s: pos 는 매도 규칙(exit) 안에서만 쓴다" % (p, sec))
-        if "exit" in cfg:
-            validate_exits(cfg["exit"], defs, "products.%s.exit" % p)
+                raise CondError("products.%s.%s: pos 는 매도·분할 규칙 안에서만 쓴다" % (p, sec))
+        validate_caution(cfg["caution"], defs, "products.%s.caution" % p)
+        validate_sizing(cfg["sizing"], defs, "products.%s.sizing" % p)
+        validate_exits(cfg["exit"], defs, "products.%s.exit" % p)
     return True
 
 
+def zone_nodes(cfg):
+    """상품 하나의 모든 식 [(칸, 라벨, ref, 식)] — 조건 칸은 칸 전체, 규칙 칸은 규칙마다."""
+    out = [(sec, None, None, cfg[sec]) for sec in SECTIONS if sec in cfg]
+    for r in cfg.get("caution") or []:
+        out.append(("caution", r.get("label"), r.get("ref"), r["when"]))
+    sz = cfg.get("sizing") or {}
+    if sz.get("weight") is not None:
+        out.append(("sizing", sz.get("label"), sz.get("ref"), sz["weight"]))
+    for t in sz.get("tranches") or []:
+        if "when" in t:
+            out.append(("sizing", t.get("label"), t.get("ref"), t["when"]))
+    for r in cfg.get("exit") or []:
+        out.append(("exit", r.get("label"), r.get("ref"), r["when"]))
+    return out
+
+
 def symbols_of(tree):
-    """트리가 참조하는 실제 심볼 전부(상품·지수 포함)."""
+    """트리가 참조하는 실제 심볼 전부(상품·지수·defs·여섯 칸 전부). 수집 단계의 단일 입력."""
     out = set()
 
     def walk(n):
@@ -621,8 +746,8 @@ def symbols_of(tree):
         out.add(p)
         if cfg.get("index"):
             out.add(cfg["index"])
-        for sec in SECTIONS:
-            walk(cfg[sec])
+        for _z, _l, _r, node in zone_nodes(cfg):
+            walk(node)
     return out
 
 

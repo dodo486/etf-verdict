@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""jhts 시세수집팀(jhts.marketdata) 어댑터 — 구간③의 유일한 시세 창구.
+"""jhts 시세수집팀(jhts.marketdata) 어댑터 — 파이프라인의 유일한 시세 창구.
 
 구간③(verdict 팀)은 시세(미국 ETF·지수·선물·섹터 ETF의 일봉·현재값·분봉)를 직접
 스크래핑하지 않는다. 모든 시세를 여기서 jhts.marketdata(md)로부터 받는다.
@@ -63,6 +63,40 @@ def history(symbol, start):
         return md.candles(symbol, start=start) or []
     except Exception:  # noqa: BLE001
         return []
+
+
+# ---------------------------------------------------------------- 수집 단계(단일 입구)
+REQUESTER = "etf-verdict"
+_REQUESTED = {}     # 이번 실행에서 수집 요청을 남긴 심볼 → 요청 id(또는 실패 사유)
+
+
+def histories(symbols, start):
+    """수집 단계의 단일 입구 — 심볼들의 start 이후 일봉 {심볼: [Candle]}.
+
+    판정·백테스트·트리 검사가 모두 이 함수 하나로 시세를 받는다(따로 받지 않는다).
+    시세가 없는 심볼은 지어내지 않고 jhts 수집 요청(collection_requests)을 남긴다 —
+    같은 요청은 jhts 가 하나로 합친다. 요청 결과는 requested() 로 본다."""
+    out = {}
+    for s in sorted(set(symbols)):
+        out[s] = history(s, start)
+        if not out[s]:
+            _REQUESTED[s] = _request(s, start)
+    return out
+
+
+def _request(symbol, start):
+    if not AVAILABLE:
+        return "요청 못 함: jhts.marketdata 미설치"
+    try:
+        return md.request(REQUESTER, code=symbol, dataset="candles", start=start,
+                          note="조건 트리가 쓰는 심볼 — 일봉 없음")
+    except Exception as e:  # noqa: BLE001
+        return "요청 실패: %s" % e
+
+
+def requested():
+    """{심볼: 요청 id | 실패 사유} — 시세가 없어 수집을 요청한 심볼."""
+    return dict(_REQUESTED)
 
 
 # ---------------------------------------------------------------- 여러 종목 폭(breadth)

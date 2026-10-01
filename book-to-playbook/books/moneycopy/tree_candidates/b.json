@@ -1,5 +1,5 @@
 {
- "version": 1,
+ "version": 2,
  "source": {
   "book": "moneycopy",
   "extractor": "b",
@@ -803,7 +803,13 @@
       "def": "VOL_CHASE"
      }
     ]
-   }
+   },
+   "caution": [],
+   "sizing": {
+    "weight": null,
+    "tranches": []
+   },
+   "exit": []
   },
   "SOXL": {
    "index": "^SOX",
@@ -1337,7 +1343,13 @@
       "def": "VOL_CHASE"
      }
     ]
-   }
+   },
+   "caution": [],
+   "sizing": {
+    "weight": null,
+    "tranches": []
+   },
+   "exit": []
   },
   "UPRO": {
    "index": "^GSPC",
@@ -1547,7 +1559,13 @@
       "def": "VOL_CHASE"
      }
     ]
-   }
+   },
+   "caution": [],
+   "sizing": {
+    "weight": null,
+    "tranches": []
+   },
+   "exit": []
   }
  }
 }

@@ -1,5 +1,5 @@
 {
- "version": 1,
+ "version": 2,
  "source": {
   "book": "trend",
   "extractor": "채택",
@@ -254,7 +254,13 @@
    },
    "avoid": {
     "def": "avoid_common"
-   }
+   },
+   "caution": [],
+   "sizing": {
+    "weight": null,
+    "tranches": []
+   },
+   "exit": []
   },
   "QQQ": {
    "index": "^NDX",
@@ -304,7 +310,13 @@
    },
    "avoid": {
     "def": "avoid_common"
-   }
+   },
+   "caution": [],
+   "sizing": {
+    "weight": null,
+    "tranches": []
+   },
+   "exit": []
   },
   "IWM": {
    "index": "^RUT",
@@ -365,7 +377,13 @@
    },
    "avoid": {
     "def": "avoid_common"
-   }
+   },
+   "caution": [],
+   "sizing": {
+    "weight": null,
+    "tranches": []
+   },
+   "exit": []
   }
  }
 }

@@ -1,5 +1,5 @@
 {
- "version": 1,
+ "version": 2,
  "source": {
   "book": "moneycopy",
   "extractor": "a",
@@ -1128,7 +1128,13 @@
       "note": "지수 거래량 결측 가능 → 상품 자체 거래량 사용"
      }
     ]
-   }
+   },
+   "caution": [],
+   "sizing": {
+    "weight": null,
+    "tranches": []
+   },
+   "exit": []
   },
   "SOXL": {
    "index": "^SOX",
@@ -1590,7 +1596,13 @@
       "def": "AV_NEWS_27"
      }
     ]
-   }
+   },
+   "caution": [],
+   "sizing": {
+    "weight": null,
+    "tranches": []
+   },
+   "exit": []
   },
   "UPRO": {
    "index": "^GSPC",
@@ -2160,7 +2172,13 @@
       "note": "지수 거래량 결측 가능 → 상품 자체 거래량 사용"
      }
     ]
-   }
+   },
+   "caution": [],
+   "sizing": {
+    "weight": null,
+    "tranches": []
+   },
+   "exit": []
   }
  }
 }
