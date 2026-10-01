@@ -58,6 +58,12 @@ TELEGRAM_BOT_TOKEN=...
 TELEGRAM_CHAT_ID=...
 ```
 
+jhts 시세 패키지가 pip 설치가 아니면 `local.env` 에 경로를 적는다(커밋 안 함 — `local.env.example` 참고):
+
+```
+PYTHONPATH=C:\Users\<사용자>\jhts
+```
+
 ## 3. 수동 실행
 
 ```

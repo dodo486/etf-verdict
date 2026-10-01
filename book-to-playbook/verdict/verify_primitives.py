@@ -557,6 +557,17 @@ def t_at():
         c2 = cond.Ctx(H(hist), cal, "X", now=now, manual_as=m)
         check(cond.series(obs, c2) == [True, m], "observe manual_as=%r" % m)
         check(cond.series({"not": obs}, c2)[1] == (None if m is None else m), "not observe 극성 manual_as=%r" % m)
+    # 제외 모드(백테스트) — 관측값 없는 observe 는 묶음에서 빠진다. all/any 는 그 칸만, atleast 는 N 그대로.
+    ex = cond.Ctx(H(hist), cal, "X", now=now, unobserved="exclude")
+    T_, F_ = {"gt": [1, 0]}, {"gt": [0, 1]}
+    cases = [({"all": [obs, T_]}, [True, True]), ({"all": [obs, F_]}, [False, False]),
+             ({"any": [obs, F_]}, [True, False]), ({"atleast": 2, "of": [obs, T_, T_]}, [True, True]),
+             ({"atleast": 2, "of": [obs, T_, F_]}, [True, False]), ({"not": obs}, [False, cond.EXCLUDED]),
+             ({"all": [obs]}, [True, cond.EXCLUDED])]
+    for node, want in cases:
+        got = cond.series(node, ex)
+        check(got == want, "제외 모드 %s → %r (기대 %r)" % (list(node)[0], got, want))
+    check(cond.series({"gt": [{"case": [[obs, 1]], "else": 0}, 0]}, ex)[1] is None, "제외 표지는 다른 연산엔 모름으로")
     try:
         cond.validate({"observe": {"gt": [C, 1]}})
         FAILS.append("사유 없는 observe 통과")

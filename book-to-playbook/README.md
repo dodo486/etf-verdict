@@ -94,6 +94,7 @@ python -m publish.serve                                         # 로컬 실시�
 ```
 
 환경: jhts 시세 패키지가 pip 설치가 아니면 `PYTHONPATH=<jhts 경로>` 를 줘야 시세가 들어온다(없으면 판정이 ❔).
+스케줄러로 돌릴 때는 `local.env`(커밋 안 함, `local.env.example` 참고)에 적어 두면 `run.py` 가 읽는다.
 
 ## 구성 파일
 

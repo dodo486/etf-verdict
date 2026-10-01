@@ -86,8 +86,9 @@ def fetch_history(tree, days):
     return tree_grade.history(tree, (datetime.now() - timedelta(days=days + WARMUP_DAYS)).strftime("%Y%m%d"))
 
 
-def run(slug, days=365, hist=None, tree=None):
-    """hist 를 주면 시세를 다시 받지 않는다(여러 기간을 한 번에 돌릴 때)."""
+def run(slug, days=365, hist=None, tree=None, unobserved=None):
+    """hist 를 주면 시세를 다시 받지 않는다(여러 기간을 한 번에 돌릴 때).
+    unobserved="exclude" = 분봉이 없어 관측 못 한 저자 시각 조건(개장 전 선물 등)을 빼고 판단한다."""
     tree = tree or tree_grade.load_tree(slug)
     if tree is None:
         raise SystemExit("books/%s/tree.json 없음 — 조건 트리가 있어야 백테스트한다" % slug)
@@ -100,7 +101,7 @@ def run(slug, days=365, hist=None, tree=None):
     for p in tree["products"]:
         cs = hist.get(p) or []
         cal = [c.date for c in cs]
-        pe = tree_grade.ProductEval(tree, p, hist, cal)
+        pe = tree_grade.ProductEval(tree, p, hist, cal, unobserved)
         prow = []
         for i, d in enumerate(cal):
             if d >= start:
@@ -214,7 +215,9 @@ def _cli():
         print("웹페이지용 백테스트 → %s" % path)
         return
     days = int(argv[argv.index("--days") + 1]) if "--days" in argv else 365
-    res = run(slug, days)
+    # --exclude-unobserved : 분봉이 없어 관측 못 한 저자 시각 조건(개장 전 선물 등)을 빼고 판단(나머지 조건으로 진입)
+    res = run(slug, days, unobserved="exclude" if "--exclude-unobserved" in argv else None)
+    res["unobserved"] = "제외하고 판단" if "--exclude-unobserved" in argv else "수동(🟡)으로 둠"
     ensure_dir(LOGS)
     write_text(os.path.join(LOGS, "backtest-%s.json" % slug),
                json.dumps(res, ensure_ascii=False, indent=1))

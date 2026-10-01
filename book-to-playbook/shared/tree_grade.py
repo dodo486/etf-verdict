@@ -65,16 +65,24 @@ def history(trees, start):
 class ProductEval:
     """한 상품의 여섯 칸을 전체 달력에 대해 한 번 계산해 둔다."""
 
-    def __init__(self, tree, prod, hist, cal):
+    def __init__(self, tree, prod, hist, cal, unobserved=None):
+        """unobserved="exclude" = 관측값이 없는 저자 시각 조건(observe)을 빼고 판단한다(백테스트 비교용)."""
         cfg = tree["products"][prod]
         defs = tree.get("defs") or {}
         self.tree, self.prod, self.cfg, self.defs, self.cal, self.hist = tree, prod, cfg, defs, list(cal), hist
-        mk = lambda m: cond.Ctx(hist, cal, prod, cfg.get("index"), defs, manual_as=m)
+        mk = lambda m: cond.Ctx(hist, cal, prod, cfg.get("index"), defs, manual_as=m, unobserved=unobserved)
         self.ctx = {True: mk(True), False: mk(False), None: mk(None)}
-        s = lambda node, m: cond.series(node, self.ctx[m])
-        self.opt = {"filter": s(cfg["filter"], True), "entry": s(cfg["entry"], True), "avoid": s(cfg["avoid"], False)}
-        self.pes = {"filter": s(cfg["filter"], False), "entry": s(cfg["entry"], False), "avoid": s(cfg["avoid"], True)}
-        self.caution = [(r, s(r["when"], None)) for r in cfg.get("caution") or []]
+        neutral = {"filter": True, "entry": True, "avoid": False}      # 칸 전체가 빠지면 그 칸은 제약 없음
+
+        def s(node, m, sec=None):
+            out = cond.series(node, self.ctx[m])
+            if sec is None:
+                return [None if x is cond.EXCLUDED else x for x in out]
+            return [neutral[sec] if x is cond.EXCLUDED else x for x in out]
+        self.opt = {sec: s(cfg[sec], sec != "avoid", sec) for sec in cond.SECTIONS}
+        self.pes = {sec: s(cfg[sec], sec == "avoid", sec) for sec in cond.SECTIONS}
+        self.caution = [(r, [False if x is cond.EXCLUDED else x for x in cond.series(r["when"], self.ctx[None])])
+                        for r in cfg.get("caution") or []]
         w = (cfg.get("sizing") or {}).get("weight")
         self.weight = {m: (s(w, m) if w is not None else None) for m in (None, True, False)}
 

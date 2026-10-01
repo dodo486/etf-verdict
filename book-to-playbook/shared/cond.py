@@ -220,10 +220,12 @@ def validate(node, defs=None, path="$"):
 class Ctx:
     """평가 문맥. hist={심볼: [Candle(date,open,high,low,close,volume)]}, cal=날짜 목록."""
 
-    def __init__(self, hist, cal, self_sym, index_sym=None, defs=None, manual_as=None, pos=None, now=None):
+    def __init__(self, hist, cal, self_sym, index_sym=None, defs=None, manual_as=None, pos=None, now=None,
+                 unobserved=None):
         """pos = (첫 매수일 인덱스, 평균 매입가 | 날짜별 평균 매입가 목록) — 매도·분할 규칙 평가 때만."""
         self.pos = pos
         self.now = now            # 저자 시각 값의 '지금'(UTC datetime) — None 이면 실제 지금
+        self.unobserved = unobserved  # None = 관측값 없는 observe 는 수동처럼 · "exclude" = 그 조건을 빼고 판단(백테스트)
         self.hist = hist
         self.cal = list(cal)
         self.self_sym = self_sym
@@ -240,7 +242,7 @@ class Ctx:
             return self
         if self._flip is None:
             f = Ctx(self.hist, self.cal, self.self_sym, self.index_sym, self.defs, not self.manual_as, self.pos,
-                    self.now)
+                    self.now, self.unobserved)
             f._px, f._flip = self._px, self
             self._flip = f
         return self._flip
@@ -374,6 +376,17 @@ def _or3(vals):
     return False
 
 
+class _Excluded:
+    """'이 조건은 빼고 판단' 표지 — unobserved="exclude" 문맥에서 관측값이 없는 observe 가 낸다. 논리 묶음은 이 값을
+    후보에서 빼고 계산한다(all·any 는 그 칸만, atleast 는 N 을 그대로 두고 후보에서만). 그 밖의 연산에는 모름(None)으로 간다."""
+
+    def __repr__(self):
+        return "EXCLUDED"
+
+
+EXCLUDED = _Excluded()
+
+
 def series(node, ctx, s_sym=None):
     """노드 → 달력 길이 시계열."""
     key = (repr(node), s_sym, ctx.manual_as)
@@ -390,7 +403,8 @@ def _series(node, ctx, s_sym):
         return [float(node)] * L
     op = _op_of(node)
     v = node[op]
-    S = lambda n: series(n, ctx, s_sym)
+    R = lambda n: series(n, ctx, s_sym)                                   # 논리 묶음용(제외 표지 그대로)
+    S = lambda n: [None if x is EXCLUDED else x for x in series(n, ctx, s_sym)]   # 그 밖의 연산용
 
     if op == "px":
         sym = node.get("sym", "$self")
@@ -526,22 +540,29 @@ def _series(node, ctx, s_sym):
         return out
 
     if op in ("all", "any"):
-        cols = [S(c) for c in v]
+        cols = [R(c) for c in v]
         f = _and3 if op == "all" else _or3
-        return [f([c[i] for c in cols]) for i in range(L)]
-
-    if op == "atleast":
-        cols = [S(c) for c in node["of"]]
         out = []
         for i in range(L):
-            vals = [c[i] for c in cols]
+            vals = [c[i] for c in cols if c[i] is not EXCLUDED]
+            out.append(EXCLUDED if cols and not vals else f(vals))
+        return out
+
+    if op == "atleast":
+        cols = [R(c) for c in node["of"]]
+        out = []
+        for i in range(L):
+            vals = [c[i] for c in cols if c[i] is not EXCLUDED]
+            if cols and not vals:
+                out.append(EXCLUDED)
+                continue
             t = sum(1 for x in vals if x is True)
             u = sum(1 for x in vals if x is None)
             out.append(True if t >= v else (False if t + u < v else None))
         return out
 
     if op == "not":
-        return [None if x is None else (not x) for x in series(v, ctx.flipped(), s_sym)]
+        return [x if x is None or x is EXCLUDED else (not x) for x in series(v, ctx.flipped(), s_sym)]
 
     if op == "count":
         c, n = S(v[0]), v[1]
@@ -633,7 +654,8 @@ def _series(node, ctx, s_sym):
         return [ctx.manual_as] * L
 
     if op == "observe":
-        return [ctx.manual_as if x is None else x for x in S(v)]
+        miss = EXCLUDED if ctx.unobserved == "exclude" else ctx.manual_as
+        return [miss if x is None else x for x in S(v)]
 
     if op == "pos":
         if ctx.pos is None:

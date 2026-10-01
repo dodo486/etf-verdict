@@ -17,8 +17,9 @@ homebrew·python.org·Microsoft Store 어느 설치본이든 그대로 동작한
   --no-push    commit 은 하되 push 는 생략
   --quiet      콘솔 출력 최소화(로그 파일에는 그대로 남음)
 
-경로·크레덴셜은 shared/paths.py 규칙을 따른다. telegram.env 가 BASE에 있으면
-자동으로 환경변수에 주입한다(없으면 그냥 건너뜀).
+경로·크레덴셜은 shared/paths.py 규칙을 따른다. telegram.env · local.env 가 BASE에 있으면
+자동으로 환경변수에 주입한다(없으면 그냥 건너뜀). 스케줄러로 돌릴 때 jhts 시세 패키지 경로는
+local.env 의 PYTHONPATH 로 준다(local.env.example 참고).
 
 팀 구조: 실행 대상은 전부 패키지 모듈(python -m <팀>.<모듈>)이다 — playbook(구간①)
 · checklist(구간②) · verdict(구간③) · publish(발행층) · shared(공통).
@@ -172,7 +173,8 @@ def main(argv):
     no_git = "--no-git" in argv
     no_push = "--no-push" in argv
 
-    for envfile in ("telegram.env",):
+    # telegram.env(알림 크레덴셜) · local.env(이 컴퓨터 설정 — 예: PYTHONPATH=<jhts 경로>). 둘 다 커밋하지 않는다.
+    for envfile in ("telegram.env", "local.env"):
         loaded = load_env_file(os.path.join(BASE, envfile))
         if loaded and not quiet:
             print("%s 로드 (%d개 키)" % (envfile, len(loaded)))
