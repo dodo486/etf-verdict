@@ -13,6 +13,8 @@
 
   * `review-ui`    — 좌우 분할·소절→시트 점프·노란 bullet 매핑·반영 현황 요약표
   * `checklist-ui` — 탭 전환·스코어카드·진입 체크리스트 렌더·STEP3 계산기·메모
+  * `collect-ui`   — 데이터 수집 현황(소스·갱신 모드 표시)
+  * `live-ui`      — 라이브 모드(로컬 서버 /api/verdict 폴링·SSE → 화면 재렌더)
 
 다만 이 페이지들은 **자체완결**이어야 한다 — 오프라인·아티팩트에서도 떠야 하므로
 런타임에 외부 파일을 참조(`<script src>`)하면 안 된다. 그래서 파일을 참조하는 대신
@@ -60,6 +62,8 @@ REGIONS = {
     "playbook-ui": os.path.join(_HERE, "ui", "playbook-ui.js"),
     "review-ui": os.path.join(_HERE, "ui", "review-ui.js"),
     "checklist-ui": os.path.join(_HERE, "ui", "checklist-ui.js"),
+    "collect-ui": os.path.join(_HERE, "ui", "collect-ui.js"),
+    "live-ui": os.path.join(_HERE, "ui", "live-ui.js"),
 }
 
 
@@ -145,6 +149,11 @@ def check(html):
         return False, "HTML 에 등록된 INJECT 센티넬 구간이 하나도 없음 (%s)" % ", ".join(REGIONS)
     msgs = []
     ok_all = True
+    # 등록 구획은 모든 책 공통 로직이다 — 빠진 책은 그 로직을 안 탄다(조용히 넘기지 않는다).
+    for name in REGIONS:
+        if name not in present:
+            ok_all = False
+            msgs.append("%s: 구획 없음 — 이 책은 공통 로직을 안 탐" % name)
     for name in present:
         cur = extract(html, name)
         want = load_ui(name)
