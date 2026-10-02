@@ -9,13 +9,16 @@ homebrew·python.org·Microsoft Store 어느 설치본이든 그대로 동작한
 사용법
   python run.py daily        # 판정(체크리스트 = 조건 트리) → 백테스트 → 발행 (장 마감 후)
   python run.py watch        # 저자가 말한 시각(트리의 at — 예: 개장 10분 전)마다 기다렸다 판정 → 발행
-                             #   그날 미국 정규장 개장 기준으로 계산한다(서머타임 자동). 매일 밤 한 번 띄우면 된다.
+                             #   다음 정규장 개장 기준(업계 캘린더 — 서머타임·휴장 자동). 매일 밤 한 번 띄우면 된다.
   python run.py publish      # 재판정 없이 현재 JSON으로 다시 발행만
 
 옵션
   --no-git     발행 후 git commit/push 생략
   --no-push    commit 은 하되 push 는 생략
   --quiet      콘솔 출력 최소화(로그 파일에는 그대로 남음)
+  --no-verify-tree  트리 검수(verify_tree)·원시함수 검사(verify_primitives) 생략 — 트리를
+                    만들 때 한 번 검수하면 되는 것이라, 트리가 더 안 바뀌면 끈다(발행물 점검
+                    verify_structure 는 항상 돈다). 트리 완성 전에는 켜 두는 것이 안전하다.
 
 경로·크레덴셜은 shared/paths.py 규칙을 따른다. telegram.env · local.env 가 BASE에 있으면
 자동으로 환경변수에 주입한다(없으면 그냥 건너뜀). 스케줄러로 돌릴 때 jhts 시세 패키지 경로는
@@ -172,6 +175,10 @@ def main(argv):
     quiet = "--quiet" in argv
     no_git = "--no-git" in argv
     no_push = "--no-push" in argv
+    # 트리 검수(verify_tree)·원시함수 검사(verify_primitives)는 트리를 '만들 때' 한 번 하면 되는
+    # 것이라(python -m checklist.verify_tree <slug>), 트리가 더 안 바뀌면 daily 가 매번 다시 돌 필요가
+    # 없다. --no-verify-tree 로 그 둘을 끈다(발행물 점검 verify_structure 는 트리와 무관해 항상 돈다).
+    no_verify_tree = "--no-verify-tree" in argv
 
     # telegram.env(알림 크레덴셜) · local.env(이 컴퓨터 설정 — 예: PYTHONPATH=<jhts 경로>). 둘 다 커밋하지 않는다.
     for envfile in ("telegram.env", "local.env"):
@@ -185,7 +192,7 @@ def main(argv):
     # 판정 JSON은 책마다 분리 저장한다(latest-verdict-<slug>.json). 한 파일을
     # 돌려쓰면 live 2권째부터 마지막 책의 판정이 모든 페이지에 병합된다.
     def latest_path(slug):
-        return os.path.join(BASE, "latest-verdict-%s.json" % slug)
+        return paths.latest_verdict_path(slug)
 
     # 어느 엔진을 돌릴지는 books.json 에서 온다(코드에 특정 책을 박지 않는다).
     live = paths.live_slugs()
@@ -220,7 +227,11 @@ def main(argv):
     #   ② verdict.verify_primitives 조건 트리 원시 연산이 계산을 맞게 하나(실행 검사)
     #   ③ checklist.verify_tree     체크리스트가 원문 뜻대로 동작하나(이중 추출·원문 사례·발화 통계·비중 합)
     # 등급: 0 통과 · 1 정지 · 2 경고.
-    checks = ["verify_structure", "verdict.verify_primitives", "checklist.verify_tree"]
+    checks = ["verify_structure"]   # 발행물·구조 점검 — 트리와 무관, 항상 돈다
+    if not no_verify_tree:
+        checks += ["verdict.verify_primitives", "checklist.verify_tree"]
+    else:
+        r.say("--no-verify-tree: 트리 검수·원시함수 검사 생략(트리 생성 단계에서 이미 검수한 것으로 봄)")
     codes = {}
     for script in checks:
         code, out, err = r.verify(script)
@@ -261,25 +272,41 @@ def main(argv):
 
 
 def watch(argv):
-    """저자가 말한 시각마다 판정 — 라이브 책 트리의 at(개장 기준 분)을 모아, 오늘 미국 정규장 개장 기준 그 시각
-    (+1분: 1분봉이 닫히고 들어오는 여유)까지 기다렸다가 판정→발행(백테스트 제외)을 돈다. 주말이면 그냥 끝난다."""
+    """저자가 말한 시각마다 판정 — 라이브 책 트리의 at(개장 기준 분)을 모아, 다음 정규장 개장 기준 그 시각
+    (+1분: 1분봉이 닫히고 들어오는 여유)까지 기다렸다가 판정→발행(백테스트 제외)을 돈다.
+
+    개장 시각은 코드에 박지 않고 업계 캘린더(md_feed.sessions)에서 읽는다 — 서머타임·휴장·반일장이 자동 반영된다.
+    at 심볼의 시장을 모아 그 시장들의 다음 개장을 쓴다. 오늘·앞으로 개장이 없으면(주말·휴장) 그냥 끝난다."""
     import time
     from datetime import timedelta, timezone
-    from shared import cond, tree_grade
-    offs = set()
+    from shared import cond, tree_grade, md_feed
+    offs, msyms = set(), set()
     for slug in paths.live_slugs():
         t = tree_grade.load_tree(slug)
         if t:
             offs.update(cond.at_offsets(t))
-    now = datetime.now(timezone.utc)
-    et_day = (now - timedelta(hours=5)).strftime("%Y%m%d")    # 뉴욕 날짜(대략) — 개장 시각은 et_to_utc 가 정확히
-    if datetime.strptime(et_day, "%Y%m%d").weekday() >= 5:
-        print("watch: 오늘은 미국 정규장이 없다 — 끝")
+            msyms.update(cond.minute_symbols_of(t))
+    if not offs:
+        print("watch: 저자 시각(at) 조건이 없다 — 끝")
         return 0
+    now = datetime.now(timezone.utc)
+    start = (now - timedelta(days=3)).strftime("%Y%m%d")
+    end = (now + timedelta(days=7)).strftime("%Y%m%d")
+    # at 심볼이 속한 시장들의 다음 개장 — 여러 시장이면 가장 이른 다음 개장을 기준으로 잡는다.
+    markets = sorted({m for m in (md_feed.market_of(s) for s in msyms) if m})
+    nxt_open = None
+    for mk in markets:
+        s = cond._next_session(md_feed.sessions(mk, start, end), now.strftime("%Y%m%d"))
+        if s is not None and (nxt_open is None or s.open < nxt_open):
+            nxt_open = s.open
+    if nxt_open is None:
+        print("watch: 다음 정규장 개장을 캘린더에서 못 찾음(주말·휴장·세션 미설치) — 끝")
+        return 0
+    nxt_open = nxt_open.astimezone(timezone.utc)
     rest = [a for a in argv if a != "watch"]
     code = 0
     for off in sorted(offs):
-        due = cond.et_to_utc(et_day, *cond.US_OPEN_ET) + timedelta(minutes=off + 1)
+        due = nxt_open + timedelta(minutes=off + 1)
         wait = (due - datetime.now(timezone.utc)).total_seconds()
         if wait < -600:
             print("watch: 개장 %+d분 시각은 이미 지남 — 건너뜀" % off)

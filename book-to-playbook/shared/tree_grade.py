@@ -29,7 +29,11 @@ GRADES = {
     "wait": "⚪ 관망",
     "unknown": "❔ 판정 불가",
 }
-OP_WORD = {"all": "모두", "any": "하나 이상", "not": "아님"}
+# 판정 전에 과거 시세를 며칠치(달력일) 미리 당겨올지 — '워밍업'. 트리가 쓰는 가장 긴 창
+# (예: 52주 신고가 = 252거래일 ≈ 달력 365일)이 첫날부터 제대로 서도록 넉넉히 둔다.
+# ★ 여기 한 곳이 정본이다 — 매일 판정(verdict_engine)·백테스트(backtest)·검증(verify_tree)이
+#   모두 이 값을 가져다 쓴다. 과거엔 세 곳에 따로(500/400/500) 박혀 백테스트만 어긋났었다.
+WARMUP_DAYS = 500
 
 
 def tree_path(slug, name="tree.json"):
@@ -47,18 +51,28 @@ def load_tree(slug, name="tree.json"):
 
 
 class History(dict):
-    """{심볼: 일봉} + minutes{심볼: 1분봉} — 저자 시각(at) 값은 분봉에서 읽는다."""
+    """{심볼: 일봉} + minutes{심볼: 1분봉} + sessions{시장: [Session]} + market{심볼: 시장}.
+    저자 시각(at) 값은 분봉에서 읽고, 그 '다음 개장/마감' 시각은 업계 캘린더(sessions)에서 읽는다."""
     minutes = {}
+    sessions = {}      # {"US"|"KR": [Session] 날짜 오름차순} — md_feed(jhts) 가 준 정규장 달력
+    market = {}        # {심볼: "US"|"KR"} — 분봉·세션의 기준 시장
 
 
 def history(trees, start):
-    """트리(들)가 쓰는 모든 심볼의 일봉(+ 저자 시각 값에 쓰는 심볼의 1분봉) — 수집 단계(md_feed) 하나로 받는다."""
+    """트리(들)가 쓰는 모든 심볼의 일봉(+ 저자 시각 값에 쓰는 심볼의 1분봉·그 시장의 정규장 달력) —
+    수집 단계(md_feed) 하나로 받는다. jhts 는 md_feed 에서만 만진다(팀 경계)."""
+    import datetime as _dt
     syms, msyms = set(), set()
     for t in trees if isinstance(trees, list) else [trees]:
         syms |= cond.symbols_of(t)
         msyms |= cond.minute_symbols_of(t)
     h = History(md_feed.histories(syms, start))
     h.minutes = {s: md_feed.minutes(s) for s in sorted(msyms)}
+    # 저자 시각 심볼이 속한 시장을 모아, 그 시장들의 정규장 달력을 받는다(start ~ 넉넉히 미래 — 판정일 다음 개장까지).
+    h.market = {s: md_feed.market_of(s) for s in sorted(msyms)}
+    end = (_dt.date.today() + _dt.timedelta(days=14)).strftime("%Y%m%d")
+    for mk in sorted({m for m in h.market.values() if m}):
+        h.sessions[mk] = md_feed.sessions(mk, start, end)
     return h
 
 

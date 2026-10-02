@@ -24,25 +24,17 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 
-from shared.paths import BASE
+from shared.paths import BASE, book_meta
 from shared.notify import send_telegram, send_desktop
 from shared import cond, md_feed, tree_grade
 
-# 트리 판정에 필요한 이력 길이(가장 긴 창 + 여유). backtest.WARMUP_DAYS 와 같은 기준.
-TREE_HISTORY_DAYS = 500
 SOURCE = "jhts 시세팀(일봉)"
 
 
 def book_title(slug):
-    """books.json 에서 이 책의 제목(알림/콘솔 헤더용). 없으면 slug."""
-    try:
-        m = json.load(open(os.path.join(BASE, "books.json"), encoding="utf-8"))
-        for b in m.get("books", []):
-            if b.get("slug") == slug:
-                return b.get("title") or slug
-    except Exception:  # noqa: BLE001
-        pass
-    return slug
+    """books.json 에서 이 책의 제목(알림/콘솔 헤더용). 없으면 slug.
+    명단 읽기는 공용 함수(paths.book_meta) 한 곳을 쓴다 — 직접 파싱하지 않는다."""
+    return book_meta(slug).get("title") or slug
 
 
 def load_positions(slug):
@@ -206,11 +198,13 @@ def render(slug):
     tree = tree_grade.load_tree(slug)
     now = datetime.now(timezone.utc).astimezone()
     top = {"slug": slug, "title": book_title(slug), "ts": now.isoformat(), "source": SOURCE,
-           "verdicts": [], "common": [], "refs": {}, "missing": {}, "cash": None}
+           "verdicts": [], "common": [], "refs": {}, "missing": {}, "cash": None,
+           # 등급 글자표(키→라벨)를 실어보낸다 — 화면이 따로 복붙하지 않고 이걸 받아 쓴다(단일 출처).
+           "grades": tree_grade.GRADES}
     if tree is None:
         top["error"] = "조건 트리 없음 — books/%s/tree.json 이 있어야 판정한다" % slug
         return top
-    start = (datetime.now() - timedelta(days=TREE_HISTORY_DAYS)).strftime("%Y%m%d")
+    start = (datetime.now() - timedelta(days=tree_grade.WARMUP_DAYS)).strftime("%Y%m%d")
     hist = tree_grade.history(tree, start)
     positions = load_positions(slug)
     pe0 = None

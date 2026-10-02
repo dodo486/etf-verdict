@@ -10,7 +10,7 @@
   if(!btn) return;
 
   function refs(){ try { return JSON.parse(document.getElementById('verdict-data').textContent).refs || {}; } catch(e){ return {}; } }
-  var ZW = {filter:'필터', avoid:'회피', entry:'진입', caution:'조심', sizing:'비중·분할', exit:'매도'};
+  var ZW = window.BP.ZW;                 // 공용 부품(shared-ui)
   function zones(r){ return (r.zones || []).map(function(z){ return ZW[z] || z; }).join('·'); }
 
   /* ---- 분할 모드 토글 ---- */
@@ -101,7 +101,7 @@
     var heads = document.querySelectorAll('#content h3.sec, #content h3');
     var head = null;
     for(var i=0;i<heads.length;i++){
-      var m = (heads[i].textContent || '').match(/^\s*([0-9]+-[0-9]+|프롤로그|에필로그)/);
+      var m = (heads[i].textContent || '').match(window.BP.REF_RE);
       if(m && m[1] === String(key)){ head = heads[i]; break; }
     }
     if(!head) return;   // 플레이북에 별도 소절이 없으면(0장 흡수 등) 조용히 넘어간다
@@ -119,7 +119,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('#content h3, #content h2'), function(h){
       if(h.dataset.jumpReady) return;
       var t = (h.textContent || '').trim();
-      var m = t.match(/^\s*([0-9]+-[0-9]+|프롤로그|에필로그)/);
+      var m = t.match(window.BP.REF_RE);
       if(!m) return;
       h.dataset.jumpReady = '1';
       h.classList.add('jumpable');
@@ -145,7 +145,7 @@
   if(!rowsEl) return;
   var REFS = {};
   try { REFS = JSON.parse(document.getElementById('verdict-data').textContent).refs || {}; } catch(e){}
-  var ZW = {filter:'필터', avoid:'회피', entry:'진입', caution:'조심', sizing:'비중·분할', exit:'매도'};
+  var ZW = window.BP.ZW;                 // 공용 부품(shared-ui)
 
   // 소절 목록·제목은 플레이북 원문(#src)에서 가져온다(따로 적지 않는다 — 어긋날 수 있으므로)
   var TITLE = {}, KEYS = [], CHAP = {};
@@ -153,7 +153,7 @@
     document.getElementById('src').textContent.split('\n').forEach(function(l){
       var c = l.match(/^##\s+([0-9A-Za-z가-힣]+)\.\s*(.*)$/);
       if(c){ CHAP[c[1]] = (c[1] + '. ' + c[2]).trim(); return; }
-      var m = l.match(/^#{3}\s*([0-9]+-[0-9]+|프롤로그|에필로그)[.\s]\s*(.*)$/);
+      var m = l.match(window.BP.REF_HEAD_RE);
       if(m && !TITLE[m[1]]){ TITLE[m[1]] = (m[2] || '').replace(/\*\*/g, '').trim(); KEYS.push(m[1]); }
     });
   } catch(e){}

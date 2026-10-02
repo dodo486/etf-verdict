@@ -43,7 +43,6 @@ from shared.paths import BASE, LOGS, ensure_dir, live_slugs, write_text
 from shared import cond, md_feed, trades as trades_mod, tree_grade
 
 Candle = namedtuple("Candle", "date open high low close volume")
-WARMUP_DAYS = 500
 COMPARED = cond.SECTIONS + ("caution", "sizing")      # 날마다 비교하는 칸(분할·매도는 거래로)
 MANUAL_HEADS = ("저자 미명시", "데이터 없음", "연산 없음")
 
@@ -55,7 +54,7 @@ def _load(slug, name):
 
 # ------------------------------------------------------------------ 실제 시세 평가
 def _start(years):
-    return (datetime.now() - timedelta(days=int(365 * years) + WARMUP_DAYS)).strftime("%Y%m%d")
+    return (datetime.now() - timedelta(days=int(365 * years) + tree_grade.WARMUP_DAYS)).strftime("%Y%m%d")
 
 
 def _history(trees, years):

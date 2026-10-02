@@ -3,17 +3,13 @@
 """책 페이지 HTML에 '책 전환 사이드 레일'을 주입한다(빌드 시).
 좌측 고정 레일 = books.json의 모든 책. 현재 책 강조. 클릭 시 ../slug/ 로 전환.
 드릴다운 없이 책 사이를 바로 오간다. import 해서 inject(html, cur_slug) 사용."""
-import os, json, html as H
+import html as H
 
-from shared.paths import BASE
-
-def _books():
-    return json.load(open(os.path.join(BASE, "books.json"), encoding="utf-8"))
+from shared.paths import load_books
 
 def inject(html, cur_slug):
-    m = _books()
     items = []
-    for b in m["books"]:
+    for b in load_books():
         slug = b["slug"]
         active = " active" if slug == cur_slug else ""
         live = '<span class="bd"></span>' if b.get("live") else ''

@@ -11,7 +11,8 @@ PUBLIC/<slug>/index.html 로 출력한다. GitHub Pages 자동 갱신용. 조립
 import os, re, sys
 import json
 from shared.paths import (BASE, book_meta, live_slugs, playbook_src, public_book_dir,
-                          ensure_dir, read_text, write_text, PUBLIC)
+                          ensure_dir, read_text, write_text, PUBLIC,
+                          latest_verdict_path, backtest_path, source_index_path)
 
 VERDICT_RE = re.compile(
     r'(<script type="application/json" id="verdict-data">)(.*?)(</script>)', re.S)
@@ -22,7 +23,7 @@ def _source_sections(slug):
     원문 파일이 repo 에 없으면(실제 책 미커밋 등) 빈 {} — 프런트가 '원문 미제공'으로 처리한다.
     자작/공개 원문이 있는 책만 소절 원문이 노출된다(없는 책은 아무것도 새로 드러나지 않음)."""
     try:
-        idx = json.loads(read_text(os.path.join(BASE, "books", slug, "source_index.json")))
+        idx = json.loads(read_text(source_index_path(slug)))
     except Exception:
         return {}
     sf = idx.get("source_file", "")
@@ -64,7 +65,7 @@ def _inject_backtest(html, slug):
     checklist-ui 바로 앞에 심는다 — checklist-ui 가 로드 때 .tab 을 묶기 전에 탭이 생겨야 기존 탭 전환에 묶인다.
     데이터가 없는 책은 탭을 만들지 않는다(빈 탭을 보이지 않는다). 다시 발행하면 이전 주입분을 갈아끼운다."""
     html = re.sub(re.escape(BACKTEST_BEGIN) + r".*?" + re.escape(BACKTEST_END) + r"\n?", "", html, flags=re.S)
-    data_p = os.path.join(BASE, "backtest-%s.json" % slug)
+    data_p = backtest_path(slug)
     ui_p = os.path.join(BASE, "checklist", "ui", "backtest-ui.js")
     if not (os.path.exists(data_p) and os.path.exists(ui_p)):
         return html
@@ -107,7 +108,7 @@ def publish(slug):
         return True   # 없는 책은 이 스크립트 대상이 아님(실패로 치지 않는다)
     data = None
     if book_meta(slug).get("live"):
-        js = os.path.join(BASE, "latest-verdict-%s.json" % slug)
+        js = latest_verdict_path(slug)
         if not os.path.exists(js):
             print("판정 파일 없음(%s) — run.py daily 가 먼저 돌아야 한다" % os.path.basename(js), file=sys.stderr)
             return False

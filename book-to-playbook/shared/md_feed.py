@@ -13,6 +13,8 @@ jhts.marketdata 미설치 시 AVAILABLE=False, 함수는 빈 값을 돌려준다
 이 파일에는 네트워크 코드가 **없어야 한다** — 수집은 전부 jhts 몫이다.
 (`import jhts` 가 허용되는 곳도 파이프라인 전체에서 이 파일 하나다. verify_teams.py 가 강제.)
 """
+import sys
+
 try:
     import jhts.marketdata as md
     AVAILABLE = True
@@ -30,7 +32,10 @@ def history(symbol, start):
         return []
     try:
         return md.candles(symbol, start=start) or []
-    except Exception:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001
+        # 판정은 ❔ 로 degrade 하되(무크래시), '데이터 없음'과 '어댑터가 실제로 고장'을
+        # 구분할 수 있게 진짜 예외는 한 줄 남긴다(조용한 실패가 버그를 숨기지 않도록).
+        sys.stderr.write("md_feed.history(%s) 예외 — %s: %s\n" % (symbol, type(e).__name__, e))
         return []
 
 
@@ -63,6 +68,27 @@ def minutes(symbol):
         return md.minute_closes(symbol) or {}
     except Exception:  # noqa: BLE001
         return {}
+
+
+def sessions(market, start, end):
+    """market("US"|"KR")의 start~end(YYYYMMDD) 정규장 달력 [Session] — 업계 캘린더(거래소 휴장·반일장 반영).
+    Session: .date(YYYYMMDD) · .open/.close(거래소 현지 tz-aware datetime) · .is_half(반일장). 실패/미설치 시 []."""
+    if not AVAILABLE:
+        return []
+    try:
+        return md.sessions(market, start, end) or []
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def market_of(symbol):
+    """심볼이 속한 시장 "US"|"KR" — 분봉/세션 시각의 기준 시장을 정한다. 미설치/실패 시 None."""
+    if not AVAILABLE:
+        return None
+    try:
+        return md.market_of(symbol)
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def requested():

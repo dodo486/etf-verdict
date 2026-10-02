@@ -1,21 +1,29 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""books.json → public/index.html (책 선택 홈/런처). 카드 클릭 시 /slug/ 로 이동."""
-import os, json, html
+"""books.json → public/index.html (책 선택 홈/런처). 카드 클릭 시 /slug/ 로 이동.
 
-from shared.paths import BASE, PUBLIC, ensure_dir, read_text, write_text
+부작용(파일 쓰기·디렉터리 생성)은 전부 build() 안에서만 일어난다 — 이 모듈을 import 만
+해서는 아무것도 쓰지 않는다. 실행은 `python -m publish.build_home` (아래 __main__ → build()).
+render_home(manifest) 은 순수 함수라 가짜 manifest 로 단독 테스트할 수 있다.
+"""
+import os, html
 
-manifest = json.loads(read_text(os.path.join(BASE, "books.json")))
-outdir = ensure_dir(PUBLIC)
+from shared.paths import PUBLIC, ensure_dir, read_text, write_text, load_manifest, playbook_src
+from publish.inject_nav import inject
 
-def esc(s): return html.escape(str(s))
 
-cards = []
-for b in manifest["books"]:
-    live = b.get("live")
-    badge = ('<span class="live"><span class="dot"></span>시세 자동판정</span>'
-             if live else '<span class="static">수동 체크 시트</span>')
-    cards.append(f'''    <a class="card" href="{esc(b['slug'])}/" style="--accent:{esc(b.get('accent','#d4a24e'))}">
+def esc(s):
+    return html.escape(str(s))
+
+
+def render_home(manifest):
+    """books.json(dict) → 홈 HTML 문자열. 순수 — 파일을 쓰지 않는다."""
+    cards = []
+    for b in manifest.get("books", []):
+        live = b.get("live")
+        badge = ('<span class="live"><span class="dot"></span>시세 자동판정</span>'
+                 if live else '<span class="static">수동 체크 시트</span>')
+        cards.append(f'''    <a class="card" href="{esc(b['slug'])}/" style="--accent:{esc(b.get('accent','#d4a24e'))}">
       <div class="tk">{esc(b.get('tickers',''))}</div>
       <h2>{esc(b['title'])}</h2>
       <div class="author">{esc(b.get('author',''))}</div>
@@ -23,7 +31,7 @@ for b in manifest["books"]:
       <div class="foot">{badge}<span class="go">열기 →</span></div>
     </a>''')
 
-page = f'''<!doctype html><html lang="ko"><head>
+    return f'''<!doctype html><html lang="ko"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{esc(manifest.get("site_title","트레이딩 책 플레이북"))}</title>
@@ -63,20 +71,27 @@ h1{{font-size:clamp(26px,4vw,38px);color:var(--head);font-weight:800;margin:10px
 <div class="note">각 책은 저자가 명시한 매매기법만 정량화한 체크리스트입니다. <b>시세 자동판정</b>이 붙은 책은 매일 자동으로 값이 채워지고, <b>수동 체크</b> 책은 무료 데이터가 없어 직접 확인이 필요합니다.</div>
 </div></body></html>'''
 
-write_text(os.path.join(outdir, "index.html"), page)
-print(f"홈 생성: {os.path.join(outdir, 'index.html')} ({len(manifest['books'])}권)")
 
-# 정적 책(라이브 아님) 조립: 소스 HTML에 레일 주입 → public/slug/index.html
-# (라이브 책은 publish_pages.py가 담당하므로 건너뜀)
-from publish.inject_nav import inject
-from shared.paths import playbook_src   # 소스 경로는 규칙(<slug>-playbook.html)에서 — 책마다 dict 에 안 박음
-for b in manifest["books"]:
-    if b.get("live"):
-        continue
-    slug = b["slug"]; src = playbook_src(slug)
-    if not src or not os.path.exists(src):
-        print(f"  (건너뜀: {slug} 소스 없음)"); continue
-    s = read_text(src)
-    d = ensure_dir(os.path.join(outdir, slug))
-    write_text(os.path.join(d, "index.html"), inject(s, slug))
-    print(f"  정적 책 조립: {os.path.join(d, 'index.html')}")
+def build():
+    """홈 + 정적 책 페이지를 PUBLIC 에 쓴다 — 부작용은 여기서만."""
+    manifest = load_manifest()
+    outdir = ensure_dir(PUBLIC)
+    write_text(os.path.join(outdir, "index.html"), render_home(manifest))
+    print(f"홈 생성: {os.path.join(outdir, 'index.html')} ({len(manifest.get('books', []))}권)")
+
+    # 정적 책(라이브 아님) 조립: 소스 HTML에 레일 주입 → public/slug/index.html
+    # (라이브 책은 publish_pages.py가 담당하므로 건너뜀)
+    for b in manifest.get("books", []):
+        if b.get("live"):
+            continue
+        slug = b["slug"]; src = playbook_src(slug)
+        if not src or not os.path.exists(src):
+            print(f"  (건너뜀: {slug} 소스 없음)"); continue
+        s = read_text(src)
+        d = ensure_dir(os.path.join(outdir, slug))
+        write_text(os.path.join(d, "index.html"), inject(s, slug))
+        print(f"  정적 책 조립: {os.path.join(d, 'index.html')}")
+
+
+if __name__ == "__main__":
+    build()
