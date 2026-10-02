@@ -38,7 +38,7 @@ def book_contract(slug):
     bad = []
     bdir = os.path.join(BASE, "books", slug)
     try:
-        idx = json.load(open(os.path.join(bdir, "source_index.json"), encoding="utf-8"))
+        idx = json.load(open(paths.source_index_path(slug), encoding="utf-8"))
         keys = set(idx.get("sections") or {})
         if not keys:
             bad.append("source_index.json 에 소절이 없다")

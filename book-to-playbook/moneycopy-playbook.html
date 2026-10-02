@@ -1312,7 +1312,9 @@ UPRO는 시장의 폭을 산다. S&P500에는 기술주 외에 금융·헬스케
     const t = vs.filter(v=>v===true).length, u = vs.filter(v=>v===null).length;   // atleast
     return t >= it.n ? true : (t + u < it.n ? false : null);
   }
-  const GR = {buy:'✅ 매수 후보', confirm:'🟡 확인 대기', nofilter:'🚫 진입 금지', avoid:'⛔ 보류', wait:'⚪ 관망', unknown:'❔ 판정 불가'};
+  // 등급 글자표는 엔진이 판정 JSON(VD.grades, = shared/tree_grade.GRADES)에 실어보낸다 — 화면은 받아 쓴다.
+  // 고치는 곳은 파이썬 한 곳. 혹시 없으면 키 그대로 보여 깨지지 않게.
+  const GR = k => ((VD && VD.grades) || {})[k] || k;
   const GCLS = {buy:'go', confirm:'small', unknown:'small', nofilter:'no', avoid:'no', wait:''};
   // shared/tree_grade.ProductEval.grade_key 와 같은 순서
   function gradeKey(v, ans){
@@ -1388,9 +1390,9 @@ UPRO는 시장의 폭을 산다. S&P500에는 기술주 외에 금융·헬스케
     const key = v.zones ? gradeKey(v, ans) : v.key;
     const P = s => v.prod+'.'+s;
     let h = '<div class="ck-head"><h3><span class="tk">'+esc(v.prod)+'</span>'+(v.index?' <span class="subtle">기준 지수 '+esc(v.index)+'</span>':'')+'</h3>'
-          + '<span class="verdict '+(GCLS[key]||'')+'" style="margin:0;padding:4px 11px;font-size:13.5px">'+GR[key]+'</span></div>';
+          + '<span class="verdict '+(GCLS[key]||'')+'" style="margin:0;padding:4px 11px;font-size:13.5px">'+GR(key)+'</span></div>';
     if(v.close != null) h += '<p class="subtle" style="margin:4px 0 2px">'+esc(v.date)+' 종가 <b style="color:var(--head)">'+v.close.toFixed(2)+'</b>'+(v.chg!=null?' · 당일 '+(v.chg>=0?'+':'')+v.chg.toFixed(2)+'%':'')+'</p>';
-    h += '<p class="subtle" style="margin:2px 0 10px">엔진 판정: '+esc(v.reason)+(key!==v.key?' <b style="color:var(--gold)">→ 체크한 수동 조건 반영: '+GR[key]+'</b>':'')+'</p>';
+    h += '<p class="subtle" style="margin:2px 0 10px">엔진 판정: '+esc(v.reason)+(key!==v.key?' <b style="color:var(--gold)">→ 체크한 수동 조건 반영: '+GR(key)+'</b>':'')+'</p>';
     if(!v.zones){ return h; }
     const z = v.zones;
     h += zoneHead('① 필터 — 참이어야 본다', true, ev(z.filter,null,ans,P('filter'))) + node(z.filter, P('filter'), ans, 0);
@@ -1478,7 +1480,7 @@ UPRO는 시장의 폭을 산다. S&P500에는 기술주 외에 금융·헬스케
       + VD.verdicts.map(v=>{ const k = v.zones ? gradeKey(v, answers()) : v.key;
           return '<button class="td-chip" data-jump="'+esc(v.prod)+'" style="text-align:left;cursor:pointer;background:'+(v.prod===curP?'var(--surface-2)':'var(--surface)')+';border:1px solid var(--line);border-top:3px solid var(--'+esc(v.prod.toLowerCase())+',var(--line));border-radius:10px;padding:11px 13px">'
             + '<div style="font-weight:800;font-size:15px">'+esc(v.prod)+'</div>'
-            + '<div class="verdict '+(GCLS[k]||'')+'" style="margin:6px 0 0;padding:3px 9px;font-size:12.5px;display:inline-block">'+GR[k]+'</div></button>'; }).join('')
+            + '<div class="verdict '+(GCLS[k]||'')+'" style="margin:6px 0 0;padding:3px 9px;font-size:12.5px;display:inline-block">'+GR(k)+'</div></button>'; }).join('')
       + '</div>';
     const cur = VD.verdicts.find(v=>v.prod===curP);
     h += '<div class="card acc" id="entryCard" style="--pc:var(--'+esc(curP.toLowerCase())+',var(--line))">'+renderProduct(cur)+'</div>';

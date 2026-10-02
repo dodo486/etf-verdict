@@ -198,7 +198,9 @@ def render(slug):
     tree = tree_grade.load_tree(slug)
     now = datetime.now(timezone.utc).astimezone()
     top = {"slug": slug, "title": book_title(slug), "ts": now.isoformat(), "source": SOURCE,
-           "verdicts": [], "common": [], "refs": {}, "missing": {}, "cash": None}
+           "verdicts": [], "common": [], "refs": {}, "missing": {}, "cash": None,
+           # 등급 글자표(키→라벨)를 실어보낸다 — 화면이 따로 복붙하지 않고 이걸 받아 쓴다(단일 출처).
+           "grades": tree_grade.GRADES}
     if tree is None:
         top["error"] = "조건 트리 없음 — books/%s/tree.json 이 있어야 판정한다" % slug
         return top

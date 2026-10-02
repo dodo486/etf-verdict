@@ -331,7 +331,7 @@ def build_index(slug):
 
 
 def index_path(slug):
-    return os.path.join(BOOKS_DIR, slug, "source_index.json")
+    return paths.source_index_path(slug)
 
 
 def write_index(slug):

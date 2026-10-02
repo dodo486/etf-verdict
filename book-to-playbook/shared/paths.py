@@ -153,6 +153,25 @@ def public_book_dir(slug):
     return os.path.join(PUBLIC, slug)
 
 
+# ---------------------------------------------------------------- 산출물(아티팩트) 경로
+# 파이프라인이 주고받는 파일 이름을 여기 한 곳에서만 짓는다 — 예전엔 run.py·publish·backtest·
+# verify_structure 가 "latest-verdict-<slug>.json" 식 이름을 각자 손으로 적어, 규칙을 바꾸면
+# 여러 파일을 동시에 고쳐야 했다.
+def latest_verdict_path(slug):
+    """오늘 판정 결과 JSON(BASE/latest-verdict-<slug>.json) — 엔진이 쓰고 발행이 읽는다."""
+    return os.path.join(BASE, "latest-verdict-%s.json" % slug)
+
+
+def backtest_path(slug):
+    """책 페이지 '백테스트' 탭 데이터(BASE/backtest-<slug>.json)."""
+    return os.path.join(BASE, "backtest-%s.json" % slug)
+
+
+def source_index_path(slug):
+    """원문 소절 인덱스(BASE/books/<slug>/source_index.json)."""
+    return os.path.join(BASE, "books", slug, "source_index.json")
+
+
 if __name__ == "__main__":
     print("BASE   =", BASE)
     print("PUBLIC =", PUBLIC)

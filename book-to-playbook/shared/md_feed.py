@@ -13,6 +13,8 @@ jhts.marketdata 미설치 시 AVAILABLE=False, 함수는 빈 값을 돌려준다
 이 파일에는 네트워크 코드가 **없어야 한다** — 수집은 전부 jhts 몫이다.
 (`import jhts` 가 허용되는 곳도 파이프라인 전체에서 이 파일 하나다. verify_teams.py 가 강제.)
 """
+import sys
+
 try:
     import jhts.marketdata as md
     AVAILABLE = True
@@ -30,7 +32,10 @@ def history(symbol, start):
         return []
     try:
         return md.candles(symbol, start=start) or []
-    except Exception:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001
+        # 판정은 ❔ 로 degrade 하되(무크래시), '데이터 없음'과 '어댑터가 실제로 고장'을
+        # 구분할 수 있게 진짜 예외는 한 줄 남긴다(조용한 실패가 버그를 숨기지 않도록).
+        sys.stderr.write("md_feed.history(%s) 예외 — %s: %s\n" % (symbol, type(e).__name__, e))
         return []
 
 

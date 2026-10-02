@@ -185,7 +185,7 @@ def main(argv):
     # 판정 JSON은 책마다 분리 저장한다(latest-verdict-<slug>.json). 한 파일을
     # 돌려쓰면 live 2권째부터 마지막 책의 판정이 모든 페이지에 병합된다.
     def latest_path(slug):
-        return os.path.join(BASE, "latest-verdict-%s.json" % slug)
+        return paths.latest_verdict_path(slug)
 
     # 어느 엔진을 돌릴지는 books.json 에서 온다(코드에 특정 책을 박지 않는다).
     live = paths.live_slugs()
