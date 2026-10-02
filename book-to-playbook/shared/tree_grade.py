@@ -29,6 +29,11 @@ GRADES = {
     "wait": "⚪ 관망",
     "unknown": "❔ 판정 불가",
 }
+# 등급 판정 사다리의 '뜻'은 코드가 아니라 데이터(shared/grade_rules.json)에 있다 — 규칙을 바꾸면
+# 거기 한 곳만 고친다. 파이썬(grade_key)과 화면(checklist-ui.gradeKey)이 같은 표를 읽는다.
+# 판정 JSON 에도 실어보내(verdict_engine) 화면이 복붙 없이 받아 쓴다.
+GRADE_RULES = json.load(
+    open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "grade_rules.json"), encoding="utf-8"))
 # 판정 전에 과거 시세를 며칠치(달력일) 미리 당겨올지 — '워밍업'. 트리가 쓰는 가장 긴 창
 # (예: 52주 신고가 = 252거래일 ≈ 달력 365일)이 첫날부터 제대로 서도록 넉넉히 둔다.
 # ★ 여기 한 곳이 정본이다 — 매일 판정(verdict_engine)·백테스트(backtest)·검증(verify_tree)이
@@ -102,19 +107,14 @@ class ProductEval:
 
     # ---------------------------------------------------------------- 등급
     def grade_key(self, i):
-        fo, eo, ao = self.opt["filter"][i], self.opt["entry"][i], self.opt["avoid"][i]
-        fp, ep, ap = self.pes["filter"][i], self.pes["entry"][i], self.pes["avoid"][i]
-        if fp is True and ap is False and ep is True:
-            return "buy"
-        if fo is True and ao is False and eo is True:
-            return "confirm"
-        if fo is False:
-            return "nofilter"
-        if ao is True:
-            return "avoid"
-        if fo is True and ao is False and eo is False:
-            return "wait"
-        return "unknown"
+        # grade_rules.json 을 위에서 아래로 본다 — when 의 모든 칸이 맞는 첫 규칙이 이긴다.
+        # 값은 3값(True/False/None) — 'is' 로 정확히 맞춘다(None 은 True·False 어디에도 안 맞는다).
+        views = {"opt": self.opt, "pes": self.pes}
+        for rule in GRADE_RULES["rules"]:
+            view = views[rule["view"]]
+            if all(view[sec][i] is want for sec, want in rule["when"].items()):
+                return rule["key"]
+        return GRADE_RULES["default"]
 
     # ---------------------------------------------------------------- 금액
     def caution_state(self, i):

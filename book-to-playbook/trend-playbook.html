@@ -972,17 +972,26 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
   // 고치는 곳은 파이썬 한 곳. 혹시 없으면 키 그대로 보여 깨지지 않게.
   const GR = k => ((VD && VD.grades) || {})[k] || k;
   const GCLS = {buy:'go', confirm:'small', unknown:'small', nofilter:'no', avoid:'no', wait:''};
-  // shared/tree_grade.ProductEval.grade_key 와 같은 순서
+  // 등급 판정 사다리는 엔진이 판정 JSON(VD.grade_rules, = shared/grade_rules.json)에 실어보낸다 — 복붙 금지.
+  // 위에서 아래로 보며 when 의 모든 칸이 맞는(=== 로 엄격 비교 → null 은 true·false 어디에도 안 맞음)
+  //   첫 규칙이 이긴다. 혹시 없으면 깨지지 않게 예전 순서를 기본값으로 둔다.
+  const GRADE_RULES = (VD && VD.grade_rules) || {rules:[
+    {key:'buy',      view:'pes', when:{filter:true,  avoid:false, entry:true}},
+    {key:'confirm',  view:'opt', when:{filter:true,  avoid:false, entry:true}},
+    {key:'nofilter', view:'opt', when:{filter:false}},
+    {key:'avoid',    view:'opt', when:{avoid:true}},
+    {key:'wait',     view:'opt', when:{filter:true,  avoid:false, entry:false}}
+  ], default:'unknown'};
   function gradeKey(v, ans){
     const z = v.zones || {}, P = s => v.prod+'.'+s;
     const o = {filter:ev(z.filter,true,ans,P('filter')), entry:ev(z.entry,true,ans,P('entry')), avoid:ev(z.avoid,false,ans,P('avoid'))};
     const p = {filter:ev(z.filter,false,ans,P('filter')), entry:ev(z.entry,false,ans,P('entry')), avoid:ev(z.avoid,true,ans,P('avoid'))};
-    if(p.filter===true && p.avoid===false && p.entry===true) return 'buy';
-    if(o.filter===true && o.avoid===false && o.entry===true) return 'confirm';
-    if(o.filter===false) return 'nofilter';
-    if(o.avoid===true) return 'avoid';
-    if(o.filter===true && o.avoid===false && o.entry===false) return 'wait';
-    return 'unknown';
+    const views = {opt:o, pes:p};
+    for(const rule of GRADE_RULES.rules){
+      const view = views[rule.view];
+      if(Object.keys(rule.when).every(sec => view[sec] === rule.when[sec])) return rule.key;
+    }
+    return GRADE_RULES.default;
   }
   function selfCheck(){
     const bad = [];
