@@ -10,8 +10,8 @@
   if(!btn) return;
 
   function refs(){ try { return JSON.parse(document.getElementById('verdict-data').textContent).refs || {}; } catch(e){ return {}; } }
-  var ZW = window.BP.ZW;                 // 공용 부품(shared-ui)
-  function zones(r){ return (r.zones || []).map(function(z){ return ZW[z] || z; }).join('·'); }
+  // 칸 이름표는 엔진 값(VD.zones)을 먼저 읽는다 — 공용 부품(shared-ui.zw). ZW 리터럴은 오프라인 기본값.
+  function zones(r){ return (r.zones || []).map(function(z){ return window.BP.zw(z); }).join('·'); }
 
   /* ---- 분할 모드 토글 ---- */
   function fitTop(){
@@ -145,7 +145,7 @@
   if(!rowsEl) return;
   var REFS = {};
   try { REFS = JSON.parse(document.getElementById('verdict-data').textContent).refs || {}; } catch(e){}
-  var ZW = window.BP.ZW;                 // 공용 부품(shared-ui)
+  // 칸 이름표는 엔진 값(VD.zones)을 먼저 읽는다 — 공용 부품(shared-ui.zw)
 
   // 소절 목록·제목은 플레이북 원문(#src)에서 가져온다(따로 적지 않는다 — 어긋날 수 있으므로)
   var TITLE = {}, KEYS = [], CHAP = {};
@@ -184,7 +184,7 @@
       var chap = CHAP[ck] || ck;
       if(chap !== lastChap){ html += '<div class="covchap">' + chap + '</div>'; lastChap = chap; }
       var where = (s === 'ref' || s === 'part')
-        ? (r.zones || []).map(function(z){ return ZW[z] || z; }).join('·') + ' · 자동 ' + r.auto + ' · 수동 ' + r.manual
+        ? (r.zones || []).map(function(z){ return window.BP.zw(z); }).join('·') + ' · 자동 ' + r.auto + ' · 수동 ' + r.manual
         : (s === 'gap' ? '⚠ 트리로 못 옮김' : '— 체크리스트 없음');
       var why = (r.unexpressed || []).map(function(u){ return u.rule + ' (' + u.reason + ')'; }).join(' · ');
       html += '<div class="covrow ' + (s === 'none' ? 'mindset' : (s === 'gap' ? 'gap' : 'ref')) + '" data-k="' + k + '">'

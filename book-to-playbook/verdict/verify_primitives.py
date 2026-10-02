@@ -647,12 +647,52 @@ def t_regress():
     check(cond.series(four, make_ctx([1.0]))[0] is None, "4개 중 2개(1참·1거짓·2모름) → 모름")
 
 
+def t_no_excluded_live():
+    """불변식(화면 Fix #1): 실전 판정이 쓰는 문맥(unobserved != "exclude")에서는 EXCLUDED 가 절대 나오지 않는다.
+    EXCLUDED/빈-전부-제외 노드가 브라우저(verdict_engine → #verdict-data)에 실리면, 화면 3값 엔진
+    (checklist-ui ev/and3/or3)에는 그 개념이 없어 null 로 오해해 등급이 엔진과 갈라진다. 그 입력이 애초에
+    실전 경로로 올 수 없음을 여기서 강제한다.
+
+    확인:
+      (1) verdict_engine(실전 판정)은 cond.Ctx 를 만들 때 unobserved="exclude" 를 쓰지 않는다 — 소스로 확인.
+      (2) 기본/실전 문맥에서는 관측값 없는 observe·수동·그 논리 묶음(전부 제외가 될 법한 묶음)조차 EXCLUDED 를
+          내지 않고 true/false/None 만 낸다 — 실행으로 확인.
+    """
+    import datetime as dt
+    import inspect
+    from verdict import verdict_engine
+    src = inspect.getsource(verdict_engine)
+    check('unobserved="exclude"' not in src and "unobserved='exclude'" not in src,
+          "verdict_engine 실전 경로가 unobserved=exclude 를 쓰지 않아야(백테스트 전용)")
+    # 기본/낙관/비관 문맥 어디서도 EXCLUDED 가 안 나와야 한다 — 관측 없는 observe 와 그 논리 묶음까지.
+    # (EXCLUDED 는 cond.py 에서 ctx.unobserved=="exclude" 일 때만 난다 — 실전은 그 모드가 아니다.)
+    cal = ["20261001", "20261002"]
+    hist = {"X": [Candle(d, 100, 100, 100, 100, 1000) for d in cal]}
+    now = dt.datetime(2026, 10, 2, 20, 0, tzinfo=dt.timezone.utc)
+
+    class H(dict):
+        minutes = {"X": {}}          # 분봉 없음 → observe 는 관측값이 없다(실전에서 흔함)
+        sessions = {"US": []}
+        market = {"X": "US"}
+
+    obs = {"observe": {"gt": [{"px": "close", "at": {"open_offset_min": -10}}, {"px": "close"}]}, "manual": "데이터 없음: x"}
+    nodes = [obs, {"manual": "y"}, {"all": [obs]}, {"any": [obs]}, {"not": obs},
+             {"all": [obs, {"manual": "z"}]}, {"atleast": 1, "of": [obs, {"manual": "w"}]}]
+    for manual_as in (None, True, False):
+        ctx = cond.Ctx(H(hist), cal, "X", now=now, manual_as=manual_as)   # 실전 기본: unobserved 미지정
+        for node in nodes:
+            got = cond.series(node, ctx)
+            bad = [x for x in got if x is cond.EXCLUDED]
+            check(not bad, "실전 문맥(manual_as=%r) %s 가 EXCLUDED 를 냄 %r" % (manual_as, list(node)[0], got))
+
+
 def main():
     rng = random.Random(20261001)
     for name, fn in (("수치 연산", lambda: t_numeric(rng)), ("3값 논리", t_logic),
                      ("시간 연산", lambda: t_time(rng)), ("하한", t_bounds), ("포지션", lambda: t_pos(rng)), ("거래 시뮬레이터", t_trades),
                      ("인과성", lambda: t_causal(rng)),
-                     ("문법", t_syntax), ("저자 시각", t_at), ("등급·금액", t_grade), ("표현력 회귀", t_regress)):
+                     ("문법", t_syntax), ("저자 시각", t_at), ("등급·금액", t_grade), ("표현력 회귀", t_regress),
+                     ("EXCLUDED 실전 불변식", t_no_excluded_live)):
         before = len(FAILS)
         try:
             fn()
