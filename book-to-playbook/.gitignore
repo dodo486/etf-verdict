@@ -19,6 +19,10 @@ __pycache__/
 *.pyc
 .DS_Store
 .omc/
+.venv/
+
+# ==== 시세 데이터 캐시(jhts 가 생성 — 로컬 전용) ====
+data/
 
 # ==== 내 포지션(개인 정보 — 로컬 화면에서만 매도·분할 판정) ====
 books/*/positions.json

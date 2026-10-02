@@ -38,8 +38,9 @@
   시세          {"px": "close"|"open"|"high"|"low"|"volume", "sym": 심볼?, "tf": 봉?}   sym 기본 "$self",
                 tf 기본 "1d". 봉 길이는 노드 속성일 뿐 — 연결된 데이터가 일봉뿐이라 지금은 "1d" 만 허용.
                 {"px": "close", "sym": 심볼, "at": {"open_offset_min": m}}  저자가 말한 시각의 값 — 그 판정일
-                다음 미국 정규장 개장(뉴욕 09:30) 기준 m분(음수 = 개장 전) 시각까지의 마지막 1분봉 종가.
-                판정일 종가 이후 그 시각 사이의 분봉만 쓴다. 그 시각이 아직 안 왔거나 분봉이 없으면 모름(None).
+                다음 정규장 개장(업계 캘린더 기준 — 시장 휴장·반일장 반영) 기준 m분(음수 = 개장 전) 시각까지의
+                마지막 1분봉 종가. 판정일 종가(그날 정규장 마감) 이후 그 시각 사이의 분봉만 쓴다. 개장 시각은
+                코드에 박지 않고 심볼의 시장 세션(sessions)에서 읽는다. 그 시각이 아직 안 왔거나 분봉이 없으면 모름(None).
   산술          {"add"|"sub"|"mul"|"div"|"max"|"min": [a, b]}   max/min = 같은 날 두 값 중 큰/작은 값
                 {"abs": a}
   선택          {"case": [[c1, v1], [c2, v2], ...], "else": v}   위에서부터 처음 참인 c 의 v.
@@ -77,7 +78,7 @@ POS_FIELDS = ("ret", "days", "maxret", "minret")
 ARITH = ("add", "sub", "mul", "div", "max", "min")
 TIMEFRAMES = ("1d",)      # 연결된 봉 길이 — 분봉이 연결되면 여기만 늘린다(문법은 그대로)
 AT_KEYS = ("open_offset_min",)
-US_OPEN_ET = (9, 30)      # 미국 정규장 개장 — 뉴욕 시각
+AT_OFFSET_CAP = 24 * 60   # 저자 시각 offset(개장 기준 분)의 상한 — 하루(±1440분) 밖은 오타로 본다. 시장 가정은 없다.
 WINDOW = ("ma", "ema", "stdev", "highest", "lowest", "sum")
 CMP = ("gt", "ge", "lt", "le")
 STREAK_CAP = 400          # 연속·경과일을 거꾸로 셀 때의 상한(데이터 길이보다 길면 무의미)
@@ -138,11 +139,14 @@ def validate(node, defs=None, path="$"):
             raise CondError("%s.sym: 문자열이어야 한다" % path)
         if "at" in node:
             at = node["at"]
+            # px 는 close 만(분봉은 종가만 들어온다). offset 은 정수 — 개장 기준 분(음수 = 개장 전). 시장별 개장·마감
+            # 시각은 업계 캘린더(sessions)가 정하므로 여기에 US 09:30/16:00 같은 가정은 없다. 하루(±24시간) 밖은 오타로 거른다.
             if v != "close" or not (isinstance(at, dict) and set(at) == set(AT_KEYS)
                                     and isinstance(at["open_offset_min"], int)
                                     and not isinstance(at["open_offset_min"], bool)
-                                    and -720 <= at["open_offset_min"] <= 390):
-                raise CondError("%s.at: {\"open_offset_min\": 정수(-720~390)} 이고 px 는 close 여야 한다" % path)
+                                    and -AT_OFFSET_CAP <= at["open_offset_min"] <= AT_OFFSET_CAP):
+                raise CondError("%s.at: {\"open_offset_min\": 정수(±%d 이내)} 이고 px 는 close 여야 한다"
+                                % (path, AT_OFFSET_CAP))
         if "tf" in node and node["tf"] not in TIMEFRAMES:
             raise CondError("%s.tf: 연결되지 않은 봉 %r (연결된 봉 %s) — 그 데이터가 연결될 때까지 manual "
                             "(\"데이터 없음: ...\") 로 둔다" % (path, node["tf"], "/".join(TIMEFRAMES)))
@@ -221,8 +225,9 @@ class Ctx:
     """평가 문맥. hist={심볼: [Candle(date,open,high,low,close,volume)]}, cal=날짜 목록."""
 
     def __init__(self, hist, cal, self_sym, index_sym=None, defs=None, manual_as=None, pos=None, now=None,
-                 unobserved=None):
-        """pos = (첫 매수일 인덱스, 평균 매입가 | 날짜별 평균 매입가 목록) — 매도·분할 규칙 평가 때만."""
+                 unobserved=None, sessions=None):
+        """pos = (첫 매수일 인덱스, 평균 매입가 | 날짜별 평균 매입가 목록) — 매도·분할 규칙 평가 때만.
+        sessions = {시장: [Session]} 정규장 달력(저자 시각 값의 개장·마감 시각을 읽는다) — at 노드가 없으면 None 이어도 된다."""
         self.pos = pos
         self.now = now            # 저자 시각 값의 '지금'(UTC datetime) — None 이면 실제 지금
         self.unobserved = unobserved  # None = 관측값 없는 observe 는 수동처럼 · "exclude" = 그 조건을 빼고 판단(백테스트)
@@ -232,6 +237,9 @@ class Ctx:
         self.index_sym = index_sym
         self.defs = defs or {}
         self.manual_as = manual_as
+        # 저자 시각(at)용 정규장 달력. History 가 들고 있으면 거기서, 아니면 넘겨받은 것(테스트)에서 읽는다.
+        self.sessions = sessions if sessions is not None else getattr(hist, "sessions", None) or {}
+        self.market = getattr(hist, "market", None) or {}
         self._px = {}
         self._memo = {}
         self._flip = None
@@ -242,7 +250,7 @@ class Ctx:
             return self
         if self._flip is None:
             f = Ctx(self.hist, self.cal, self.self_sym, self.index_sym, self.defs, not self.manual_as, self.pos,
-                    self.now, self.unobserved)
+                    self.now, self.unobserved, self.sessions)
             f._px, f._flip = self._px, self
             self._flip = f
         return self._flip
@@ -263,55 +271,72 @@ class Ctx:
                 by = {c.date: getattr(c, field) for c in (self.hist.get(sym) or [])}
                 self._px[key] = [by.get(d) for d in self.cal]
             else:
+                mkt = self.market.get(sym)
+                sess = self.sessions.get(mkt) or []
                 self._px[key] = at_series(getattr(self.hist, "minutes", {}).get(sym) or {}, self.cal,
-                                          at["open_offset_min"], self.now)
+                                          at["open_offset_min"], sess, mkt, self.now)
         return self._px[key]
 
 
 # ------------------------------------------------------------------ 저자 시각(분봉)
-def _nth_sunday(y, m, n):
+# 분봉 키(YYYYMMDDHHMM)의 기준 시간대 — 시장마다 다르다(US 는 UTC, KR 은 KST).
+# 세션 시각(거래소 현지 tz-aware)을 이 시간대로 옮겨 분봉 키와 같은 자리에서 비교한다.
+# jhts 세션 시각은 어느 시장이든 tz-aware 라, 키 포맷만 이 표를 따른다.
+_MINUTE_TZ = {"US": "UTC", "KR": "Asia/Seoul"}
+
+
+def _to_minute_key(when, market):
+    """세션의 tz-aware datetime → 분봉 키(YYYYMMDDHHMM). 그 시장 분봉이 쓰는 시간대로 옮긴 뒤 자른다."""
     import datetime as _dt
-    d = _dt.date(y, m, 1)
-    d += _dt.timedelta(days=(6 - d.weekday()) % 7)
-    return d + _dt.timedelta(days=7 * (n - 1))
+    tzname = _MINUTE_TZ.get(market, "UTC")
+    if tzname == "UTC":
+        tz = _dt.timezone.utc
+    else:
+        try:
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo(tzname)
+        except Exception:  # noqa: BLE001 — zoneinfo 없으면 UTC 로(오차 가능 — 로그만)
+            tz = _dt.timezone.utc
+    return when.astimezone(tz).strftime("%Y%m%d%H%M")
 
 
-def et_to_utc(day, hh, mm):
-    """뉴욕 시각(YYYYMMDD, 시, 분) → UTC datetime. 미국 서머타임 규칙(3월 둘째 일요일 ~ 11월 첫째 일요일)."""
-    import datetime as _dt
-    d = _dt.date(int(day[:4]), int(day[4:6]), int(day[6:8]))
-    dst = _nth_sunday(d.year, 3, 2) <= d < _nth_sunday(d.year, 11, 1)
-    local = _dt.datetime(d.year, d.month, d.day, hh, mm)
-    return (local + _dt.timedelta(hours=4 if dst else 5)).replace(tzinfo=_dt.timezone.utc)
+def _next_session(sessions, d):
+    """판정일 d(YYYYMMDD) 다음 정규장 Session — sessions(날짜 오름차순)에서 d 보다 큰 첫 날. 없으면 None."""
+    for s in sessions:
+        if s.date > d:
+            return s
+    return None
 
 
-def _next_session(cal, i):
-    """판정일 cal[i] 다음 정규장 날 — 달력에 다음 날이 있으면 그날(휴장 반영), 마지막 날이면 다음 평일."""
-    import datetime as _dt
-    if i + 1 < len(cal):
-        return cal[i + 1]
-    d = _dt.date(int(cal[i][:4]), int(cal[i][4:6]), int(cal[i][6:8])) + _dt.timedelta(days=1)
-    while d.weekday() >= 5:
-        d += _dt.timedelta(days=1)
-    return d.strftime("%Y%m%d")
+def _session_of(sessions, d):
+    """판정일 d(YYYYMMDD)의 정규장 Session — 달력에 그날이 있으면 그 세션, 없으면 None."""
+    for s in sessions:
+        if s.date == d:
+            return s
+    return None
 
 
-def at_series(minutes, cal, offset, now=None):
-    """판정일마다 '다음 정규장 개장 + offset 분' 시각까지의 마지막 1분봉 종가(판정일 종가 이후 분봉만).
-    minutes = {YYYYMMDDHHMM(UTC): 종가}. 그 시각이 아직 안 왔거나 구간에 분봉이 없으면 None."""
+def at_series(minutes, cal, offset, sessions, market=None, now=None):
+    """판정일마다 '다음 정규장 개장 + offset 분' 시각까지의 마지막 1분봉 종가(판정일 정규장 마감 이후 분봉만).
+    minutes = {YYYYMMDDHHMM: 종가}. 개장·마감 시각은 sessions(업계 캘린더)에서 읽는다 — 코드에 시장 가정 없음.
+    그 시각이 아직 안 왔거나 세션 정보가 없거나 구간에 분봉이 없으면 None."""
     import datetime as _dt
     now = now or _dt.datetime.now(_dt.timezone.utc)
     keys = sorted(minutes)
     out = []
-    for i, d in enumerate(cal):
-        nxt = _next_session(cal, i)
-        oh, om = US_OPEN_ET
-        target = et_to_utc(nxt, oh, om) + _dt.timedelta(minutes=offset)
-        start = et_to_utc(d, 16, 0)                       # 판정일 정규장 마감 이후
-        if target > now or not keys:
-            out.append(None)
+    for d in cal:
+        nxt = _next_session(sessions, d)
+        today = _session_of(sessions, d)
+        if nxt is None or not keys:
+            out.append(None)                              # 다음 개장 시각을 모르면(세션 없음) 모름
             continue
-        lo, hi = start.strftime("%Y%m%d%H%M"), target.strftime("%Y%m%d%H%M")
+        target = nxt.open + _dt.timedelta(minutes=offset)
+        if target > now:
+            out.append(None)                              # 아직 그 시각이 안 옴
+            continue
+        hi = _to_minute_key(target, market)
+        # 구간 시작 = 판정일 정규장 마감 이후. 세션을 알면 그 마감 시각, 모르면 다음 개장 전날까지로 열어 둔다.
+        lo = _to_minute_key(today.close, market) if today is not None else ""
         val = None
         for k in reversed(keys):
             if k <= hi:

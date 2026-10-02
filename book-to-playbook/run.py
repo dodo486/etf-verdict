@@ -9,7 +9,7 @@ homebrew·python.org·Microsoft Store 어느 설치본이든 그대로 동작한
 사용법
   python run.py daily        # 판정(체크리스트 = 조건 트리) → 백테스트 → 발행 (장 마감 후)
   python run.py watch        # 저자가 말한 시각(트리의 at — 예: 개장 10분 전)마다 기다렸다 판정 → 발행
-                             #   그날 미국 정규장 개장 기준으로 계산한다(서머타임 자동). 매일 밤 한 번 띄우면 된다.
+                             #   다음 정규장 개장 기준(업계 캘린더 — 서머타임·휴장 자동). 매일 밤 한 번 띄우면 된다.
   python run.py publish      # 재판정 없이 현재 JSON으로 다시 발행만
 
 옵션
@@ -272,25 +272,41 @@ def main(argv):
 
 
 def watch(argv):
-    """저자가 말한 시각마다 판정 — 라이브 책 트리의 at(개장 기준 분)을 모아, 오늘 미국 정규장 개장 기준 그 시각
-    (+1분: 1분봉이 닫히고 들어오는 여유)까지 기다렸다가 판정→발행(백테스트 제외)을 돈다. 주말이면 그냥 끝난다."""
+    """저자가 말한 시각마다 판정 — 라이브 책 트리의 at(개장 기준 분)을 모아, 다음 정규장 개장 기준 그 시각
+    (+1분: 1분봉이 닫히고 들어오는 여유)까지 기다렸다가 판정→발행(백테스트 제외)을 돈다.
+
+    개장 시각은 코드에 박지 않고 업계 캘린더(md_feed.sessions)에서 읽는다 — 서머타임·휴장·반일장이 자동 반영된다.
+    at 심볼의 시장을 모아 그 시장들의 다음 개장을 쓴다. 오늘·앞으로 개장이 없으면(주말·휴장) 그냥 끝난다."""
     import time
     from datetime import timedelta, timezone
-    from shared import cond, tree_grade
-    offs = set()
+    from shared import cond, tree_grade, md_feed
+    offs, msyms = set(), set()
     for slug in paths.live_slugs():
         t = tree_grade.load_tree(slug)
         if t:
             offs.update(cond.at_offsets(t))
-    now = datetime.now(timezone.utc)
-    et_day = (now - timedelta(hours=5)).strftime("%Y%m%d")    # 뉴욕 날짜(대략) — 개장 시각은 et_to_utc 가 정확히
-    if datetime.strptime(et_day, "%Y%m%d").weekday() >= 5:
-        print("watch: 오늘은 미국 정규장이 없다 — 끝")
+            msyms.update(cond.minute_symbols_of(t))
+    if not offs:
+        print("watch: 저자 시각(at) 조건이 없다 — 끝")
         return 0
+    now = datetime.now(timezone.utc)
+    start = (now - timedelta(days=3)).strftime("%Y%m%d")
+    end = (now + timedelta(days=7)).strftime("%Y%m%d")
+    # at 심볼이 속한 시장들의 다음 개장 — 여러 시장이면 가장 이른 다음 개장을 기준으로 잡는다.
+    markets = sorted({m for m in (md_feed.market_of(s) for s in msyms) if m})
+    nxt_open = None
+    for mk in markets:
+        s = cond._next_session(md_feed.sessions(mk, start, end), now.strftime("%Y%m%d"))
+        if s is not None and (nxt_open is None or s.open < nxt_open):
+            nxt_open = s.open
+    if nxt_open is None:
+        print("watch: 다음 정규장 개장을 캘린더에서 못 찾음(주말·휴장·세션 미설치) — 끝")
+        return 0
+    nxt_open = nxt_open.astimezone(timezone.utc)
     rest = [a for a in argv if a != "watch"]
     code = 0
     for off in sorted(offs):
-        due = cond.et_to_utc(et_day, *cond.US_OPEN_ET) + timedelta(minutes=off + 1)
+        due = nxt_open + timedelta(minutes=off + 1)
         wait = (due - datetime.now(timezone.utc)).total_seconds()
         if wait < -600:
             print("watch: 개장 %+d분 시각은 이미 지남 — 건너뜀" % off)

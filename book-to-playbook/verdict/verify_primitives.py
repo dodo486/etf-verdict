@@ -516,28 +516,36 @@ def t_syntax():
 
 
 def t_at():
-    """저자 시각 값 — 판정일 다음 정규장 개장 ± 분 시각까지의 마지막 1분봉(판정일 마감 이후), 서머타임, 아직 안 온 시각."""
+    """저자 시각 값 — 판정일 다음 정규장 개장 ± 분 시각까지의 마지막 1분봉(판정일 마감 이후), 아직 안 온 시각.
+    개장·마감 시각은 업계 캘린더(sessions)에서 온다 — 코드에 US 09:30/16:00/DST 가정이 없다(여기선 세션을 직접 지어 넣는다)."""
     import datetime as dt
     utc = dt.timezone.utc
-    check(cond.et_to_utc("20261002", 9, 30) == dt.datetime(2026, 10, 2, 13, 30, tzinfo=utc), "서머타임 개장 13:30 UTC")
-    check(cond.et_to_utc("20261215", 9, 30) == dt.datetime(2026, 12, 15, 14, 30, tzinfo=utc), "표준시 개장 14:30 UTC")
-    check(cond.et_to_utc("20260309", 9, 30).hour == 13 and cond.et_to_utc("20260306", 9, 30).hour == 14,
-          "3월 둘째 일요일 전환")
-    check(cond.et_to_utc("20261102", 9, 30).hour == 14 and cond.et_to_utc("20261030", 9, 30).hour == 13,
-          "11월 첫째 일요일 전환")
+    Session = namedtuple("Session", "date open close is_half")
+
+    def us_session(day, oh=9, om=30, ch=16, cm=0, utc_off=4):
+        """US 정규장 세션 하나 — 분봉 키가 UTC 이므로 세션 시각도 UTC-aware(개장 09:30 ET = 13:30 UTC @ DST)로 지어 둔다."""
+        y, mo, dd = int(day[:4]), int(day[4:6]), int(day[6:8])
+        op = dt.datetime(y, mo, dd, oh, om, tzinfo=utc) + dt.timedelta(hours=utc_off)
+        cl = dt.datetime(y, mo, dd, ch, cm, tzinfo=utc) + dt.timedelta(hours=utc_off)
+        return Session(day, op, cl, False)
+
     # 판정일 10/01(목) → 다음 정규장 10/02(금) 09:20 ET = 13:20 UTC. 10/01 마감(20:00 UTC) 이후 분봉만.
+    sess = [us_session("20261001"), us_session("20261002")]
     m = {"202610011950": 1.0, "202610012100": 2.0, "202610021315": 3.0, "202610021320": 4.0, "202610021321": 5.0}
     cal = ["20261001", "20261002"]
     now = dt.datetime(2026, 10, 2, 20, 0, tzinfo=utc)
-    got = cond.at_series(m, cal, -10, now)
+    got = cond.at_series(m, cal, -10, sess, "US", now)
     check(got[0] == 4.0, "개장 10분 전 값 = 13:20 UTC 분봉 %r" % got)
-    check(got[1] is None, "다음 정규장(월) 시각이 아직 안 옴 → 모름")
-    early = cond.at_series(m, cal, -10, dt.datetime(2026, 10, 2, 13, 0, tzinfo=utc))
+    check(got[1] is None, "다음 정규장 세션이 없음(캘린더 밖) → 모름")
+    early = cond.at_series(m, cal, -10, sess, "US", dt.datetime(2026, 10, 2, 13, 0, tzinfo=utc))
     check(early[0] is None, "그 시각 전이면 지금까지의 값을 쓰지 않는다(모름) %r" % early)
-    check(cond.at_series({"202610011950": 1.0}, cal, -10, now)[0] is None, "판정일 마감 전 분봉만 있으면 모름")
-    # 문법: close 만, 정수 분
+    check(cond.at_series({"202610011950": 1.0}, cal, -10, sess, "US", now)[0] is None, "판정일 마감 전 분봉만 있으면 모름")
+    # 세션 정보가 아예 없으면(다음 개장 시각 모름) 전부 모름
+    check(cond.at_series(m, cal, -10, [], "US", now) == [None, None], "세션 없으면 모름")
+    # 문법: close 만, 정수 분 (±24시간 밖은 거부)
     for b in ({"px": "volume", "at": {"open_offset_min": -10}}, {"px": "close", "at": {"open_offset_min": 1.5}},
-              {"px": "close", "at": {"minutes": -10}}, {"px": "close", "at": -10}):
+              {"px": "close", "at": {"minutes": -10}}, {"px": "close", "at": -10},
+              {"px": "close", "at": {"open_offset_min": 2000}}, {"px": "close", "at": {"open_offset_min": -2000}}):
         try:
             cond.validate(b)
             FAILS.append("잘못된 at 통과: %r" % b)
@@ -548,6 +556,8 @@ def t_at():
 
     class H(dict):
         minutes = {"X": {"202610021320": 101.0}}
+        sessions = {"US": sess}
+        market = {"X": "US"}
     ctx = cond.Ctx(H(hist), cal, "X", now=now)
     v = cond.series({"gt": [{"px": "close", "at": {"open_offset_min": -10}}, {"px": "close"}]}, ctx)
     check(v == [True, None], "선물 개장 전 값 > 전일 종가 %r" % v)

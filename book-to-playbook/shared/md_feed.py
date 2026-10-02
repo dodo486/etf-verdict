@@ -70,6 +70,27 @@ def minutes(symbol):
         return {}
 
 
+def sessions(market, start, end):
+    """market("US"|"KR")의 start~end(YYYYMMDD) 정규장 달력 [Session] — 업계 캘린더(거래소 휴장·반일장 반영).
+    Session: .date(YYYYMMDD) · .open/.close(거래소 현지 tz-aware datetime) · .is_half(반일장). 실패/미설치 시 []."""
+    if not AVAILABLE:
+        return []
+    try:
+        return md.sessions(market, start, end) or []
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def market_of(symbol):
+    """심볼이 속한 시장 "US"|"KR" — 분봉/세션 시각의 기준 시장을 정한다. 미설치/실패 시 None."""
+    if not AVAILABLE:
+        return None
+    try:
+        return md.market_of(symbol)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def requested():
     """{심볼: 요청 id | 실패 사유} — 시세가 없어 수집을 요청한 심볼."""
     return dict(_REQUESTED)
