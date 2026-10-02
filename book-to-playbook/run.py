@@ -16,6 +16,9 @@ homebrew·python.org·Microsoft Store 어느 설치본이든 그대로 동작한
   --no-git     발행 후 git commit/push 생략
   --no-push    commit 은 하되 push 는 생략
   --quiet      콘솔 출력 최소화(로그 파일에는 그대로 남음)
+  --no-verify-tree  트리 검수(verify_tree)·원시함수 검사(verify_primitives) 생략 — 트리를
+                    만들 때 한 번 검수하면 되는 것이라, 트리가 더 안 바뀌면 끈다(발행물 점검
+                    verify_structure 는 항상 돈다). 트리 완성 전에는 켜 두는 것이 안전하다.
 
 경로·크레덴셜은 shared/paths.py 규칙을 따른다. telegram.env · local.env 가 BASE에 있으면
 자동으로 환경변수에 주입한다(없으면 그냥 건너뜀). 스케줄러로 돌릴 때 jhts 시세 패키지 경로는
@@ -172,6 +175,10 @@ def main(argv):
     quiet = "--quiet" in argv
     no_git = "--no-git" in argv
     no_push = "--no-push" in argv
+    # 트리 검수(verify_tree)·원시함수 검사(verify_primitives)는 트리를 '만들 때' 한 번 하면 되는
+    # 것이라(python -m checklist.verify_tree <slug>), 트리가 더 안 바뀌면 daily 가 매번 다시 돌 필요가
+    # 없다. --no-verify-tree 로 그 둘을 끈다(발행물 점검 verify_structure 는 트리와 무관해 항상 돈다).
+    no_verify_tree = "--no-verify-tree" in argv
 
     # telegram.env(알림 크레덴셜) · local.env(이 컴퓨터 설정 — 예: PYTHONPATH=<jhts 경로>). 둘 다 커밋하지 않는다.
     for envfile in ("telegram.env", "local.env"):
@@ -220,7 +227,11 @@ def main(argv):
     #   ② verdict.verify_primitives 조건 트리 원시 연산이 계산을 맞게 하나(실행 검사)
     #   ③ checklist.verify_tree     체크리스트가 원문 뜻대로 동작하나(이중 추출·원문 사례·발화 통계·비중 합)
     # 등급: 0 통과 · 1 정지 · 2 경고.
-    checks = ["verify_structure", "verdict.verify_primitives", "checklist.verify_tree"]
+    checks = ["verify_structure"]   # 발행물·구조 점검 — 트리와 무관, 항상 돈다
+    if not no_verify_tree:
+        checks += ["verdict.verify_primitives", "checklist.verify_tree"]
+    else:
+        r.say("--no-verify-tree: 트리 검수·원시함수 검사 생략(트리 생성 단계에서 이미 검수한 것으로 봄)")
     codes = {}
     for script in checks:
         code, out, err = r.verify(script)
