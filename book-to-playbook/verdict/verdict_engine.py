@@ -202,7 +202,11 @@ def render(slug):
            # 등급 글자표(키→라벨)를 실어보낸다 — 화면이 따로 복붙하지 않고 이걸 받아 쓴다(단일 출처).
            "grades": tree_grade.GRADES,
            # 등급 판정 사다리(데이터) 도 같이 실어, 화면이 같은 표로 등급을 다시 낸다(복붙 금지).
-           "grade_rules": tree_grade.GRADE_RULES}
+           "grade_rules": tree_grade.GRADE_RULES,
+           # 여섯 칸 키→한글 이름표(화면 머리글용) — cond.ZONE_LABELS 가 정본이다. 화면(shared-ui ZW)이
+           #   복붙하지 않고 이걸 받아 쓴다. 머리글 번호 순서대로(①필터 ②회피 ③진입 …) 실어보낸다.
+           "zones": {s: cond.ZONE_LABELS[s]
+                     for s in ("filter", "avoid", "entry", "caution", "sizing", "exit")}}
     if tree is None:
         top["error"] = "조건 트리 없음 — books/%s/tree.json 이 있어야 판정한다" % slug
         return top

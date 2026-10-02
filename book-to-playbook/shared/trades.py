@@ -27,6 +27,24 @@ STANDARD = [
 FULL = [{"label": "전량", "frac": 1.0}]
 
 
+def _std_const(field, op):
+    """STANDARD 에서 (pos.<field> op 상수) 꼴 규칙의 상수를 꺼낸다 — 숫자를 다시 적지 않고 구조에서 끌어온다."""
+    for r in STANDARD:
+        w = r.get("when") or {}
+        args = w.get(op)
+        if args and isinstance(args[0], dict) and args[0].get("pos") == field:
+            return args[1]
+    return None
+
+
+def standard_label():
+    """표준 매도 규칙의 짧은 표시 문자열(예 '+9%/−5%/10일') — STANDARD 상수에서 파생(단일 출처).
+    화면은 이 문자열을 받아 쓰고 숫자를 복붙하지 않는다."""
+    tp, sl, dys = _std_const("ret", "ge"), _std_const("ret", "le"), _std_const("days", "ge")
+    return "+%g%%/−5%%/%g일" % (tp, dys) if sl == -5 else \
+           "+%g%%/%g%%/%g일" % (tp, sl, dys)
+
+
 def exits_of(tree, prod):
     """(규칙 목록, 출처) — 책 규칙이 없으면 표준."""
     ex = tree["products"][prod].get("exit")

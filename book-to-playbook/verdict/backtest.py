@@ -190,7 +190,10 @@ def page_data(slug):
     hist = fetch_history(tree, max(d for _, d in PAGE_PERIODS))
     out = {"slug": slug, "generated": datetime.now().isoformat(timespec="seconds"),
            "horizons": list(HORIZONS), "grades": list(tree_grade.GRADES.values()),
-           "buy_or_confirm": BUY_OR_CONFIRM, "periods": {}}
+           "buy_or_confirm": BUY_OR_CONFIRM,
+           # 표준 매도 규칙의 짧은 표시(예 '+9%/−5%/10일') — shared/trades.STANDARD 에서 파생(단일 출처).
+           #   화면(backtest-ui)은 이 값을 받아 쓰고 숫자를 복붙하지 않는다.
+           "standard_exit_label": trades_mod.standard_label(), "periods": {}}
     for key, days in PAGE_PERIODS:
         res = run(slug, days, hist=hist, tree=tree)
         out["periods"][key] = {
