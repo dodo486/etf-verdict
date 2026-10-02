@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """books.json → public/index.html (책 선택 홈/런처). 카드 클릭 시 /slug/ 로 이동."""
-import os, json, html
+import os, html
 
-from shared.paths import BASE, PUBLIC, ensure_dir, read_text, write_text
+from shared.paths import PUBLIC, ensure_dir, read_text, write_text, load_manifest
 
-manifest = json.loads(read_text(os.path.join(BASE, "books.json")))
+manifest = load_manifest()
 outdir = ensure_dir(PUBLIC)
 
 def esc(s): return html.escape(str(s))

@@ -6,18 +6,15 @@
 같은 로직이 검사기 세 곳에 복붙돼 있었다 — 사본이 갈라지면 검사기마다 서로 다른
 페이지를 보게 되므로 여기 하나로 모은다.
 """
-import io
-import json
 import os
 
-from shared.paths import BASE, PUBLIC
+from shared.paths import BASE, PUBLIC, load_books
 
 
 def book_pages():
     """{slug: html경로} — books.json 기준, 배포본(PUBLIC/<slug>/index.html) 우선."""
-    manifest = json.loads(io.open(os.path.join(BASE, "books.json"), encoding="utf-8").read())
     out = {}
-    for b in manifest.get("books", []):
+    for b in load_books():
         slug = b["slug"]
         for cand in (os.path.join(PUBLIC, slug, "index.html"),
                      os.path.join(BASE, "%s-playbook.html" % slug)):

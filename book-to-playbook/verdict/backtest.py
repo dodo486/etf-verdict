@@ -32,8 +32,6 @@ from shared.paths import BASE, LOGS, ensure_dir, write_text
 from shared import trades as trades_mod, tree_grade
 
 HORIZONS = (5, 10, 20)
-# 트리가 쓰는 가장 긴 창(예: 52주 신고가 252거래일)이 첫날부터 서도록 넉넉히(달력 400일).
-WARMUP_DAYS = 400
 BUY_OR_CONFIRM = "✅+🟡 (수동 확인 가정)"
 
 
@@ -83,7 +81,7 @@ def _summarize(prod_rows, cs):
 # ------------------------------------------------------------------ 실행
 def fetch_history(tree, days):
     """트리(여섯 칸 전부)가 쓰는 심볼의 일봉 — days + 워밍업만큼. 수집은 tree_grade.history 한 곳."""
-    return tree_grade.history(tree, (datetime.now() - timedelta(days=days + WARMUP_DAYS)).strftime("%Y%m%d"))
+    return tree_grade.history(tree, (datetime.now() - timedelta(days=days + tree_grade.WARMUP_DAYS)).strftime("%Y%m%d"))
 
 
 def run(slug, days=365, hist=None, tree=None, unobserved=None):

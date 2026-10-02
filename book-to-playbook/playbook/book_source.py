@@ -284,14 +284,6 @@ def parse(slug):
     }
 
 
-def load_sections(slug):
-    """{소절키: 본문} — 다른 검사기가 import 해서 쓴다.
-
-    장 표지는 빼고 소절(`3-2`)·특수소절(`프롤로그`·`에필로그`)만 담는다.
-    """
-    return {s["key"]: s["body"] for s in parse(slug)["sections"]}
-
-
 # ---------------------------------------------------------------- 인덱스
 def build_index(slug):
     d = parse(slug)
@@ -347,13 +339,6 @@ def write_index(slug):
     p = index_path(slug)
     paths.write_text(p, json.dumps(idx, ensure_ascii=False, indent=2) + "\n")
     return p, idx
-
-
-def load_index(slug):
-    p = index_path(slug)
-    if not os.path.exists(p):
-        raise SourceMissing("인덱스가 없습니다: %s  (python book_source.py --write)" % p)
-    return json.loads(io.open(p, encoding="utf-8").read())
 
 
 # ---------------------------------------------------------------- 플레이북 대조

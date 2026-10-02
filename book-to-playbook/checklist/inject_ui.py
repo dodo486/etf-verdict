@@ -60,6 +60,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 
 # 이름 → ui/<name>.js. 대상 HTML 에 그 이름의 센티넬 구간이 있을 때만 처리한다.
 REGIONS = {
+    "shared-ui": os.path.join(_HERE, "ui", "shared-ui.js"),
     "playbook-ui": os.path.join(_HERE, "ui", "playbook-ui.js"),
     "review-ui": os.path.join(_HERE, "ui", "review-ui.js"),
     "checklist-ui": os.path.join(_HERE, "ui", "checklist-ui.js"),

@@ -20,7 +20,7 @@
 
   const root = document.getElementById('sheet-root');
   if(!root) return;
-  const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const esc = window.BP.esc;            // 공용 부품(shared-ui) — 고치는 곳은 거기 하나
   function readVD(){ try { return JSON.parse(document.getElementById('verdict-data').textContent); } catch(e){ return null; } }
   let VD = readVD();
   let curP = null;

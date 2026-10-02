@@ -7,12 +7,12 @@
 //   점프는 window.__jumpToSheet(review-ui) 에 위임한다. 고치는 곳은 언제나 이 파일이다.
 (function(){
   const raw = document.getElementById('src').textContent;
-  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const esc = window.BP.esc;            // 공용 부품(shared-ui) — 고치는 곳은 거기 하나
   const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
   const REFS = (function(){ try { return JSON.parse(document.getElementById('verdict-data').textContent).refs || {}; } catch(e){ return {}; } })();
-  const ZW = {filter:'필터', avoid:'회피', entry:'진입', caution:'조심', sizing:'비중·분할', exit:'매도'};
+  const ZW = window.BP.ZW;
   function refBadge(headText){
-    const m = headText.match(/^\s*([0-9]+-[0-9]+|프롤로그|에필로그)/); if(!m) return '';
+    const m = headText.match(window.BP.REF_RE); if(!m) return '';
     const r = REFS[m[1]];
     if(r && (r.auto + r.manual) > 0){
       const z = (r.zones||[]).map(x=>ZW[x]||x).join('·');
@@ -111,7 +111,7 @@
       +'.pb-src-panel.empty{color:var(--mute,#999);font-style:italic;border-left-color:var(--line,#ccc)}';
     document.head.appendChild(st);
     Array.prototype.forEach.call(document.querySelectorAll('#content h3.sec'), function(h){
-      var m = (h.textContent||'').match(/^\s*(\d+-\d+|프롤로그|에필로그)/); if(!m) return;
+      var m = (h.textContent||'').match(window.BP.REF_RE); if(!m) return;
       var ref = m[1], text = SRC[ref];
       var btn = document.createElement('button');
       btn.type = 'button'; btn.className = 'pb-src-btn'; btn.textContent = '원문';

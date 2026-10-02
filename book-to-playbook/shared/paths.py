@@ -52,16 +52,6 @@ PUBLIC = _detect_public()
 LOGS = os.path.join(BASE, "logs")
 
 
-def path(*parts):
-    """BASE 기준 경로."""
-    return os.path.join(BASE, *parts)
-
-
-def public_path(*parts):
-    """PUBLIC(배포 루트) 기준 경로."""
-    return os.path.join(PUBLIC, *parts)
-
-
 def ensure_dir(p):
     os.makedirs(p, exist_ok=True)
     return p
@@ -111,12 +101,18 @@ def load_env_file(p):
 import json as _json
 
 
-def load_books():
-    """books.json 의 books 목록. 없으면 빈 리스트."""
+def load_manifest():
+    """books.json 전체(dict) — site_title · site_subtitle · books 를 담는다.
+    없으면 빈 dict. books.json 을 읽는 입구는 이 함수 하나다(아래 load_books 도 이걸 쓴다)."""
     p = os.path.join(BASE, "books.json")
     if not os.path.exists(p):
-        return []
-    return _json.loads(read_text(p)).get("books", [])
+        return {}
+    return _json.loads(read_text(p))
+
+
+def load_books():
+    """books.json 의 books 목록. 없으면 빈 리스트."""
+    return load_manifest().get("books", [])
 
 
 def book_meta(slug):
