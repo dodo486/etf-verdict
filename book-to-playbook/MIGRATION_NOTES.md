@@ -127,9 +127,25 @@ minutes(symbol) -> { "YYYYMMDDHHMM(UTC)": {"open":f,"high":f,"low":f,"close":f,"
 - **값 = OHLCV dict.** `cond.minute_series` 는 이미 dict/스칼라 둘 다 받으므로, jhts 가 종가만 주던 것을
   OHLCV dict 로 바꿔도 트리·평가기 변경 없이 그날 분봉의 high/low/open/volume 까지 tf="1m" 로 읽힌다.
 - **보관 기간**이 늘면 장중 observe 의 과거 자동 판정 구간(백테스트 반영)도 그만큼 자동으로 는다.
-- `md_feed.minutes` 의 docstring 을 `{YYYYMMDDHHMM(UTC): 종가}`(현재) → 위 OHLCV 로 갱신하는 것이 다음 할 일
-  (지금은 종가 계약 그대로라 docstring 유지). **md_feed 는 jhts 세션 함수(sessions/market_of)를 더는
-  호출하지 않으므로**, jhts 쪽에서 세션 API 유지 여부는 이 파이프라인과 무관해짐.
+- **md_feed 는 jhts 세션 함수(sessions/market_of)를 더는 호출하지 않으므로**, jhts 쪽에서 세션 API
+  유지 여부는 이 파이프라인과 무관해짐.
+
+### ④-T  [TEMP] yfinance 임시 분봉 제공자 — jhts OHLCV 연결 시 통째 삭제
+
+jhts 분봉이 아직 OHLCV 로 안 와서, 위 목표 계약을 **임시로 yfinance** 가 채운다. 흔적0 격리:
+  · yfinance 를 import 하는 파일은 **단 하나**: `shared/_temp_yf_minutes.py`(신규).
+  · 스왑 포인트는 **1곳**: `shared/md_feed.py` 의 `minutes()`(TEMP 두 줄 — 원래 jhts 경로는 바로 아래 주석).
+  · 계약 형태는 위 목표(④)와 동일: `{YYYYMMDDHHMM(UTC): {open,high,low,close,volume}}`.
+  · 정직한 한계: yfinance 1분봉은 최근 ~7일만. 그 밖·실패·빈결과 → `{}`(→ 모름 → observe 는 manual 🟡).
+    가짜로 안 채운다. (과거 asof 는 여전히 None 으로 정직하게 떨어짐을 실측 확인.)
+
+**삭제 체크리스트(jhts 분봉 OHLCV 연결 시):**
+1. `shared/_temp_yf_minutes.py` 파일 통째 삭제.
+2. `shared/md_feed.py` 의 `minutes()` 를 jhts 경로로 되돌림(TEMP 두 줄 삭제 → 바로 아래 주석 블록 복원).
+3. `pip uninstall yfinance`(및 함께 설치된 curl_cffi·lxml·peewee 등 전이 의존 — 필요 시).
+4. `grep -rn "yfinance\|_temp_yf" .`(`.venv` 제외) 가 **0건**인지 확인.
+
+- `md_feed.minutes` 의 docstring 은 이미 OHLCV 계약(위 목표)으로 갱신됨(TEMP 제공자가 그 형태로 채움).
 
 ---
 

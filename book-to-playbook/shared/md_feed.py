@@ -61,13 +61,20 @@ def _request(symbol, start):
 
 
 def minutes(symbol):
-    """1분봉 종가 {YYYYMMDDHHMM(UTC): 종가} — jhts 가 주는 최근 구간(미국 심볼 약 7거래일). 실패/미설치 시 {}."""
-    if not AVAILABLE:
-        return {}
-    try:
-        return md.minute_closes(symbol) or {}
-    except Exception:  # noqa: BLE001
-        return {}
+    """1분봉 OHLCV {YYYYMMDDHHMM(UTC): {open,high,low,close,volume}} — 계약은 MIGRATION_NOTES ④.
+    현재는 jhts 분봉이 OHLCV 로 아직 안 와서 **임시로 yfinance** 에서 받는다(최근 ~7일, 실패 시 {}).
+    cond.minute_series 는 이 OHLCV dict(또는 스칼라 종가)를 둘 다 받으므로 트리·평가기는 무변경."""
+    # ── TEMP 스왑 포인트(1곳) — jhts 분봉 OHLCV 가 연결되면 이 한 줄만 아래 jhts 경로로 되돌린다.
+    #    (삭제 체크리스트: MIGRATION_NOTES.md. yfinance import 는 _temp_yf_minutes 한 파일에만 있다.)
+    from shared import _temp_yf_minutes
+    return _temp_yf_minutes.minutes(symbol)
+    # ── 원래 jhts 경로(복원용 — 위 TEMP 두 줄을 지우면 이 아래가 산다):
+    # if not AVAILABLE:
+    #     return {}
+    # try:
+    #     return md.minute_closes(symbol) or {}   # jhts: 종가만 {키:종가} → OHLCV dict 로 확장 예정
+    # except Exception:  # noqa: BLE001
+    #     return {}
 
 
 def sessions(market, start, end):
