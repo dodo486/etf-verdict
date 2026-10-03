@@ -43,8 +43,10 @@
 문법 (JSON) — 허용 키 밖은 전부 오류(조용히 무시하지 않는다):
   숫자          3, 1.5            (상수)
   시세          {"px": "close"|"open"|"high"|"low"|"volume", "sym": 심볼?, "tf": 봉?}   sym 기본 "$self",
-                tf 기본 "1d"(일봉 — asof 이하 마지막 확정 일봉). tf "1m"(분봉 — asof 이하 마지막 분봉, 장중 값):
-                분봉 데이터가 연결되기 전까진 늘 모름(None)이라 장중 조건은 observe 로 감싸 None→manual 로 떨어진다.
+                tf 기본 "1d"(일봉 — asof 이하 '확정(settled)' 일봉; 장중 asof 면 아직 마감 안 된 그날 일봉은
+                None, 즉 전일 종가까지만 본다). tf "1m"(분봉 — asof 이하 마지막 분봉, 장중 값). tf "5m"(5분봉 —
+                세션 안 1분봉을 5분 OHLC 로 집계한 뒤 asof 이하 마지막 5분봉). 분봉/5분봉 데이터가 연결되기
+                전까진 늘 모름(None)이라 장중 조건은 observe 로 감싸 None→manual 로 떨어진다.
   산술          {"add"|"sub"|"mul"|"div"|"max"|"min": [a, b]}   max/min = 같은 날 두 값 중 큰/작은 값
                 {"abs": a}
   선택          {"case": [[c1, v1], [c2, v2], ...], "else": v}   위에서부터 처음 참인 c 의 v.
@@ -80,8 +82,9 @@ META = ("label", "ref", "id", "note")
 PX_FIELDS = ("open", "high", "low", "close", "volume")
 POS_FIELDS = ("ret", "days", "maxret", "minret")
 ARITH = ("add", "sub", "mul", "div", "max", "min")
-TIMEFRAMES = ("1d", "1m")  # 봉 길이 — asof 축에서 자른다. 일봉은 확정 일봉, 분봉은 asof 이하 마지막 분봉.
-                           # 분봉 데이터가 연결되기 전까진 "1m" 조회는 늘 None(장중 observe → manual).
+TIMEFRAMES = ("1d", "1m", "5m")  # 봉 길이 — asof 축에서 자른다. 일봉은 확정(settled) 일봉, 분봉은 asof 이하
+                           # 마지막 분봉, 5분봉은 1분봉을 세션 안에서 5분 OHLC 로 집계한 뒤 asof 이하 마지막.
+                           # 분봉/5분봉 데이터가 연결되기 전까진 "1m"/"5m" 조회는 늘 None(장중 observe → manual).
 WINDOW = ("ma", "ema", "stdev", "highest", "lowest", "sum")
 CMP = ("gt", "ge", "lt", "le")
 STREAK_CAP = 400          # 연속·경과일을 거꾸로 셀 때의 상한(데이터 길이보다 길면 무의미)
@@ -217,9 +220,13 @@ class Ctx:
     """평가 문맥. hist={심볼: [Candle(date,open,high,low,close,volume)]}, cal=날짜 목록."""
 
     def __init__(self, hist, cal, self_sym, index_sym=None, defs=None, manual_as=None, pos=None, asof=None,
-                 unobserved=None):
+                 unobserved=None, session_close=None):
         """pos = (첫 매수일 인덱스, 평균 매입가 | 날짜별 평균 매입가 목록) — 매도·분할 규칙 평가 때만.
-        asof = 관측 시각(UTC datetime) — 분봉(tf="1m") 필드를 이 시각 이하로 자른다. None 이면 실제 지금."""
+        asof = 관측 시각(UTC datetime) — 분봉(tf="1m"/"5m") 필드를 이 시각 이하로 자른다. None 이면 실제 지금.
+        session_close = {심볼: {YYYYMMDD: 그날 정규장 마감(UTC datetime, tz-aware)}} — 일봉 확정(settled) 경계.
+          거래소 캘린더(md_feed.sessions)에서 캐려 밖(cond)에서 넣는다(평가기는 jhts 를 모른다). 장중 asof 에서
+          '마감이 asof 이후'인 일봉은 아직 미확정이므로 None 으로 가린다(look-ahead 0). asof=None 이거나 캘린더가
+          비면(미설치·조회 실패) 아무것도 가리지 않는다 — 없는 캘린더가 조용히 일봉을 전부 지우지 않게."""
         self.pos = pos
         self.asof = asof          # 관측 시각(UTC datetime) — 분봉 조회를 이 시각 이하로 자른다. None 이면 실제 지금
         self.unobserved = unobserved  # None = 관측값 없는 observe 는 수동처럼 · "exclude" = 그 조건을 빼고 판단(백테스트)
@@ -229,6 +236,7 @@ class Ctx:
         self.index_sym = index_sym
         self.defs = defs or {}
         self.manual_as = manual_as
+        self.session_close = session_close or {}  # {심볼: {YYYYMMDD: 마감 UTC datetime}} — 일봉 확정 경계
         self._px = {}
         self._memo = {}
         self._flip = None
@@ -239,7 +247,7 @@ class Ctx:
             return self
         if self._flip is None:
             f = Ctx(self.hist, self.cal, self.self_sym, self.index_sym, self.defs, not self.manual_as, self.pos,
-                    self.asof, self.unobserved)
+                    self.asof, self.unobserved, self.session_close)
             f._px, f._flip = self._px, self
             self._flip = f
         return self._flip
@@ -254,17 +262,35 @@ class Ctx:
         return sym
 
     def px(self, sym, field, tf="1d"):
-        """심볼·필드의 asof 축 시계열(달력 길이). 일봉(tf="1d")은 날짜별 확정 일봉, 분봉(tf="1m")은 그날
-        asof 이하 마지막 분봉 값(분봉 데이터가 없으면 전부 None — 장중 observe → manual)."""
+        """심볼·필드의 asof 축 시계열(달력 길이). 일봉(tf="1d")은 날짜별 '확정(settled)' 일봉(장중 asof 면 아직
+        마감 안 된 그날 일봉은 None 으로 가림 — look-ahead 0), 분봉(tf="1m")은 그날 asof 이하 마지막 분봉 값,
+        5분봉(tf="5m")은 세션 안 1분봉→5분 OHLC 집계의 그날 asof 이하 마지막 5분봉 값
+        (분봉/5분봉 데이터가 없으면 전부 None — 장중 observe → manual)."""
         key = (sym, field, tf)
         if key not in self._px:
             if tf == "1d":
                 by = {c.date: getattr(c, field) for c in (self.hist.get(sym) or [])}
-                self._px[key] = [by.get(d) for d in self.cal]
+                settled = self._settled_dates(sym)   # None = 가리지 않음(asof 없음·캘린더 없음)
+                self._px[key] = [by.get(d) if (settled is None or d in settled) else None
+                                 for d in self.cal]
             else:
-                self._px[key] = minute_series(getattr(self.hist, "minutes", {}).get(sym) or {},
-                                              self.cal, field, self.asof)
+                mins = getattr(self.hist, "minutes", {}).get(sym) or {}
+                if tf == "5m":
+                    mins = aggregate_5m(mins)
+                self._px[key] = minute_series(mins, self.cal, field, self.asof)
         return self._px[key]
+
+    def _settled_dates(self, sym):
+        """일봉 확정(settled) 규칙: 심볼의 거래소 세션 마감이 asof 이하인 날짜 집합(그 날 일봉은 확정 → 읽어도 됨).
+        asof 가 없으면(라이브 '지금' = 늘 마지막 확정봉 계약) 또는 그 심볼의 세션 캘린더가 없으면(미설치·조회 실패)
+        None 을 돌려 '아무것도 가리지 않음'으로 떨어뜨린다 — 캘린더가 없다고 조용히 일봉을 전부 지우지 않게."""
+        if self.asof is None:
+            return None
+        closes = self.session_close.get(sym)
+        if not closes:
+            return None
+        # 세션 마감(마감 == asof 도 확정)이 asof 이하인 날만 확정 — 마감 > asof 인 '진행 중' 봉은 뺀다.
+        return {d for d, close in closes.items() if close is not None and close <= self.asof}
 
 
 # ------------------------------------------------------------------ 분봉(asof 축)
@@ -285,6 +311,32 @@ def minute_series(minutes, cal, field, asof=None):
                 val = bar if not isinstance(bar, dict) else bar.get(field)
                 break
         out.append(None if val is None else float(val))
+    return out
+
+
+def aggregate_5m(minutes):
+    """1분봉 OHLCV {YYYYMMDDHHMM(UTC): {open,high,low,close,volume} 또는 종가} → 5분봉 {5분 시작키: {OHLCV}}.
+    5분 버킷은 '같은 날·같은 시(HH)·분을 5로 내림'(09:30·09:35…)으로 묶어 세션 경계를 넘지 않는다
+    (버킷 키가 YYYYMMDDHH 를 포함하므로 다른 날·다른 세션의 분봉은 절대 한 버킷에 섞이지 않는다).
+    OHLC = 버킷 안 (첫 open, 최고 high, 최저 low, 끝 close), volume = 합. 스칼라 종가만 있으면 O=H=L=C=종가,
+    volume=0. 각 필드가 모두 없는 봉은 건너뛴다(가짜로 채우지 않는다)."""
+    buckets = {}                 # 5분 시작키(YYYYMMDDHHmm, mm=5의 배수) → [(분키, 봉dict), ...] 시간순
+    for k in sorted(minutes):
+        mm = int(k[10:12])
+        bkey = k[:10] + "%02d" % (mm - mm % 5)     # 같은 날·시 + 분 5내림 (세션/날 경계 안 넘음)
+        bar = minutes[k]
+        if not isinstance(bar, dict):
+            bar = {"open": bar, "high": bar, "low": bar, "close": bar, "volume": 0.0}
+        buckets.setdefault(bkey, []).append(bar)
+    out = {}
+    for bkey, bars in buckets.items():
+        o = next((b.get("open") for b in bars if b.get("open") is not None), None)
+        c = next((b.get("close") for b in reversed(bars) if b.get("close") is not None), None)
+        highs = [b.get("high") for b in bars if b.get("high") is not None]
+        lows = [b.get("low") for b in bars if b.get("low") is not None]
+        vols = [b.get("volume") for b in bars if b.get("volume") is not None]
+        out[bkey] = {"open": o, "high": max(highs) if highs else None, "low": min(lows) if lows else None,
+                     "close": c, "volume": sum(vols) if vols else None}
     return out
 
 
@@ -803,16 +855,17 @@ def zone_nodes(cfg):
 
 
 def _minute_nodes(tree):
-    """분봉(tf="1m") 시세 노드 전부 — 장중 observe 조건이 쓰는 장중 값."""
+    """장중 봉(tf="1m" 또는 "5m") 시세 노드 전부 — 장중 조건이 쓰는 장중 값. 5분봉도 원천은 1분봉이라(세션 안
+    집계) 같은 수집 대상이다."""
     nodes = list((tree.get("defs") or {}).values())
     for cfg in tree["products"].values():
         nodes.extend(n for _z, _l, _r, n in zone_nodes(cfg))
     return [n for node in nodes for n in labeled_all(node, tree.get("defs") or {})
-            if "px" in n and n.get("tf") == "1m"]
+            if "px" in n and n.get("tf") in ("1m", "5m")]
 
 
 def minute_symbols_of(tree):
-    """분봉(tf="1m") 값을 쓰는 심볼 — 수집 단계가 이 심볼들의 분봉을 같이 받는다(데이터 연결 시)."""
+    """장중 봉(tf="1m"/"5m") 값을 쓰는 심볼 — 수집 단계가 이 심볼들의 1분봉을 같이 받는다(5분봉은 세션 안 집계)."""
     out = set()
     for n in _minute_nodes(tree):
         s = n.get("sym", "$self")

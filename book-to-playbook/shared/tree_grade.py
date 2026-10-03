@@ -73,16 +73,44 @@ def history(trees, start):
     return h
 
 
+def session_closes(symbols, cal, asof):
+    """일봉 확정(settled) 경계 — {심볼: {YYYYMMDD: 그날 정규장 마감(UTC datetime)}}. cond.Ctx 가 장중 asof 에서
+    '마감이 asof 이후'인 일봉(아직 미확정)을 가리는 데 쓴다. 경계는 하드코딩이 아니라 거래소 캘린더
+    (md_feed.sessions)에서 읽는다. asof 가 없으면(라이브 '지금' = 늘 마지막 확정봉) 가릴 것이 없으므로 빈 dict.
+    캘린더가 비면(jhts 미설치·조회 실패) 해당 심볼은 빠진다 → cond 가 '가리지 않음'으로 떨어진다(캘린더 없다고
+    일봉을 조용히 전부 지우지 않게). 시장(US/KR)이 같은 심볼은 캘린더를 한 번만 조회해 공유한다."""
+    import datetime as _dt
+    if asof is None or not cal:
+        return {}
+    start, end = min(cal), max(cal)
+    by_market = {}      # market → {YYYYMMDD: 마감 UTC}
+    out = {}
+    for sym in sorted(set(symbols)):
+        mkt = md_feed.market_of(sym)
+        if mkt is None:
+            continue
+        if mkt not in by_market:
+            by_market[mkt] = {s.date: s.close.astimezone(_dt.timezone.utc)
+                              for s in md_feed.sessions(mkt, start, end) if s.close is not None}
+        closes = by_market[mkt]
+        if closes:
+            out[sym] = closes
+    return out
+
+
 class ProductEval:
     """한 상품의 여섯 칸을 전체 달력에 대해 한 번 계산해 둔다."""
 
     def __init__(self, tree, prod, hist, cal, unobserved=None, asof=None):
         """unobserved="exclude" = 관측값이 없는 장중 조건(observe)을 빼고 판단한다(백테스트 비교용).
-        asof = 관측 시각(UTC datetime) — 장중(tf="1m") 조건을 이 시점 이하로 자른다. None 이면 실제 지금."""
+        asof = 관측 시각(UTC datetime) — 장중(tf="1m"/"5m") 조건을 이 시점 이하로 자르고, 일봉은 asof 이하
+        확정(settled) 봉만 본다(미확정 그날 일봉은 None). None 이면 실제 지금(일봉은 마지막 확정봉)."""
         cfg = tree["products"][prod]
         defs = tree.get("defs") or {}
         self.tree, self.prod, self.cfg, self.defs, self.cal, self.hist = tree, prod, cfg, defs, list(cal), hist
-        mk = lambda m: cond.Ctx(hist, cal, prod, cfg.get("index"), defs, manual_as=m, unobserved=unobserved, asof=asof)
+        sc = session_closes(cond.symbols_of(tree), list(cal), asof)
+        mk = lambda m: cond.Ctx(hist, cal, prod, cfg.get("index"), defs, manual_as=m, unobserved=unobserved,
+                                asof=asof, session_close=sc)
         self.ctx = {True: mk(True), False: mk(False), None: mk(None)}
         neutral = {"filter": True, "entry": True, "avoid": False}      # 칸 전체가 빠지면 그 칸은 제약 없음
 

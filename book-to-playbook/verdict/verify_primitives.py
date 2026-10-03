@@ -450,7 +450,7 @@ def t_syntax():
         {"gt": [C]}, {"ma": [C, 0]}, {"ma": [C, 2.5]}, {"px": "price"}, {"foo": 1},
         {"gt": [C, 1], "lt": [C, 2]}, True, {"atleast": 2}, {"def": "없음"},
         {"across": {"syms": [], "cond": C}}, {"manual": ""}, {"gt": [C, 1], "op": "above"},
-        {"px": "close", "tf": "5m"}, {"abs": [C, 1]}, {"case": [[C, 1]]}, {"case": [C, 1], "else": 0},
+        {"px": "close", "tf": "1h"}, {"abs": [C, 1]}, {"case": [[C, 1]]}, {"case": [C, 1], "else": 0},
         {"max": [C]},
     ]
     for b in bad:
@@ -533,8 +533,8 @@ def t_asof():
     # OHLCV dict 봉도 받는다(목표 분봉 구조)
     md = {"202610021320": {"open": 10, "high": 12, "low": 9, "close": 11, "volume": 500}}
     check(cond.minute_series(md, cal, "high", asof) == [None, 12.0], "dict 분봉 필드 선택")
-    # 문법: tf 는 "1d"/"1m" 만, 그 밖은 거부. px 에 모르는 보조 키가 붙으면 '노드에 연산 둘'로 거부된다.
-    for b in ({"px": "close", "tf": "5m"}, {"px": "close", "tf": "1h"},
+    # 문법: tf 는 "1d"/"1m"/"5m" 만, 그 밖은 거부. px 에 모르는 보조 키가 붙으면 '노드에 연산 둘'로 거부된다.
+    for b in ({"px": "close", "tf": "1h"}, {"px": "close", "tf": "15m"},
               {"px": "close", "offset": -10}):
         try:
             cond.validate(b)
@@ -542,6 +542,7 @@ def t_asof():
         except cond.CondError:
             pass
     cond.validate({"px": "close", "tf": "1m"})      # 분봉 노드는 통과
+    cond.validate({"px": "close", "tf": "5m"})      # 5분봉 노드도 통과
     # 평가: 장중 분봉 값 > 전일 종가(선물이 전일 종가 위). tf="1m" 를 asof 로 자른다.
     hist = {"X": [Candle(d, 100, 100, 100, 100, 1000) for d in cal]}
 
@@ -572,6 +573,112 @@ def t_asof():
         FAILS.append("사유 없는 observe 통과")
     except cond.CondError:
         pass
+
+
+def t_settled_mtf():
+    """★ 혼합 tf·확정(settled) 규칙·look-ahead 0 — 이 덩어리의 최우선 correctness 증명(영구).
+
+    1) settled 규칙: 장중 asof 면 '마감이 asof 이후'인 일봉(진행 중 그날 봉)은 None(안 봄). 마감 == asof 는 확정.
+    2) look-ahead 0: tf:1d 조건 값이 '오늘 미확정 일봉 포함/제외'와 무관(오늘 종가를 절대 안 본다) — 전수.
+    3) 캘린더 없음·asof None → 아무것도 안 가림(no-op, 일봉 파리티 보존).
+    4) 5분봉 집계: 1분봉→5분 OHLC 가 세션 경계를 안 넘고, asof 로 자른 마지막 5분봉이 1분봉 재집계와 일치.
+    5) 혼합 tf 트리: 한 트리가 tf:1d(확정 전일) AND tf:5m(asof 이하) 를 저자 논리처럼 중첩해도 각 잎이 자기 축을 본다.
+    """
+    import datetime as dt
+    utc = dt.timezone.utc
+    cal = ["20261001", "20261002"]
+    # 세션 마감: 둘 다 20:00 UTC. (미 정규장 13:30~20:00 UTC — 한 UTC 날짜 안에서 닫힌다.)
+    sc = {"X": {"20261001": dt.datetime(2026, 10, 1, 20, 0, tzinfo=utc),
+                "20261002": dt.datetime(2026, 10, 2, 20, 0, tzinfo=utc)}}
+
+    def hist_of(closes):      # closes = cal 길이, None 이면 그 날 봉 없음(일봉 feed 가 오늘 봉을 아직 안 줌)
+        return {"X": [Candle(d, c, c, c, c, 1000) for d, c in zip(cal, closes) if c is not None]}
+
+    node1d = {"px": "close", "sym": "X", "tf": "1d"}
+
+    # 1) settled 규칙 — 장중(13:20)·마감시각(20:00)·마감전(19:59)·장후(21:00)
+    full = hist_of([100.0, 200.0])      # 오늘(10/02) 미확정 봉 종가 200 이 feed 에 들어온 (최악의) 경우
+    intraday = cond.Ctx(full, cal, "X", asof=dt.datetime(2026, 10, 2, 13, 20, tzinfo=utc), session_close=sc)
+    check(cond.series(node1d, intraday) == [100.0, None], "settled: 장중엔 오늘 미확정 일봉 None(전일만)")
+    atclose = cond.Ctx(full, cal, "X", asof=dt.datetime(2026, 10, 2, 20, 0, tzinfo=utc), session_close=sc)
+    check(cond.series(node1d, atclose) == [100.0, 200.0], "settled: 마감 == asof 는 확정(읽는다)")
+    pre = cond.Ctx(full, cal, "X", asof=dt.datetime(2026, 10, 2, 19, 59, tzinfo=utc), session_close=sc)
+    check(cond.series(node1d, pre) == [100.0, None], "settled: 마감 1분 전은 아직 미확정")
+    post = cond.Ctx(full, cal, "X", asof=dt.datetime(2026, 10, 2, 21, 0, tzinfo=utc), session_close=sc)
+    check(cond.series(node1d, post) == [100.0, 200.0], "settled: 장 끝난 뒤는 확정")
+
+    # 2) look-ahead 0 — '오늘 미확정 봉 포함/제외'와 무관(전수: 여러 asof × 여러 일봉 파생값)
+    with_today = hist_of([100.0, 999.0])    # 오늘 봉 있음(미확정, 종가 999)
+    cal_wo = ["20261001"]
+    without = {"X": [Candle("20261001", 100.0, 100.0, 100.0, 100.0, 1000)]}   # 오늘 봉 없음(현재 feed 모습)
+    derived = [node1d, {"ma": [node1d, 1]}, {"highest": [node1d, 1]}, {"lag": [node1d, 0]},
+               {"gt": [node1d, 50]}, {"streak": {"gt": [node1d, 50]}}]
+    for h in (10, 13, 15, 19, 20, 21):       # 장중~장후 여러 asof
+        a = dt.datetime(2026, 10, 2, h, 0, tzinfo=utc)
+        cw = cond.Ctx(with_today, cal, "X", asof=a, session_close=sc)
+        cwo = cond.Ctx(without, cal_wo, "X", asof=a, session_close=sc)
+        for node in derived:
+            vw = cond.series(node, cw)
+            vwo = cond.series(node, cwo)
+            # 마지막 확정일(10/01, index 0) 값이 오늘 봉 유무와 무관해야 한다
+            check(same(vw[0], vwo[0], 1e-9),
+                  "look-ahead: %s @10/01 이 오늘 봉 유무에 흔들림(asof %dh) %r≠%r"
+                  % (cond._op_of(node), h, vw[0], vwo[0]))
+            # 그리고 미확정 종가 999 가 어떤 확정값에도 새어들면 안 된다(장중 asof)
+            if h < 20:
+                check(all(not same(x, 999.0, 1e-9) for x in vw if x is not None),
+                      "look-ahead: 미확정 종가 999 가 샘(asof %dh) %r" % (h, vw))
+
+    # 3) no-op — 캘린더 없음·asof None 이면 장중이라도 아무것도 안 가린다(일봉 파리티 보존)
+    a = dt.datetime(2026, 10, 2, 13, 20, tzinfo=utc)
+    check(cond.series(node1d, cond.Ctx(full, cal, "X", asof=a, session_close={})) == [100.0, 200.0],
+          "no-op: 캘린더 없으면 안 가림(캘린더 없다고 일봉 전부 지우지 않는다)")
+    check(cond.series(node1d, cond.Ctx(full, cal, "X", asof=None, session_close=sc)) == [100.0, 200.0],
+          "no-op: asof None(라이브 지금)은 안 가림")
+
+    # 4) 5분봉 집계 — 1분봉→5분 OHLC, 세션(날) 경계 안 넘음, asof 로 자른 마지막 5분봉 = 재집계와 일치
+    m = {"202610021330": {"open": 10, "high": 11, "low": 9, "close": 10, "volume": 100},
+         "202610021331": {"open": 10, "high": 13, "low": 8, "close": 12, "volume": 50},
+         "202610021334": {"open": 12, "high": 12, "low": 7, "close": 9, "volume": 70},   # 1330 버킷 끝
+         "202610021335": {"open": 9, "high": 9, "low": 9, "close": 9, "volume": 10},     # 1335 버킷 시작
+         "202610011959": {"open": 5, "high": 5, "low": 5, "close": 5, "volume": 1}}      # 전날 — 다른 세션
+    agg = cond.aggregate_5m(m)
+    check(agg["202610021330"] == {"open": 10, "high": 13, "low": 7, "close": 9, "volume": 220},
+          "5m 집계: 1330 버킷 OHLC(첫open·최고high·최저low·끝close·합volume) %r" % agg.get("202610021330"))
+    check(agg["202610021335"]["close"] == 9 and "202610011955" in agg,
+          "5m 집계: 5분 경계로 새 버킷 · 전날(다른 세션)은 별도 버킷(경계 안 넘음)")
+    # 세션 경계: 전날 1955 버킷(1959→5내림)에 10/02 분봉이 섞이지 않는다
+    check(agg["202610011955"]["close"] == 5 and agg["202610011955"]["volume"] == 1,
+          "5m 집계: 전날 버킷엔 전날 분봉만(세션 경계 안 넘음)")
+
+    class H(dict):
+        minutes = {"X": m}
+    # asof 가 10/02 13:34 → 그날 마지막 완성/진행 5분봉 = 1330 버킷(1335 는 asof 이후). px tf="5m" 는 이 버킷 close.
+    c5 = cond.Ctx(H({"X": [Candle(d, 100, 100, 100, 100, 1000) for d in cal]}), cal, "X",
+                  asof=dt.datetime(2026, 10, 2, 13, 34, tzinfo=utc), session_close=sc)
+    got5 = c5.px("X", "close", "5m")
+    # 10/01 엔 그날 5분봉(1955 버킷, close 5)이 있고, 10/02 엔 asof 이하 마지막이 1330 버킷(close 9).
+    check(got5 == [5.0, 9.0], "5m px: 날짜별 asof 이하 마지막 5분봉 close(10/01=5·10/02=9) %r" % got5)
+    # asof 를 1335 이후로 밀면 10/02 는 1335 버킷(high 9)까지 보인다
+    c5b = cond.Ctx(H({"X": [Candle(d, 100, 100, 100, 100, 1000) for d in cal]}), cal, "X",
+                   asof=dt.datetime(2026, 10, 2, 13, 40, tzinfo=utc), session_close=sc)
+    check(c5b.px("X", "high", "5m") == [5.0, 9.0], "5m px: 10/02 1335 버킷까지(high 9)")
+
+    # 5) 혼합 tf 트리 — tf:1d(확정 전일) AND tf:5m(asof 이하) 를 저자 논리처럼 중첩. 각 잎이 자기 축을 본다.
+    #    저자 논리는 '같은 asof 의 확정 일봉 + 장중 5분봉'을 합치는 것이므로, 일봉이 확정된 마지막 날(10/01, i=0)에서
+    #    두 축이 모두 값을 가진다(일봉 100 확정, 5분봉 5). 오늘(10/02, i=1)은 일봉 미확정이라 1d 잎이 None → AND None
+    #    (= 아직 못 정함, look-ahead 금지의 정직한 결과. 올바른 index 선택은 장중 재생 드라이버 = 다음 덩어리).
+    mixed = {"all": [{"gt": [{"px": "close", "sym": "X", "tf": "1d"}, 50]},      # 확정 일봉 100 > 50 → 참
+                     {"lt": [{"px": "close", "sym": "X", "tf": "5m"}, 50]}]}     # 5분봉 종가 5 < 50 → 참
+    mv = cond.series(mixed, c5)
+    check(mv[0] is True, "혼합 tf: 확정일(10/01) 일봉·5분봉 각 축이 저자 AND 를 그대로 합침(참) %r" % mv)
+    check(mv[1] is None, "혼합 tf: 오늘(미확정 일봉)은 1d 잎 None → AND None(look-ahead 금지의 정직한 결과) %r" % mv)
+    # 5분봉 데이터가 아예 없으면 그 잎은 None → all = None(조용히 거짓 아님). 일봉은 확정일(10/01) 100 으로 여전히 참.
+    class H0(dict):
+        minutes = {"X": {}}
+    c5none = cond.Ctx(H0({"X": [Candle(d, 100, 100, 100, 100, 1000) for d in cal]}), cal, "X",
+                      asof=dt.datetime(2026, 10, 2, 13, 0, tzinfo=utc), session_close=sc)
+    check(cond.series(mixed, c5none)[0] is None, "혼합 tf: 데이터 없는 5분봉 축은 None(모름) → all None")
 
 
 def t_grade():
@@ -678,7 +785,9 @@ def main():
     for name, fn in (("수치 연산", lambda: t_numeric(rng)), ("3값 논리", t_logic),
                      ("시간 연산", lambda: t_time(rng)), ("하한", t_bounds), ("포지션", lambda: t_pos(rng)), ("거래 시뮬레이터", t_trades),
                      ("인과성", lambda: t_causal(rng)),
-                     ("문법", t_syntax), ("관측 시점(asof)", t_asof), ("등급·금액", t_grade), ("표현력 회귀", t_regress),
+                     ("문법", t_syntax), ("관측 시점(asof)", t_asof),
+                     ("혼합 tf·확정봉·look-ahead 0", t_settled_mtf),
+                     ("등급·금액", t_grade), ("표현력 회귀", t_regress),
                      ("EXCLUDED 실전 불변식", t_no_excluded_live)):
         before = len(FAILS)
         try:
