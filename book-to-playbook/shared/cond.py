@@ -239,6 +239,7 @@ class Ctx:
         self.session_close = session_close or {}  # {심볼: {YYYYMMDD: 마감 UTC datetime}} — 일봉 확정 경계
         self._px = {}
         self._memo = {}
+        self._smap = {}       # 심볼 → settled_map 캐시(일봉축 마지막 확정 index 지도)
         self._flip = None
 
     def flipped(self):
@@ -248,7 +249,7 @@ class Ctx:
         if self._flip is None:
             f = Ctx(self.hist, self.cal, self.self_sym, self.index_sym, self.defs, not self.manual_as, self.pos,
                     self.asof, self.unobserved, self.session_close)
-            f._px, f._flip = self._px, self
+            f._px, f._smap, f._flip = self._px, self._smap, self
             self._flip = f
         return self._flip
 
@@ -291,6 +292,27 @@ class Ctx:
             return None
         # 세션 마감(마감 == asof 도 확정)이 asof 이하인 날만 확정 — 마감 > asof 인 '진행 중' 봉은 뺀다.
         return {d for d, close in closes.items() if close is not None and close <= self.asof}
+
+    def settled_map(self, sym):
+        """'일봉축 마지막 확정봉' 지도 — 길이 L 리스트 m 에서 m[i] = cal[i] 이하 마지막 '확정(settled)' 일봉의 index
+        (그런 확정봉이 없으면 None). 일봉-tf 식(일봉 잎·그 위 창/lag/streak…)을 평가할 때, 평가 index i 를 'asof 이하
+        마지막 확정 일봉'으로 바꾸는 데 쓴다 — 장중 asof 면 오늘 봉은 미확정이라 m[i] = 어제 index → 일봉 잎·ma20 이
+        '어제까지의 실제값'(None 아님)으로 나온다. 오늘 미확정 봉은 절대 안 본다(look-ahead 0).
+
+        계약은 _settled_dates 와 같다: asof 없음·캘린더 없음이면 None(가리지 않음 = no-op, EOD/라이브 동작 그대로).
+        EOD/장후 asof 에선 오늘 봉까지 다 확정 → 모든 i 에서 m[i] = i(항등) → 일봉 파리티 그대로 유지."""
+        if sym not in self._smap:
+            settled = self._settled_dates(sym)
+            if settled is None:
+                self._smap[sym] = None      # no-op — 가리지 않는다(기존 동작 보존)
+            else:
+                m, last = [], None
+                for i, d in enumerate(self.cal):
+                    if d in settled:
+                        last = i
+                    m.append(last)          # cal[i] 이하 마지막 확정 index(없으면 None)
+                self._smap[sym] = m
+        return self._smap[sym]
 
 
 # ------------------------------------------------------------------ 분봉(asof 축)
@@ -405,12 +427,57 @@ class _Excluded:
 EXCLUDED = _Excluded()
 
 
+# 일봉축 조회(asof 이하 마지막 확정봉) 대상이 아닌 잎 — 하나라도 있으면 그 식은 '1d-순수'가 아니다.
+#   · 분봉/5분봉 px(tf 1m/5m) : asof 이하 '살아 있는' 축(오늘 재생) — 일봉 확정 경계로 당기면 안 된다.
+#   · manual/observe/pos      : 일봉 봉이 아닌 값(수동·포지션).
+#   · across                  : $s 가 across 안에서만 풀려(심볼이 확정되지 않음) — 안전하게 비-1d 로 둔다.
+_NON_DAILY = ("manual", "observe", "pos", "across")
+
+
+def _daily_axis(node, ctx, s_sym):
+    """node 가 '1d-순수'(모든 px 잎이 tf=1d 이고 분봉·수동·pos·across 잎이 없음)면, 그 1d 심볼들의 settled_map 을
+    돌려준다(일봉축 '마지막 확정봉' 지도). 아니거나, 심볼들의 지도가 엇갈리거나, 지도가 no-op(asof 없음·캘린더 없음)이면
+    None — 그 경우 gather 를 건너뛴다(기존 동작 그대로). 같은 시장 심볼은 지도가 같으므로(세션 경계가 시장별) 한 지도로
+    모은다 — 서로 다른 시장이 한 1d-순수 식에 섞이면(지도 엇갈림) 당기지 않는다(조용히 잘못 당기느니 기존 masked-None)."""
+    syms = set()
+    for n in labeled_all(node, ctx.defs):
+        if not isinstance(n, dict):
+            continue
+        op = _op_of(n)
+        if op == "px":
+            if n.get("tf", "1d") != "1d":
+                return None                 # 분봉/5분봉 잎 — 1d-순수 아님
+            sym = n.get("sym", "$self")
+            if sym == "$s":
+                return None                 # across 안 — 심볼 미확정, 안전하게 당기지 않음
+            syms.add(ctx.bind(sym))
+        elif op in _NON_DAILY:
+            return None                     # 수동·포지션·across — 1d-순수 아님
+    if not syms:
+        return None                         # px 잎이 없는 순수 숫자/비교식 — 당길 일봉축이 없음
+    maps = [ctx.settled_map(sym) for sym in syms]
+    first = maps[0]
+    if first is None or any(m != first for m in maps[1:]):
+        return None                         # no-op(asof 없음·캘린더 없음) 또는 시장별 지도 엇갈림 → 당기지 않음
+    return first
+
+
 def series(node, ctx, s_sym=None):
-    """노드 → 달력 길이 시계열."""
+    """노드 → 달력 길이 시계열.
+
+    일봉축 재해석(장중 asof): 노드가 '1d-순수'면(모든 px 잎 tf=1d·분봉/수동/pos/across 없음), 평가 결과의 각 index i 를
+    'asof 이하 마지막 확정 일봉' 값으로 당긴다(_daily_axis·settled_map). 장중 asof 면 오늘 봉은 미확정이라 m[i]=어제 →
+    일봉 잎·ma20 등이 '어제까지 실제값'(None 아님)으로 나온다. 당김은 settled index 에서만 읽으므로 오늘 미확정 종가는
+    어떤 파생값에도 새지 않는다(look-ahead 0). 당김은 멱등(m[m[i]]==m[i])이라 잎·그 위 1d 노드 어디서 걸어도 결과가
+    같다 — 그래서 '가장 바깥 1d 노드'를 따로 찾지 않고 모든 노드에서 한 번씩 안전하게 건다. EOD/장후 asof·asof None·캘린더
+    없음에선 m[i]==i(또는 no-op)라 항등 → 일봉 파리티·기존 동작 그대로."""
     key = (repr(node), s_sym, ctx.manual_as)
     if key in ctx._memo:
         return ctx._memo[key]
     out = _series(node, ctx, s_sym)
+    m = _daily_axis(node, ctx, s_sym)
+    if m is not None:
+        out = [out[m[i]] if m[i] is not None else None for i in range(len(out))]
     ctx._memo[key] = out
     return out
 

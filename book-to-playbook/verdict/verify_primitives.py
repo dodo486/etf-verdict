@@ -576,13 +576,17 @@ def t_asof():
 
 
 def t_settled_mtf():
-    """★ 혼합 tf·확정(settled) 규칙·look-ahead 0 — 이 덩어리의 최우선 correctness 증명(영구).
+    """★ 혼합 tf·확정(settled) 규칙·일봉축 '마지막 확정봉'·look-ahead 0 — 이 덩어리의 최우선 correctness 증명(영구).
 
-    1) settled 규칙: 장중 asof 면 '마감이 asof 이후'인 일봉(진행 중 그날 봉)은 None(안 봄). 마감 == asof 는 확정.
-    2) look-ahead 0: tf:1d 조건 값이 '오늘 미확정 일봉 포함/제외'와 무관(오늘 종가를 절대 안 본다) — 전수.
-    3) 캘린더 없음·asof None → 아무것도 안 가림(no-op, 일봉 파리티 보존).
+    1) 일봉축 '마지막 확정봉' 재해석(장중 asof): tf:1d 식의 평가 index 를 'asof 이하 마지막 확정 일봉'으로 당긴다.
+       장중 asof 면 오늘 봉은 미확정이라 오늘 칸에도 '어제 확정값'이 나온다(None 아님) — 실전 '일봉 regime=어제값'.
+       EOD/마감시각/장후 asof 면 오늘 봉까지 확정이라 항등(당김 없음, 기존과 동일). 마감 1분 전은 아직 미확정 → 어제값.
+    2) look-ahead 0 (★확장·전수): 장중 asof 에서 tf:1d 잎·그 위 모든 파생값이 '오늘 미확정 봉 유무'와 무관하고,
+       오늘 미확정 종가(999)가 어떤 일봉 파생값에도 절대 새지 않는다. 오늘 칸 값 == 어제 확정 칸 값(당겨왔으므로)도 전수.
+    3) 캘린더 없음·asof None → 아무것도 안 당김(no-op, 일봉 파리티 보존).
     4) 5분봉 집계: 1분봉→5분 OHLC 가 세션 경계를 안 넘고, asof 로 자른 마지막 5분봉이 1분봉 재집계와 일치.
-    5) 혼합 tf 트리: 한 트리가 tf:1d(확정 전일) AND tf:5m(asof 이하) 를 저자 논리처럼 중첩해도 각 잎이 자기 축을 본다.
+    5) 혼합 tf 트리: tf:1d(어제 확정) AND tf:5m(asof 이하)를 저자 논리처럼 중첩해도 1d 잎만 일봉축으로 당기고
+       5m 잎은 asof-오늘 축 그대로 — 두 축이 섞인 식(all)은 당기지 않는다(per-leaf 스코프).
     """
     import datetime as dt
     utc = dt.timezone.utc
@@ -596,18 +600,18 @@ def t_settled_mtf():
 
     node1d = {"px": "close", "sym": "X", "tf": "1d"}
 
-    # 1) settled 규칙 — 장중(13:20)·마감시각(20:00)·마감전(19:59)·장후(21:00)
+    # 1) 일봉축 '마지막 확정봉' — 장중(13:20)엔 오늘 칸도 어제 확정값, 마감시각(20:00)·장후(21:00)엔 오늘 봉 확정(항등).
     full = hist_of([100.0, 200.0])      # 오늘(10/02) 미확정 봉 종가 200 이 feed 에 들어온 (최악의) 경우
     intraday = cond.Ctx(full, cal, "X", asof=dt.datetime(2026, 10, 2, 13, 20, tzinfo=utc), session_close=sc)
-    check(cond.series(node1d, intraday) == [100.0, None], "settled: 장중엔 오늘 미확정 일봉 None(전일만)")
+    check(cond.series(node1d, intraday) == [100.0, 100.0], "일봉축: 장중엔 오늘 칸도 어제 확정값(100)으로 당김")
     atclose = cond.Ctx(full, cal, "X", asof=dt.datetime(2026, 10, 2, 20, 0, tzinfo=utc), session_close=sc)
-    check(cond.series(node1d, atclose) == [100.0, 200.0], "settled: 마감 == asof 는 확정(읽는다)")
+    check(cond.series(node1d, atclose) == [100.0, 200.0], "settled: 마감 == asof 는 확정(오늘 봉 그대로, 당김 없음)")
     pre = cond.Ctx(full, cal, "X", asof=dt.datetime(2026, 10, 2, 19, 59, tzinfo=utc), session_close=sc)
-    check(cond.series(node1d, pre) == [100.0, None], "settled: 마감 1분 전은 아직 미확정")
+    check(cond.series(node1d, pre) == [100.0, 100.0], "일봉축: 마감 1분 전은 아직 미확정 → 어제값으로 당김")
     post = cond.Ctx(full, cal, "X", asof=dt.datetime(2026, 10, 2, 21, 0, tzinfo=utc), session_close=sc)
-    check(cond.series(node1d, post) == [100.0, 200.0], "settled: 장 끝난 뒤는 확정")
+    check(cond.series(node1d, post) == [100.0, 200.0], "settled: 장 끝난 뒤는 확정(항등)")
 
-    # 2) look-ahead 0 — '오늘 미확정 봉 포함/제외'와 무관(전수: 여러 asof × 여러 일봉 파생값)
+    # 2) look-ahead 0 (★확장·전수) — 장중 asof 에서 오늘 칸이 '어제 확정값'으로 당겨지고, 미확정 종가 999 는 안 샘.
     with_today = hist_of([100.0, 999.0])    # 오늘 봉 있음(미확정, 종가 999)
     cal_wo = ["20261001"]
     without = {"X": [Candle("20261001", 100.0, 100.0, 100.0, 100.0, 1000)]}   # 오늘 봉 없음(현재 feed 모습)
@@ -624,10 +628,14 @@ def t_settled_mtf():
             check(same(vw[0], vwo[0], 1e-9),
                   "look-ahead: %s @10/01 이 오늘 봉 유무에 흔들림(asof %dh) %r≠%r"
                   % (cond._op_of(node), h, vw[0], vwo[0]))
-            # 그리고 미확정 종가 999 가 어떤 확정값에도 새어들면 안 된다(장중 asof)
+            # 장중(마감 전) asof 에선 미확정 종가 999 가 어떤 일봉 파생값에도 새어들면 안 된다 — look-ahead 0.
+            #   (마감 == asof·장후(h>=20)엔 오늘 봉이 확정이라 999 는 '확정된 오늘 종가'로 정당히 쓰인다.)
             if h < 20:
                 check(all(not same(x, 999.0, 1e-9) for x in vw if x is not None),
                       "look-ahead: 미확정 종가 999 가 샘(asof %dh) %r" % (h, vw))
+                # ★확장: 장중엔 오늘 칸(index 1)이 '어제 확정 칸(index 0)'과 같아야 한다(일봉축으로 당겨왔으므로).
+                check(same(vw[1], vw[0], 1e-9),
+                      "일봉축 확장: 장중 오늘 칸 %s 가 어제 확정값과 달라짐(asof %dh) %r" % (cond._op_of(node), h, vw))
 
     # 3) no-op — 캘린더 없음·asof None 이면 장중이라도 아무것도 안 가린다(일봉 파리티 보존)
     a = dt.datetime(2026, 10, 2, 13, 20, tzinfo=utc)
@@ -664,16 +672,21 @@ def t_settled_mtf():
                    asof=dt.datetime(2026, 10, 2, 13, 40, tzinfo=utc), session_close=sc)
     check(c5b.px("X", "high", "5m") == [5.0, 9.0], "5m px: 10/02 1335 버킷까지(high 9)")
 
-    # 5) 혼합 tf 트리 — tf:1d(확정 전일) AND tf:5m(asof 이하) 를 저자 논리처럼 중첩. 각 잎이 자기 축을 본다.
-    #    저자 논리는 '같은 asof 의 확정 일봉 + 장중 5분봉'을 합치는 것이므로, 일봉이 확정된 마지막 날(10/01, i=0)에서
-    #    두 축이 모두 값을 가진다(일봉 100 확정, 5분봉 5). 오늘(10/02, i=1)은 일봉 미확정이라 1d 잎이 None → AND None
-    #    (= 아직 못 정함, look-ahead 금지의 정직한 결과. 올바른 index 선택은 장중 재생 드라이버 = 다음 덩어리).
-    mixed = {"all": [{"gt": [{"px": "close", "sym": "X", "tf": "1d"}, 50]},      # 확정 일봉 100 > 50 → 참
-                     {"lt": [{"px": "close", "sym": "X", "tf": "5m"}, 50]}]}     # 5분봉 종가 5 < 50 → 참
+    # 5) 혼합 tf 트리 — tf:1d(어제 확정) AND tf:5m(asof 이하) 를 저자 논리처럼 중첩. 1d 잎만 일봉축으로 당기고(per-leaf),
+    #    5m 잎은 asof-오늘 축 그대로다 — 두 축이 섞인 all 노드는 당기지 않는다.
+    #    c5 asof = 10/02 13:34(장중). 1d 잎은 어제(10/01) 확정 100 으로 당겨져 오늘 칸도 참(100>50). 5분봉은 asof 이하
+    #    마지막(10/02 는 1330 버킷 close 9, 10/01 은 1955 버킷 close 5) 둘 다 50 미만 → 참. 그래서 오늘 칸도 AND 참.
+    mixed = {"all": [{"gt": [{"px": "close", "sym": "X", "tf": "1d"}, 50]},      # 일봉축 어제 확정 100 > 50 → 참
+                     {"lt": [{"px": "close", "sym": "X", "tf": "5m"}, 50]}]}     # 5분봉 종가 5·9 < 50 → 참
     mv = cond.series(mixed, c5)
     check(mv[0] is True, "혼합 tf: 확정일(10/01) 일봉·5분봉 각 축이 저자 AND 를 그대로 합침(참) %r" % mv)
-    check(mv[1] is None, "혼합 tf: 오늘(미확정 일봉)은 1d 잎 None → AND None(look-ahead 금지의 정직한 결과) %r" % mv)
-    # 5분봉 데이터가 아예 없으면 그 잎은 None → all = None(조용히 거짓 아님). 일봉은 확정일(10/01) 100 으로 여전히 참.
+    check(mv[1] is True, "혼합 tf: 오늘(10/02 장중)도 1d 잎=어제 확정값·5m 잎=asof 이하값 둘 다 참 → AND 참 %r" % mv)
+    # per-leaf 스코프 확인: 1d 잎 단독은 장중에도 어제값으로 당겨지고, 5m 잎 단독은 asof-오늘 축(1330 버킷 9)을 본다.
+    leaf1d = cond.series({"px": "close", "sym": "X", "tf": "1d"}, c5)
+    leaf5m = cond.series({"px": "close", "sym": "X", "tf": "5m"}, c5)
+    check(leaf1d == [100.0, 100.0], "per-leaf: 1d 잎은 장중에도 어제 확정값으로 당김 %r" % leaf1d)
+    check(leaf5m == [5.0, 9.0], "per-leaf: 5m 잎은 당기지 않고 asof 이하 마지막 5분봉 축 그대로 %r" % leaf5m)
+    # 5분봉 데이터가 아예 없으면 그 잎은 None → all = None(조용히 거짓 아님). 일봉은 어제(10/01) 100 으로 여전히 참.
     class H0(dict):
         minutes = {"X": {}}
     c5none = cond.Ctx(H0({"X": [Candle(d, 100, 100, 100, 100, 1000) for d in cal]}), cal, "X",
