@@ -725,6 +725,87 @@ def t_grade():
           and hid["kids"][0]["v"] is True, "라벨 없는 잎은 hidden 으로 값과 함께 %r" % hid)
 
 
+# ------------------------------------------------------------------ 데이터 완전성 가드(워밍업 부족 → 불완전)
+def t_warmup_guard():
+    """★ 실제 발견된 버그 방지(영구): 시세가 rate-limit 로 잘려(워밍업 부족) 와도 엔진이 그 불완전 데이터로
+    조용히 ✅/🚫 확신을 내면 모르고 매매하게 된다. 가드는 트리가 쓰는 가장 긴 lookback(워밍업)을 트리에서
+    직접 뽑아, 그보다 확정 봉이 적은 초기 구간의 1d 신호를 '불완전 데이터(❔)'로 표면화한다.
+
+    확인:
+      1) 필요 워밍업을 트리에서 바르게 계산한다(창 n-1·lag k·rsi n·count n-1 가 가장 깊은 사슬로 누적되고,
+         streak/barssince 류는 AtLeast/None 으로 스스로 불확실을 드러내므로 워밍업에 넣지 않는다).
+      2) 워밍업을 일부러 잘라낸(필요보다 적은 봉) 입력 → 그 초기 구간은 incomplete=True 이고 grade_key 가 ❔.
+      3) 워밍업이 충분한 구간 → incomplete=False, 가드 끼기 전과 등급이 '그대로'(오탐 0).
+    """
+    from shared import tree_grade
+
+    # 1) warmup_of / tree_warmup 산식 — 손으로 셀 수 있는 노드들로 전수 대조.
+    D = {"ma20": {"ma": [C, 20]}, "hi60": {"highest": [C, 60]}}
+    cases = [
+        (C, 0), ({"px": "close"}, 0), ({"manual": "x"}, 0), (5, 0),
+        ({"ma": [C, 20]}, 19), ({"highest": [C, 60]}, 59), ({"sum": [C, 10]}, 9),
+        ({"lag": [C, 5]}, 5), ({"pct": [C, 3]}, 3), ({"rsi": [C, 14]}, 14), ({"count": [C, 10]}, 9),
+        ({"ma": [{"lag": [C, 5]}, 20]}, 24),                      # 중첩: lag5 안에 ma20 → 5 + 19
+        ({"streak": {"gt": [C, {"ma": [C, 20]}]}}, 19),          # streak 자체는 안 더함, 안쪽 ma20 만
+        ({"barssince": {"ge": [C, {"highest": [C, 60]}]}}, 59),
+        ({"valuewhen": [{"gt": [C, 0]}, {"ma": [C, 30]}]}, 29),  # max(안쪽) = 29
+        ({"all": [{"ma": [C, 5]}, {"highest": [C, 60]}]}, 59),   # 논리 묶음 = 자식 최댓값
+        ({"atleast": 1, "of": [{"lag": [C, 2]}, {"ma": [C, 10]}]}, 9),
+        ({"not": {"ma": [C, 7]}}, 6), ({"abs": {"pct": [C, 4]}}, 4),
+        ({"case": [[{"gt": [C, 0]}, {"ma": [C, 8]}]], "else": {"highest": [C, 40]}}, 39),
+        ({"def": "hi60"}, 59),                                   # 정의 펼침
+    ]
+    for node, exp in cases:
+        got = cond.warmup_of(node, D)
+        check(got == exp, "warmup_of %r → %d (기대 %d)" % (node, got, exp))
+
+    # 트리 상품 워밍업 = 조건 칸(filter/entry/avoid) 전체의 최댓값. 규칙 칸(caution 등)은 안 센다.
+    cfg = dict(cond.EMPTY_ZONE, filter={"gt": [C, {"ma": [C, 50]}]},
+               entry={"gt": [C, {"highest": [C, 60]}]}, avoid={"lt": [C, {"ma": [C, 10]}]},
+               caution=[{"label": "c", "when": {"gt": [C, {"ma": [C, 200]}]}, "scale": 0.5}])
+    tree = {"products": {"P": cfg}}
+    cond.validate_tree(tree)
+    check(cond.tree_warmup(tree, "P") == 59, "tree_warmup = 조건 칸 최댓값(highest60 → 59), caution(ma200) 제외")
+
+    # 2) 워밍업 자르기 — 필요 워밍업 60(=highest60)짜리 트리. 충분한 봉 vs 모자란 봉.
+    W = cond.tree_warmup(tree, "P")                               # 59
+    need = W + 1                                                  # 첫 완전 봉이 서려면 확정 봉이 이만큼
+    rng = random.Random(7)
+    xs = [x if x is not None else 100.0 for x in rand_series(rng, need + 40, miss=0)]
+    cal = ["2024%04d" % i for i in range(len(xs))]
+    hist = {"P": [Candle(d, c, c, c, c, 1000) for d, c in zip(cal, xs)]}
+    pe = tree_grade.ProductEval(tree, "P", hist, cal)
+    # 초기 W 개 봉(index 0..W-1)은 확정 봉이 모자라 incomplete → grade_key 가 ❔(unknown).
+    check(all(pe.incomplete(i) for i in range(W)), "워밍업 부족 구간(0..%d) 전부 incomplete" % (W - 1))
+    check(all(pe.grade_key(i) == "unknown" for i in range(W)),
+          "워밍업 부족 구간 1d 등급은 ❔(판정 불가)여야 — 조용히 ✅/🚫 안 냄")
+    # 워밍업이 충분해진 뒤(index >= W)는 incomplete=False — 신호를 낸다.
+    check(not any(pe.incomplete(i) for i in range(W, len(xs))), "워밍업 채운 뒤는 incomplete 아님(오탐 0)")
+
+    # 3) 오탐 0(가드 불변식) — 가드가 끼기 전 '원시 등급'(워밍업 무시)과, 워밍업 충분한 구간의 등급이 같아야.
+    #    _raw_grade = incomplete 검사를 건너뛴 등급. 충분 구간에서 두 값이 완전히 일치하면 가드는 정상 데이터를
+    #    절대 건드리지 않는다는 뜻(파리티 오탐 0 의 단위테스트판).
+    def raw_grade(pe_, i):
+        views = {"opt": pe_.opt, "pes": pe_.pes}
+        for rule in tree_grade.GRADE_RULES["rules"]:
+            if all(views[rule["view"]][sec][i] is want for sec, want in rule["when"].items()):
+                return rule["key"]
+        return tree_grade.GRADE_RULES["default"]
+    bad = [i for i in range(W, len(xs)) if pe.grade_key(i) != raw_grade(pe, i)]
+    check(not bad, "워밍업 충분 구간 등급 == 가드 없는 원시 등급(오탐 0) @%r" % bad[:3])
+
+    # 트렁케이트 비교: 같은 꼬리 구간을 '긴 이력'과 '짧게 잘린 이력'으로 각각 판정 — 긴 쪽은 신호를 내지만
+    # 짧게 잘린 쪽은 워밍업이 모자란 꼬리 봉을 ❔ 로 뺀다(바로 그 '251봉 vs 594봉' 버그를 잡는 경로).
+    short = {"P": [Candle(d, c, c, c, c, 1000) for d, c in zip(cal, xs)][-30:]}   # 꼬리 30봉만(워밍업 없음)
+    short_cal = [c.date for c in short["P"]]
+    pe_short = tree_grade.ProductEval(tree, "P", short, short_cal)
+    check(all(pe_short.incomplete(i) for i in range(len(short_cal))),
+          "짧게 잘린 이력(워밍업 없음)은 전 구간 불완전 — 긴 이력이면 신호 낼 꼬리까지 ❔ 로 뺀다")
+    last = len(cal) - 1
+    check(not pe.incomplete(last) and pe_short.incomplete(len(short_cal) - 1),
+          "같은 마지막 날: 긴 이력=완전(신호 OK) · 잘린 이력=불완전(판정 보류) — 조용한 오판 차단")
+
+
 # ------------------------------------------------------------------ 6. 표현력 회귀(이번 버그 유형)
 def t_regress():
     # (a) '20일선 회복 후 2거래일 유지' — 1일만 위면 거짓, 회복일+2일이면 참
@@ -800,7 +881,8 @@ def main():
                      ("인과성", lambda: t_causal(rng)),
                      ("문법", t_syntax), ("관측 시점(asof)", t_asof),
                      ("혼합 tf·확정봉·look-ahead 0", t_settled_mtf),
-                     ("등급·금액", t_grade), ("표현력 회귀", t_regress),
+                     ("등급·금액", t_grade), ("데이터 완전성 가드(워밍업)", t_warmup_guard),
+                     ("표현력 회귀", t_regress),
                      ("EXCLUDED 실전 불변식", t_no_excluded_live)):
         before = len(FAILS)
         try:

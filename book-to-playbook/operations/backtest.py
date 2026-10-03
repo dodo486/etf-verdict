@@ -101,16 +101,22 @@ def run(slug, days=365, hist=None, tree=None, unobserved=None):
     hist = hist if hist is not None else fetch_history(tree, days)
     missing = sorted(s for s, cs in hist.items() if not cs)
 
-    rows, summary, manual, period, trade_res = [], {}, {}, None, {}
+    rows, summary, manual, period, trade_res, incomplete = [], {}, {}, None, {}, {}
     for p in tree["products"]:
         cs = hist.get(p) or []
         cal = [c.date for c in cs]
         pe = tree_grade.ProductEval(tree, p, hist, cal, unobserved)
-        prow = []
+        prow, inc_days = [], 0
         for i, d in enumerate(cal):
             if d >= start:
+                if pe.incomplete(i):
+                    inc_days += 1          # 워밍업 부족 — grade_key 가 ❔(불완전)로 내보낸다(✅/🚫 확신 안 냄)
                 k = pe.grade_key(i)
                 prow.append({"date": d, "prod": p, "key": k, "grade": tree_grade.GRADES[k]})
+        if inc_days:
+            # 불완전 데이터 표면화(missing_symbols 패턴) — 필요 워밍업 대비 확정 봉이 모자란 날 수.
+            #   그 날들의 1d 신호는 조용히 계산하지 않고 ❔(판정 불가)로 뺐다.
+            incomplete[p] = {"required_warmup": pe.warmup, "incomplete_days": inc_days}
         rows.extend(prow)
         summary[p] = _summarize(prow, cs)
         # 거래: 매수 신호(✅·🟡) 시작일 다음 날 시가 진입 → 매도 규칙으로 청산(보유 중 신호는 건너뜀)
@@ -130,7 +136,7 @@ def run(slug, days=365, hist=None, tree=None, unobserved=None):
             period = [prow[0]["date"], prow[-1]["date"], len(prow)]
     return {"slug": slug, "title": (tree.get("source") or {}).get("book", slug),
             "period": period[:2] if period else None, "trading_days": period[2] if period else 0,
-            "horizons": list(HORIZONS), "missing_symbols": missing, "manual": manual,
+            "horizons": list(HORIZONS), "missing_symbols": missing, "incomplete_warmup": incomplete, "manual": manual,
             "summary": summary, "trades": trade_res, "daily": rows, "generated": today.isoformat(timespec="seconds")}
 
 
@@ -180,6 +186,10 @@ def build_text(res):
             L.append("   - [%s %s] %s" % (p, m["section"], m["rule"]))
     if res["missing_symbols"]:
         L.append("※ 시세를 못 받은 심볼: %s (그 조건은 판정 불가)" % ", ".join(res["missing_symbols"]))
+    if res.get("incomplete_warmup"):
+        L.append("※ 워밍업 부족(불완전 데이터) — 트리가 쓰는 가장 긴 창이 덜 차 그 날들의 1d 신호는 ❔(판정 보류)로 뺐다:")
+        for p, w in res["incomplete_warmup"].items():
+            L.append("   - %s: 필요 워밍업 %d거래일 · 부족한 날 %d개" % (p, w["required_warmup"], w["incomplete_days"]))
     L.append("※ 과거 성적이 미래를 보장하지 않는다. 신호 수가 적으면 참고용이다.")
     return "\n".join(L)
 

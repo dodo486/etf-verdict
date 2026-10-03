@@ -1010,3 +1010,87 @@ def labeled_all(node, defs=None, acc=None):
         for x in node:
             labeled_all(x, defs, acc)
     return acc
+
+
+# ------------------------------------------------------------------ 워밍업(필요 lookback)
+def warmup_of(node, defs=None, _seen=None):
+    """node 를 평가할 때 '첫 평가 봉'이 조용히 틀린 값을 내지 않으려면 그 앞에 몇 개의 확정 봉이
+    더 있어야 하는지 — 트리가 실제로 쓰는 가장 긴 lookback(거래일 수).
+
+    왜 필요한가
+      ma20·highest60·lag5 같은 창/지연 연산은 창이 덜 차면 **조용히 None** 을 내고, 그 None 은
+      3값 논리로 위에 전파돼 '모름'이 된다 — 데이터가 모자란 줄 모르고 ✅/🚫 확신을 내는 길목이다.
+      시세가 rate-limit 로 잘려(워밍업 부족) 들어오면 바로 이 일이 난다(실제 발견된 버그).
+      이 함수가 트리에서 '필요한 확정 봉 수'를 직접 뽑아, 그보다 짧은 구간의 1d 신호를 '불완전'으로
+      표면화하는 가드(tree_grade)의 임계값이 된다 — WARMUP_DAYS(fetch 버퍼)와 무관하다.
+
+    어떻게 세나 (연산마다 '그날 값이 서려면 그 앞에 몇 봉이 더 있어야 하나'를 더해 가장 깊은 사슬)
+      · 창(ma/ema/stdev/highest/lowest/sum) n : n-1 + 안쪽
+      · rsi n                                : n + 안쪽(와일더 시드)
+      · lag/pct k                            : k  + 안쪽
+      · count n                              : n-1 + 안쪽
+      · streak/barssince/valuewhen/minsince/maxsince : 안쪽만. 이들은 데이터 시작에 닿으면 조용히
+        틀리지 않고 AtLeast/None(모름)으로 스스로 불확실을 드러내므로(STREAK_CAP 는 fetch 버퍼가
+        아닌 역방향 상한일 뿐) 워밍업 기준에 넣지 않는다 — 넣으면 정상 데이터의 짧은 창도 오탐한다.
+      · 산술·비교·abs·case·논리(all/any/atleast/not)·across : 자식 중 최댓값
+      · px/manual/pos/상수                   : 0
+    """
+    defs = defs or {}
+    _seen = _seen or set()
+    if isinstance(node, (int, float)) and not isinstance(node, bool):
+        return 0
+    if not isinstance(node, dict):
+        return 0
+    op = _op_of(node)
+    v = node[op]
+    w = lambda n: warmup_of(n, defs, _seen)
+    if op == "px":
+        return 0
+    if op == "def":
+        if v in _seen:                       # 정의 순환(있어선 안 되지만) — 무한재귀 방지
+            return 0
+        return warmup_of(defs[v], defs, _seen | {v})
+    if op in WINDOW:
+        return (v[1] - 1) + w(v[0])
+    if op == "rsi":
+        return v[1] + w(v[0])
+    if op in ("lag", "pct"):
+        return v[1] + w(v[0])
+    if op == "count":
+        return (v[1] - 1) + w(v[0])
+    if op in ("streak", "barssince"):
+        return w(v)                          # AtLeast/None 으로 스스로 불확실을 드러낸다 — 워밍업에 안 넣음
+    if op in ("valuewhen", "minsince", "maxsince"):
+        return max(w(v[0]), w(v[1]))
+    if op in ARITH or op in CMP:
+        return max(w(v[0]), w(v[1]))
+    if op == "abs":
+        return w(v)
+    if op == "case":
+        return max([w(c) for c, _ in v] + [w(x) for _, x in v] + [w(node["else"])])
+    if op in ("all", "any"):
+        return max([w(c) for c in v] + [0])
+    if op == "atleast":
+        return max([w(c) for c in node["of"]] + [0])
+    if op == "not":
+        return w(v)
+    if op == "across":
+        return w(v["cond"])
+    if op == "observe":
+        return w(node["observe"])
+    # manual · pos — lookback 없음
+    return 0
+
+
+def tree_warmup(tree, prod=None):
+    """상품 하나(prod)의 등급(조건 칸 filter/entry/avoid)이 요구하는 가장 긴 워밍업(거래일 수).
+    prod=None 이면 트리의 모든 상품에 걸친 최댓값. 규칙 칸(caution/sizing/exit)은 포지션이 있을 때만
+    보고 등급과 무관하므로 등급 워밍업에는 넣지 않는다(가드는 등급 신호의 신뢰성만 지킨다)."""
+    defs = tree.get("defs") or {}
+    prods = [prod] if prod is not None else list(tree["products"])
+    mx = 0
+    for p in prods:
+        cfg = tree["products"][p]
+        for sec in SECTIONS:
+            mx = max(mx, warmup_of(cfg[sec], defs))
+    return mx

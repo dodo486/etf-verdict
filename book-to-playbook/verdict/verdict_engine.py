@@ -138,6 +138,11 @@ def product_verdict(tree, p, hist, positions, asof=None):
     i = len(cal) - 1
     key, top = pe.grade_key(i), pe.top(i)
     reason = tree_grade.reason_of(key, top, pe.manual_items(i))
+    # 데이터 완전성 가드 — 지금 가진 확정 봉이 트리가 쓰는 가장 긴 창(필요 워밍업)보다 짧으면 등급은 ❔(불완전
+    #   데이터, 판정 보류)로 떨어져 있다(grade_key). 사유를 '모르고 매매 금지'로 분명히 적는다(✅/🚫 확신 금지).
+    if pe.incomplete(i):
+        have = pe._confirmed[i] + 1
+        reason = "불완전 데이터(판정 보류) — 확정 봉 %d개 < 필요 워밍업 %d개, 창이 덜 차 신뢰불가" % (have, pe.warmup)
     f, unspec, unknown = pe.amount_factor(i)
     if key in ("buy", "confirm"):
         if f < 1:

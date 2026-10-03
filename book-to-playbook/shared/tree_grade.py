@@ -125,9 +125,42 @@ class ProductEval:
                         for r in cfg.get("caution") or []]
         w = (cfg.get("sizing") or {}).get("weight")
         self.weight = {m: (s(w, m) if w is not None else None) for m in (None, True, False)}
+        # 데이터 완전성 가드 — 이 상품 등급이 실제로 쓰는 가장 긴 워밍업(트리에서 파생, 하드코딩 아님).
+        #   그보다 '확정 봉'이 적은 초기 구간의 1d 신호는 창이 덜 차 조용히 None/틀릴 수 있어 신뢰불가다
+        #   → grade_key 가 '불완전 데이터(❔ 보류)'로 표시한다(✅/🚫 확신 금지). WARMUP_DAYS(fetch 버퍼)와 무관.
+        self.warmup = cond.tree_warmup(tree, prod)
+        # 심볼 확정봉 지도 — asof 장중이면 오늘 미확정 봉을 뺀 '마지막 확정 index'(없으면 전부 확정 = 항등).
+        #   여러 심볼을 보면 가장 적게 확정된 심볼(지연된 feed)이 기준이다 — 하나라도 모자라면 불완전.
+        self._confirmed = self._confirmed_index_map()
+
+    def _confirmed_index_map(self):
+        """날짜별 '이 상품 등급이 쓰는 모든 심볼이 확정한 봉 수 − 1'(= 확정 index). 어떤 심볼이 그 index 를
+        아직 확정 못 했으면(지연된 feed·asof 장중 미확정) 그 심볼 기준으로 낮춘다. 확정봉이 하나도 없으면 -1.
+        캘린더가 없거나 asof 가 없으면(라이브 지금) settled_map 이 no-op(None) → 날짜 index 그대로(항등)."""
+        ctx = self.ctx[None]
+        syms = sorted({ctx.bind(s) for s in cond.symbols_of(self.tree)
+                       if not s.startswith("$")} | {self.prod}
+                      | ({ctx.bind("$index")} if self.cfg.get("index") else set()))
+        maps = [ctx.settled_map(s) for s in syms]
+        out = []
+        for i in range(len(self.cal)):
+            idxs = []
+            for m in maps:
+                idxs.append(i if m is None else m[i])   # None map = 가리지 않음(항등)
+            out.append(-1 if any(x is None for x in idxs) else min(idxs))
+        return out
+
+    def incomplete(self, i):
+        """i 번째 봉의 1d 등급이 '불완전 데이터'인가 — 확정 봉이 필요 워밍업보다 적으면 True.
+        확정 index(가장 늦은 심볼 기준)가 warmup 미만이면 가장 긴 창이 덜 차 신호가 신뢰불가다."""
+        return self._confirmed[i] < self.warmup
 
     # ---------------------------------------------------------------- 등급
     def grade_key(self, i):
+        # 데이터 완전성 가드 — 워밍업이 모자란 봉은 확신 판정을 내지 않고 '판정 불가(불완전 데이터)'로 둔다.
+        #   (조용히 None 이 섞인 opt/pes 로 ✅/🚫 를 내면 모르고 매매하게 된다 — 정직성 원칙.)
+        if self.incomplete(i):
+            return "unknown"
         # grade_rules.json 을 위에서 아래로 본다 — when 의 모든 칸이 맞는 첫 규칙이 이긴다.
         # 값은 3값(True/False/None) — 'is' 로 정확히 맞춘다(None 은 True·False 어디에도 안 맞는다).
         views = {"opt": self.opt, "pes": self.pes}
