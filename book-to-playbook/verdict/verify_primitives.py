@@ -320,8 +320,8 @@ def t_pos(rng):
 
 
 def t_trades():
-    """거래 시뮬레이터 — 손으로 답을 셀 수 있는 시세로 진입·분할 매도·동시 발동·미청산·보유 중 신호 건너뛰기."""
-    from shared import trades
+    """체결 글루(portfolio.build_trades) — 손으로 답을 셀 수 있는 시세로 진입·분할 매도·동시 발동·미청산·보유 중 신호 건너뛰기."""
+    from shared import portfolio
 
     def mk(rows):
         cal = ["2021%04d" % i for i in range(len(rows))]
@@ -337,7 +337,7 @@ def t_trades():
     ex = [{"label": "1차", "when": {"ge": [R, 7]}, "sell": {"initial": 0.3}},
           {"label": "2차", "when": {"ge": [R, 15]}, "sell": {"initial": 0.3}},
           {"label": "잔량", "when": {"all": [{"ge": [{"pos": "maxret"}, 15]}, {"lt": [R, 0]}]}, "sell": "all"}]
-    t = trades.simulate(tree, "X", hist, cal, [0], ex)
+    t = portfolio.build_trades(tree, "X", hist, cal, [0], ex)
     check(len(t) == 1 and t[0]["closed"], "분할: 거래 1건 청산")
     if t:
         t = t[0]
@@ -352,7 +352,7 @@ def t_trades():
     tree, hist, cal = mk(rows)
     ex = [{"label": "a", "when": {"ge": [R, 5]}, "sell": {"initial": 0.5}},
           {"label": "b", "when": {"ge": [R, 5]}, "sell": {"remaining": 0.5}}]
-    t = trades.simulate(tree, "X", hist, cal, [0], ex)[0]
+    t = portfolio.build_trades(tree, "X", hist, cal, [0], ex)[0]
     check([round(x["qty"], 6) for x in t["sells"]] == [0.5, 0.25] and not t["closed"], "동시 발동 순서·미청산")
     exp = (0.5 * 120 + 0.25 * 120 + 0.25 * 125) / 100 * 100 - 100        # 남은 0.25 는 마지막 종가 125 로 평가
     check(same(t["ret"], exp, 1e-9), "미청산 평가 %r≠%r" % (t["ret"], exp))
@@ -360,30 +360,30 @@ def t_trades():
     rows = [(100, 100)] * 3 + [(100, 106), (106, 106)] + [(100, 100)] * 4
     tree, hist, cal = mk(rows)
     ex = [{"label": "익절", "when": {"ge": [R, 5]}, "sell": "all"}]
-    t = trades.simulate(tree, "X", hist, cal, [0, 1, 2, 5], ex)
+    t = portfolio.build_trades(tree, "X", hist, cal, [0, 1, 2, 5], ex)
     check([x["entry"] for x in t] == [cal[1], cal[6]], "보유 중 신호 건너뜀: %r" % [x["entry"] for x in t])
     check(t[0]["exit"] == cal[4] and t[0]["sells"][0]["px"] == 106, "청산일·가격")
     # (4) 같은 규칙은 한 번만 — 다시 조건이 참이 돼도 두 번 팔지 않는다
     rows = [(100, 100), (100, 108), (108, 100), (100, 109), (109, 109)]
     tree, hist, cal = mk(rows)
-    t = trades.simulate(tree, "X", hist, cal, [0], [{"label": "1차", "when": {"ge": [R, 7]}, "sell": {"initial": 0.3}}])[0]
+    t = portfolio.build_trades(tree, "X", hist, cal, [0], [{"label": "1차", "when": {"ge": [R, 7]}, "sell": {"initial": 0.3}}])[0]
     check(len(t["sells"]) == 1, "규칙 한 번만")
     # (5) 마지막 날 신호 → 다음 날이 없어 체결 못 함(미청산), fixed20 은 20거래일 모자라면 None
     rows = [(100, 100), (100, 100), (100, 120)]
     tree, hist, cal = mk(rows)
-    t = trades.simulate(tree, "X", hist, cal, [0], [{"label": "x", "when": {"ge": [R, 5]}, "sell": "all"}])[0]
+    t = portfolio.build_trades(tree, "X", hist, cal, [0], [{"label": "x", "when": {"ge": [R, 5]}, "sell": "all"}])[0]
     check(not t["closed"] and t["sells"] == [] and t["fixed20"] is None, "마지막 날 신호는 체결 안 됨")
     # (6) fixed20 = 진입일 포함 20번째 거래일 종가
     rows = [(100, 100)] + [(100, 100 + i) for i in range(1, 30)]
     tree, hist, cal = mk(rows)
-    t = trades.simulate(tree, "X", hist, cal, [0], [])[0]
+    t = portfolio.build_trades(tree, "X", hist, cal, [0], [])[0]
     check(same(t["fixed20"], (rows[20][1] / 100 - 1) * 100, 1e-9), "fixed20 정의")
     # (7) manual 은 '매도가 안 나가는 쪽'으로 풀린다 — 확인 못 한 조건 때문에 팔지 않는다(not 아래도 마찬가지)
     rows = [(100, 100), (100, 100), (100, 100), (100, 100)]
     tree, hist, cal = mk(rows)
-    t = trades.simulate(tree, "X", hist, cal, [0], [{"label": "m", "when": {"manual": "실적"}, "sell": "all"}])[0]
+    t = portfolio.build_trades(tree, "X", hist, cal, [0], [{"label": "m", "when": {"manual": "실적"}, "sell": "all"}])[0]
     check(t["sells"] == [], "manual 매도는 안 걸림")
-    t = trades.simulate(tree, "X", hist, cal, [0], [{"label": "nm", "when": {"not": {"manual": "x"}}, "sell": "all"}])[0]
+    t = portfolio.build_trades(tree, "X", hist, cal, [0], [{"label": "nm", "when": {"not": {"manual": "x"}}, "sell": "all"}])[0]
     check(t["sells"] == [], "not 아래 manual 도 매도를 일으키지 않는다(안쪽을 참으로 풀어 not = 거짓)")
     # (8) 분할 매수 — 1차 25% 1일 시가 100. 2차(종가 ≥ +5%) 2일 종가 106 → 3일 시가 108 에 30%.
     #     평균 매입가 = (0.25·100 + 0.30·108)/0.55 = 104.36… 4일 종가 115(+10.2%) → 익절(산 물량 전부) 5일 시가 116.
@@ -391,7 +391,7 @@ def t_trades():
     tree, hist, cal = mk(rows)
     trs = [{"label": "1차", "frac": 0.25}, {"label": "2차", "frac": 0.30, "when": {"ge": [R, 5]}},
            {"label": "3차", "frac": 0.45, "when": {"ge": [R, 50]}}]
-    t = trades.simulate(tree, "X", hist, cal, [0],
+    t = portfolio.build_trades(tree, "X", hist, cal, [0],
                         [{"label": "익절", "when": {"ge": [R, 10]}, "sell": {"initial": 1.0}}], trs)[0]
     avg = (0.25 * 100 + 0.30 * 108) / 0.55
     check([(b["date"], b["px"], b["qty"]) for b in t["buys"]] == [(cal[1], 100, 0.25), (cal[3], 108, 0.30)],
@@ -402,15 +402,15 @@ def t_trades():
     # 같은 날 매도가 걸리면 그날은 추가 매수하지 않는다
     rows = [(100, 100), (100, 100), (100, 106), (106, 106), (106, 106)]
     tree, hist, cal = mk(rows)
-    t = trades.simulate(tree, "X", hist, cal, [0],
+    t = portfolio.build_trades(tree, "X", hist, cal, [0],
                         [{"label": "반", "when": {"ge": [R, 5]}, "sell": {"remaining": 0.5}}], trs)[0]
     check([b["date"] for b in t["buys"]] == [cal[1], cal[4]],      # 2일 매도 신호 → 3일 시가 매수 안 함, 3일 신호 → 4일 매수
           "매도가 걸린 날은 추가 매수 안 함 %r" % t["buys"])
     # 분할이 없으면 한 번에 전량(옛 규약과 같은 결과) · 비율이 저자 미명시(null)여도 전량(비율을 지어내지 않는다)
-    t = trades.simulate(tree, "X", hist, cal, [0], [], [])[0]
+    t = portfolio.build_trades(tree, "X", hist, cal, [0], [], [])[0]
     check([b["qty"] for b in t["buys"]] == [1.0], "분할 없음 = 전량")
     nul = [{"label": "1차", "frac": None}, {"label": "2차", "frac": None, "when": {"ge": [R, 5]}}]
-    t = trades.simulate(tree, "X", hist, cal, [0], [], nul)[0]
+    t = portfolio.build_trades(tree, "X", hist, cal, [0], [], nul)[0]
     check([b["qty"] for b in t["buys"]] == [1.0], "분할 비율 미명시 = 전량 한 번")
     # (9) 백테스트 수익률 정의(_fwd): 신호일 i → i+1 시가 진입, i+h 종가
     from verdict import backtest
@@ -515,69 +515,60 @@ def t_syntax():
         FAILS.append("올바른 caution·sizing 이 거부: %s" % e)
 
 
-def t_at():
-    """저자 시각 값 — 판정일 다음 정규장 개장 ± 분 시각까지의 마지막 1분봉(판정일 마감 이후), 아직 안 온 시각.
-    개장·마감 시각은 업계 캘린더(sessions)에서 온다 — 코드에 US 09:30/16:00/DST 가정이 없다(여기선 세션을 직접 지어 넣는다)."""
+def t_asof():
+    """장중(tf="1m") 값 — asof(관측 시점) 이하 그날 마지막 분봉. asof 이후 분봉·다른 날 분봉은 안 쓴다.
+    분봉 데이터가 없으면 None(장중 observe → manual). 분봉 키는 UTC(YYYYMMDDHHMM)."""
     import datetime as dt
     utc = dt.timezone.utc
-    Session = namedtuple("Session", "date open close is_half")
-
-    def us_session(day, oh=9, om=30, ch=16, cm=0, utc_off=4):
-        """US 정규장 세션 하나 — 분봉 키가 UTC 이므로 세션 시각도 UTC-aware(개장 09:30 ET = 13:30 UTC @ DST)로 지어 둔다."""
-        y, mo, dd = int(day[:4]), int(day[4:6]), int(day[6:8])
-        op = dt.datetime(y, mo, dd, oh, om, tzinfo=utc) + dt.timedelta(hours=utc_off)
-        cl = dt.datetime(y, mo, dd, ch, cm, tzinfo=utc) + dt.timedelta(hours=utc_off)
-        return Session(day, op, cl, False)
-
-    # 판정일 10/01(목) → 다음 정규장 10/02(금) 09:20 ET = 13:20 UTC. 10/01 마감(20:00 UTC) 이후 분봉만.
-    sess = [us_session("20261001"), us_session("20261002")]
-    m = {"202610011950": 1.0, "202610012100": 2.0, "202610021315": 3.0, "202610021320": 4.0, "202610021321": 5.0}
     cal = ["20261001", "20261002"]
-    now = dt.datetime(2026, 10, 2, 20, 0, tzinfo=utc)
-    got = cond.at_series(m, cal, -10, sess, "US", now)
-    check(got[0] == 4.0, "개장 10분 전 값 = 13:20 UTC 분봉 %r" % got)
-    check(got[1] is None, "다음 정규장 세션이 없음(캘린더 밖) → 모름")
-    early = cond.at_series(m, cal, -10, sess, "US", dt.datetime(2026, 10, 2, 13, 0, tzinfo=utc))
-    check(early[0] is None, "그 시각 전이면 지금까지의 값을 쓰지 않는다(모름) %r" % early)
-    check(cond.at_series({"202610011950": 1.0}, cal, -10, sess, "US", now)[0] is None, "판정일 마감 전 분봉만 있으면 모름")
-    # 세션 정보가 아예 없으면(다음 개장 시각 모름) 전부 모름
-    check(cond.at_series(m, cal, -10, [], "US", now) == [None, None], "세션 없으면 모름")
-    # 문법: close 만, 정수 분 (±24시간 밖은 거부)
-    for b in ({"px": "volume", "at": {"open_offset_min": -10}}, {"px": "close", "at": {"open_offset_min": 1.5}},
-              {"px": "close", "at": {"minutes": -10}}, {"px": "close", "at": -10},
-              {"px": "close", "at": {"open_offset_min": 2000}}, {"px": "close", "at": {"open_offset_min": -2000}}):
+    # minute_series: 날짜별 asof 이하 마지막 분봉. dict 봉·단일 종가 둘 다 받는다.
+    m = {"202610011950": 1.0, "202610012100": 2.0, "202610021315": 3.0, "202610021320": 4.0, "202610021321": 5.0}
+    asof = dt.datetime(2026, 10, 2, 13, 20, tzinfo=utc)      # 10/02 13:20 UTC
+    got = cond.minute_series(m, cal, "close", asof)
+    check(got == [2.0, 4.0], "asof 이하 그날 마지막 분봉 %r" % got)
+    # asof 가 이르면 그날 분봉이 아직 없다 → None(미래 분봉을 쓰지 않는다)
+    early = cond.minute_series(m, cal, "close", dt.datetime(2026, 10, 2, 13, 0, tzinfo=utc))
+    check(early == [2.0, None], "asof 전 분봉은 쓰지 않는다(그날 None) %r" % early)
+    # 그날 분봉이 아예 없으면 None(다른 날 분봉으로 넘어가지 않는다)
+    check(cond.minute_series({"202610011950": 1.0}, cal, "close", asof) == [1.0, None], "그날 분봉 없으면 None")
+    check(cond.minute_series({}, cal, "close", asof) == [None, None], "분봉 전무 → 전부 None(장중 observe → manual)")
+    # OHLCV dict 봉도 받는다(목표 분봉 구조)
+    md = {"202610021320": {"open": 10, "high": 12, "low": 9, "close": 11, "volume": 500}}
+    check(cond.minute_series(md, cal, "high", asof) == [None, 12.0], "dict 분봉 필드 선택")
+    # 문법: tf 는 "1d"/"1m" 만, 그 밖은 거부. px 에 모르는 보조 키가 붙으면 '노드에 연산 둘'로 거부된다.
+    for b in ({"px": "close", "tf": "5m"}, {"px": "close", "tf": "1h"},
+              {"px": "close", "offset": -10}):
         try:
             cond.validate(b)
-            FAILS.append("잘못된 at 통과: %r" % b)
+            FAILS.append("잘못된 tf 통과: %r" % b)
         except cond.CondError:
             pass
-    # 평가: 저자 시각 값 > 판정일 종가 (선물이 전일 종가 위)
+    cond.validate({"px": "close", "tf": "1m"})      # 분봉 노드는 통과
+    # 평가: 장중 분봉 값 > 전일 종가(선물이 전일 종가 위). tf="1m" 를 asof 로 자른다.
     hist = {"X": [Candle(d, 100, 100, 100, 100, 1000) for d in cal]}
 
     class H(dict):
         minutes = {"X": {"202610021320": 101.0}}
-        sessions = {"US": sess}
-        market = {"X": "US"}
-    ctx = cond.Ctx(H(hist), cal, "X", now=now)
-    v = cond.series({"gt": [{"px": "close", "at": {"open_offset_min": -10}}, {"px": "close"}]}, ctx)
-    check(v == [True, None], "선물 개장 전 값 > 전일 종가 %r" % v)
+    ctx = cond.Ctx(H(hist), cal, "X", asof=asof)
+    v = cond.series({"gt": [{"px": "close", "sym": "X", "tf": "1m"}, {"px": "close"}]}, ctx)
+    check(v == [None, True], "장중 분봉 값 > 전일 종가(그날만 분봉 있음) %r" % v)
     # observe — 관측되면 그 값, 관측값이 없으면 수동처럼(manual_as, not 아래 극성 포함)
-    obs = {"observe": {"gt": [{"px": "close", "at": {"open_offset_min": -10}}, {"px": "close"}]}, "manual": "데이터 없음: x"}
-    for m in (True, False, None):
-        c2 = cond.Ctx(H(hist), cal, "X", now=now, manual_as=m)
-        check(cond.series(obs, c2) == [True, m], "observe manual_as=%r" % m)
-        check(cond.series({"not": obs}, c2)[1] == (None if m is None else m), "not observe 극성 manual_as=%r" % m)
-    # 제외 모드(백테스트) — 관측값 없는 observe 는 묶음에서 빠진다. all/any 는 그 칸만, atleast 는 N 그대로.
-    ex = cond.Ctx(H(hist), cal, "X", now=now, unobserved="exclude")
+    obs = {"observe": {"gt": [{"px": "close", "sym": "X", "tf": "1m"}, {"px": "close"}]}, "manual": "데이터 없음: x"}
+    for mas in (True, False, None):
+        c2 = cond.Ctx(H(hist), cal, "X", asof=asof, manual_as=mas)
+        check(cond.series(obs, c2) == [mas, True], "observe manual_as=%r" % mas)
+        check(cond.series({"not": obs}, c2)[0] == (None if mas is None else mas), "not observe 극성 manual_as=%r" % mas)
+    # 제외 모드(백테스트) — 관측값 없는 observe(0일째: 분봉 없음)는 묶음에서 빠진다.
+    ex = cond.Ctx(H(hist), cal, "X", asof=asof, unobserved="exclude")
     T_, F_ = {"gt": [1, 0]}, {"gt": [0, 1]}
     cases = [({"all": [obs, T_]}, [True, True]), ({"all": [obs, F_]}, [False, False]),
-             ({"any": [obs, F_]}, [True, False]), ({"atleast": 2, "of": [obs, T_, T_]}, [True, True]),
-             ({"atleast": 2, "of": [obs, T_, F_]}, [True, False]), ({"not": obs}, [False, cond.EXCLUDED]),
-             ({"all": [obs]}, [True, cond.EXCLUDED])]
+             ({"any": [obs, F_]}, [False, True]), ({"atleast": 2, "of": [obs, T_, T_]}, [True, True]),
+             ({"atleast": 2, "of": [obs, T_, F_]}, [False, True]), ({"not": obs}, [cond.EXCLUDED, False]),
+             ({"all": [obs]}, [cond.EXCLUDED, True])]
     for node, want in cases:
         got = cond.series(node, ex)
         check(got == want, "제외 모드 %s → %r (기대 %r)" % (list(node)[0], got, want))
-    check(cond.series({"gt": [{"case": [[obs, 1]], "else": 0}, 0]}, ex)[1] is None, "제외 표지는 다른 연산엔 모름으로")
+    check(cond.series({"gt": [{"case": [[obs, 1]], "else": 0}, 0]}, ex)[0] is None, "제외 표지는 다른 연산엔 모름으로")
     try:
         cond.validate({"observe": {"gt": [C, 1]}})
         FAILS.append("사유 없는 observe 통과")
@@ -668,18 +659,16 @@ def t_no_excluded_live():
     # (EXCLUDED 는 cond.py 에서 ctx.unobserved=="exclude" 일 때만 난다 — 실전은 그 모드가 아니다.)
     cal = ["20261001", "20261002"]
     hist = {"X": [Candle(d, 100, 100, 100, 100, 1000) for d in cal]}
-    now = dt.datetime(2026, 10, 2, 20, 0, tzinfo=dt.timezone.utc)
+    asof = dt.datetime(2026, 10, 2, 20, 0, tzinfo=dt.timezone.utc)
 
     class H(dict):
         minutes = {"X": {}}          # 분봉 없음 → observe 는 관측값이 없다(실전에서 흔함)
-        sessions = {"US": []}
-        market = {"X": "US"}
 
-    obs = {"observe": {"gt": [{"px": "close", "at": {"open_offset_min": -10}}, {"px": "close"}]}, "manual": "데이터 없음: x"}
+    obs = {"observe": {"gt": [{"px": "close", "sym": "X", "tf": "1m"}, {"px": "close"}]}, "manual": "데이터 없음: x"}
     nodes = [obs, {"manual": "y"}, {"all": [obs]}, {"any": [obs]}, {"not": obs},
              {"all": [obs, {"manual": "z"}]}, {"atleast": 1, "of": [obs, {"manual": "w"}]}]
     for manual_as in (None, True, False):
-        ctx = cond.Ctx(H(hist), cal, "X", now=now, manual_as=manual_as)   # 실전 기본: unobserved 미지정
+        ctx = cond.Ctx(H(hist), cal, "X", asof=asof, manual_as=manual_as)   # 실전 기본: unobserved 미지정
         for node in nodes:
             got = cond.series(node, ctx)
             bad = [x for x in got if x is cond.EXCLUDED]
@@ -691,7 +680,7 @@ def main():
     for name, fn in (("수치 연산", lambda: t_numeric(rng)), ("3값 논리", t_logic),
                      ("시간 연산", lambda: t_time(rng)), ("하한", t_bounds), ("포지션", lambda: t_pos(rng)), ("거래 시뮬레이터", t_trades),
                      ("인과성", lambda: t_causal(rng)),
-                     ("문법", t_syntax), ("저자 시각", t_at), ("등급·금액", t_grade), ("표현력 회귀", t_regress),
+                     ("문법", t_syntax), ("관측 시점(asof)", t_asof), ("등급·금액", t_grade), ("표현력 회귀", t_regress),
                      ("EXCLUDED 실전 불변식", t_no_excluded_live)):
         before = len(FAILS)
         try:

@@ -27,6 +27,9 @@
           로컬 서빙은 publish/serve.py 가 맡는다(거기만 허용).
   규칙 4  publish/ 도 수집 금지다(규칙 3 의 네트워크 모듈 중 서버용
           http.server 만 허용) — 발행층은 판정 산출물을 소비만 한다.
+  규칙 5  단방향(폭포수) — 구간③ 핵심 판정 모듈(cond·tree_grade·verdict_engine, '규칙 읽기·등급')은
+          계산기(shared/portfolio, '돈·성적')를 import 하지 않는다. 계산기는 핵심 산출물을 읽기만 한다.
+          (백테스트/검사 파일은 계산기를 써도 된다 — 머리와 계산기를 잇는 소비자이지 핵심이 아니다.)
 
 ## 사용
 
@@ -51,6 +54,12 @@ ALLOW = {
     ("shared", "notify.py"): {"urllib"},                    # 알림 '송신' 전용(수집 아님)
     ("publish", "serve.py"): {"http", "urllib"},            # 로컬 서버(서빙·URL 파싱)
 }
+
+# 규칙 5 — 단방향(폭포수): 구간③ 핵심 판정 모듈(규칙 읽기·등급)은 계산기(돈·성적)를 import 하지 않는다.
+#   계산기(shared/portfolio)는 shared/구간③ 산출물을 '읽기만' 한다 — 핵심이 계산기를 부르면 흐름이 거꾸로 선다.
+#   (cond=순수 규칙 평가기, tree_grade=등급, verdict_engine=판정 머리. 백테스트/검사 파일은 계산기를 써도 된다.)
+CORE_JUDGES = {("shared", "cond.py"), ("shared", "tree_grade.py"), ("verdict", "verdict_engine.py")}
+CALCULATORS = {"portfolio"}
 
 
 def _imports(path):
@@ -110,6 +119,11 @@ def check():
                 bad.append((layer, fn,
                             "네트워크 모듈 import: %s — 시세 자가수집 금지"
                             " (수집은 jhts, 알림은 shared/notify)" % ", ".join(sorted(net))))
+
+            # 규칙 5 — 구간③ 핵심은 계산기를 import 하지 않는다(단방향 폭포수 — 역류 금지)
+            if (layer, fn) in CORE_JUDGES and (CALCULATORS & mods):
+                bad.append((layer, fn, "핵심 판정 모듈이 계산기 import: %s — 단방향(폭포수) 역류"
+                            % ", ".join(sorted(CALCULATORS & mods))))
     return bad
 
 
@@ -122,7 +136,7 @@ def main():
         print("\n팀 사이는 코드가 아니라 산출물 파일(books/<slug>/*.json)로만 잇습니다.")
         print("두 팀 이상이 같은 코드가 필요하면 shared/ 로 올리세요.")
         return 1
-    print("팀 경계 통과 — 팀 간 import 0 · jhts 창구 단일 · 자가수집 네트워크 코드 0.")
+    print("팀 경계 통과 — 팀 간 import 0 · jhts 창구 단일 · 자가수집 네트워크 코드 0 · 구간③ 핵심↛계산기 역류 0.")
     return 0
 
 

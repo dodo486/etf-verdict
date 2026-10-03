@@ -8,8 +8,8 @@ homebrew·python.org·Microsoft Store 어느 설치본이든 그대로 동작한
 
 사용법
   python run.py daily        # 판정(체크리스트 = 조건 트리) → 백테스트 → 발행 (장 마감 후)
-  python run.py watch        # 저자가 말한 시각(트리의 at — 예: 개장 10분 전)마다 기다렸다 판정 → 발행
-                             #   다음 정규장 개장 기준(업계 캘린더 — 서머타임·휴장 자동). 매일 밤 한 번 띄우면 된다.
+  python run.py watch [--every N]  # asof=지금 기준으로 N분(기본 5)마다 재판정 → 발행(백테스트 제외).
+                             #   장중 조건은 asof(관측 시점) 기준 분봉을 본다 — 분봉이 연결되면 그대로 살아난다.
   python run.py publish      # 재판정 없이 현재 JSON으로 다시 발행만
 
 옵션
@@ -272,50 +272,23 @@ def main(argv):
 
 
 def watch(argv):
-    """저자가 말한 시각마다 판정 — 라이브 책 트리의 at(개장 기준 분)을 모아, 다음 정규장 개장 기준 그 시각
-    (+1분: 1분봉이 닫히고 들어오는 여유)까지 기다렸다가 판정→발행(백테스트 제외)을 돈다.
+    """asof=지금 기준으로 주기적으로 재판정→발행(백테스트 제외)한다. 장중(tf="1m") 조건은 asof(관측 시점)
+    이하 마지막 분봉을 본다 — 분봉이 연결되면 그대로 자동으로 살아나고, 그 전엔 None→manual(🟡)로 떨어진다.
 
-    개장 시각은 코드에 박지 않고 업계 캘린더(md_feed.sessions)에서 읽는다 — 서머타임·휴장·반일장이 자동 반영된다.
-    at 심볼의 시장을 모아 그 시장들의 다음 개장을 쓴다. 오늘·앞으로 개장이 없으면(주말·휴장) 그냥 끝난다."""
+    옛 watch 는 저자가 말한 '아침 고정 시각'까지 기다리는 용도였다 — asof 모델에선 그 고정 시점 개념이 없어
+    '지금 기준 주기 평가'로 바뀌었다. --every N 으로 간격(분, 기본 5)을, --cycles K 로 횟수(기본 무한)를 준다."""
     import time
-    from datetime import timedelta, timezone
-    from shared import cond, tree_grade, md_feed
-    offs, msyms = set(), set()
-    for slug in paths.live_slugs():
-        t = tree_grade.load_tree(slug)
-        if t:
-            offs.update(cond.at_offsets(t))
-            msyms.update(cond.minute_symbols_of(t))
-    if not offs:
-        print("watch: 저자 시각(at) 조건이 없다 — 끝")
-        return 0
-    now = datetime.now(timezone.utc)
-    start = (now - timedelta(days=3)).strftime("%Y%m%d")
-    end = (now + timedelta(days=7)).strftime("%Y%m%d")
-    # at 심볼이 속한 시장들의 다음 개장 — 여러 시장이면 가장 이른 다음 개장을 기준으로 잡는다.
-    markets = sorted({m for m in (md_feed.market_of(s) for s in msyms) if m})
-    nxt_open = None
-    for mk in markets:
-        s = cond._next_session(md_feed.sessions(mk, start, end), now.strftime("%Y%m%d"))
-        if s is not None and (nxt_open is None or s.open < nxt_open):
-            nxt_open = s.open
-    if nxt_open is None:
-        print("watch: 다음 정규장 개장을 캘린더에서 못 찾음(주말·휴장·세션 미설치) — 끝")
-        return 0
-    nxt_open = nxt_open.astimezone(timezone.utc)
-    rest = [a for a in argv if a != "watch"]
-    code = 0
-    for off in sorted(offs):
-        due = nxt_open + timedelta(minutes=off + 1)
-        wait = (due - datetime.now(timezone.utc)).total_seconds()
-        if wait < -600:
-            print("watch: 개장 %+d분 시각은 이미 지남 — 건너뜀" % off)
-            continue
-        print("watch: 개장 %+d분 판정 — %s(현지 %s)까지 %.0f분 대기"
-              % (off, due.strftime("%H:%M UTC"), due.astimezone().strftime("%H:%M"), max(0, wait) / 60))
-        if wait > 0:
-            time.sleep(wait)
+    rest = [a for a in argv if a != "watch" and a not in ("--every", "--cycles")]
+    every = int(argv[argv.index("--every") + 1]) if "--every" in argv else 5
+    cycles = int(argv[argv.index("--cycles") + 1]) if "--cycles" in argv else None
+    code, n = 0, 0
+    while cycles is None or n < cycles:
+        n += 1
+        print("watch: asof=지금 %d회차 판정 — %s" % (n, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         code = main(["verdict"] + rest) or code
+        if cycles is not None and n >= cycles:
+            break
+        time.sleep(max(1, every) * 60)
     return code
 
 

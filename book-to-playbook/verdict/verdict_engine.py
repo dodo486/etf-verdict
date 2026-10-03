@@ -125,7 +125,7 @@ def ref_map(tree):
 
 
 # ------------------------------------------------------------------ 상품 하나
-def product_verdict(tree, p, hist, positions):
+def product_verdict(tree, p, hist, positions, asof=None):
     cfg = tree["products"][p]
     cs = hist.get(p) or []
     base = {"prod": p, "index": cfg.get("index"), "note": cfg.get("note")}
@@ -134,7 +134,7 @@ def product_verdict(tree, p, hist, positions):
         return dict(base, key="unknown", grade=tree_grade.GRADES["unknown"],
                     reason="%s 시세 없음(수집 요청 %s)" % (p, req)), None
     cal = [c.date for c in cs]
-    pe = tree_grade.ProductEval(tree, p, hist, cal)
+    pe = tree_grade.ProductEval(tree, p, hist, cal, asof=asof)
     i = len(cal) - 1
     key, top = pe.grade_key(i), pe.top(i)
     reason = tree_grade.reason_of(key, top, pe.manual_items(i))
@@ -194,7 +194,8 @@ def _static_view(node, defs, index=None):
 
 
 # ------------------------------------------------------------------ 책 하나
-def render(slug):
+def render(slug, asof=None):
+    """asof = 관측 시각(UTC datetime). None 이면 지금 — 장중(tf="1m") 조건을 이 시점 이하로 자른다."""
     tree = tree_grade.load_tree(slug)
     now = datetime.now(timezone.utc).astimezone()
     top = {"slug": slug, "title": book_title(slug), "ts": now.isoformat(), "source": SOURCE,
@@ -216,7 +217,7 @@ def render(slug):
     pe0 = None
     weights, all_known = [], True
     for p in tree["products"]:
-        v, pe = product_verdict(tree, p, hist, positions)
+        v, pe = product_verdict(tree, p, hist, positions, asof=asof)
         top["verdicts"].append(v)
         pe0 = pe0 or pe
         sz = v.get("sizing") or {}
@@ -272,7 +273,8 @@ def build_text(top):
     if top.get("missing"):
         L.append("⚠ 시세 없음(수집 요청): " + ", ".join("%s #%s" % kv for kv in top["missing"].items()))
     L.append("─" * 30)
-    L.append("※ 종가 기준 판정. 🟡 는 수동(장중·저자 미명시) 조건을 직접 확인한 뒤 진입. 규칙 출처 = 저자 명시.")
+    L.append("※ 관측 시점(asof) 기준 판정 — 종가 조건은 마지막 확정 일봉, 장중 조건은 그 시점 분봉. "
+             "🟡 는 수동(장중 분봉 미연결·저자 미명시) 조건을 직접 확인한 뒤 진입. 규칙 출처 = 저자 명시.")
     return "\n".join(L)
 
 

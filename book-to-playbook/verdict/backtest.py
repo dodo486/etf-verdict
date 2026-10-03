@@ -21,6 +21,11 @@
 사용:
     python -m verdict.backtest <slug> [--days 365] [--json]   → logs/backtest-<slug>.json
     python -m verdict.backtest <slug> --page                  → backtest-<slug>.json (책 페이지 '백테스트' 탭, 1년·3년)
+    python -m verdict.backtest <slug> --engine vectorbt       → 새 계산기(shared/portfolio)로 자산곡선·MaxDD·샤프 (1단계, 추가 경로)
+
+--engine vectorbt 는 기존 경로를 건드리지 않는 '옆에 나란히' 길이다(플래그 없으면 전부 그대로).
+같은 거래(머리=tree 가 낸 신호·분할·매도)를 vectorbt 로 굴려 포트폴리오 지표(자산곡선·MaxDD·샤프·총수익)를
+낸다. 거래수·승률·거래당 평균(머리가 정한 거래 경계로 집계한 옛 정의)의 parity 도 나란히 보여준다.
 """
 import json
 import os
@@ -29,7 +34,7 @@ import sys
 from datetime import datetime, timedelta
 
 from shared.paths import BASE, LOGS, ensure_dir, write_text, backtest_path
-from shared import trades as trades_mod, tree_grade
+from shared import portfolio, trades as trades_mod, tree_grade
 
 HORIZONS = (5, 10, 20)
 BUY_OR_CONFIRM = "✅+🟡 (수동 확인 가정)"
@@ -86,7 +91,7 @@ def fetch_history(tree, days):
 
 def run(slug, days=365, hist=None, tree=None, unobserved=None):
     """hist 를 주면 시세를 다시 받지 않는다(여러 기간을 한 번에 돌릴 때).
-    unobserved="exclude" = 분봉이 없어 관측 못 한 저자 시각 조건(개장 전 선물 등)을 빼고 판단한다."""
+    unobserved="exclude" = 분봉이 없어 관측 못 한 장중 조건(asof observe — 개장 전 선물 등)을 빼고 판단한다."""
     tree = tree or tree_grade.load_tree(slug)
     if tree is None:
         raise SystemExit("books/%s/tree.json 없음 — 조건 트리가 있어야 백테스트한다" % slug)
@@ -116,9 +121,9 @@ def run(slug, days=365, hist=None, tree=None, unobserved=None):
                 starts.append(pos_of[r["date"]])
             prev = b
         exits, src = trades_mod.exits_of(tree, p)
-        tl = trades_mod.simulate(tree, p, hist, cal, starts, exits)
+        tl = portfolio.build_trades(tree, p, hist, cal, starts, exits)
         trade_res[p] = {"exit_source": src, "tranche_note": trades_mod.tranche_note(tree, p),
-                        "stats": trades_mod.stats(tl), "trades": tl}
+                        "stats": portfolio._parity_stats(tl), "trades": tl}
         manual[p] = [{"section": s, "rule": l, "ref": r} for s, l, r in pe.manual_items()]
         if prow and period is None:
             period = [prow[0]["date"], prow[-1]["date"], len(prow)]
@@ -203,6 +208,67 @@ def page_data(slug):
     return out
 
 
+# ------------------------------------------------------------------ 새 계산기 경로(--engine vectorbt · 1단계 추가)
+def run_vectorbt(slug, days=365, hist=None, tree=None, unobserved=None):
+    """기존 run()으로 거래(머리가 낸 신호·분할·매도)를 얻고, 그 거래를 새 계산기(shared/portfolio)로
+    다시 굴려 포트폴리오 지표(자산곡선·MaxDD·샤프·총수익)를 더한다. 기존 경로는 그대로 두고 옆에 나란히 둔다.
+
+    거래 경계·체결가·체결일은 run()이 쓰는 글루(portfolio.build_trades)가 정한 그대로 재사용한다
+    (머리의 규약·분할/매도 규칙을 계산기가 다시 정하지 않는다 — '머리=판단/계산기=계산' 분리)."""
+    tree = tree or tree_grade.load_tree(slug)
+    if tree is None:
+        raise SystemExit("books/%s/tree.json 없음 — 조건 트리가 있어야 백테스트한다" % slug)
+    hist = hist if hist is not None else fetch_history(tree, days)
+    res = run(slug, days, hist=hist, tree=tree, unobserved=unobserved)
+    vbt_products = {}
+    for p in tree["products"]:
+        cs = hist.get(p) or []
+        cal = [c.date for c in cs]
+        closes = [c.close for c in cs]
+        tl = res["trades"].get(p, {}).get("trades") or []
+        vbt_products[p] = portfolio.run_product(p, cal, closes, tl)
+    return {"slug": slug, "title": res["title"], "period": res["period"],
+            "trading_days": res["trading_days"], "engine": "vectorbt",
+            "old_trades": res["trades"], "vectorbt": vbt_products,
+            "generated": res["generated"]}
+
+
+def build_vectorbt_text(vres):
+    """포트폴리오 지표(총수익·MaxDD·샤프·자산곡선 점 수)와 parity(머리가 정한 거래 경계로 센 거래수·승률·거래당 평균)를 나란히."""
+    L = ["📊 백테스트 (vectorbt 계산기) — %s" % vres["title"]]
+    if not vres["period"]:
+        return "\n".join(L + ["데이터 없음"])
+    L.append("기간 %s ~ %s (%d거래일) · 거래=머리(tree)가 낸 신호·분할·매도 · 계산=vectorbt"
+             % (vres["period"][0], vres["period"][1], vres["trading_days"]))
+    L.append("")
+    L.append("■ 포트폴리오 지표(vectorbt) · parity(머리가 정한 거래 경계로 센 옛 정의)")
+    head = ("  %-6s %-6s %9s %8s %7s %6s   | parity(옛정의)  %5s %6s %8s"
+            % ("상품", "시장", "총수익", "MaxDD", "샤프", "자산점", "거래", "승률", "거래당평균"))
+    L.append(head)
+    for p, v in vres["vectorbt"].items():
+        mk = v["market_params"]["market"]
+        pa = v["parity"]
+        old = vres["old_trades"].get(p, {}).get("stats", {})
+        tr = "%+8.2f%%" % v["total_return"] if v["total_return"] is not None else "    -   "
+        dd = "%7.2f%%" % v["max_drawdown"] if v["max_drawdown"] is not None else "   -   "
+        sh = "%7.3f" % v["sharpe"] if v["sharpe"] is not None else "   -   "
+        win = "%5.1f%%" % old["win"] if "win" in old else "   -  "
+        avg = "%+7.2f%%" % old["avg"] if "avg" in old else "   -    "
+        L.append("  %-6s %-6s %9s %8s %7s %6d   | %12s  %4d %6s %8s"
+                 % (p, mk, tr, dd, sh, v["equity_points"], "", pa.get("trades", 0), win, avg))
+        pf = v["position_facts"]
+        if pf:
+            L.append("        (열린 포지션) 진입가 %.2f · 평단 %.2f · 현재수익률 %s · 최고 %.2f · 최저 %.2f · 보유 %d일"
+                     % (pf["entry_px"], pf["avg_px"],
+                        ("%+.2f%%" % pf["ret"]) if pf["ret"] is not None else "-",
+                        pf["high"] or 0, pf["low"] or 0, pf["days"]))
+    L.append("")
+    L.append("※ 거래수·승률·거래당평균은 '머리가 정한 거래 경계(한 진입→청산)'로 센 옛 정의 그대로다")
+    L.append("  (글루가 낸 체결 일정을 그대로 vectorbt 에 넣으므로 거래당 수익률은 구성상 동일).")
+    L.append("※ MaxDD=자산곡선 최고점 대비 최대 하락폭(양수%%) · 샤프=일별수익률 연율화(무위험0) · 총수익=(마지막자산/시작자본)−1.")
+    return "\n".join(L)
+
+
 def _cli():
     argv = sys.argv[1:]
     slug = next((a for a in argv if not a.startswith("-") and not a.isdigit()), None)
@@ -216,8 +282,17 @@ def _cli():
         print("웹페이지용 백테스트 → %s" % path)
         return
     days = int(argv[argv.index("--days") + 1]) if "--days" in argv else 365
-    # --exclude-unobserved : 분봉이 없어 관측 못 한 저자 시각 조건(개장 전 선물 등)을 빼고 판단(나머지 조건으로 진입)
-    res = run(slug, days, unobserved="exclude" if "--exclude-unobserved" in argv else None)
+    unobserved = "exclude" if "--exclude-unobserved" in argv else None
+    # --engine vectorbt : 새 계산기 경로(추가·비파괴). 플래그 없으면 아래 기존 경로로 그대로 간다.
+    if "--engine" in argv and argv[argv.index("--engine") + 1] == "vectorbt":
+        vres = run_vectorbt(slug, days, unobserved=unobserved)
+        if "--json" in argv:
+            print(json.dumps(vres, ensure_ascii=False, indent=2, default=str))
+        else:
+            print(build_vectorbt_text(vres))
+        return
+    # --exclude-unobserved : 분봉이 없어 관측 못 한 장중 조건(asof observe — 개장 전 선물 등)을 빼고 판단(나머지 조건으로 진입)
+    res = run(slug, days, unobserved=unobserved)
     res["unobserved"] = "제외하고 판단" if "--exclude-unobserved" in argv else "수동(🟡)으로 둠"
     ensure_dir(LOGS)
     write_text(os.path.join(LOGS, "backtest-%s.json" % slug),

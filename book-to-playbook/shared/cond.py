@@ -16,6 +16,13 @@
   조건 시계열은 True|False|None. None = 데이터가 없어 모름 — 조용히 거짓으로 치지 않는다.
   모든 연산은 인과적이다(그날까지의 값만 쓴다) — verify_primitives 가 강제한다.
 
+관측 시점(asof)
+  평가는 '사용자가 보는 그 순간(asof)' 기준이다. asof = 관측 시각(UTC datetime) — 라이브는 실제 지금
+  또는 지정 시각, 백테스트는 재생되는 각 시점. 각 시세 조회는 asof 로 자른다: 일봉 필드는 asof 이하
+  마지막 확정 일봉(고정), 분봉/장중 필드(tf="1m")는 asof 이하 마지막 분봉(살아 있음). 데이터가 없으면
+  None(모름) — 조용히 거짓으로 치지 않는다. '아침 한 시점 고정 판정'은 없다 — 조건이 요구하는 데이터를
+  그 조건이 말하는 봉(일봉·분봉)으로 asof 기준 가져올 뿐이다.
+
 3값 논리
   all : 하나라도 False → False, 아니면 하나라도 None → None, 아니면 True (빈 all = True)
   any : 하나라도 True → True, 아니면 하나라도 None → None, 아니면 False (빈 any = False)
@@ -36,11 +43,8 @@
 문법 (JSON) — 허용 키 밖은 전부 오류(조용히 무시하지 않는다):
   숫자          3, 1.5            (상수)
   시세          {"px": "close"|"open"|"high"|"low"|"volume", "sym": 심볼?, "tf": 봉?}   sym 기본 "$self",
-                tf 기본 "1d". 봉 길이는 노드 속성일 뿐 — 연결된 데이터가 일봉뿐이라 지금은 "1d" 만 허용.
-                {"px": "close", "sym": 심볼, "at": {"open_offset_min": m}}  저자가 말한 시각의 값 — 그 판정일
-                다음 정규장 개장(업계 캘린더 기준 — 시장 휴장·반일장 반영) 기준 m분(음수 = 개장 전) 시각까지의
-                마지막 1분봉 종가. 판정일 종가(그날 정규장 마감) 이후 그 시각 사이의 분봉만 쓴다. 개장 시각은
-                코드에 박지 않고 심볼의 시장 세션(sessions)에서 읽는다. 그 시각이 아직 안 왔거나 분봉이 없으면 모름(None).
+                tf 기본 "1d"(일봉 — asof 이하 마지막 확정 일봉). tf "1m"(분봉 — asof 이하 마지막 분봉, 장중 값):
+                분봉 데이터가 연결되기 전까진 늘 모름(None)이라 장중 조건은 observe 로 감싸 None→manual 로 떨어진다.
   산술          {"add"|"sub"|"mul"|"div"|"max"|"min": [a, b]}   max/min = 같은 날 두 값 중 큰/작은 값
                 {"abs": a}
   선택          {"case": [[c1, v1], [c2, v2], ...], "else": v}   위에서부터 처음 참인 c 의 v.
@@ -59,8 +63,8 @@
   여러 종목     {"across": {"syms": [...], "cond": c}}   c 가 참인 종목 수(c 안에서 "$s" = 그 종목)
   수동          {"manual": "사유"}
   관측·수동     {"observe": c, "manual": "사유"}   c 를 계산할 수 있으면 그 값, 관측값이 없어 모름이면 수동처럼
-                (manual_as) 푼다 — 저자가 말한 시각에 관측하는 조건(개장 전 선물 등): 그 시각이 지났고 분봉이
-                있으면 자동, 과거 분봉이 없는 날·아직 그 시각 전이면 지금처럼 사람 확인.
+                (manual_as) 푼다 — 장중 관측 조건(개장 전 선물 등): asof 기준 분봉이 있으면 자동, 분봉이
+                없으면(아직 연결 전·그 시각 분봉 미보관) 지금처럼 사람 확인(🟡).
   포지션        {"pos": "ret"|"days"|"maxret"|"minret"}   매도(exit)·2차 이후 분할 매수 규칙 안에서만.
                 ret = 평균 매입가 대비 오늘 종가 수익률(%), days = 첫 매수일부터 지난 봉(첫 매수일 0),
                 maxret/minret = 첫 매수일~오늘 종가 수익률의 최고/최저. 매수 전 날은 None.
@@ -76,9 +80,8 @@ META = ("label", "ref", "id", "note")
 PX_FIELDS = ("open", "high", "low", "close", "volume")
 POS_FIELDS = ("ret", "days", "maxret", "minret")
 ARITH = ("add", "sub", "mul", "div", "max", "min")
-TIMEFRAMES = ("1d",)      # 연결된 봉 길이 — 분봉이 연결되면 여기만 늘린다(문법은 그대로)
-AT_KEYS = ("open_offset_min",)
-AT_OFFSET_CAP = 24 * 60   # 저자 시각 offset(개장 기준 분)의 상한 — 하루(±1440분) 밖은 오타로 본다. 시장 가정은 없다.
+TIMEFRAMES = ("1d", "1m")  # 봉 길이 — asof 축에서 자른다. 일봉은 확정 일봉, 분봉은 asof 이하 마지막 분봉.
+                           # 분봉 데이터가 연결되기 전까진 "1m" 조회는 늘 None(장중 observe → manual).
 WINDOW = ("ma", "ema", "stdev", "highest", "lowest", "sum")
 CMP = ("gt", "ge", "lt", "le")
 STREAK_CAP = 400          # 연속·경과일을 거꾸로 셀 때의 상한(데이터 길이보다 길면 무의미)
@@ -102,7 +105,7 @@ def _op_of(node):
     if node.get("atleast") is not None:
         keys = [k for k in keys if k != "of"]
     if node.get("px") is not None:
-        keys = [k for k in keys if k not in ("sym", "tf", "at")]
+        keys = [k for k in keys if k not in ("sym", "tf")]
     if node.get("case") is not None:
         keys = [k for k in keys if k != "else"]
     if node.get("observe") is not None:
@@ -137,19 +140,8 @@ def validate(node, defs=None, path="$"):
             raise CondError("%s.px: 모르는 시세 필드 %r" % (path, v))
         if "sym" in node and not isinstance(node["sym"], str):
             raise CondError("%s.sym: 문자열이어야 한다" % path)
-        if "at" in node:
-            at = node["at"]
-            # px 는 close 만(분봉은 종가만 들어온다). offset 은 정수 — 개장 기준 분(음수 = 개장 전). 시장별 개장·마감
-            # 시각은 업계 캘린더(sessions)가 정하므로 여기에 US 09:30/16:00 같은 가정은 없다. 하루(±24시간) 밖은 오타로 거른다.
-            if v != "close" or not (isinstance(at, dict) and set(at) == set(AT_KEYS)
-                                    and isinstance(at["open_offset_min"], int)
-                                    and not isinstance(at["open_offset_min"], bool)
-                                    and -AT_OFFSET_CAP <= at["open_offset_min"] <= AT_OFFSET_CAP):
-                raise CondError("%s.at: {\"open_offset_min\": 정수(±%d 이내)} 이고 px 는 close 여야 한다"
-                                % (path, AT_OFFSET_CAP))
         if "tf" in node and node["tf"] not in TIMEFRAMES:
-            raise CondError("%s.tf: 연결되지 않은 봉 %r (연결된 봉 %s) — 그 데이터가 연결될 때까지 manual "
-                            "(\"데이터 없음: ...\") 로 둔다" % (path, node["tf"], "/".join(TIMEFRAMES)))
+            raise CondError("%s.tf: 모르는 봉 %r (허용 %s)" % (path, node["tf"], "/".join(TIMEFRAMES)))
     elif op == "abs":
         validate(v, defs, path + ".abs")
     elif op == "case":
@@ -224,12 +216,12 @@ def validate(node, defs=None, path="$"):
 class Ctx:
     """평가 문맥. hist={심볼: [Candle(date,open,high,low,close,volume)]}, cal=날짜 목록."""
 
-    def __init__(self, hist, cal, self_sym, index_sym=None, defs=None, manual_as=None, pos=None, now=None,
-                 unobserved=None, sessions=None):
+    def __init__(self, hist, cal, self_sym, index_sym=None, defs=None, manual_as=None, pos=None, asof=None,
+                 unobserved=None):
         """pos = (첫 매수일 인덱스, 평균 매입가 | 날짜별 평균 매입가 목록) — 매도·분할 규칙 평가 때만.
-        sessions = {시장: [Session]} 정규장 달력(저자 시각 값의 개장·마감 시각을 읽는다) — at 노드가 없으면 None 이어도 된다."""
+        asof = 관측 시각(UTC datetime) — 분봉(tf="1m") 필드를 이 시각 이하로 자른다. None 이면 실제 지금."""
         self.pos = pos
-        self.now = now            # 저자 시각 값의 '지금'(UTC datetime) — None 이면 실제 지금
+        self.asof = asof          # 관측 시각(UTC datetime) — 분봉 조회를 이 시각 이하로 자른다. None 이면 실제 지금
         self.unobserved = unobserved  # None = 관측값 없는 observe 는 수동처럼 · "exclude" = 그 조건을 빼고 판단(백테스트)
         self.hist = hist
         self.cal = list(cal)
@@ -237,9 +229,6 @@ class Ctx:
         self.index_sym = index_sym
         self.defs = defs or {}
         self.manual_as = manual_as
-        # 저자 시각(at)용 정규장 달력. History 가 들고 있으면 거기서, 아니면 넘겨받은 것(테스트)에서 읽는다.
-        self.sessions = sessions if sessions is not None else getattr(hist, "sessions", None) or {}
-        self.market = getattr(hist, "market", None) or {}
         self._px = {}
         self._memo = {}
         self._flip = None
@@ -250,7 +239,7 @@ class Ctx:
             return self
         if self._flip is None:
             f = Ctx(self.hist, self.cal, self.self_sym, self.index_sym, self.defs, not self.manual_as, self.pos,
-                    self.now, self.unobserved, self.sessions)
+                    self.asof, self.unobserved)
             f._px, f._flip = self._px, self
             self._flip = f
         return self._flip
@@ -264,86 +253,38 @@ class Ctx:
             return self.index_sym
         return sym
 
-    def px(self, sym, field, at=None):
-        key = (sym, field, None if at is None else at["open_offset_min"])
+    def px(self, sym, field, tf="1d"):
+        """심볼·필드의 asof 축 시계열(달력 길이). 일봉(tf="1d")은 날짜별 확정 일봉, 분봉(tf="1m")은 그날
+        asof 이하 마지막 분봉 값(분봉 데이터가 없으면 전부 None — 장중 observe → manual)."""
+        key = (sym, field, tf)
         if key not in self._px:
-            if at is None:
+            if tf == "1d":
                 by = {c.date: getattr(c, field) for c in (self.hist.get(sym) or [])}
                 self._px[key] = [by.get(d) for d in self.cal]
             else:
-                mkt = self.market.get(sym)
-                sess = self.sessions.get(mkt) or []
-                self._px[key] = at_series(getattr(self.hist, "minutes", {}).get(sym) or {}, self.cal,
-                                          at["open_offset_min"], sess, mkt, self.now)
+                self._px[key] = minute_series(getattr(self.hist, "minutes", {}).get(sym) or {},
+                                              self.cal, field, self.asof)
         return self._px[key]
 
 
-# ------------------------------------------------------------------ 저자 시각(분봉)
-# 분봉 키(YYYYMMDDHHMM)의 기준 시간대 — 시장마다 다르다(US 는 UTC, KR 은 KST).
-# 세션 시각(거래소 현지 tz-aware)을 이 시간대로 옮겨 분봉 키와 같은 자리에서 비교한다.
-# jhts 세션 시각은 어느 시장이든 tz-aware 라, 키 포맷만 이 표를 따른다.
-_MINUTE_TZ = {"US": "UTC", "KR": "Asia/Seoul"}
-
-
-def _to_minute_key(when, market):
-    """세션의 tz-aware datetime → 분봉 키(YYYYMMDDHHMM). 그 시장 분봉이 쓰는 시간대로 옮긴 뒤 자른다."""
+# ------------------------------------------------------------------ 분봉(asof 축)
+def minute_series(minutes, cal, field, asof=None):
+    """날짜별 'asof 이하 마지막 분봉'의 필드 값. minutes = {YYYYMMDDHHMM(UTC): {open,high,low,close,volume} 또는 종가}.
+    분봉 데이터가 asof 이하 그날 범위에 없으면 None(모름 — 장중 observe 가 manual 로 떨어진다).
+    분봉 다축 달력(그날의 분봉 구간)은 후속 범위다 — 데이터가 연결되면 여기만 채운다."""
     import datetime as _dt
-    tzname = _MINUTE_TZ.get(market, "UTC")
-    if tzname == "UTC":
-        tz = _dt.timezone.utc
-    else:
-        try:
-            from zoneinfo import ZoneInfo
-            tz = ZoneInfo(tzname)
-        except Exception:  # noqa: BLE001 — zoneinfo 없으면 UTC 로(오차 가능 — 로그만)
-            tz = _dt.timezone.utc
-    return when.astimezone(tz).strftime("%Y%m%d%H%M")
-
-
-def _next_session(sessions, d):
-    """판정일 d(YYYYMMDD) 다음 정규장 Session — sessions(날짜 오름차순)에서 d 보다 큰 첫 날. 없으면 None."""
-    for s in sessions:
-        if s.date > d:
-            return s
-    return None
-
-
-def _session_of(sessions, d):
-    """판정일 d(YYYYMMDD)의 정규장 Session — 달력에 그날이 있으면 그 세션, 없으면 None."""
-    for s in sessions:
-        if s.date == d:
-            return s
-    return None
-
-
-def at_series(minutes, cal, offset, sessions, market=None, now=None):
-    """판정일마다 '다음 정규장 개장 + offset 분' 시각까지의 마지막 1분봉 종가(판정일 정규장 마감 이후 분봉만).
-    minutes = {YYYYMMDDHHMM: 종가}. 개장·마감 시각은 sessions(업계 캘린더)에서 읽는다 — 코드에 시장 가정 없음.
-    그 시각이 아직 안 왔거나 세션 정보가 없거나 구간에 분봉이 없으면 None."""
-    import datetime as _dt
-    now = now or _dt.datetime.now(_dt.timezone.utc)
+    asof = asof or _dt.datetime.now(_dt.timezone.utc)
+    hi = asof.astimezone(_dt.timezone.utc).strftime("%Y%m%d%H%M")
     keys = sorted(minutes)
     out = []
     for d in cal:
-        nxt = _next_session(sessions, d)
-        today = _session_of(sessions, d)
-        if nxt is None or not keys:
-            out.append(None)                              # 다음 개장 시각을 모르면(세션 없음) 모름
-            continue
-        target = nxt.open + _dt.timedelta(minutes=offset)
-        if target > now:
-            out.append(None)                              # 아직 그 시각이 안 옴
-            continue
-        hi = _to_minute_key(target, market)
-        # 구간 시작 = 판정일 정규장 마감 이후. 세션을 알면 그 마감 시각, 모르면 다음 개장 전날까지로 열어 둔다.
-        lo = _to_minute_key(today.close, market) if today is not None else ""
         val = None
         for k in reversed(keys):
-            if k <= hi:
-                if k > lo:
-                    val = float(minutes[k])
+            if k[:8] == d and k <= hi:
+                bar = minutes[k]
+                val = bar if not isinstance(bar, dict) else bar.get(field)
                 break
-        out.append(val)
+        out.append(None if val is None else float(val))
     return out
 
 
@@ -437,7 +378,7 @@ def _series(node, ctx, s_sym):
             if s_sym is None:
                 raise CondError("$s 는 across 안에서만 쓴다")
             sym = s_sym
-        return ctx.px(ctx.bind(sym), v, node.get("at"))
+        return ctx.px(ctx.bind(sym), v, node.get("tf", "1d"))
 
     if op in ARITH:
         a, b = S(v[0]), S(v[1])
@@ -861,18 +802,19 @@ def zone_nodes(cfg):
     return out
 
 
-def _at_nodes(tree):
-    """저자 시각(at) 시세 노드 전부."""
+def _minute_nodes(tree):
+    """분봉(tf="1m") 시세 노드 전부 — 장중 observe 조건이 쓰는 장중 값."""
     nodes = list((tree.get("defs") or {}).values())
     for cfg in tree["products"].values():
         nodes.extend(n for _z, _l, _r, n in zone_nodes(cfg))
-    return [n for node in nodes for n in labeled_all(node, tree.get("defs") or {}) if "px" in n and "at" in n]
+    return [n for node in nodes for n in labeled_all(node, tree.get("defs") or {})
+            if "px" in n and n.get("tf") == "1m"]
 
 
 def minute_symbols_of(tree):
-    """저자 시각(at) 값을 쓰는 심볼 — 수집 단계가 이 심볼들의 1분봉을 같이 받는다."""
+    """분봉(tf="1m") 값을 쓰는 심볼 — 수집 단계가 이 심볼들의 분봉을 같이 받는다(데이터 연결 시)."""
     out = set()
-    for n in _at_nodes(tree):
+    for n in _minute_nodes(tree):
         s = n.get("sym", "$self")
         if s.startswith("$"):
             out.update(cfg.get("index") if s == "$index" else p for p, cfg in tree["products"].items())
@@ -880,11 +822,6 @@ def minute_symbols_of(tree):
             out.add(s)
     out.discard(None)
     return out
-
-
-def at_offsets(tree):
-    """트리가 쓰는 저자 시각(개장 기준 분) — 이 시각마다 판정해야 그 값이 들어간다(run.py watch)."""
-    return sorted({n["at"]["open_offset_min"] for n in _at_nodes(tree)})
 
 
 def symbols_of(tree):

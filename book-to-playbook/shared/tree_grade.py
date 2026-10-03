@@ -56,40 +56,33 @@ def load_tree(slug, name="tree.json"):
 
 
 class History(dict):
-    """{심볼: 일봉} + minutes{심볼: 1분봉} + sessions{시장: [Session]} + market{심볼: 시장}.
-    저자 시각(at) 값은 분봉에서 읽고, 그 '다음 개장/마감' 시각은 업계 캘린더(sessions)에서 읽는다."""
+    """{심볼: 일봉} + minutes{심볼: 분봉}. 장중(tf="1m") 값은 asof 축에서 분봉을 잘라 읽는다(cond.minute_series)."""
     minutes = {}
-    sessions = {}      # {"US"|"KR": [Session] 날짜 오름차순} — md_feed(jhts) 가 준 정규장 달력
-    market = {}        # {심볼: "US"|"KR"} — 분봉·세션의 기준 시장
 
 
 def history(trees, start):
-    """트리(들)가 쓰는 모든 심볼의 일봉(+ 저자 시각 값에 쓰는 심볼의 1분봉·그 시장의 정규장 달력) —
-    수집 단계(md_feed) 하나로 받는다. jhts 는 md_feed 에서만 만진다(팀 경계)."""
-    import datetime as _dt
+    """트리(들)가 쓰는 모든 심볼의 일봉(+ 장중(tf="1m") 값에 쓰는 심볼의 분봉) — 수집 단계(md_feed)
+    하나로 받는다. jhts 는 md_feed 에서만 만진다(팀 경계). 분봉이 연결되기 전에는 minutes 가 비어 있고
+    장중 observe 조건은 None→manual 로 떨어진다(의도된 동작)."""
     syms, msyms = set(), set()
     for t in trees if isinstance(trees, list) else [trees]:
         syms |= cond.symbols_of(t)
         msyms |= cond.minute_symbols_of(t)
     h = History(md_feed.histories(syms, start))
     h.minutes = {s: md_feed.minutes(s) for s in sorted(msyms)}
-    # 저자 시각 심볼이 속한 시장을 모아, 그 시장들의 정규장 달력을 받는다(start ~ 넉넉히 미래 — 판정일 다음 개장까지).
-    h.market = {s: md_feed.market_of(s) for s in sorted(msyms)}
-    end = (_dt.date.today() + _dt.timedelta(days=14)).strftime("%Y%m%d")
-    for mk in sorted({m for m in h.market.values() if m}):
-        h.sessions[mk] = md_feed.sessions(mk, start, end)
     return h
 
 
 class ProductEval:
     """한 상품의 여섯 칸을 전체 달력에 대해 한 번 계산해 둔다."""
 
-    def __init__(self, tree, prod, hist, cal, unobserved=None):
-        """unobserved="exclude" = 관측값이 없는 저자 시각 조건(observe)을 빼고 판단한다(백테스트 비교용)."""
+    def __init__(self, tree, prod, hist, cal, unobserved=None, asof=None):
+        """unobserved="exclude" = 관측값이 없는 장중 조건(observe)을 빼고 판단한다(백테스트 비교용).
+        asof = 관측 시각(UTC datetime) — 장중(tf="1m") 조건을 이 시점 이하로 자른다. None 이면 실제 지금."""
         cfg = tree["products"][prod]
         defs = tree.get("defs") or {}
         self.tree, self.prod, self.cfg, self.defs, self.cal, self.hist = tree, prod, cfg, defs, list(cal), hist
-        mk = lambda m: cond.Ctx(hist, cal, prod, cfg.get("index"), defs, manual_as=m, unobserved=unobserved)
+        mk = lambda m: cond.Ctx(hist, cal, prod, cfg.get("index"), defs, manual_as=m, unobserved=unobserved, asof=asof)
         self.ctx = {True: mk(True), False: mk(False), None: mk(None)}
         neutral = {"filter": True, "entry": True, "avoid": False}      # 칸 전체가 빠지면 그 칸은 제약 없음
 
@@ -208,7 +201,7 @@ def _view(node, defs, ctx, i, shared=False):
     if "def" in node and node["def"] in defs and not node.get("label")             and not [k for k in node if k not in cond.META and k != "def"]:
         body = defs[node["def"]]
         return _view(body, defs, ctx, i, shared or not product_specific(body, defs))
-    skip = ("of", "sym", "tf", "at", "else") + (("manual",) if "observe" in node else ())
+    skip = ("of", "sym", "tf", "else") + (("manual",) if "observe" in node else ())
     op = next((k for k in node if k not in cond.META and k not in skip), None)
     item = {"v": cond.series(node, ctx)[i]}
     for k in ("label", "ref", "note"):

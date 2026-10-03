@@ -40,7 +40,7 @@ from datetime import datetime, timedelta
 
 from shared import paths  # noqa: F401  (UTF-8 출력)
 from shared.paths import BASE, LOGS, ensure_dir, live_slugs, write_text
-from shared import cond, md_feed, trades as trades_mod, tree_grade
+from shared import cond, md_feed, portfolio, trades as trades_mod, tree_grade
 
 Candle = namedtuple("Candle", "date open high low close volume")
 COMPARED = cond.SECTIONS + ("caution", "sizing")      # 날마다 비교하는 칸(분할·매도는 거래로)
@@ -130,8 +130,8 @@ def compare_tranches(ta, tb, prod, hist, cal, years):
         return []
     starts = _entry_starts(ta, prod, hist, cal, years)
     exits = trades_mod.exits_of(ta, prod)[0]
-    xa = {t["entry"]: t for t in trades_mod.simulate(ta, prod, hist, cal, starts, exits, trs_a)}
-    xb = {t["entry"]: t for t in trades_mod.simulate(tb, prod, hist, cal, starts, exits, trs_b)}
+    xa = {t["entry"]: t for t in portfolio.build_trades(ta, prod, hist, cal, starts, exits, trs_a)}
+    xb = {t["entry"]: t for t in portfolio.build_trades(tb, prod, hist, cal, starts, exits, trs_b)}
     return [(xa.get(k), xb.get(k)) for k in sorted(set(xa) | set(xb))
             if not (xa.get(k) and xb.get(k) and _trade_key(xa[k]) == _trade_key(xb[k]))]
 
@@ -141,7 +141,7 @@ def _synthetic(sc, symbols):
     days = int(sc.get("days") or 60)
     import datetime as _dt
     cal, d = [], _dt.date(2000, 1, 3)
-    while len(cal) < days:                 # 실제 평일 달력(저자 시각 값이 날짜로 개장 시각을 계산한다)
+    while len(cal) < days:                 # 실제 평일 달력
         if d.weekday() < 5:
             cal.append(d.strftime("%Y%m%d"))
         d += _dt.timedelta(days=1)
@@ -242,7 +242,7 @@ def _has_manual(n, defs):
 
 def _stat_nodes(cfg, defs):
     """통계 대상 라벨 노드 [(칸, 노드)] — 조건 칸 + 조심 규칙(규칙 자체와 그 안의 라벨 노드).
-    저자 시각 관측(observe) 안쪽은 뺀다 — 과거 분봉이 없는 날은 판정 불가가 정상이다(그날은 수동으로 푼다)."""
+    장중 관측(observe) 안쪽은 뺀다 — asof 기준 분봉이 없는 날은 판정 불가가 정상이다(그날은 수동으로 푼다)."""
     out = [(sec, n) for sec in cond.SECTIONS for n in cond.labeled(cfg[sec], defs)]
     for r in cfg["caution"]:
         if isinstance(r["when"], dict) and not r["when"].get("label"):
@@ -470,8 +470,8 @@ def compare_exits(tree, ea, eb, hist, years):
     for p in tree["products"]:
         cal = [c.date for c in hist.get(p) or []]
         starts = _entry_starts(tree, p, hist, cal, years)
-        ta = {t["entry"]: t for t in trades_mod.simulate(tree, p, hist, cal, starts, _exit_rules(ea, p))}
-        tb = {t["entry"]: t for t in trades_mod.simulate(tree, p, hist, cal, starts, _exit_rules(eb, p))}
+        ta = {t["entry"]: t for t in portfolio.build_trades(tree, p, hist, cal, starts, _exit_rules(ea, p))}
+        tb = {t["entry"]: t for t in portfolio.build_trades(tree, p, hist, cal, starts, _exit_rules(eb, p))}
         keys = sorted(set(ta) | set(tb))
         diff = [(ta.get(k), tb.get(k)) for k in keys
                 if not (ta.get(k) and tb.get(k) and _trade_key(ta[k]) == _trade_key(tb[k]))]
@@ -571,8 +571,8 @@ def check_exits(slug, tree, years, review):
             want = _exit_rules(ea if win_name == "a" else eb, p)
         cal = [c.date for c in hist.get(p) or []]
         starts = _entry_starts(tree, p, hist, cal, years)
-        mine = trades_mod.simulate(tree, p, hist, cal, starts, tree["products"][p].get("exit") or [])
-        theirs = trades_mod.simulate(tree, p, hist, cal, starts, want)
+        mine = portfolio.build_trades(tree, p, hist, cal, starts, tree["products"][p].get("exit") or [])
+        theirs = portfolio.build_trades(tree, p, hist, cal, starts, want)
         if [_trade_key(t) for t in mine] != [_trade_key(t) for t in theirs]:
             stop.append("%s.exit 채택 규칙이 %s 와 다르게 동작" % (p, win_name))
             line += "  ❌ 채택 != %s" % win_name
