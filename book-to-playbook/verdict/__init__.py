@@ -5,8 +5,10 @@
 (shared/cond.symbols_of), 시세는 shared/md_feed.histories 하나로 받는다 — 없으면 jhts 에 수집 요청을 남긴다.
 
   · verdict_engine.py     오늘 판정(여섯 칸) → 알림 + latest-verdict-<slug>.json (화면이 그대로 그린다)
-  · backtest.py           같은 트리로 과거 신호·거래 성적(책 매도·분할 규칙) → 백테스트 탭
   · verify_primitives.py  검사기 ② — 원시 연산·체결·등급 계산을 기준값·손계산과 대조
+
+과거 신호·거래 성적(백테스트)은 구간④ 계산기(operations/backtest.py)로 옮겼다 — 확정된 트리를
+'소비'하는 돈·성적 계산기다(단방향 폭포수: operations 는 shared/verdict 산출물을 읽기만 한다).
 
 팀 경계: 다른 팀(playbook·checklist) 코드를 import 하지 않는다. 공용은 shared/ 만.
 `import jhts` 는 shared/md_feed.py 에서만 허용된다. 네트워크 모듈(urllib 등)은 이 팀

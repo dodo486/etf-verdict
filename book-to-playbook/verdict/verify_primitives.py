@@ -320,8 +320,8 @@ def t_pos(rng):
 
 
 def t_trades():
-    """체결 글루(portfolio.build_trades) — 손으로 답을 셀 수 있는 시세로 진입·분할 매도·동시 발동·미청산·보유 중 신호 건너뛰기."""
-    from shared import portfolio
+    """체결 규칙 평가 워크(shared.trades.build_trades) — 손으로 답을 셀 수 있는 시세로 진입·분할 매도·동시 발동·미청산·보유 중 신호 건너뛰기."""
+    from shared import trades as trades_mod
 
     def mk(rows):
         cal = ["2021%04d" % i for i in range(len(rows))]
@@ -337,7 +337,7 @@ def t_trades():
     ex = [{"label": "1차", "when": {"ge": [R, 7]}, "sell": {"initial": 0.3}},
           {"label": "2차", "when": {"ge": [R, 15]}, "sell": {"initial": 0.3}},
           {"label": "잔량", "when": {"all": [{"ge": [{"pos": "maxret"}, 15]}, {"lt": [R, 0]}]}, "sell": "all"}]
-    t = portfolio.build_trades(tree, "X", hist, cal, [0], ex)
+    t = trades_mod.build_trades(tree, "X", hist, cal, [0], ex)
     check(len(t) == 1 and t[0]["closed"], "분할: 거래 1건 청산")
     if t:
         t = t[0]
@@ -352,7 +352,7 @@ def t_trades():
     tree, hist, cal = mk(rows)
     ex = [{"label": "a", "when": {"ge": [R, 5]}, "sell": {"initial": 0.5}},
           {"label": "b", "when": {"ge": [R, 5]}, "sell": {"remaining": 0.5}}]
-    t = portfolio.build_trades(tree, "X", hist, cal, [0], ex)[0]
+    t = trades_mod.build_trades(tree, "X", hist, cal, [0], ex)[0]
     check([round(x["qty"], 6) for x in t["sells"]] == [0.5, 0.25] and not t["closed"], "동시 발동 순서·미청산")
     exp = (0.5 * 120 + 0.25 * 120 + 0.25 * 125) / 100 * 100 - 100        # 남은 0.25 는 마지막 종가 125 로 평가
     check(same(t["ret"], exp, 1e-9), "미청산 평가 %r≠%r" % (t["ret"], exp))
@@ -360,30 +360,30 @@ def t_trades():
     rows = [(100, 100)] * 3 + [(100, 106), (106, 106)] + [(100, 100)] * 4
     tree, hist, cal = mk(rows)
     ex = [{"label": "익절", "when": {"ge": [R, 5]}, "sell": "all"}]
-    t = portfolio.build_trades(tree, "X", hist, cal, [0, 1, 2, 5], ex)
+    t = trades_mod.build_trades(tree, "X", hist, cal, [0, 1, 2, 5], ex)
     check([x["entry"] for x in t] == [cal[1], cal[6]], "보유 중 신호 건너뜀: %r" % [x["entry"] for x in t])
     check(t[0]["exit"] == cal[4] and t[0]["sells"][0]["px"] == 106, "청산일·가격")
     # (4) 같은 규칙은 한 번만 — 다시 조건이 참이 돼도 두 번 팔지 않는다
     rows = [(100, 100), (100, 108), (108, 100), (100, 109), (109, 109)]
     tree, hist, cal = mk(rows)
-    t = portfolio.build_trades(tree, "X", hist, cal, [0], [{"label": "1차", "when": {"ge": [R, 7]}, "sell": {"initial": 0.3}}])[0]
+    t = trades_mod.build_trades(tree, "X", hist, cal, [0], [{"label": "1차", "when": {"ge": [R, 7]}, "sell": {"initial": 0.3}}])[0]
     check(len(t["sells"]) == 1, "규칙 한 번만")
     # (5) 마지막 날 신호 → 다음 날이 없어 체결 못 함(미청산), fixed20 은 20거래일 모자라면 None
     rows = [(100, 100), (100, 100), (100, 120)]
     tree, hist, cal = mk(rows)
-    t = portfolio.build_trades(tree, "X", hist, cal, [0], [{"label": "x", "when": {"ge": [R, 5]}, "sell": "all"}])[0]
+    t = trades_mod.build_trades(tree, "X", hist, cal, [0], [{"label": "x", "when": {"ge": [R, 5]}, "sell": "all"}])[0]
     check(not t["closed"] and t["sells"] == [] and t["fixed20"] is None, "마지막 날 신호는 체결 안 됨")
     # (6) fixed20 = 진입일 포함 20번째 거래일 종가
     rows = [(100, 100)] + [(100, 100 + i) for i in range(1, 30)]
     tree, hist, cal = mk(rows)
-    t = portfolio.build_trades(tree, "X", hist, cal, [0], [])[0]
+    t = trades_mod.build_trades(tree, "X", hist, cal, [0], [])[0]
     check(same(t["fixed20"], (rows[20][1] / 100 - 1) * 100, 1e-9), "fixed20 정의")
     # (7) manual 은 '매도가 안 나가는 쪽'으로 풀린다 — 확인 못 한 조건 때문에 팔지 않는다(not 아래도 마찬가지)
     rows = [(100, 100), (100, 100), (100, 100), (100, 100)]
     tree, hist, cal = mk(rows)
-    t = portfolio.build_trades(tree, "X", hist, cal, [0], [{"label": "m", "when": {"manual": "실적"}, "sell": "all"}])[0]
+    t = trades_mod.build_trades(tree, "X", hist, cal, [0], [{"label": "m", "when": {"manual": "실적"}, "sell": "all"}])[0]
     check(t["sells"] == [], "manual 매도는 안 걸림")
-    t = portfolio.build_trades(tree, "X", hist, cal, [0], [{"label": "nm", "when": {"not": {"manual": "x"}}, "sell": "all"}])[0]
+    t = trades_mod.build_trades(tree, "X", hist, cal, [0], [{"label": "nm", "when": {"not": {"manual": "x"}}, "sell": "all"}])[0]
     check(t["sells"] == [], "not 아래 manual 도 매도를 일으키지 않는다(안쪽을 참으로 풀어 not = 거짓)")
     # (8) 분할 매수 — 1차 25% 1일 시가 100. 2차(종가 ≥ +5%) 2일 종가 106 → 3일 시가 108 에 30%.
     #     평균 매입가 = (0.25·100 + 0.30·108)/0.55 = 104.36… 4일 종가 115(+10.2%) → 익절(산 물량 전부) 5일 시가 116.
@@ -391,7 +391,7 @@ def t_trades():
     tree, hist, cal = mk(rows)
     trs = [{"label": "1차", "frac": 0.25}, {"label": "2차", "frac": 0.30, "when": {"ge": [R, 5]}},
            {"label": "3차", "frac": 0.45, "when": {"ge": [R, 50]}}]
-    t = portfolio.build_trades(tree, "X", hist, cal, [0],
+    t = trades_mod.build_trades(tree, "X", hist, cal, [0],
                         [{"label": "익절", "when": {"ge": [R, 10]}, "sell": {"initial": 1.0}}], trs)[0]
     avg = (0.25 * 100 + 0.30 * 108) / 0.55
     check([(b["date"], b["px"], b["qty"]) for b in t["buys"]] == [(cal[1], 100, 0.25), (cal[3], 108, 0.30)],
@@ -402,21 +402,19 @@ def t_trades():
     # 같은 날 매도가 걸리면 그날은 추가 매수하지 않는다
     rows = [(100, 100), (100, 100), (100, 106), (106, 106), (106, 106)]
     tree, hist, cal = mk(rows)
-    t = portfolio.build_trades(tree, "X", hist, cal, [0],
+    t = trades_mod.build_trades(tree, "X", hist, cal, [0],
                         [{"label": "반", "when": {"ge": [R, 5]}, "sell": {"remaining": 0.5}}], trs)[0]
     check([b["date"] for b in t["buys"]] == [cal[1], cal[4]],      # 2일 매도 신호 → 3일 시가 매수 안 함, 3일 신호 → 4일 매수
           "매도가 걸린 날은 추가 매수 안 함 %r" % t["buys"])
     # 분할이 없으면 한 번에 전량(옛 규약과 같은 결과) · 비율이 저자 미명시(null)여도 전량(비율을 지어내지 않는다)
-    t = portfolio.build_trades(tree, "X", hist, cal, [0], [], [])[0]
+    t = trades_mod.build_trades(tree, "X", hist, cal, [0], [], [])[0]
     check([b["qty"] for b in t["buys"]] == [1.0], "분할 없음 = 전량")
     nul = [{"label": "1차", "frac": None}, {"label": "2차", "frac": None, "when": {"ge": [R, 5]}}]
-    t = portfolio.build_trades(tree, "X", hist, cal, [0], [], nul)[0]
+    t = trades_mod.build_trades(tree, "X", hist, cal, [0], [], nul)[0]
     check([b["qty"] for b in t["buys"]] == [1.0], "분할 비율 미명시 = 전량 한 번")
-    # (9) 백테스트 수익률 정의(_fwd): 신호일 i → i+1 시가 진입, i+h 종가
-    from verdict import backtest
-    cs = [Candle("d%d" % i, 100 + i, 0, 0, 200 + i, 0) for i in range(30)]
-    check(same(backtest._fwd(cs, 3, 20), (cs[23].close / cs[4].open - 1) * 100, 1e-12), "_fwd 정의")
-    check(backtest._fwd(cs, 15, 20) is None, "_fwd 미래 부족 None")
+    # 주: 백테스트 수익률 정의(_fwd)는 구간④ 계산기(operations/backtest)로 옮겼다 — 이 검사기는 구간③(머리/공통층)
+    #     원시함수만 본다. operations(계산기)를 import 하면 단방향(폭포수) 역류이므로 여기서 _fwd 는 검사하지 않는다
+    #     (operations 자체 검증에서 다룬다).
 
 
 # ------------------------------------------------------------------ 4. 인과성

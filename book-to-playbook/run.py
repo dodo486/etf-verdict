@@ -25,7 +25,7 @@ homebrew·python.org·Microsoft Store 어느 설치본이든 그대로 동작한
 local.env 의 PYTHONPATH 로 준다(local.env.example 참고).
 
 팀 구조: 실행 대상은 전부 패키지 모듈(python -m <팀>.<모듈>)이다 — playbook(구간①)
-· checklist(구간②) · verdict(구간③) · publish(발행층) · shared(공통).
+· checklist(구간②) · verdict(구간③) · operations(구간④ 계산기) · publish(발행층) · shared(공통).
 """
 import json
 import os
@@ -207,7 +207,7 @@ def main(argv):
             r.step(daily, [slug, "--json", "--no-send"], capture_to=latest_path(slug))  # 2) 발행용 JSON
             # 3) 책 페이지 '백테스트' 탭 데이터(1년·3년) — 장 마감 후(daily)만. 실패해도 판정 발행은 막지 않는다.
             if mode == "daily":
-                r.step("verdict.backtest", [slug, "--page"], required=False)
+                r.step("operations.backtest", [slug, "--page"], required=False)
 
     missing = [s for s in live if not os.path.exists(latest_path(s))]
     if missing:

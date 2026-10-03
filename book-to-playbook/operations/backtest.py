@@ -19,9 +19,9 @@
 '✅+🟡' 줄은 수동 조건이 전부 확인됐다고 가정한 낙관치다.
 
 사용:
-    python -m verdict.backtest <slug> [--days 365] [--json]   → logs/backtest-<slug>.json
-    python -m verdict.backtest <slug> --page                  → backtest-<slug>.json (책 페이지 '백테스트' 탭, 1년·3년)
-    python -m verdict.backtest <slug> --engine vectorbt       → 새 계산기(shared/portfolio)로 자산곡선·MaxDD·샤프 (1단계, 추가 경로)
+    python -m operations.backtest <slug> [--days 365] [--json]   → logs/backtest-<slug>.json
+    python -m operations.backtest <slug> --page                  → backtest-<slug>.json (책 페이지 '백테스트' 탭, 1년·3년)
+    python -m operations.backtest <slug> --engine vectorbt       → 계산기(operations/portfolio)로 자산곡선·MaxDD·샤프 (추가 경로)
 
 --engine vectorbt 는 기존 경로를 건드리지 않는 '옆에 나란히' 길이다(플래그 없으면 전부 그대로).
 같은 거래(머리=tree 가 낸 신호·분할·매도)를 vectorbt 로 굴려 포트폴리오 지표(자산곡선·MaxDD·샤프·총수익)를
@@ -34,7 +34,8 @@ import sys
 from datetime import datetime, timedelta
 
 from shared.paths import BASE, LOGS, ensure_dir, write_text, backtest_path
-from shared import portfolio, trades as trades_mod, tree_grade
+from shared import trades as trades_mod, tree_grade
+from operations import portfolio
 
 HORIZONS = (5, 10, 20)
 BUY_OR_CONFIRM = "✅+🟡 (수동 확인 가정)"
@@ -121,9 +122,9 @@ def run(slug, days=365, hist=None, tree=None, unobserved=None):
                 starts.append(pos_of[r["date"]])
             prev = b
         exits, src = trades_mod.exits_of(tree, p)
-        tl = portfolio.build_trades(tree, p, hist, cal, starts, exits)
+        tl = trades_mod.build_trades(tree, p, hist, cal, starts, exits)
         trade_res[p] = {"exit_source": src, "tranche_note": trades_mod.tranche_note(tree, p),
-                        "stats": portfolio._parity_stats(tl), "trades": tl}
+                        "stats": trades_mod._parity_stats(tl), "trades": tl}
         manual[p] = [{"section": s, "rule": l, "ref": r} for s, l, r in pe.manual_items()]
         if prow and period is None:
             period = [prow[0]["date"], prow[-1]["date"], len(prow)]
@@ -210,10 +211,10 @@ def page_data(slug):
 
 # ------------------------------------------------------------------ 새 계산기 경로(--engine vectorbt · 1단계 추가)
 def run_vectorbt(slug, days=365, hist=None, tree=None, unobserved=None):
-    """기존 run()으로 거래(머리가 낸 신호·분할·매도)를 얻고, 그 거래를 새 계산기(shared/portfolio)로
+    """기존 run()으로 거래(머리가 낸 신호·분할·매도)를 얻고, 그 거래를 계산기(operations/portfolio)로
     다시 굴려 포트폴리오 지표(자산곡선·MaxDD·샤프·총수익)를 더한다. 기존 경로는 그대로 두고 옆에 나란히 둔다.
 
-    거래 경계·체결가·체결일은 run()이 쓰는 글루(portfolio.build_trades)가 정한 그대로 재사용한다
+    거래 경계·체결가·체결일은 run()이 쓰는 규칙 평가 워크(shared.trades.build_trades)가 정한 그대로 재사용한다
     (머리의 규약·분할/매도 규칙을 계산기가 다시 정하지 않는다 — '머리=판단/계산기=계산' 분리)."""
     tree = tree or tree_grade.load_tree(slug)
     if tree is None:
@@ -273,7 +274,7 @@ def _cli():
     argv = sys.argv[1:]
     slug = next((a for a in argv if not a.startswith("-") and not a.isdigit()), None)
     if not slug:
-        print("사용법: python -m verdict.backtest <slug> [--days 365] [--json]", file=sys.stderr)
+        print("사용법: python -m operations.backtest <slug> [--days 365] [--json]", file=sys.stderr)
         sys.exit(2)
     if "--page" in argv:
         data = page_data(slug)

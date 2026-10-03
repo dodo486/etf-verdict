@@ -8,6 +8,7 @@
   · playbook/   구간① 책 원본 → 플레이북
   · checklist/  구간② 플레이북 → 체크리스트 시트
   · verdict/    구간③ 체크리스트 → 데이터 수집·판정
+  · operations/ 구간④ 확정 트리 → 돈·성적 계산기(백테스트 엔진)
   · shared/     공통층(모든 팀이 쓰는 유일한 공용 코드)
   · publish/    발행·서빙층(팀 산출물의 소비자·조립자)
 
@@ -27,9 +28,9 @@
           로컬 서빙은 publish/serve.py 가 맡는다(거기만 허용).
   규칙 4  publish/ 도 수집 금지다(규칙 3 의 네트워크 모듈 중 서버용
           http.server 만 허용) — 발행층은 판정 산출물을 소비만 한다.
-  규칙 5  단방향(폭포수) — 구간③ 핵심 판정 모듈(cond·tree_grade·verdict_engine, '규칙 읽기·등급')은
-          계산기(shared/portfolio, '돈·성적')를 import 하지 않는다. 계산기는 핵심 산출물을 읽기만 한다.
-          (백테스트/검사 파일은 계산기를 써도 된다 — 머리와 계산기를 잇는 소비자이지 핵심이 아니다.)
+  규칙 5  단방향(폭포수) — 머리(playbook·checklist·verdict)와 공통층(shared) 어느 것도 구간④
+          계산기(operations, '돈·성적')를 import 하지 않는다. operations 만 아래(shared 의 규칙 평가
+          결과·verdict 산출물)를 읽는다 — 머리/공통이 계산기를 부르면 흐름이 거꾸로 선다(역류).
 
 ## 사용
 
@@ -43,7 +44,7 @@ from shared import paths  # noqa: F401  (경로·UTF-8 출력 고정)
 from shared.paths import BASE
 
 TEAMS = ("playbook", "checklist", "verdict")
-LAYERS = TEAMS + ("shared", "publish")
+LAYERS = TEAMS + ("shared", "publish", "operations")
 
 # 시세 자가수집에 쓰이는 모듈들 — 팀 폴더에서 보이면 그 자체로 위반.
 NET_MODULES = {"urllib", "http", "requests", "socket", "aiohttp", "httpx"}
@@ -55,11 +56,11 @@ ALLOW = {
     ("publish", "serve.py"): {"http", "urllib"},            # 로컬 서버(서빙·URL 파싱)
 }
 
-# 규칙 5 — 단방향(폭포수): 구간③ 핵심 판정 모듈(규칙 읽기·등급)은 계산기(돈·성적)를 import 하지 않는다.
-#   계산기(shared/portfolio)는 shared/구간③ 산출물을 '읽기만' 한다 — 핵심이 계산기를 부르면 흐름이 거꾸로 선다.
-#   (cond=순수 규칙 평가기, tree_grade=등급, verdict_engine=판정 머리. 백테스트/검사 파일은 계산기를 써도 된다.)
-CORE_JUDGES = {("shared", "cond.py"), ("shared", "tree_grade.py"), ("verdict", "verdict_engine.py")}
-CALCULATORS = {"portfolio"}
+# 규칙 5 — 단방향(폭포수): 머리(playbook·checklist·verdict)와 공통층(shared) 어느 것도 구간④ 계산기
+#   (operations, '돈·성적')를 import 하지 않는다. operations 만 아래(shared 규칙 평가 결과·verdict 산출물)를
+#   읽는다 — 머리/공통이 계산기를 부르면 흐름이 거꾸로 선다(역류). operations 폴더는 이 금지의 대상이 아니다.
+UPSTREAM = set(TEAMS) | {"shared"}      # operations 를 import 해선 안 되는 '위쪽' 레이어
+OPERATIONS = "operations"
 
 
 def _imports(path):
@@ -120,10 +121,10 @@ def check():
                             "네트워크 모듈 import: %s — 시세 자가수집 금지"
                             " (수집은 jhts, 알림은 shared/notify)" % ", ".join(sorted(net))))
 
-            # 규칙 5 — 구간③ 핵심은 계산기를 import 하지 않는다(단방향 폭포수 — 역류 금지)
-            if (layer, fn) in CORE_JUDGES and (CALCULATORS & mods):
-                bad.append((layer, fn, "핵심 판정 모듈이 계산기 import: %s — 단방향(폭포수) 역류"
-                            % ", ".join(sorted(CALCULATORS & mods))))
+            # 규칙 5 — 단방향(폭포수): 위쪽(머리 + 공통층)은 구간④ 계산기(operations)를 import 하지 않는다.
+            #   operations 만 아래(shared 규칙 평가 결과·verdict 산출물)를 읽는다 — 위가 아래 계산기를 부르면 역류.
+            if layer in UPSTREAM and OPERATIONS in mods:
+                bad.append((layer, fn, "%s 가 계산기(operations) import — 단방향(폭포수) 역류" % layer))
     return bad
 
 
@@ -136,7 +137,7 @@ def main():
         print("\n팀 사이는 코드가 아니라 산출물 파일(books/<slug>/*.json)로만 잇습니다.")
         print("두 팀 이상이 같은 코드가 필요하면 shared/ 로 올리세요.")
         return 1
-    print("팀 경계 통과 — 팀 간 import 0 · jhts 창구 단일 · 자가수집 네트워크 코드 0 · 구간③ 핵심↛계산기 역류 0.")
+    print("팀 경계 통과 — 팀 간 import 0 · jhts 창구 단일 · 자가수집 네트워크 코드 0 · 머리/공통↛operations 역류 0.")
     return 0
 
 

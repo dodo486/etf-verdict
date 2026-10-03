@@ -61,7 +61,7 @@ BACKTEST_BEGIN, BACKTEST_END = "<!-- INJECT:backtest -->", "<!-- /INJECT:backtes
 
 
 def _inject_backtest(html, slug):
-    """백테스트 탭(책 무관): backtest-<slug>.json(verdict.backtest --page) + checklist/ui/backtest-ui.js 를
+    """백테스트 탭(책 무관): backtest-<slug>.json(operations.backtest --page) + checklist/ui/backtest-ui.js 를
     checklist-ui 바로 앞에 심는다 — checklist-ui 가 로드 때 .tab 을 묶기 전에 탭이 생겨야 기존 탭 전환에 묶인다.
     데이터가 없는 책은 탭을 만들지 않는다(빈 탭을 보이지 않는다). 다시 발행하면 이전 주입분을 갈아끼운다."""
     html = re.sub(re.escape(BACKTEST_BEGIN) + r".*?" + re.escape(BACKTEST_END) + r"\n?", "", html, flags=re.S)

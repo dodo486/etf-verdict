@@ -40,7 +40,7 @@ from datetime import datetime, timedelta
 
 from shared import paths  # noqa: F401  (UTF-8 출력)
 from shared.paths import BASE, LOGS, ensure_dir, live_slugs, write_text
-from shared import cond, md_feed, portfolio, trades as trades_mod, tree_grade
+from shared import cond, md_feed, trades as trades_mod, tree_grade
 
 Candle = namedtuple("Candle", "date open high low close volume")
 COMPARED = cond.SECTIONS + ("caution", "sizing")      # 날마다 비교하는 칸(분할·매도는 거래로)
@@ -130,8 +130,8 @@ def compare_tranches(ta, tb, prod, hist, cal, years):
         return []
     starts = _entry_starts(ta, prod, hist, cal, years)
     exits = trades_mod.exits_of(ta, prod)[0]
-    xa = {t["entry"]: t for t in portfolio.build_trades(ta, prod, hist, cal, starts, exits, trs_a)}
-    xb = {t["entry"]: t for t in portfolio.build_trades(tb, prod, hist, cal, starts, exits, trs_b)}
+    xa = {t["entry"]: t for t in trades_mod.build_trades(ta, prod, hist, cal, starts, exits, trs_a)}
+    xb = {t["entry"]: t for t in trades_mod.build_trades(tb, prod, hist, cal, starts, exits, trs_b)}
     return [(xa.get(k), xb.get(k)) for k in sorted(set(xa) | set(xb))
             if not (xa.get(k) and xb.get(k) and _trade_key(xa[k]) == _trade_key(xb[k]))]
 
@@ -470,8 +470,8 @@ def compare_exits(tree, ea, eb, hist, years):
     for p in tree["products"]:
         cal = [c.date for c in hist.get(p) or []]
         starts = _entry_starts(tree, p, hist, cal, years)
-        ta = {t["entry"]: t for t in portfolio.build_trades(tree, p, hist, cal, starts, _exit_rules(ea, p))}
-        tb = {t["entry"]: t for t in portfolio.build_trades(tree, p, hist, cal, starts, _exit_rules(eb, p))}
+        ta = {t["entry"]: t for t in trades_mod.build_trades(tree, p, hist, cal, starts, _exit_rules(ea, p))}
+        tb = {t["entry"]: t for t in trades_mod.build_trades(tree, p, hist, cal, starts, _exit_rules(eb, p))}
         keys = sorted(set(ta) | set(tb))
         diff = [(ta.get(k), tb.get(k)) for k in keys
                 if not (ta.get(k) and tb.get(k) and _trade_key(ta[k]) == _trade_key(tb[k]))]
@@ -571,8 +571,8 @@ def check_exits(slug, tree, years, review):
             want = _exit_rules(ea if win_name == "a" else eb, p)
         cal = [c.date for c in hist.get(p) or []]
         starts = _entry_starts(tree, p, hist, cal, years)
-        mine = portfolio.build_trades(tree, p, hist, cal, starts, tree["products"][p].get("exit") or [])
-        theirs = portfolio.build_trades(tree, p, hist, cal, starts, want)
+        mine = trades_mod.build_trades(tree, p, hist, cal, starts, tree["products"][p].get("exit") or [])
+        theirs = trades_mod.build_trades(tree, p, hist, cal, starts, want)
         if [_trade_key(t) for t in mine] != [_trade_key(t) for t in theirs]:
             stop.append("%s.exit 채택 규칙이 %s 와 다르게 동작" % (p, win_name))
             line += "  ❌ 채택 != %s" % win_name
