@@ -130,22 +130,15 @@ minutes(symbol) -> { "YYYYMMDDHHMM(UTC)": {"open":f,"high":f,"low":f,"close":f,"
 - **md_feed 는 jhts 세션 함수(sessions/market_of)를 더는 호출하지 않으므로**, jhts 쪽에서 세션 API
   유지 여부는 이 파이프라인과 무관해짐.
 
-### ④-T  [TEMP] yfinance 임시 분봉 제공자 — jhts OHLCV 연결 시 통째 삭제
+### ④-T  jhts minute_bars(OHLCV+UTC)로 교체 완료
 
-jhts 분봉이 아직 OHLCV 로 안 와서, 위 목표 계약을 **임시로 yfinance** 가 채운다. 흔적0 격리:
-  · yfinance 를 import 하는 파일은 **단 하나**: `shared/_temp_yf_minutes.py`(신규).
-  · 스왑 포인트는 **1곳**: `shared/md_feed.py` 의 `minutes()`(TEMP 두 줄 — 원래 jhts 경로는 바로 아래 주석).
-  · 계약 형태는 위 목표(④)와 동일: `{YYYYMMDDHHMM(UTC): {open,high,low,close,volume}}`.
-  · 정직한 한계: yfinance 1분봉은 최근 ~7일만. 그 밖·실패·빈결과 → `{}`(→ 모름 → observe 는 manual 🟡).
-    가짜로 안 채운다. (과거 asof 는 여전히 None 으로 정직하게 떨어짐을 실측 확인.)
-
-**삭제 체크리스트(jhts 분봉 OHLCV 연결 시):**
-1. `shared/_temp_yf_minutes.py` 파일 통째 삭제.
-2. `shared/md_feed.py` 의 `minutes()` 를 jhts 경로로 되돌림(TEMP 두 줄 삭제 → 바로 아래 주석 블록 복원).
-3. `pip uninstall yfinance`(및 함께 설치된 curl_cffi·lxml·peewee 등 전이 의존 — 필요 시).
-4. `grep -rn "yfinance\|_temp_yf" .`(`.venv` 제외) 가 **0건**인지 확인.
-
-- `md_feed.minutes` 의 docstring 은 이미 OHLCV 계약(위 목표)으로 갱신됨(TEMP 제공자가 그 형태로 채움).
+jhts 분봉이 이제 OHLCV + UTC 로 온다(실측 확인) → 임시 분봉 제공자를 **제거하고 jhts 로 교체 완료**.
+  · `jhts.marketdata.minute_bars(symbol)` 반환: 리스트 `[{"dt":"...T19:59:00Z"(ISO8601 UTC), "open","high","low","close","vol"}, ...]` 오름차순(지수·선물 포함).
+  · `md_feed.minutes()` 가 모양만 계약으로 변환한다: `dt` → `YYYYMMDDHHMM`(UTC 그대로, 추가 변환 없음) 키, `vol` → `volume`, open/high/low/close 그대로.
+  · 반환 계약은 ④ 목표 그대로: `{YYYYMMDDHHMM(UTC): {open,high,low,close,volume}}`.
+  · 빈 리스트·실패·미설치·예외 → `{}`(→ 모름 → observe 는 manual 🟡). 가짜로 안 채운다.
+  · 임시 제공자 흔적 0: 임시 분봉 제공자 파일 삭제, 임시 vendor 패키지 uninstall 완료, 저장소 grep 0건(.venv·spike 제외).
+  · 실측 샘플: SPY `dt` 끝 `T19:59:00Z` → 키 `202610021959`, ES=F 끝 `T20:59:00Z` — UTC 확인.
 
 ---
 
@@ -154,7 +147,7 @@ jhts 분봉이 아직 OHLCV 로 안 와서, 위 목표 계약을 **임시로 yfi
 1. **분봉 다축 달력.** 지금은 분봉을 일봉 달력 날짜에 "asof 이하 마지막 1봉"으로 접어 넣는다. 그날의 분봉
    구간 전체를 독립 축으로 돌리는 창·시간 연산(분봉 ma 등)은 데이터 계약(④) 확정 후. `cond.minute_series`
    한 곳만 확장하면 된다(평가기 다른 부분 무변경).
-2. **OHLCV 분봉 수집.** jhts `minute_closes`(종가) → OHLCV dict 로 확장(④). 평가기는 준비됨.
+2. **OHLCV 분봉 수집.** ~~jhts `minute_closes`(종가) → OHLCV dict 로 확장(④).~~ 완료 — `md_feed.minutes()` 가 jhts `minute_bars`(OHLCV+UTC)를 쓴다(④-T).
 3. **분봉 tz 일반화.** KR 등 비-UTC 분봉이 오면 `minute_series` 에 tz 파라미터 추가(현재 UTC 가정).
 4. **`md_feed.sessions`/`market_of` 정리.** 이 파이프라인에서 호출부가 사라졌다 — md_feed 에 함수는 남아
    있으나 미사용. jhts 다른 소비자가 없으면 다음 청소 때 제거 가능(이번 범위에선 어댑터 축소를 피해 보존).

@@ -62,19 +62,33 @@ def _request(symbol, start):
 
 def minutes(symbol):
     """1분봉 OHLCV {YYYYMMDDHHMM(UTC): {open,high,low,close,volume}} — 계약은 MIGRATION_NOTES ④.
-    현재는 jhts 분봉이 OHLCV 로 아직 안 와서 **임시로 yfinance** 에서 받는다(최근 ~7일, 실패 시 {}).
+    jhts.marketdata.minute_bars 로 받는다: 리스트 [{dt(ISO8601 UTC, 끝 Z), open,high,low,close,vol}] 오름차순.
+    여기서 모양만 계약으로 바꾼다 — dt 를 YYYYMMDDHHMM(UTC 그대로) 키로, vol → volume 로.
+    실패·빈결과·미설치·예외 → {} (가짜로 안 채운다 — 평가기에서 '모름' 으로 정직하게 떨어진다).
     cond.minute_series 는 이 OHLCV dict(또는 스칼라 종가)를 둘 다 받으므로 트리·평가기는 무변경."""
-    # ── TEMP 스왑 포인트(1곳) — jhts 분봉 OHLCV 가 연결되면 이 한 줄만 아래 jhts 경로로 되돌린다.
-    #    (삭제 체크리스트: MIGRATION_NOTES.md. yfinance import 는 _temp_yf_minutes 한 파일에만 있다.)
-    from shared import _temp_yf_minutes
-    return _temp_yf_minutes.minutes(symbol)
-    # ── 원래 jhts 경로(복원용 — 위 TEMP 두 줄을 지우면 이 아래가 산다):
-    # if not AVAILABLE:
-    #     return {}
-    # try:
-    #     return md.minute_closes(symbol) or {}   # jhts: 종가만 {키:종가} → OHLCV dict 로 확장 예정
-    # except Exception:  # noqa: BLE001
-    #     return {}
+    if not AVAILABLE:
+        return {}
+    try:
+        bars = md.minute_bars(symbol) or []
+    except Exception as e:  # noqa: BLE001
+        # '데이터 없음'과 '어댑터 고장'을 구분할 수 있게 진짜 예외는 한 줄 남긴다.
+        sys.stderr.write("md_feed.minutes(%s) 예외 — %s: %s\n" % (symbol, type(e).__name__, e))
+        return {}
+    out = {}
+    for b in bars:
+        dt = b.get("dt")
+        if not dt:
+            continue
+        # dt: "2026-10-02T19:59:00Z"(ISO8601 UTC) → "202610021959"(UTC 그대로, 변환 없음).
+        key = dt[:4] + dt[5:7] + dt[8:10] + dt[11:13] + dt[14:16]
+        out[key] = {
+            "open": b.get("open"),
+            "high": b.get("high"),
+            "low": b.get("low"),
+            "close": b.get("close"),
+            "volume": b.get("vol"),
+        }
+    return out
 
 
 def sessions(market, start, end):

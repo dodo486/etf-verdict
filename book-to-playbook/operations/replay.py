@@ -17,8 +17,9 @@
 
 ## 정직한 한계 (가짜로 안 늘린다)
 
-분봉은 jhts 분봉 OHLCV 가 연결되기 전까진 yfinance 임시 경로(shared/_temp_yf_minutes)에서 최근 ~7일만 온다.
-따라서 장중 타임라인도 그 범위(데이터 있는 세션·봉)만 깔린다. 타임라인이 비거나 짧으면 "N세션·M봉만 재생,
+분봉은 jhts 분봉(md_feed.minutes → jhts.minute_bars, OHLCV+UTC)에서 온다. 개별주·ETF 는 Alpaca(키 있으면
+깊은 히스토리), 지수·선물과 Alpaca 미연결은 최근 ~7거래일(야후 1분봉 보관 한계)만 온다.
+따라서 장중 타임라인도 데이터 있는 세션·봉만 깔린다. 타임라인이 비거나 짧으면 "N세션·M봉만 재생,
 그 밖은 데이터 없음"을 그대로 표면화한다 — 없는 분봉을 지어내 타임라인을 늘리지 않는다.
 
 ## 단방향(폭포수)
@@ -151,10 +152,10 @@ def _limit_note(tree, hist, tf, timeline, sessions):
                 "sessions": 0, "bars": 0}
     if not timeline:
         syms = sorted(cond.minute_symbols_of(tree))
-        return {"reason": "분봉 데이터 없음 — yfinance 임시 경로(최근 ~7일)에서 %s 분봉이 비어 있다"
+        return {"reason": "분봉 데이터 없음 — jhts 분봉(md_feed.minutes)에서 %s 분봉이 비어 있다"
                           "(미설치·네트워크·그 심볼 분봉 미보관). 없는 봉을 지어내 타임라인을 늘리지 않는다." % (", ".join(syms) or "대상 심볼"),
                 "sessions": 0, "bars": 0}
-    return {"reason": "분봉은 yfinance 임시 경로가 최근 ~7일만 준다 — 장중 타임라인도 데이터 있는 %d세션·%d봉(tf=%s)만 "
+    return {"reason": "분봉은 jhts 분봉(지수·선물은 최근 ~7거래일 한계)만큼만 온다 — 장중 타임라인도 데이터 있는 %d세션·%d봉(tf=%s)만 "
                       "재생된다. 그 밖 기간은 분봉이 없어 재생할 수 없다(정직한 한계)." % (len(sessions), len(timeline), tf),
             "sessions": len(sessions), "bars": len(timeline)}
 
