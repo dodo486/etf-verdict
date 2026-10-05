@@ -1068,7 +1068,8 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
         lead = d.inputs.map(x=>esc(x.d)+' '+((x.v===null||x.v===undefined)?'<span class="ev-x">—</span>':'<b>'+fmtMeas(x.v)+'</b>')).join('<span class="ev-sep"> · </span>') + ' → ';
       }
       const lv = noVal ? '<span class="ev-x">측정 없음</span>' : '<b>'+fmtMeas(d.lhs)+u+'</b>';
-      const L = lead + (d.lhsd ? esc(d.lhsd)+' ' : '') + lv;
+      // 입력값(lead)이 있으면 파생값 이름(lhsd)은 생략 — 입력이 이미 설명한다
+      const L = lead + (lead ? '' : (d.lhsd ? esc(d.lhsd)+' ' : '')) + lv;
       // 기준이 상수(rhsd 없음)면 "· 기준 op 값", 다른 식이면 "op 설명 값" — 단위는 양쪽에 같게 붙인다
       const R = d.rhsd ? ' '+(EVSYM[d.op]||'')+' '+esc(d.rhsd)+' <b>'+fmtMeas(d.rhs)+u+'</b>'
                        : ' <span class="ev-th">· 기준 '+(EVSYM[d.op]||'')+' '+fmtMeas(d.rhs)+u+'</span>';

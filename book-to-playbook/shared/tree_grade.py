@@ -333,30 +333,43 @@ def _unit_of(e, defs):
     return ""
 
 
-def _inputs_of(e, ctx, i, defs, acc, seen):
-    """복합식(산술)의 원시 측정 잎들을 [{d, v}]로 모은다 — '무슨 숫자로 계산했나'를 보여주려고.
-    예: (고가 − 종가) ÷ 고가 → [{d:'고가', v:…}, {d:'종가', v:…}]. 중복 설명은 한 번만."""
+def _inputs_of(e, ctx, i, defs, acc, seen, top=True):
+    """파생값이 '무슨 원시 숫자로 나왔나'를 [{d, v}]로 모은다 — 사용자가 검증할 수 있게.
+    · pct(변화율)은 두 끝점(오늘·k일 전)을 보여준다. 예: 오늘 종가 770.6 · 5일 전 765.6.
+    · 산술(합·차·비율)은 안의 시세 잎들을 보여준다. 예: 고가 771 · 종가 770.6.
+    · LHS 자체가 단일 잎(종가·20일선·연속일수)이면 분해하지 않는다 — 피연산자가 이미 값으로 보인다.
+    중복 설명은 한 번만."""
     if not isinstance(e, dict):
         return
     if "def" in e and e["def"] in defs and len([k for k in e if k not in cond.META]) == 1:
-        return _inputs_of(defs[e["def"]], ctx, i, defs, acc, seen)
+        return _inputs_of(defs[e["def"]], ctx, i, defs, acc, seen, top)
+
+    def add(d, v):
+        if d and d not in seen:
+            seen.add(d)
+            acc.append({"d": d, "v": v})
+
     try:
         op = cond._op_of(e)
     except cond.CondError:
         return
-    LEAF = ("px", "ma", "ema", "pct", "lag", "streak", "count", "barssince",
-            "rsi", "highest", "lowest", "sum", "stdev", "pos")
-    if op in LEAF:
-        d = _describe_operand(e, defs)
-        if d and d not in seen:
-            seen.add(d)
-            acc.append({"d": d, "v": _meas_val(e, ctx, i)})
+    if op == "pct":                                   # 변화율 — 두 끝점을 보여준다
+        s, k = e["pct"]
+        base = _describe_operand(s, defs) or "값"
+        add("오늘 " + base, _meas_val(s, ctx, i))
+        add("%d일 전" % k, _meas_val({"lag": [s, k]}, ctx, i))
         return
     if op in cond.ARITH:
         for sub in e[op]:
-            _inputs_of(sub, ctx, i, defs, acc, seen)
-    elif op == "abs":
-        _inputs_of(e["abs"], ctx, i, defs, acc, seen)
+            _inputs_of(sub, ctx, i, defs, acc, seen, top=False)
+        return
+    if op == "abs":
+        _inputs_of(e["abs"], ctx, i, defs, acc, seen, top=False)
+        return
+    # 단일 잎(px·ma·streak…): 산술 안쪽이면 값으로 보여주고, LHS 통째면(top) 분해하지 않는다
+    if not top and op in ("px", "ma", "ema", "lag", "streak", "count", "barssince",
+                          "rsi", "highest", "lowest", "sum", "stdev", "pos"):
+        add(_describe_operand(e, defs), _meas_val(e, ctx, i))
     # case·valuewhen 등은 생략(라벨이 설명을 맡는다)
 
 
@@ -380,11 +393,10 @@ def _measure(node, defs, ctx, i, top=True):
                 "lhs": _meas_val(a, ctx, i), "lhsd": lhsd,
                 "rhs": _meas_val(b, ctx, i), "rhsd": _describe_operand(b, defs),
                 "unit": _unit_of(a, defs)}
-        if not lhsd:                       # 복합식(산술) — 무슨 원시 숫자로 계산했는지 함께 보여준다
-            ins = []
-            _inputs_of(a, ctx, i, defs, ins, set())
-            if ins:
-                fact["inputs"] = ins
+        ins = []                           # 파생값(변화율·산술)이면 무슨 원시 숫자로 나왔는지 함께 보여준다
+        _inputs_of(a, ctx, i, defs, ins, set())
+        if ins:
+            fact["inputs"] = ins
         return [fact]
     if op == "not":
         kids = [node["not"]]
