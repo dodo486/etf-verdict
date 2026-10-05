@@ -248,6 +248,126 @@ def product_specific(node, defs):
     return False
 
 
+# ------------------------------------------------------------------ 측정 증거(실제 값)
+# 조건의 ●/○ 밑에 '무엇을 재서 그 값이 얼마였나'를 실어보낸다 — 사용자가 판정을 검증·신뢰할 수 있게.
+# 엔진은 어차피 비교 양쪽 값을 계산해 참/거짓을 낸다(cond.series). 그 값을 버리지 않고 뷰에 담는 것뿐이다.
+_PXF = {"close": "종가", "open": "시가", "high": "고가", "low": "저가", "volume": "거래량"}
+
+
+def _meas_val(e, ctx, i):
+    """값 표현식 하나를 그날 실제 숫자로 — 못 재면 None. 표시용이라 자리수만 줄인다(계산엔 안 쓴다)."""
+    try:
+        v = cond.series(e, ctx)[i]
+    except Exception:
+        return None
+    if v is None or isinstance(v, bool):
+        return None
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return None
+    if v != v:                                   # NaN
+        return None
+    a = abs(v)
+    return round(v, 1) if a >= 100 else round(v, 2) if a >= 1 else round(v, 3)
+
+
+def _describe_operand(e, defs):
+    """값 표현식 → 짧은 사람 설명(없으면 '' — 그럼 숫자만 보여준다). 복합식(산술 등)은 라벨이 설명하므로 생략."""
+    if not isinstance(e, dict):
+        return ""                                # 상수(기준값) — 숫자 자체로
+    if "def" in e and e["def"] in defs and len([k for k in e if k not in cond.META]) == 1:
+        return _describe_operand(defs[e["def"]], defs)
+    try:
+        op = cond._op_of(e)
+    except cond.CondError:
+        return ""
+    if op == "px":
+        sym = e.get("sym", "$self")
+        base = _PXF.get(e["px"], e["px"])
+        return base if sym in ("$self", "$index") else "%s %s" % (sym, base)
+    if op in ("ma", "ema"):
+        return "%d일선" % e[op][1] if op == "ma" else "%d일 지수이평" % e[op][1]
+    if op in ("highest", "lowest", "sum", "stdev"):
+        m = {"highest": "최고", "lowest": "최저", "sum": "합계", "stdev": "변동성"}
+        return "%d일 %s" % (e[op][1], m[op])
+    if op == "pct":
+        return "전일 대비 변화율" if e["pct"][1] == 1 else "%d일 전 대비 변화율" % e["pct"][1]
+    if op == "lag":
+        inner = _describe_operand(e["lag"][0], defs)
+        return ("%s " % inner if inner else "") + "%d일 전" % e["lag"][1]
+    if op == "streak":
+        return "연속 참 일수"
+    if op == "count":
+        return "최근 참 일수"
+    if op == "barssince":
+        return "마지막 참 이후 일수"
+    if op == "rsi":
+        return "RSI%d" % e["rsi"][1]
+    if op == "pos":
+        return {"ret": "수익률(%)", "days": "보유일", "maxret": "최고수익(%)",
+                "minret": "최저수익(%)"}.get(e["pos"], "포지션")
+    return ""                                    # add/sub/mul/div/case/valuewhen … 복합 → 숫자만
+
+
+def _unit_of(e, defs):
+    """값 표현식의 단위 힌트(%·일·배) — 모르면 '' (라벨이 단위를 말하므로 비워도 된다)."""
+    if not isinstance(e, dict):
+        return ""
+    if "def" in e and e["def"] in defs and len([k for k in e if k not in cond.META]) == 1:
+        return _unit_of(defs[e["def"]], defs)
+    try:
+        op = cond._op_of(e)
+    except cond.CondError:
+        return ""
+    if op == "pct":
+        return "%"
+    if op in ("streak", "count", "barssince"):
+        return "일"
+    if op == "div":
+        return "배"
+    if op == "rsi":
+        return ""
+    if op == "pos":
+        return "일" if e["pos"] == "days" else "%"
+    return ""
+
+
+def _measure(node, defs, ctx, i, top=True):
+    """표시되는 조건 하나가 '무엇을 재서 얼마였나' — [{op, lhs, lhsd, rhs, rhsd, unit}, …].
+    하위에 라벨 달린 조건이 있으면 멈춘다(그 조건이 자기 증거를 따로 보여준다)."""
+    if not isinstance(node, dict):
+        return []
+    if "def" in node and node["def"] in defs and len([k for k in node if k not in cond.META]) == 1:
+        return _measure(defs[node["def"]], defs, ctx, i, top)
+    if not top and (node.get("label") or "manual" in node or "observe" in node):
+        return []
+    try:
+        op = cond._op_of(node)
+    except cond.CondError:
+        return []
+    if op in cond.CMP:
+        a, b = node[op]
+        return [{"op": op,
+                 "lhs": _meas_val(a, ctx, i), "lhsd": _describe_operand(a, defs),
+                 "rhs": _meas_val(b, ctx, i), "rhsd": _describe_operand(b, defs),
+                 "unit": _unit_of(a, defs)}]
+    if op == "not":
+        kids = [node["not"]]
+    elif op in ("all", "any"):
+        kids = node[op]
+    elif op == "atleast":
+        kids = node["of"]
+    elif op == "observe":
+        kids = [node["observe"]]
+    else:
+        return []
+    facts = []
+    for c in kids:
+        facts += _measure(c, defs, ctx, i, top=False)
+    return facts
+
+
 def _view(node, defs, ctx, i, shared=False):
     """노드 하나 → 화면 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, hidden?}.
 
@@ -292,6 +412,11 @@ def _view(node, defs, ctx, i, shared=False):
             item["kids"] = inner
         if not node.get("label"):
             item["hidden"] = True
+    # 측정 증거 — 화면에 보이는 조건(라벨/수동/관측)에만 그날 실제 값을 붙인다.
+    if node.get("label") or "manual" in node or "observe" in node:
+        facts = _measure(node, defs, ctx, i)
+        if facts:
+            item["detail"] = facts
     return item
 
 

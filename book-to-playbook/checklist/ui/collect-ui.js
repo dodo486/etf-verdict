@@ -38,8 +38,8 @@
       return;
     }
     var eod = VD.ts ? new Date(VD.ts) : null;
-    // 라이브 모드 = 로컬 실시간 서버가 /api/verdict 를 제공(정직한 소스/신선도 표기).
-    // 정적(GitHub Pages) 모드 = 빌드 때 구운 스냅샷.
+    // 라이브 모드 = 로컬 실시간 서버가 /api/verdict 를 제공(유일한 보기 경로, 정직한 소스/신선도 표기).
+    // 서버 없이 열면 라이브 아님 — 오래된 값을 '지금 값'처럼 보여주지 않는다(정적 스냅샷 모드 폐지).
     var live = !!(window.__liveMode || VD.live);
     var src  = VD.source || 'jhts 시세팀';
 
@@ -48,36 +48,34 @@
       ? '<span>🤖 종가·지표('+src+')</span> <b>'+stamp(eod)+'</b> <span class="cst ok">수집됨</span>'
       : '<span>🤖 종가·지표('+src+')</span> <span class="cst err">없음</span>';
 
-    // --- 소스 2: 갱신 모드(라이브 폴링 vs 정적 스냅샷) ---
-    //     (M2 에서 KIS 장중 자동수집은 제거됨 — 더 이상 'KIS' 라벨을 쓰지 않는다)
+    // --- 소스 2: 갱신 모드(라이브 폴링 / 서버 없음) ---
     var iHtml;
     if(live){
       iHtml = '<span>🟢 실시간 · '+src+'</span> '
             + (eod ? '<b>갱신 '+hms(eod)+'</b> ' : '')
             + '<span class="cst ok">폴링 중</span>';
     } else {
-      iHtml = '<span>⏸ 스냅샷 · '+src+'</span> '
-            + (eod ? '<b>빌드 '+stamp(eod)+'</b> ' : '')
-            + '<span class="cst wait">정적 페이지</span>';
+      iHtml = '<span>⚠ 서버 연결 안 됨</span> '
+            + '<span class="cst err">값 없음 — 라이브 서버로 열어야 지금 값을 봅니다</span>';
     }
     elIntra.innerHTML = iHtml;
 
     // --- 전체: EOD 기준 시각 ---
     var last = eod;
+    if(!live){
+      box.className = 'collect old';
+      elWhen.textContent = '라이브 아님'; elAgo.textContent = '(서버 연결 필요)';
+      return;
+    }
     if(!last){
       box.className = 'collect old';
       elWhen.textContent = '없음'; elAgo.textContent = '';
       return;
     }
-    elWhen.textContent = live ? ('실시간 · 갱신 '+hms(last)) : stamp(last);
-    elAgo.textContent = '(' + ago(last) + ')';
-
-    var hours = (Date.now()-last.getTime())/3600000;
     // 라이브 모드는 방금 받은 값이므로 항상 fresh.
-    box.className = 'collect ' + (live ? 'fresh' : (hours <= 12 ? 'fresh' : (hours <= 36 ? 'stale' : 'old')));
-    if(!live && hours > 36){
-      elAgo.textContent = '(' + ago(last) + ' — 오래된 값입니다)';
-    }
+    elWhen.textContent = '실시간 · 갱신 '+hms(last);
+    elAgo.textContent = '(' + ago(last) + ')';
+    box.className = 'collect fresh';
   }
 
   // 탭 바가 sticky(top:0)라 그 높이만큼 내려 붙어야 가려지지 않는다.

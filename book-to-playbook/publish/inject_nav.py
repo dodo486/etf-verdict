@@ -50,6 +50,15 @@ body{{padding-left:var(--rail)}}
   {''.join(items)}
   <a class="home" href="../">＋ 전체 홈</a>
 </nav>
+<script>
+// 단일 앱 셸(홈)의 iframe 안에서 열리면 자기 책목록 레일을 숨긴다 — 셸의 레일 하나만 쓴다(이중 레일 방지).
+if(window.self!==window.top){{
+  var _r=document.getElementById('bookrail'); if(_r) _r.style.display='none';
+  var _t=document.getElementById('railtoggle'); if(_t) _t.style.display='none';
+  document.body.style.paddingLeft='0';
+  document.documentElement.style.setProperty('--rail','0px');
+}}
+</script>
 '''
     # <body ...> 바로 뒤에 주입 (없으면 맨 앞)
     import re

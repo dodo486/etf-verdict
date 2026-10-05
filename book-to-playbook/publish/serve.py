@@ -26,6 +26,7 @@
 import http.server
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -40,26 +41,25 @@ SSE_TICK = float(os.environ.get("PLAYBOOK_TICK", "15"))  # 초 — SSE tick 주�
 
 # 어느 책을 라이브로 띄울지는 books.json 에서 온다(코드에 특정 책을 박지 않는다).
 # BOOK_SLUG 로 덮어쓸 수 있고, 기본은 첫 live 책.
-from shared.paths import BASE, default_slug, book_engine   # noqa: E402
-SLUG = os.environ.get("BOOK_SLUG") or default_slug()
-DAILY_ENGINE = book_engine(SLUG, "daily")
+from shared.paths import BASE, default_slug, book_engine, live_slugs, load_manifest   # noqa: E402
+SLUGS = live_slugs() or [default_slug()]               # 라이브로 띄울 책 전부(코드에 특정 책 안 박음)
+DEFAULT_SLUG = os.environ.get("BOOK_SLUG") or (SLUGS[0] if SLUGS else default_slug())
 
 # ------------------------------------------------------------------ 판정 계산부
 # (HTTP 배관과 분리 — 서버리스 함수로 그대로 이관 가능한 순수 호출부)
 _cache_lock = threading.Lock()
-_cache = {"data": None, "ts": 0.0, "err": None}
+_cache = {}                       # slug -> {"data":..., "ts":...}  (책마다 따로 캐시)
 
 
-def _run_verdict():
-    """엔진(books.json engine.daily) --json 을 한 프로세스로 돌려 판정 dict 를 받는다.
+def _run_verdict(slug):
+    """엔진(books.json engine.daily) --json 을 한 프로세스로 돌려 판정 dict 를 받는다 — 매번 새 시세로.
 
-    로직을 복제하지 않고 **같은 엔진 모듈의 --json 경로를 재사용**한다(run.py 가
-    latest-verdict.json 을 만들 때와 동일한 호출). 새 프로세스라 매번 md_feed(jhts)로
-    새로 시세를 받는다. 텔레그램/데스크톱 알림은 --no-send 로 끈다.
-    """
-    if not DAILY_ENGINE:
-        raise RuntimeError("%s 책에 시세 엔진(engine.daily)이 없습니다 — books.json 확인" % SLUG)
-    cmd = [PY, "-m", DAILY_ENGINE, SLUG, "--json", "--no-send"]
+    로직을 복제하지 않고 **같은 엔진 모듈의 --json 경로를 재사용**한다. 텔레그램/데스크톱 알림은
+    --no-send 로 끈다. 라이브 전용이라 정적 스냅샷 파일(latest-verdict)은 읽지도 쓰지도 않는다."""
+    daily = book_engine(slug, "daily")
+    if not daily:
+        raise RuntimeError("%s 책에 시세 엔진(engine.daily)이 없습니다 — books.json 확인" % slug)
+    cmd = [PY, "-m", daily, slug, "--json", "--no-send"]
     p = subprocess.run(cmd, cwd=BASE, capture_output=True, timeout=90)
     if p.returncode != 0:
         raise RuntimeError((p.stderr or b"").decode("utf-8", "replace")[:400]
@@ -69,36 +69,34 @@ def _run_verdict():
     return data
 
 
-def compute_verdict(force=False):
-    """TTL 캐시가 살아 있으면 캐시를, 아니면 새로 계산해 (data, from_cache) 반환.
-
-    서버리스로 옮길 때는 이 함수 하나만 들어내면 된다(캐시는 프로세스 지역 캐시라
-    서버리스에선 무해하게 매번 계산으로 동작한다)."""
+def compute_verdict(slug, force=False):
+    """책 slug 의 판정 — TTL 캐시가 살아 있으면 캐시를, 아니면 새로 계산해 (data, from_cache) 반환."""
     now = time.time()
     with _cache_lock:
-        fresh = (not force and _cache["data"] is not None
-                 and (now - _cache["ts"]) < CACHE_TTL)
-        if fresh:
-            return _cache["data"], True
-    # 캐시 계산은 락 밖에서(수 초 걸리는 네트워크 호출 동안 다른 요청 안 막게)
-    data = _run_verdict()
+        c = _cache.get(slug)
+        if not force and c and (now - c["ts"]) < CACHE_TTL:
+            return c["data"], True
+    data = _run_verdict(slug)                 # 락 밖에서(수 초 걸리는 호출이 다른 요청 안 막게)
     with _cache_lock:
-        _cache["data"] = data
-        _cache["ts"] = time.time()
-        _cache["err"] = None
+        _cache[slug] = {"data": data, "ts": time.time()}
     return data, False
 
 
-def render_page():
-    """최신 판정(내 포지션 포함 — 로컬 화면이라)을 구워 넣은 책 페이지 HTML.
-    조립은 정적 발행과 같은 publish_pages.assemble 하나로 한다. 판정 계산이 실패해도 페이지는 내보낸다
-    (프런트가 폴링으로 재시도)."""
+def render_page(slug):
+    """책 slug 페이지 HTML — 요청 시점의 라이브 판정(내 포지션 포함)을 구워 넣는다. 조립은 assemble 하나로.
+    판정 계산이 실패해도 페이지는 내보낸다(프런트가 폴링으로 재시도)."""
     from publish.publish_pages import assemble
     try:
-        data, _ = compute_verdict()
+        data, _ = compute_verdict(slug)
     except Exception:
         data = None
-    return assemble(SLUG, data, public=False).encode("utf-8")
+    return assemble(slug, data, public=False).encode("utf-8")
+
+
+def render_shell():
+    """책 선택 셸(홈) — books.json 의 모든 책을 좌측 목록에, 본문은 /<slug>/ 를 라이브로 띄운다."""
+    from publish.build_home import render_home
+    return render_home(load_manifest()).encode("utf-8")
 
 
 # ------------------------------------------------------------------ HTTP 배관
@@ -140,13 +138,23 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._serve_verdict()
         if route == "/events":
             return self._serve_sse()
-        if route in ("/", "/index.html", "/%s/" % SLUG, "/%s/index.html" % SLUG):
-            return self._serve_page()
+        if route in ("/", "/index.html"):
+            return self._serve_shell()
+        m = re.match(r"^/([^/]+)/(?:index\.html)?$", route)
+        if m and m.group(1) in SLUGS:
+            return self._serve_page(m.group(1))
         return super().do_GET()
 
-    def _serve_page(self):
+    def _serve_shell(self):
         try:
-            body = render_page()
+            body = render_shell()
+        except Exception as ex:
+            return self._send(("셸 렌더 실패: %s" % ex).encode("utf-8"), "text/plain; charset=utf-8", 500)
+        self._send(body, "text/html; charset=utf-8")
+
+    def _serve_page(self, slug):
+        try:
+            body = render_page(slug)
         except Exception as ex:
             body = ("페이지 렌더 실패: %s" % ex).encode("utf-8")
             return self._send(body, "text/plain; charset=utf-8", 500)
@@ -155,8 +163,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def _serve_verdict(self):
         qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
         force = "force" in qs
+        slug = (qs.get("slug") or [DEFAULT_SLUG])[0]
+        if slug not in SLUGS:
+            slug = DEFAULT_SLUG
         try:
-            data, cached = compute_verdict(force=force)
+            data, cached = compute_verdict(slug, force=force)
             data = dict(data)
             data["_cached"] = cached
             body = json.dumps(data, ensure_ascii=False).encode("utf-8")
@@ -166,6 +177,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._send(body, "application/json; charset=utf-8", 500)
 
     def _serve_sse(self):
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        slug = (qs.get("slug") or [DEFAULT_SLUG])[0]
+        if slug not in SLUGS:
+            slug = DEFAULT_SLUG
         try:
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream; charset=utf-8")
@@ -183,7 +198,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         while True:
             time.sleep(SSE_TICK)
             try:
-                data, _ = compute_verdict()
+                data, _ = compute_verdict(slug)
                 ts = data.get("ts")
                 payload = json.dumps({"ts": ts}, ensure_ascii=False)
                 self.wfile.write(("data: %s\n\n" % payload).encode("utf-8"))
@@ -202,19 +217,19 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 
 def _warm():
-    """첫 요청 전에 판정을 한 번 데워 첫 클릭 지연(수 초 콜드 페치)을 없앤다."""
+    """첫 요청 전에 기본 책을 한 번 데워 첫 클릭 지연(수 초 콜드 페치)을 없앤다."""
     try:
-        compute_verdict()
+        compute_verdict(DEFAULT_SLUG)
     except Exception:
         pass
 
 
 if __name__ == "__main__":
     os.chdir(BASE)
-    print("%s 로컬 실시간 서버" % SLUG)
-    print("  로컬:      http://127.0.0.1:%d/" % PORT)
+    print("로컬 실시간 서버 — 책: %s" % ", ".join(SLUGS))
+    print("  로컬:      http://127.0.0.1:%d/  (셸 · 책 전환)" % PORT)
     print("  LAN/폰:    http://<이 컴퓨터 IP 또는 테일스케일 MagicDNS>:%d/" % PORT)
-    print("  판정 JSON: http://127.0.0.1:%d/api/verdict" % PORT)
+    print("  판정 JSON: http://127.0.0.1:%d/api/verdict?slug=<책>" % PORT)
     print("  (종료: Ctrl+C)")
     threading.Thread(target=_warm, daemon=True).start()
     with http.server.ThreadingHTTPServer((HOST, PORT), Handler) as httpd:
