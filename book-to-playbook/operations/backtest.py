@@ -27,15 +27,16 @@
 같은 거래(머리=tree 가 낸 신호·분할·매도)를 vectorbt 로 굴려 포트폴리오 지표(자산곡선·MaxDD·샤프·총수익)를
 낸다. 거래수·승률·거래당 평균(머리가 정한 거래 경계로 집계한 옛 정의)의 parity 도 나란히 보여준다.
 """
+import collections
 import json
 import os
 import statistics
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from shared.paths import BASE, LOGS, ensure_dir, write_text, backtest_path
 from shared import trades as trades_mod, tree_grade
-from operations import portfolio
+from operations import portfolio, driver
 
 HORIZONS = (5, 10, 20)
 BUY_OR_CONFIRM = "✅+🟡 (수동 확인 가정)"
@@ -280,6 +281,123 @@ def build_vectorbt_text(vres):
     return "\n".join(L)
 
 
+# ------------------------------------------------------------------ 장중(분봉) 백테스트 — 통합 스테핑 코어 + 계산기
+# 분봉 축 '봉' — build_trades·portfolio 는 .date/.open/.close 만 쓴다(일봉 Candle 과 같은 접근).
+_MinuteBar = collections.namedtuple("_MinuteBar", "date open high low close volume")
+
+
+def _minute_axis(hist, prod, timeline):
+    """장중 백테스트용 분봉 축을 만든다 — asof 타임라인을 '달력'으로, 각 asof 의 그 상품 분봉을 '봉'으로.
+
+    cal   = asof 키(YYYYMMDDHHMM, UTC) 오름차순 — 분봉 간격의 '거래 시점' 축(일봉 하루 대신 분 한 틱).
+    mhist = 그 축의 History(그 상품 분봉 OHLCV 를 봉으로) — build_trades 가 '다음 봉 시가 진입'을 분봉에 적용한다.
+    분봉 데이터가 그 asof 에 없으면 그 봉은 빠진다(가짜로 채우지 않는다 — 정직한 한계)."""
+    mins = (getattr(hist, "minutes", {}) or {}).get(prod) or {}
+    bars = []
+    for asof in timeline:
+        k = asof.astimezone(timezone.utc).strftime("%Y%m%d%H%M")
+        b = mins.get(k)
+        if b is None:
+            continue
+        if not isinstance(b, dict):
+            b = {"open": b, "high": b, "low": b, "close": b, "volume": 0.0}
+        bars.append(_MinuteBar(k, b.get("open"), b.get("high"), b.get("low"), b.get("close"), b.get("volume")))
+    cal = [b.date for b in bars]
+    mh = tree_grade.History({prod: bars})
+    mh.minutes = getattr(hist, "minutes", {})
+    return cal, mh
+
+
+def _starts_from_series(rows, cal):
+    """장중 신호 시계열(step 결과)에서 '매수 신호(✅·🟡) 연속 구간 첫 asof'의 분봉 축 인덱스 목록.
+    일봉 백테스트의 starts 규칙(연속 신호는 첫 점만 진입)을 분봉 축에 그대로 적용한다 —
+    보유 중 신호는 build_trades 가 건너뛴다(한 상품 포지션 하나)."""
+    pos_of = {d: i for i, d in enumerate(cal)}
+    starts, prev = [], False
+    for r in rows:
+        b = r["key"] in ("buy", "confirm")
+        k = r["asof"].replace("-", "").replace(":", "").replace("T", "")[:12]  # ISO → YYYYMMDDHHMM
+        if b and not prev and k in pos_of:
+            starts.append(pos_of[k])
+        prev = b
+    return starts
+
+
+def run_intraday(slug, hist=None, tree=None, limit=None):
+    """장중(분봉) 백테스트 — 통합 스테핑 코어(operations.driver)로 분 단위 신호를 얻고, 그 분봉 종가 시리즈로
+    vectorbt 계산기(operations.portfolio)를 돌려 '장중 백테스트' 지표를 낸다(신호만 내던 재생에 계산기를 붙임).
+
+    머리=판단/계산기=계산 분리는 그대로다: 신호(✅·🟡)는 driver.step(=product_verdict)이 각 asof 에서 내고,
+    체결 일정(분봉 다음봉 시가 진입 → 매도 규칙으로 청산)은 shared.trades.build_trades 가, 돈·지표는
+    operations.portfolio 가 낸다. 일봉 백테스트와 다른 것은 '축'(일봉 하루 → 분봉 한 틱)뿐이다.
+
+    정직한 한계: 분봉은 jhts 분봉 범위(지수·선물 ~7거래일)만 — 짧은 구간 샤프/MaxDD 는 참고용(limit 표면화)."""
+    tree = tree or tree_grade.load_tree(slug)
+    if tree is None:
+        raise SystemExit("books/%s/tree.json 없음 — 조건 트리가 있어야 백테스트한다" % slug)
+    if hist is None:
+        hist = driver.load_hist(tree)
+    tf = driver.finest_tf(tree)
+    timeline = driver.asof_timeline(tree, hist, limit=limit)
+    prods = list(tree["products"].keys())
+    # truncate=True — 각 asof 를 그 세션일 이하로 자른 hist 로 판정한다(verify_signal_parity 가 일봉 파리티를
+    #   증명한 바로 그 방식). 과거 세션도 '그 세션 자신의 일봉 regime + 그 시점 분봉'으로 충실히 재생된다
+    #   (truncate 없이 full hist 면 product_verdict 가 늘 오늘 봉을 판정해 과거 세션 regime 이 틀린다 — 아키텍트 확인).
+    series = driver.step(tree, hist, timeline, prods, truncate=True)   # 공통 스테핑 코어 — 분 단위 신호
+    sessions = sorted({a.strftime("%Y%m%d") for a in timeline})
+    vbt_products, signal_summary = {}, {}
+    for p in prods:
+        rows = series.get(p) or []
+        cal, mh = _minute_axis(hist, p, timeline)
+        closes = [c.close for c in mh.get(p)]
+        starts = _starts_from_series(rows, cal)
+        exits, src = trades_mod.exits_of(tree, p)
+        tl = trades_mod.build_trades(tree, p, mh, cal, starts, exits)   # 분봉 축에 체결 일정(다음봉 시가 진입)
+        vbt_products[p] = portfolio.run_product(p, cal, closes, tl) if cal else None
+        signal_summary[p] = {"points": len(rows), "buy_signals": len(starts),
+                             "exit_source": src, "bars": len(cal)}
+    return {"slug": slug, "title": (tree.get("source") or {}).get("book", slug),
+            "engine": "vectorbt-intraday", "finest_tf": tf, "prods": prods,
+            "sessions": sessions, "points": len(timeline), "signals": signal_summary,
+            "vectorbt": vbt_products, "limit": driver.limit_note(tree, hist, tf, timeline, sessions),
+            "generated": datetime.now().isoformat(timespec="seconds")}
+
+
+def build_intraday_text(ires):
+    """장중 백테스트 결과 — 분봉 신호 수 + vectorbt 지표(짧은 구간이면 참고용 표시)."""
+    L = ["📊 장중(분봉) 백테스트 — %s  (가장 촘촘한 tf = %s · 계산=vectorbt)" % (ires["title"], ires["finest_tf"])]
+    L.append("재생 점 %d개 · 세션 %s" % (ires["points"], " ".join(ires["sessions"]) or "-"))
+    L.append("※ 한계: " + ires["limit"]["reason"])
+    if not ires["points"]:
+        return "\n".join(L)
+    L.append("")
+    L.append("■ 분봉 신호 + 포트폴리오 지표(vectorbt · 분봉 축) — bars=분봉 틱 수, 보유일=분봉 틱 수(일 아님)")
+    head = ("  %-6s %-6s %6s %6s %9s %8s %7s   | %-14s %5s %6s %8s"
+            % ("상품", "시장", "틱수", "매수", "총수익", "MaxDD", "샤프", "매도기준", "거래", "승률", "거래당평균"))
+    L.append(head)
+    for p, v in ires["vectorbt"].items():
+        sg = ires["signals"][p]
+        if v is None:
+            L.append("  %-6s  (분봉 봉 없음 — 그 상품은 장중 데이터가 비어 재생 불가)" % p)
+            continue
+        mk = v["market_params"]["market"]
+        pa = v["parity"]
+        tr = "%+8.2f%%" % v["total_return"] if v["total_return"] is not None else "    -   "
+        dd = "%7.2f%%" % v["max_drawdown"] if v["max_drawdown"] is not None else "   -   "
+        sh = "%7.3f" % v["sharpe"] if v["sharpe"] is not None else "   -   "
+        win = "%5.1f%%" % pa["win"] if "win" in pa else "   -  "
+        avg = "%+7.2f%%" % pa["avg"] if "avg" in pa else "   -    "
+        L.append("  %-6s %-6s %6d %6d %9s %8s %7s   | %-14s %4d %6s %8s"
+                 % (p, mk, sg["bars"], sg["buy_signals"], tr, dd, sh, sg["exit_source"],
+                    pa.get("trades", 0), win, avg))
+    L.append("")
+    L.append("※ 축이 '분봉 한 틱'이라 보유일·MaxDD·샤프는 분봉 축 기준(샤프 연율화는 봉 간격으로 맞췄다 — 짧은 구간은 참고용).")
+    L.append("※ 장중 asof 의 일봉 잎 = 마지막 '확정' 일봉(= 전 세션 종가 — look-ahead 0). 그날 일봉은 세션 마감(종가 봉)에")
+    L.append("   비로소 확정되므로, 장중 신호는 '전 세션 일봉 regime + 그 시점 분봉'이다. 그날 일봉 판정과의 수렴은 종가 봉")
+    L.append("   asof 에서 일어나는데, jhts 분봉이 마감 1분 전(예 19:59)까지만 와 그 수렴점은 분봉 범위 밖이다(정직한 한계).")
+    return "\n".join(L)
+
+
 def _cli():
     argv = sys.argv[1:]
     slug = next((a for a in argv if not a.startswith("-") and not a.isdigit()), None)
@@ -293,8 +411,19 @@ def _cli():
         print("웹페이지용 백테스트 → %s" % path)
         return
     days = int(argv[argv.index("--days") + 1]) if "--days" in argv else 365
+    limit = int(argv[argv.index("--limit") + 1]) if "--limit" in argv else None
     unobserved = "exclude" if "--exclude-unobserved" in argv else None
-    # --engine vectorbt : 새 계산기 경로(추가·비파괴). 플래그 없으면 아래 기존 경로로 그대로 간다.
+    # --intraday : 장중(분봉) 백테스트 — finest_tf 가 분봉(5m/1m)인 트리를 분 단위로 밟아 계산기까지 돌린다.
+    #   --engine vectorbt 라도 트리의 finest_tf 가 분봉이면 자동으로 이 경로로 보낸다(일봉 트리는 벡터 경로 유지).
+    if "--intraday" in argv or ("--engine" in argv and argv[argv.index("--engine") + 1] == "vectorbt"
+                                and driver.finest_tf(tree_grade.load_tree(slug)) != "1d"):
+        ires = run_intraday(slug, limit=limit)
+        if "--json" in argv:
+            print(json.dumps(ires, ensure_ascii=False, indent=2, default=str))
+        else:
+            print(build_intraday_text(ires))
+        return
+    # --engine vectorbt (일봉 트리) : 기존 벡터 1회계산 경로 → 계산기(추가·비파괴). 일봉 파리티·속도 그대로.
     if "--engine" in argv and argv[argv.index("--engine") + 1] == "vectorbt":
         vres = run_vectorbt(slug, days, unobserved=unobserved)
         if "--json" in argv:

@@ -155,9 +155,19 @@ def run_product(symbol, cal, closes, trade_list):
         if o["sell"]:
             fees[i] = commission + sell_tax  # 매도(청산) 봉에만 거래세 가산(한국 매도 비대칭)
 
-    idx = pd.DatetimeIndex(pd.to_datetime(cal, format="%Y%m%d"))
+    # 축은 일봉(YYYYMMDD) 또는 장중 분봉(YYYYMMDDHHMM) — 키 길이로 포맷을 고른다(둘 다 지원).
+    _fmt = "%Y%m%d%H%M" if cal and len(cal[0]) == 12 else "%Y%m%d"
+    idx = pd.DatetimeIndex(pd.to_datetime(cal, format=_fmt))
     # 종가에 빈 날(None)이 있으면 앞 값으로 채운다(자산 평가용 — 체결가는 price 로 따로 줌)
     close_ser = pd.Series(closes, index=idx).ffill().bfill()
+
+    # 주기(freq) — 지표 연율화의 단위. 일봉 축이면 1D, 장중(분봉) 축이면 봉 간격(중앙값)을 그대로 쓴다
+    #   (분봉 축에 1D 를 넣으면 샤프 연율화가 틀린다 — 축에서 간격을 읽어 맞춘다. 짧은 구간은 참고용).
+    freq = "1D"
+    if _fmt.endswith("%M") and len(idx) >= 2:
+        step = pd.Series(idx).diff().dropna().median()
+        if pd.notna(step) and step.total_seconds() > 0:
+            freq = step
 
     pf = vbt.Portfolio.from_orders(
         close=close_ser,
@@ -166,7 +176,7 @@ def run_product(symbol, cal, closes, trade_list):
         fees=pd.Series(fees, index=idx),
         slippage=slippage,
         init_cash=init_cash,   # 1 unit = 자본 전액(init_cash/px 주). 진입이 시간상 겹치지 않아(build_trades free_from) 초과 없음.
-        freq="1D",
+        freq=freq,
     )
 
     eq = pf.value()

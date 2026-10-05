@@ -47,20 +47,16 @@ from datetime import datetime, timedelta, timezone
 
 from shared.paths import live_slugs
 from shared import tree_grade
-from operations import backtest
+from operations import backtest, driver
 from verdict import verdict_engine
 
 WINDOW = 120            # 비교할 최근 거래일 수(상품마다 데이터 있는 범위 안에서)
 CLOSE_HHMM_UTC = 21     # 미 증시 마감 ≈ 21:00 UTC(서머타임 20:00·표준 21:00) — asof 를 '그날 마감 시점'으로
                         # 둘 때의 시각. 분봉이 없어 일봉 결과엔 영향 없지만, 라이브와 같은 모양의 asof 를 준다.
 
-
-def _truncate(full, upto):
-    """full(History) 을 날짜 upto(YYYYMMDD) 이하로 자른 새 History. 분봉(minutes)은 그대로 넘긴다
-    — 라이브가 D 마감 직후 보유했을 데이터(그날까지의 확정 일봉)를 그대로 재현한다."""
-    t = tree_grade.History({s: [c for c in (cs or []) if c.date <= upto] for s, cs in full.items()})
-    t.minutes = getattr(full, "minutes", {})
-    return t
+# 날짜 자르기(hist → upto 이하)는 통합 스테핑 코어와 한 벌을 쓴다(단일 출처 — 파리티가 쓰는 바로 그 함수를
+# 장중 백테스트도 쓴다). 500/400/500 류 드리프트 방지(tree_grade 주석 경고).
+_truncate = driver._truncate
 
 
 def _asof_of(date_str):
