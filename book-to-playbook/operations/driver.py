@@ -11,21 +11,24 @@ operations.replay(장중 asof). 판정 머리(verdict_engine.product_verdict / t
 
 ## finest_tf 로 간격을 정한다
 
-트리가 쓰는 가장 촘촘한 tf(finest_tf)가 스테핑 간격을 정한다:
+트리가 쓰는 가장 촘촘한 tf(finest_tf)가 **신호 생성 입구 `run()`** 의 내부 경로를 정한다(로직이 아니라
+'속도·축'만 다르다 — 같은 머리, 같은 답):
 
-  · finest=1d  — 하루 한 점(일봉 축). 신호는 operations.backtest 의 '벡터 1회계산 경로'(ProductEval 를
-    한 번 만들어 전체 달력을 인덱싱)가 낸다 — 여기서 하루마다 product_verdict 를 재호출하지 않는다
-    (수백배 느려지니 금지). 그 경로가 일봉 파리티(백테스트==라이브)를 지킨다. 이 모듈의 timeline 은
-    '일봉 축은 장중 재생 대상이 아님'을 뜻하는 빈 리스트다.
-  · finest=5m/1m — 분봉 축. asof_timeline(분봉 데이터 있는 범위, 세션 안)으로 각 asof 를 깔고, 그 각
-    시점에서 머리(product_verdict)를 호출해 장중 신호·등급 시계열을 낸다(step). 일봉 잎은 그 asof 이하
+  · finest=1d  — 하루 한 점(일봉 축). run() 이 상품마다 ProductEval 를 한 번 만들어 전체 달력을 인덱싱해
+    grade_key/incomplete 를 뽑는다(벡터 1회계산) — 하루마다 product_verdict 를 재호출하지 않는다
+    (수백배 느려지니 금지). 이 경로가 일봉 파리티(백테스트==라이브)를 지킨다. 분봉 축(asof_timeline)은
+    쓰지 않는다 — 일봉 트리는 '분봉 재생' 대상이 아니다.
+  · finest=5m/1m — 분봉 축. run() 이 asof_timeline(분봉 데이터 있는 범위, 세션 안)으로 각 asof 를 깔고, 그
+    각 시점에서 머리(product_verdict)를 호출해 장중 신호·등급 시계열을 낸다(step). 일봉 잎은 그 asof 이하
     마지막 확정 일봉(어제값), 분봉 잎은 그 asof 이하 마지막 분봉 — 둘 다 cond 가 asof 로 자른다.
 
-## 세 용도 (뒤에 붙는 것만 다르다)
+## 입구 하나 (run) · 소비자 셋 (뒤에 붙는 것만 다르다)
 
-  · 재생(replay)    : step() 의 신호 시계열을 그대로 쓴다(신호만).
-  · 백테스트(backtest): finest=1d → 기존 벡터 경로(일봉 vectorbt). finest=5m/1m → step() 으로 분봉
-    신호를 얻고, 그 분봉 종가 시리즈로 vectorbt 계산기를 돌려 '장중 백테스트' 지표를 낸다.
+신호 생성은 run() 하나로 모인다. 받아쓰는 쪽만 용도별로 다르다:
+
+  · 재생(replay)    : run() 의 신호 시계열을 그대로 출력한다(신호만, truncate=False — '지금 상품 상태' 스냅샷).
+  · 백테스트(backtest): finest=1d → run() 의 일봉 신호 뒤에 집계·vectorbt 계산기. finest=5m/1m → run()(truncate
+    =True)의 분봉 신호를 얻어 그 분봉 종가 시리즈로 vectorbt 계산기를 돌려 '장중 백테스트' 지표를 낸다.
   · 라이브(live)    : timeline=[now] 한 점 — render/product_verdict 단건(미래 실행 대상 = 증권사).
 
 ## 정직한 한계 (가짜로 안 늘린다)
@@ -89,8 +92,8 @@ def asof_timeline(tree, hist, limit=None):
     """트리의 가장 촘촘한 tf 봉 타임스탬프로 asof 타임라인(UTC datetime 오름차순)을 만든다.
 
     · finest=1d : 일봉 축 — 하루 한 점(그날 마지막 확정 일봉 마감 시각)이 기존 동작이다. 분봉 데이터가 없어도
-      일봉 판정은 되므로, 일봉 트리는 '분봉 재생' 대상이 아니다 → 빈 타임라인(이 드라이버의 장중 전용 경로).
-      (일봉 신호는 backtest 의 벡터 1회계산 경로가 낸다 — 이 모듈은 그 경로를 재호출하지 않는다.)
+      일봉 판정은 되므로, 일봉 트리는 '분봉 재생' 대상이 아니다 → 빈 타임라인(이 함수는 장중 전용 경로).
+      (일봉 신호는 run() 의 벡터 1회계산 경로가 낸다 — asof_timeline(분봉 축)은 쓰지 않는다.)
     · finest=5m/1m : 그 심볼들의 분봉 키(데이터 있는 범위)를 asof 로 깐다. 5m 는 1분봉을 5분 버킷으로 접은
       '각 5분 봉의 종료(=다음 버킷 직전 마지막 분봉)' 시각을, 1m 는 분봉 키 그대로를 asof 로 쓴다.
     limit 을 주면 뒤(가장 최근)에서 limit 개만 — 긴 분봉도 꼬리만 빠르게 재생."""
@@ -161,6 +164,55 @@ def step(tree, hist, timeline, prods, truncate=False):
             series[p].append({"asof": asof.isoformat(), "key": v["key"],
                               "grade": v["grade"], "close": v.get("close")})
     return series
+
+
+# ------------------------------------------------------------------ 신호 생성 단일 입구
+def run(tree, hist, start=None, unobserved=None, limit=None, truncate=False, prods=None, axis=None):
+    """책 무관 **단일 신호 생성 입구** — finest_tf 로 내부 경로를 고른다(로직이 아니라 '속도·축'만 다르다).
+
+    axis 로 축을 강제할 수 있다(None 이면 finest_tf 자동). **일봉 백테스트는 의미상 늘 일봉축**이므로
+    backtest.run 은 axis="1d" 로 부른다 — 트리에 분봉(관측) 잎이 섞여 finest_tf 가 "1m"이어도, 일봉 판정은
+    ProductEval 이 그 관측 잎을 일봉 asof 에서 manual/None 으로 바르게 처리한다(분봉 per-asof 로 빠지면 안 된다).
+    축 자동(axis=None)은 재생·CLI 라우팅처럼 '트리가 쓰는 가장 촘촘한 축'을 따라가야 할 때만 쓴다.
+
+    · finest=1d  : 상품마다 ProductEval 를 한 번 만들고 전체 달력을 인덱싱해 grade_key/incomplete 를 뽑는다
+      (벡터 1회계산 — 하루마다 product_verdict 를 재호출하지 않는다; 수백배 느려지니 금지). start(YYYYMMDD)을
+      주면 그 이상 날만. backtest.run 의 옛 일봉 루프를 그대로 이리로 옮긴 것이다(속도·결과 보존).
+    · finest=5m/1m : asof_timeline(분봉 범위)을 깔고 step 으로 각 asof 에서 머리(product_verdict)를 호출한다.
+      truncate=True 면 각 asof 를 그 세션일 이하로 자른 hist 로 판정한다(장중 백테스트 — 파리티가 쓴 그 방식);
+      False 면 full hist 그대로(재생 기존 동작). limit 은 타임라인 꼬리 개수.
+
+    같은 머리·같은 답(신호 파리티로 보장) — 뒤에 붙는 것만 용도별로 다르다(백테=계산기/재생=화면/라이브=now).
+    prods 를 주면 그 상품만(없으면 트리의 전 상품). 반환:
+      {tf, prods, series:{prod:[점]},
+       evals:{prod:ProductEval}|None,                 # 1d 만 — 워밍업·수동조건 조회용(분봉은 None)
+       timeline:[UTC datetime], sessions:[YYYYMMDD]}   # 분봉 축(1d 는 빈 리스트 — 분봉 재생 대상 아님)
+    점(1d)   = {date, key, grade, close, incomplete}
+    점(분봉) = {asof(UTC iso), key, grade, close}   (step 결과 그대로)."""
+    tf = axis or finest_tf(tree)
+    prods = prods if prods is not None else list(tree["products"].keys())
+    if tf == "1d":
+        series, evals = {}, {}
+        for p in prods:
+            cs = hist.get(p) or []
+            cal = [c.date for c in cs]
+            pe = tree_grade.ProductEval(tree, p, hist, cal, unobserved)
+            pts = []
+            for i, d in enumerate(cal):
+                if start is not None and d < start:
+                    continue
+                inc = pe.incomplete(i)         # 워밍업 부족 — grade_key 가 ❔(불완전)로 내보낸다
+                k = pe.grade_key(i)
+                pts.append({"date": d, "key": k, "grade": tree_grade.GRADES[k],
+                            "close": cs[i].close, "incomplete": inc})
+            series[p], evals[p] = pts, pe
+        return {"tf": tf, "prods": prods, "series": series, "evals": evals,
+                "timeline": [], "sessions": []}       # 일봉 트리 — 분봉 축 없음(asof_timeline 과 같은 빈 리스트)
+    timeline = asof_timeline(tree, hist, limit=limit)
+    series = step(tree, hist, timeline, prods, truncate=truncate)
+    sessions = sorted({a.strftime("%Y%m%d") for a in timeline})
+    return {"tf": tf, "prods": prods, "series": series, "evals": None,
+            "timeline": timeline, "sessions": sessions}
 
 
 def load_hist(tree):

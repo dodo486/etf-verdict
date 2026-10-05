@@ -46,11 +46,11 @@ def replay(slug, hist=None, tree=None, limit=None, prod=None):
         raise SystemExit("books/%s/tree.json 없음 — 조건 트리가 있어야 재생한다" % slug)
     if hist is None:
         hist = driver.load_hist(tree)
-    tf = driver.finest_tf(tree)
-    timeline = driver.asof_timeline(tree, hist, limit=limit)
-    prods = [prod] if prod else list(tree["products"].keys())
-    series = driver.step(tree, hist, timeline, prods)
-    sessions = sorted({a.strftime("%Y%m%d") for a in timeline})
+    # 신호 = driver 단일 입구(분봉 per-asof). truncate=False(기본) — 재생 기존 동작 그대로(지금 상품 상태 스냅샷).
+    #   prod 를 주면 그 상품만 돌린다. 이 함수는 그 신호 시계열을 '재생 출력' 계약으로 묶기만 한다(신호만).
+    sig = driver.run(tree, hist, limit=limit, prods=([prod] if prod else None))
+    tf, timeline, sessions, prods, series = (sig["tf"], sig["timeline"], sig["sessions"],
+                                             sig["prods"], sig["series"])
     return {"slug": slug, "title": (tree.get("source") or {}).get("book", slug),
             "finest_tf": tf, "prods": prods, "sessions": sessions, "points": len(timeline),
             "timeline": [a.isoformat() for a in timeline], "series": series,

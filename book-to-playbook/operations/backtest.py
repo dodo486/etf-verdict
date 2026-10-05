@@ -102,18 +102,19 @@ def run(slug, days=365, hist=None, tree=None, unobserved=None):
     hist = hist if hist is not None else fetch_history(tree, days)
     missing = sorted(s for s, cs in hist.items() if not cs)
 
+    # 신호 = driver 단일 입구(일봉 벡터 1회계산 경로). 백테스트는 그 신호 뒤에 집계·계산기를 붙인다
+    #   (머리=판단/계산기=계산 분리 — 여기선 머리가 낸 신호를 '받아쓰기'만 한다). evals=ProductEval(워밍업·수동조건).
+    #   axis="1d" 강제 — 일봉 백테스트는 늘 일봉축이다(트리에 분봉 관측 잎이 섞여 finest_tf 가 "1m"이어도).
+    sig = driver.run(tree, hist, start=start, unobserved=unobserved, axis="1d")
+
     rows, summary, manual, period, trade_res, incomplete = [], {}, {}, None, {}, {}
     for p in tree["products"]:
         cs = hist.get(p) or []
         cal = [c.date for c in cs]
-        pe = tree_grade.ProductEval(tree, p, hist, cal, unobserved)
-        prow, inc_days = [], 0
-        for i, d in enumerate(cal):
-            if d >= start:
-                if pe.incomplete(i):
-                    inc_days += 1          # 워밍업 부족 — grade_key 가 ❔(불완전)로 내보낸다(✅/🚫 확신 안 냄)
-                k = pe.grade_key(i)
-                prow.append({"date": d, "prod": p, "key": k, "grade": tree_grade.GRADES[k]})
+        pe = sig["evals"][p]
+        pts = sig["series"][p]
+        prow = [{"date": pt["date"], "prod": p, "key": pt["key"], "grade": pt["grade"]} for pt in pts]
+        inc_days = sum(1 for pt in pts if pt["incomplete"])   # 워밍업 부족 날 수 — ❔(불완전)로 뺀 날
         if inc_days:
             # 불완전 데이터 표면화(missing_symbols 패턴) — 필요 워밍업 대비 확정 봉이 모자란 날 수.
             #   그 날들의 1d 신호는 조용히 계산하지 않고 ❔(판정 불가)로 뺐다.
@@ -324,10 +325,10 @@ def _starts_from_series(rows, cal):
 
 
 def run_intraday(slug, hist=None, tree=None, limit=None):
-    """장중(분봉) 백테스트 — 통합 스테핑 코어(operations.driver)로 분 단위 신호를 얻고, 그 분봉 종가 시리즈로
+    """장중(분봉) 백테스트 — 신호 생성 단일 입구(driver.run)로 분 단위 신호를 얻고, 그 분봉 종가 시리즈로
     vectorbt 계산기(operations.portfolio)를 돌려 '장중 백테스트' 지표를 낸다(신호만 내던 재생에 계산기를 붙임).
 
-    머리=판단/계산기=계산 분리는 그대로다: 신호(✅·🟡)는 driver.step(=product_verdict)이 각 asof 에서 내고,
+    머리=판단/계산기=계산 분리는 그대로다: 신호(✅·🟡)는 driver.run(분봉이면 내부에서 step=product_verdict)이 각 asof 에서 내고,
     체결 일정(분봉 다음봉 시가 진입 → 매도 규칙으로 청산)은 shared.trades.build_trades 가, 돈·지표는
     operations.portfolio 가 낸다. 일봉 백테스트와 다른 것은 '축'(일봉 하루 → 분봉 한 틱)뿐이다.
 
@@ -337,14 +338,13 @@ def run_intraday(slug, hist=None, tree=None, limit=None):
         raise SystemExit("books/%s/tree.json 없음 — 조건 트리가 있어야 백테스트한다" % slug)
     if hist is None:
         hist = driver.load_hist(tree)
-    tf = driver.finest_tf(tree)
-    timeline = driver.asof_timeline(tree, hist, limit=limit)
-    prods = list(tree["products"].keys())
-    # truncate=True — 각 asof 를 그 세션일 이하로 자른 hist 로 판정한다(verify_signal_parity 가 일봉 파리티를
-    #   증명한 바로 그 방식). 과거 세션도 '그 세션 자신의 일봉 regime + 그 시점 분봉'으로 충실히 재생된다
-    #   (truncate 없이 full hist 면 product_verdict 가 늘 오늘 봉을 판정해 과거 세션 regime 이 틀린다 — 아키텍트 확인).
-    series = driver.step(tree, hist, timeline, prods, truncate=True)   # 공통 스테핑 코어 — 분 단위 신호
-    sessions = sorted({a.strftime("%Y%m%d") for a in timeline})
+    # 신호 = driver 단일 입구(분봉 per-asof). truncate=True — 각 asof 를 그 세션일 이하로 자른 hist 로 판정한다
+    #   (verify_signal_parity 가 일봉 파리티를 증명한 바로 그 방식). 과거 세션도 '그 세션 자신의 일봉 regime +
+    #   그 시점 분봉'으로 충실히 재생된다(truncate 없이 full hist 면 product_verdict 가 늘 오늘 봉을 판정해 과거
+    #   세션 regime 이 틀린다 — 아키텍트 확인). 신호 뒤에 체결 일정·vectorbt 계산기만 백테스트가 붙인다.
+    sig = driver.run(tree, hist, limit=limit, truncate=True)
+    tf, timeline, sessions, prods, series = (sig["tf"], sig["timeline"], sig["sessions"],
+                                             sig["prods"], sig["series"])
     vbt_products, signal_summary = {}, {}
     for p in prods:
         rows = series.get(p) or []
