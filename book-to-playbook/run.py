@@ -7,10 +7,10 @@ run.sh(bash + /opt/homebrew/bin/python3 하드코딩)를 대체한다.
 homebrew·python.org·Microsoft Store 어느 설치본이든 그대로 동작한다.
 
 사용법
-  python run.py daily        # 판정(체크리스트 = 조건 트리) → 백테스트 → 발행 (장 마감 후)
-  python run.py watch [--every N]  # asof=지금 기준으로 N분(기본 5)마다 재판정 → 발행(백테스트 제외).
+  python run.py daily        # 판정(체크리스트 = 조건 트리) → 알림 → 백테스트 (장 마감 후). 화면은 라이브 서버가 맡는다.
+  python run.py watch [--every N]  # asof=지금 기준으로 N분(기본 5)마다 재판정(백테스트 제외).
                              #   장중 조건은 asof(관측 시점) 기준 분봉을 본다 — 분봉이 연결되면 그대로 살아난다.
-  python run.py publish      # 재판정 없이 현재 JSON으로 다시 발행만
+  python -m publish.serve    # 화면 보기 — 셸(책목록)+모든 책을 실시간 서빙(정적 스냅샷 폐지)
 
 옵션
   --no-git     발행 후 git commit/push 생략
@@ -168,7 +168,7 @@ def main(argv):
     mode = modes[0] if modes else "daily"
     if mode == "watch":
         return watch(argv)
-    if mode not in ("daily", "publish", "verdict"):
+    if mode not in ("daily", "verdict"):
         print(__doc__)
         return 2
 
@@ -189,11 +189,6 @@ def main(argv):
     r = Runner(mode, quiet)
     r.say("=== %s 시작 · %s · BASE=%s · PUBLIC=%s" % (mode, sys.platform, BASE, PUBLIC))
 
-    # 판정 JSON은 책마다 분리 저장한다(latest-verdict-<slug>.json). 한 파일을
-    # 돌려쓰면 live 2권째부터 마지막 책의 판정이 모든 페이지에 병합된다.
-    def latest_path(slug):
-        return paths.latest_verdict_path(slug)
-
     # 어느 엔진을 돌릴지는 books.json 에서 온다(코드에 특정 책을 박지 않는다).
     live = paths.live_slugs()
     if not live:
@@ -203,19 +198,13 @@ def main(argv):
             daily = paths.book_engine(slug, "daily")
             if not daily:
                 r.say("!! %s: engine.daily 없음 — 건너뜀" % slug); continue
-            r.step(daily, [slug])                                              # 1) 알림 포함 본 실행
-            r.step(daily, [slug, "--json", "--no-send"], capture_to=latest_path(slug))  # 2) 발행용 JSON
-            # 3) 책 페이지 '백테스트' 탭 데이터(1년·3년) — 장 마감 후(daily)만. 실패해도 판정 발행은 막지 않는다.
+            r.step(daily, [slug])                                              # 알림 포함 본 실행 — 화면은 라이브 서버가 맡는다
+            # 책 페이지 '백테스트' 탭 데이터(1년·3년) — 장 마감 후(daily)만. 실패해도 막지 않는다.
             if mode == "daily":
                 r.step("operations.backtest", [slug, "--page"], required=False)
 
-    missing = [s for s in live if not os.path.exists(latest_path(s))]
-    if missing:
-        r.say("!! 판정 파일 없음: %s — 발행 중단(run.py daily 를 먼저)" % ", ".join(missing))
-        return 1
-
-    r.step("publish.publish_pages")
-    r.step("publish.build_home", required=False)
+    # 정적 발행(스냅샷)은 폐지됐다 — latest-verdict 스냅샷·정적 PUBLIC 페이지를 만들지 않는다.
+    # 화면은 라이브 서버(publish.serve)가 매 요청 엔진을 새로 돌려 그린다(오래된 값이 '지금 값'처럼 안 보이게).
 
     # ---- 검사 3종 — 반드시 여기(publish/build_home 직후 · git 커밋/푸시 이전)에서 돈다.
     #

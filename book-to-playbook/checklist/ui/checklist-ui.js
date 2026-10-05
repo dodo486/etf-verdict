@@ -119,7 +119,8 @@
 
   /* ---- 그리기 ---- */
   const MARK = v => v===true ? '<span class="ck-m t">●</span>' : (v===false ? '<span class="ck-m f">○</span>' : '<span class="ck-m u">?</span>');
-  const OPW = it => it.op==='all' ? '모두' : it.op==='any' ? '하나 이상' : it.op==='atleast' ? (it.n+'개 이상') : it.op==='not' ? '아님 — 아래가 거짓이어야 참' : '';
+  // 논리 묶음 설명. not 은 라벨·증거 줄이 뜻을 다 전하므로 캡션을 달지 않는다(군더더기 제거).
+  const OPW = it => it.op==='all' ? '모두' : it.op==='any' ? '하나 이상' : it.op==='atleast' ? (it.n+'개 이상') : '';
   function refChip(ref){ return ref ? ' <a class="ck-ref" data-ref="'+esc(ref)+'" title="플레이북 원문 소절로">'+esc(ref)+'</a>' : ''; }
   function fmtV(v){ return typeof v === 'number' ? (Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(2)) : ''; }
   // 측정 증거 — 조건이 '무엇을 재서 그 값이 얼마였나'를 한 줄로(엔진이 detail 로 실어보냄). 사용자가 ●/○ 를 믿을 근거.
@@ -138,8 +139,13 @@
       const u = d.unit ? esc(d.unit) : '';
       const noVal = (d.lhs === null || d.lhs === undefined);
       if(noVal) missing = true;
+      // 복합식이면 원시 입력값을 먼저(예: 고가 7750 · 종가 7736 →)
+      let lead = '';
+      if(d.inputs && d.inputs.length){
+        lead = d.inputs.map(x=>esc(x.d)+' '+((x.v===null||x.v===undefined)?'<span class="ev-x">—</span>':'<b>'+fmtMeas(x.v)+'</b>')).join('<span class="ev-sep"> · </span>') + ' → ';
+      }
       const lv = noVal ? '<span class="ev-x">측정 없음</span>' : '<b>'+fmtMeas(d.lhs)+u+'</b>';
-      const L = (d.lhsd ? esc(d.lhsd)+' ' : '') + lv;
+      const L = lead + (d.lhsd ? esc(d.lhsd)+' ' : '') + lv;
       // 기준이 상수(rhsd 없음)면 "· 기준 op 값", 다른 식이면 "op 설명 값" — 단위는 양쪽에 같게 붙인다
       const R = d.rhsd ? ' '+(EVSYM[d.op]||'')+' '+esc(d.rhsd)+' <b>'+fmtMeas(d.rhs)+u+'</b>'
                        : ' <span class="ev-th">· 기준 '+(EVSYM[d.op]||'')+' '+fmtMeas(d.rhs)+u+'</span>';
@@ -158,7 +164,8 @@
     const showRow = it.label || it.manual !== undefined;
     if(!showRow){
       if(!kids) return '';
-      return it.op ? '<div class="ck-grp"><div class="ck-op">'+esc(OPW(it))+'</div>'+kids+'</div>' : kids;
+      const gop = OPW(it);
+      return it.op ? '<div class="ck-grp">'+(gop?'<div class="ck-op">'+esc(gop)+'</div>':'')+kids+'</div>' : kids;
     }
     const isM = it.manual !== undefined && !(it.observed && it.v !== null && it.v !== undefined);
     const a = isM ? ans[mkey(it, path)] : undefined;
@@ -174,7 +181,7 @@
     } else ctl = MARK(val);
     const num = (!isM && typeof it.v === 'number') ? ' <span class="dataval">'+fmtV(it.v)+'</span>' : '';
     const why = isM ? '<div class="ck-why">✋ '+esc(it.manual)+'</div>' : (it.note ? '<div class="ck-why">'+esc(it.note)+'</div>' : (it.observed ? '<div class="ck-why">저자가 말한 시각의 값으로 자동 판정</div>' : ''));
-    const opl = it.op ? ' <span class="ck-opl">'+esc(OPW(it))+'</span>' : '';
+    const opw = OPW(it); const opl = opw ? ' <span class="ck-opl">'+esc(opw)+'</span>' : '';
     return '<div class="ck-row'+(isM?' man':' auto')+'" '+(it.ref?'data-ref="'+esc(it.ref)+'"':'')+'>'
       + '<div class="ck-line">'+ctl+'<span class="ck-t">'+esc(it.label || '수동 확인')+opl+num+refChip(it.ref)+'</span></div>'
       + why + evLine(it.detail) + (kidsHtml ? '<div class="ck-kids">'+kidsHtml+'</div>' : '') + '</div>';

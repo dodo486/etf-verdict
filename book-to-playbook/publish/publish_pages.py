@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""책 페이지 조립·발행 — <slug>-playbook.html 에 최신 판정(verdict-data)과 공유 UI 를 얹어
-PUBLIC/<slug>/index.html 로 출력한다. GitHub Pages 자동 갱신용. 조립(assemble)은 로컬 실시간
-서버(serve)와 같은 함수 하나다 — 두 화면이 다르게 조립되지 않게.
+"""책 페이지 조립 — <slug>-playbook.html 에 판정(verdict-data)·공유 UI·레일·원문·백테스트를 얹어
+한 장의 HTML 을 만든다. 라이브 서버(publish.serve)가 매 요청 이 assemble 로 페이지를 그린다.
 
-어느 책인지는 books.json 에서 온다(코드에 특정 책을 박지 않는다):
-  · 인자 있으면 그 slug, 없으면 live:true 인 책 전부.
-  · 비-라이브 책의 홈/발행은 build_home.py 가 맡는다(역할 분담).
+정적 발행(파일로 굽기)은 폐지됐다 — 하루 지난 스냅샷이 매매를 오도하지 않게. assemble 은 파일을
+쓰지 않는 순수 조립 함수다(데이터는 호출자가 넘긴다 — 라이브 서버는 방금 계산한 라이브 판정을 준다).
 """
-import os, re, sys
+import os, re
 import json
-from shared.paths import (BASE, book_meta, live_slugs, playbook_src, public_book_dir,
-                          ensure_dir, read_text, write_text, PUBLIC,
-                          latest_verdict_path, backtest_path, source_index_path)
+from shared.paths import (BASE, playbook_src, read_text, backtest_path, source_index_path)
 
 VERDICT_RE = re.compile(
     r'(<script type="application/json" id="verdict-data">)(.*?)(</script>)', re.S)
@@ -100,43 +96,3 @@ def assemble(slug, data, public=True):
     return _inject_backtest(html, slug)
 
 
-def publish(slug):
-    """한 책을 발행한다. 라이브 책이면 최신 판정(latest-verdict-<slug>.json)을 싣는다. 성공 시 True."""
-    src = playbook_src(slug)
-    if not os.path.exists(src):
-        print("· %-8s 플레이북 원본 없음(%s) — 건너뜀" % (slug, os.path.basename(src)), file=sys.stderr)
-        return True   # 없는 책은 이 스크립트 대상이 아님(실패로 치지 않는다)
-    data = None
-    if book_meta(slug).get("live"):
-        js = latest_verdict_path(slug)
-        if not os.path.exists(js):
-            print("판정 파일 없음(%s) — run.py daily 가 먼저 돌아야 한다" % os.path.basename(js), file=sys.stderr)
-            return False
-        data = json.loads(read_text(js))
-    try:
-        html = assemble(slug, data, public=True)
-    except ValueError as e:
-        print(str(e), file=sys.stderr)
-        return False
-    outd = ensure_dir(public_book_dir(slug))
-    write_text(os.path.join(outd, "index.html"), html)
-    open(os.path.join(PUBLIC, ".nojekyll"), "a").close()
-    print("%s 갱신 완료" % os.path.join(outd, "index.html"))
-    return True
-
-
-def main(argv):
-    slugs = [a for a in argv if not a.startswith("-")]
-    if not slugs:
-        slugs = live_slugs()          # 인자 없으면 라이브 책 전부(코드에 특정 책 안 박음)
-    if not slugs:
-        print("발행할 라이브 책이 없습니다(books.json 의 live:true 확인).", file=sys.stderr)
-        return 1
-    ok = True
-    for slug in slugs:
-        ok = publish(slug) and ok
-    return 0 if ok else 1
-
-
-if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))

@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""books.json → public/index.html (책 선택 홈/런처). 카드 클릭 시 /slug/ 로 이동.
+"""books.json → 책 선택 앱 셸(좌측 책목록 + 본문 iframe) HTML.
 
-부작용(파일 쓰기·디렉터리 생성)은 전부 build() 안에서만 일어난다 — 이 모듈을 import 만
-해서는 아무것도 쓰지 않는다. 실행은 `python -m publish.build_home` (아래 __main__ → build()).
-render_home(manifest) 은 순수 함수라 가짜 manifest 로 단독 테스트할 수 있다.
+순수 함수 render_home(manifest) 하나뿐이다 — 파일을 쓰지 않는다. 라이브 서버(publish.serve)가
+홈(`/`)을 그릴 때 이걸 그대로 쓴다. 정적 발행(파일로 굽기)은 폐지됐다 — 오래된 스냅샷이 매매를
+오도하지 않게, 화면은 라이브 서버가 매 요청 엔진을 새로 돌려 그린다.
 """
-import os, html
-
-from shared.paths import PUBLIC, ensure_dir, read_text, write_text, load_manifest, playbook_src
-from publish.inject_nav import inject
+import html
 
 
 def esc(s):
@@ -110,26 +107,7 @@ body{{margin:0;background:var(--ground);color:var(--text);font-family:-apple-sys
 </body></html>'''
 
 
-def build():
-    """홈 + 정적 책 페이지를 PUBLIC 에 쓴다 — 부작용은 여기서만."""
-    manifest = load_manifest()
-    outdir = ensure_dir(PUBLIC)
-    write_text(os.path.join(outdir, "index.html"), render_home(manifest))
-    print(f"홈 생성: {os.path.join(outdir, 'index.html')} ({len(manifest.get('books', []))}권)")
-
-    # 정적 책(라이브 아님) 조립: 소스 HTML에 레일 주입 → public/slug/index.html
-    # (라이브 책은 publish_pages.py가 담당하므로 건너뜀)
-    for b in manifest.get("books", []):
-        if b.get("live"):
-            continue
-        slug = b["slug"]; src = playbook_src(slug)
-        if not src or not os.path.exists(src):
-            print(f"  (건너뜀: {slug} 소스 없음)"); continue
-        s = read_text(src)
-        d = ensure_dir(os.path.join(outdir, slug))
-        write_text(os.path.join(d, "index.html"), inject(s, slug))
-        print(f"  정적 책 조립: {os.path.join(d, 'index.html')}")
-
-
 if __name__ == "__main__":
-    build()
+    import sys
+    from shared.paths import load_manifest
+    sys.stdout.write(render_home(load_manifest()))   # 미리보기용 — 파일로 굽지 않는다(라이브 서버가 그린다)

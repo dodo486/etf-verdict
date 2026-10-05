@@ -333,8 +333,35 @@ def _unit_of(e, defs):
     return ""
 
 
+def _inputs_of(e, ctx, i, defs, acc, seen):
+    """복합식(산술)의 원시 측정 잎들을 [{d, v}]로 모은다 — '무슨 숫자로 계산했나'를 보여주려고.
+    예: (고가 − 종가) ÷ 고가 → [{d:'고가', v:…}, {d:'종가', v:…}]. 중복 설명은 한 번만."""
+    if not isinstance(e, dict):
+        return
+    if "def" in e and e["def"] in defs and len([k for k in e if k not in cond.META]) == 1:
+        return _inputs_of(defs[e["def"]], ctx, i, defs, acc, seen)
+    try:
+        op = cond._op_of(e)
+    except cond.CondError:
+        return
+    LEAF = ("px", "ma", "ema", "pct", "lag", "streak", "count", "barssince",
+            "rsi", "highest", "lowest", "sum", "stdev", "pos")
+    if op in LEAF:
+        d = _describe_operand(e, defs)
+        if d and d not in seen:
+            seen.add(d)
+            acc.append({"d": d, "v": _meas_val(e, ctx, i)})
+        return
+    if op in cond.ARITH:
+        for sub in e[op]:
+            _inputs_of(sub, ctx, i, defs, acc, seen)
+    elif op == "abs":
+        _inputs_of(e["abs"], ctx, i, defs, acc, seen)
+    # case·valuewhen 등은 생략(라벨이 설명을 맡는다)
+
+
 def _measure(node, defs, ctx, i, top=True):
-    """표시되는 조건 하나가 '무엇을 재서 얼마였나' — [{op, lhs, lhsd, rhs, rhsd, unit}, …].
+    """표시되는 조건 하나가 '무엇을 재서 얼마였나' — [{op, lhs, lhsd, rhs, rhsd, unit, inputs?}, …].
     하위에 라벨 달린 조건이 있으면 멈춘다(그 조건이 자기 증거를 따로 보여준다)."""
     if not isinstance(node, dict):
         return []
@@ -348,10 +375,17 @@ def _measure(node, defs, ctx, i, top=True):
         return []
     if op in cond.CMP:
         a, b = node[op]
-        return [{"op": op,
-                 "lhs": _meas_val(a, ctx, i), "lhsd": _describe_operand(a, defs),
-                 "rhs": _meas_val(b, ctx, i), "rhsd": _describe_operand(b, defs),
-                 "unit": _unit_of(a, defs)}]
+        lhsd = _describe_operand(a, defs)
+        fact = {"op": op,
+                "lhs": _meas_val(a, ctx, i), "lhsd": lhsd,
+                "rhs": _meas_val(b, ctx, i), "rhsd": _describe_operand(b, defs),
+                "unit": _unit_of(a, defs)}
+        if not lhsd:                       # 복합식(산술) — 무슨 원시 숫자로 계산했는지 함께 보여준다
+            ins = []
+            _inputs_of(a, ctx, i, defs, ins, set())
+            if ins:
+                fact["inputs"] = ins
+        return [fact]
     if op == "not":
         kids = [node["not"]]
     elif op in ("all", "any"):
