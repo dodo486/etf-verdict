@@ -15,6 +15,8 @@ jhts.marketdata 미설치 시 AVAILABLE=False, 함수는 빈 값을 돌려준다
 """
 import sys
 
+from shared import _dev_cache  # DEV 전용 시세 캐시(ETF_DEV_CACHE 꺼지면 no-op) — 반복 네트워크 제거
+
 try:
     import jhts.marketdata as md
     AVAILABLE = True
@@ -31,7 +33,8 @@ def history(symbol, start):
     if not AVAILABLE:
         return []
     try:
-        return md.candles(symbol, start=start) or []
+        return _dev_cache.cached(("candles", symbol, start),
+                                 lambda: md.candles(symbol, start=start) or [])
     except Exception as e:  # noqa: BLE001
         # 판정은 ❔ 로 degrade 하되(무크래시), '데이터 없음'과 '어댑터가 실제로 고장'을
         # 구분할 수 있게 진짜 예외는 한 줄 남긴다(조용한 실패가 버그를 숨기지 않도록).
@@ -69,7 +72,8 @@ def minutes(symbol):
     if not AVAILABLE:
         return {}
     try:
-        bars = md.minute_bars(symbol) or []
+        bars = _dev_cache.cached(("minute_bars", symbol),
+                                 lambda: md.minute_bars(symbol) or [])
     except Exception as e:  # noqa: BLE001
         # '데이터 없음'과 '어댑터 고장'을 구분할 수 있게 진짜 예외는 한 줄 남긴다.
         sys.stderr.write("md_feed.minutes(%s) 예외 — %s: %s\n" % (symbol, type(e).__name__, e))
