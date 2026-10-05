@@ -129,7 +129,11 @@
     if(typeof x !== 'number') return esc(String(x));
     var s = Math.abs(x) >= 100 ? x.toFixed(1) : x.toFixed(2);
     if(s.indexOf('.') >= 0) s = s.replace(/0+$/,'').replace(/\.$/,'');   // 10.00→10, 0.10→0.1 (꼬리 0 정리)
-    return s;
+    // 천단위 구분(정수부) — 거래량·지수 같은 큰 숫자 가독성: 46306400 → 46,306,400
+    var neg = s.charAt(0) === '-'; if(neg) s = s.slice(1);
+    var dot = s.indexOf('.'), ip = dot < 0 ? s : s.slice(0, dot), fp = dot < 0 ? '' : s.slice(dot);
+    ip = ip.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return (neg ? '-' : '') + ip + fp;
   }
   const EVSYM = {gt:'>', ge:'≥', lt:'<', le:'≤'};
   function evLine(detail){

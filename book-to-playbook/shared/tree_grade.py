@@ -285,7 +285,9 @@ def _describe_operand(e, defs):
     if op == "px":
         sym = e.get("sym", "$self")
         base = _PXF.get(e["px"], e["px"])
-        return base if sym in ("$self", "$index") else "%s %s" % (sym, base)
+        pre = "장중 " if e.get("tf", "1d") in ("1m", "5m") else ""   # 장중 분봉 vs 확정 일봉 구분
+        core = base if sym in ("$self", "$index") else "%s %s" % (sym, base)
+        return pre + core
     if op in ("ma", "ema"):
         return "%d일선" % e[op][1] if op == "ma" else "%d일 지수이평" % e[op][1]
     if op in ("highest", "lowest", "sum", "stdev"):
@@ -307,7 +309,11 @@ def _describe_operand(e, defs):
     if op == "pos":
         return {"ret": "수익률(%)", "days": "보유일", "maxret": "최고수익(%)",
                 "minret": "최저수익(%)"}.get(e["pos"], "포지션")
-    return ""                                    # add/sub/mul/div/case/valuewhen … 복합 → 숫자만
+    if op == "valuewhen":                        # 그 조건이 마지막으로 참이던 날의 값
+        return _describe_operand(e["valuewhen"][1], defs) + "(최근 신호일)"
+    if op in ("minsince", "maxsince"):           # 신호 이후 최저/최고
+        return ("최저 " if op == "minsince" else "최고 ") + _describe_operand(e[op][1], defs) + "(신호 이후)"
+    return ""                                    # add/sub/mul/div/case … 복합 → 숫자만(산술은 inputs 로 분해)
 
 
 def _unit_of(e, defs):
