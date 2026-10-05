@@ -319,19 +319,27 @@ class Ctx:
 def minute_series(minutes, cal, field, asof=None):
     """날짜별 'asof 이하 마지막 분봉'의 필드 값. minutes = {YYYYMMDDHHMM(UTC): {open,high,low,close,volume} 또는 종가}.
     분봉 데이터가 asof 이하 그날 범위에 없으면 None(모름 — 장중 observe 가 manual 로 떨어진다).
-    분봉 다축 달력(그날의 분봉 구간)은 후속 범위다 — 데이터가 연결되면 여기만 채운다."""
+    분봉 다축 달력(그날의 분봉 구간)은 후속 범위다 — 데이터가 연결되면 여기만 채운다.
+
+    계산: asof 이하 분봉 키를 한 번만 오름차순으로 훑어 '날짜 → 그날 마지막(가장 늦은) 키' 인덱스를 만들고
+    (덮어쓰기), 날짜별로 그 키의 값을 꺼낸다. 날짜마다 전체 분봉을 되훑던 옛 O(cal×분봉) 루프를
+    O(분봉+cal)로 바꾼 것 — 고르는 분봉이 같아 값은 완전히 동일하다. 'last key 의 값'을 그대로 쓴다
+    (None 이어도): pandas groupby.last() 는 결측(None)을 건너뛰어 '마지막 봉이 None'인 경우 다른 값을 내므로
+    쓰지 않는다(의미가 조용히 달라지는 걸 막는다)."""
     import datetime as _dt
     asof = asof or _dt.datetime.now(_dt.timezone.utc)
     hi = asof.astimezone(_dt.timezone.utc).strftime("%Y%m%d%H%M")
-    keys = sorted(minutes)
+    last_key = {}
+    for k in sorted(k for k in minutes if k <= hi):     # 오름차순 → 덮어쓰기로 날짜별 '마지막' 키만 남음
+        last_key[k[:8]] = k
     out = []
     for d in cal:
-        val = None
-        for k in reversed(keys):
-            if k[:8] == d and k <= hi:
-                bar = minutes[k]
-                val = bar if not isinstance(bar, dict) else bar.get(field)
-                break
+        k = last_key.get(d)
+        if k is None:
+            out.append(None)
+            continue
+        bar = minutes[k]
+        val = bar if not isinstance(bar, dict) else bar.get(field)
         out.append(None if val is None else float(val))
     return out
 
