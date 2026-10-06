@@ -514,7 +514,8 @@ def adopt(slug):
     fill_missing_labels(tree)
     cond.validate_tree(tree)
     write_text(os.path.join(BASE, "books", slug, "tree.json"), cond.compact_json(tree))
-    print("채택 트리 → books/%s/tree.json (%s) · 되접기 %d곳" % (slug, tree["source"]["review"] or "전 칸 일치", refolded))
+    print("채택 트리 → books/%s/tree.json (%s) · 되접기 %d곳"
+          % (slug, tree["source"]["review"] or "전 칸 일치", refolded))
 
 
 # ------------------------------------------------------------------ 매도 규칙(exit) 이중 추출
@@ -698,6 +699,24 @@ def _nameless_manual(node, out=None):
     return out
 
 
+def _unclassified_numeric_manual(node, out=None):
+    """'저자 미명시' 수동인데 measure 도 '(정성)' 표시도 없는 잎 — 수치인지 주관인지 분류가 안 된 모호한 것.
+    수치로 검증 가능하면 measure(근거 숫자)를, 순수 주관이면 '(정성)' 표시를 달아야 한다
+    (어느 쪽도 아니면 화면이 깜깜이로 뜬다 — 데이터 없음/연산 없음 머리는 스스로 분류돼 있어 면제)."""
+    out = [] if out is None else out
+    if isinstance(node, dict):
+        m = node.get("manual")
+        if (isinstance(m, str) and m.startswith("저자 미명시") and not node.get("measure")
+                and "(정성)" not in m and "(정성)" not in (node.get("label") or "")):
+            out.append(node.get("label") or m[:40])
+        for v in node.values():
+            _unclassified_numeric_manual(v, out)
+    elif isinstance(node, list):
+        for v in node:
+            _unclassified_numeric_manual(v, out)
+    return out
+
+
 def check_book(slug, years):
     stop, warn = [], []
     print("== %s" % slug)
@@ -714,6 +733,12 @@ def check_book(slug, years):
     if nameless:
         stop.append("%s 이름 없는 수동 조건 %d개" % (slug, len(nameless)))
         print("  ❌ label 없는 수동 잎 %d개 — 화면에 '수동 확인'으로 샌다: %s" % (len(nameless), nameless[:3]))
+    # 0b. 분류 안 된 수동 정지 — '저자 미명시' 수동은 measure(수치 검증 가능) 또는 '(정성)' 표시(순수 주관) 중 하나여야 한다
+    unclassified = _unclassified_numeric_manual(tree)
+    if unclassified:
+        stop.append("%s 분류 안 된 수동 조건 %d개" % (slug, len(unclassified)))
+        print("  ❌ measure 도 '(정성)' 표시도 없는 수동 %d개 — 수치면 measure, 주관이면 '(정성)': %s"
+              % (len(unclassified), unclassified[:3]))
     review = _load(slug, "tree_review.json") or {}
     ta, tb = _load(slug, "tree_candidates/a.json"), _load(slug, "tree_candidates/b.json")
     for t in (ta, tb):
