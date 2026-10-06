@@ -422,32 +422,160 @@ def _is_rule_def(body):
     return "manual" in json.dumps(body, ensure_ascii=False)
 
 
+def _strip_meta(node):
+    """META(label·ref·id·note·measure)를 모든 깊이에서 떼낸 '순수 로직'만 남긴다 — 되접기 신원 비교용."""
+    if isinstance(node, dict):
+        return {k: _strip_meta(v) for k, v in node.items() if k not in cond.META}
+    if isinstance(node, list):
+        return [_strip_meta(x) for x in node]
+    return node
+
+
+def _logic_key(node, defs):
+    """노드를 끝까지 펼치고(def 참조 포함) META 를 뗀 로직 지문 — 자리 라벨·부분접힘 차이에 흔들리지 않는다."""
+    return json.dumps(_strip_meta(_inline(node, defs)), ensure_ascii=False, sort_keys=True)
+
+
+_RULE_OPS = ("all", "any", "atleast", "not", "manual")
+
+
+def _cond_op(node):
+    """노드의 연산 키 하나(META·보조키 제외). 조건 노드가 아니면(연산 0개·2개 이상) None.
+    entry 래퍼({when,scale,…})나 리스트·원시값을 조건으로 오인하지 않게 cond 의 판정을 그대로 쓴다."""
+    if not isinstance(node, dict):
+        return None
+    try:
+        return cond._op_of(node)
+    except cond.CondError:
+        return None
+
+
+def _foldable_def(body):
+    """색인(되접기 대상) def 인가 — 규칙(all/any/atleast/not/manual)이거나 '이름표 달린 규칙'(label).
+    label 이 있으면 저자가 의도한 명명 규칙이라, 최상위가 단순비교(ge/gt…)여도 접는다(VIX 10% 같은 것).
+    label 없는 원시 부품(C·V·px·ma)만 제외한다 — 펼친 형태가 작아 우연히 겹칠 수 있어서."""
+    return _is_rule_def(body) or bool(isinstance(body, dict) and body.get("label"))
+
+
+def _factorable(node):
+    """공통 def 로 뽑거나 되접을 '규칙 덩어리'인가 — 유효한 조건 노드이면서, 규칙 연산(all/any/atleast/
+    not/manual)이거나 '이름표 달린 비교'(VIX 10% 같은 gt/ge/lt/le). 원시값·arith·case·sizing 구조
+    (frac/weight…)·entry 래퍼는 제외한다(래퍼는 _cond_op 가 None, 나머지는 op 가 집합 밖이라 자동 제외)."""
+    op = _cond_op(node)
+    if op is None:
+        return False
+    if op in _RULE_OPS:
+        return True
+    return op in cond.CMP and bool(node.get("label"))
+
+
 def refold_to_defs(tree):
     """adopt 가 _inline 으로 상품마다 복제한 규칙 덩어리를 다시 {"def":name} 참조로 되접는다(중복 제거).
-    로직은 안 바뀐다 — 참조는 렌더 시 같은 내용으로 펼쳐지므로. 규칙 def 만 대상, 가장 바깥 것부터 매치."""
-    defs = tree.get("defs") or {}
-    index = {}
-    for name, body in defs.items():
-        if not _is_rule_def(body):
-            continue
-        exp = _inline(body, defs)
-        index[json.dumps(exp, ensure_ascii=False, sort_keys=True)] = name
 
+    신원은 '로직'이다 — 끝까지 펼친 뒤 META(label·ref·note…)를 떼고 비교하므로, 복제본끼리 자리 라벨이
+    달라지거나(드리프트) 일부만 접혀 있어도 같은 def 로 되접힌다. 접을 때 그 자리의 META 는 참조에 그대로
+    얹어(`{"def":name, "label":…}`) 자리마다의 문구를 보존한다 — 렌더 시 def 로직 위에 그 META 가 덮이므로
+    로직도 화면 문구도 안 바뀐다.
+
+    두 단계:
+      ① 기존 def 로 되접기 — 로직이 같은 명명 def 가 있으면 그리로.
+      ② 공통 def 신설 — 접을 def 가 없지만 '상품 둘 이상에 같은 로직'으로 복제된 규칙 덩어리는 새 def 를
+         만들어(가장 바깥 것부터) 참조로 바꾼다. custom 추출이 후보 def 와 미묘히 달라져 되접을 데가 없던
+         복제도 이걸로 사라진다 — 어떤 책이든 상품 간 복제가 트리에 남지 않는다. (원시 부품은 대상 아님.)"""
+    defs = tree.get("defs") or {}
     n = [0]
 
-    def walk(node):
-        if isinstance(node, dict):
-            name = index.get(json.dumps(node, ensure_ascii=False, sort_keys=True))
-            if name is not None:
-                n[0] += 1
-                return {"def": name}
-            return {k: walk(v) for k, v in node.items()}
-        if isinstance(node, list):
-            return [walk(x) for x in node]
-        return node
+    def build_index():
+        idx = {}
+        for name, body in defs.items():
+            if _foldable_def(body):
+                idx.setdefault(_logic_key(body, defs), name)   # 로직 같은 def 여럿이면 먼저 정의된 쪽
+        return idx
 
-    tree["products"] = walk(tree["products"])
+    def fold_once(index):
+        def walk(node):
+            if isinstance(node, dict):
+                if _factorable(node):
+                    name = index.get(_logic_key(node, defs))
+                    if name is not None:
+                        n[0] += 1
+                        # 자리의 표시 META(label·ref·note)만 참조에 얹는다. measure 는 수동 조건 본문에만
+                        #   허용되므로(def 참조엔 불가) def 본문에 남겨 두고 렌더 때 그걸 쓴다. id 도 안 얹는다.
+                        meta = {k: v for k, v in node.items() if k in ("label", "ref", "note")}
+                        return dict({"def": name}, **meta)
+                return {k: walk(v) for k, v in node.items()}
+            if isinstance(node, list):
+                return [walk(x) for x in node]
+            return node
+        tree["products"] = walk(tree["products"])
+
+    def cross_product_dups():
+        """상품 둘 이상에 같은 로직으로 남은 규칙 덩어리 → {로직키: 대표 노드}. 가장 바깥 것부터."""
+        prods, rep = {}, {}
+        def walk(node, prod):
+            if isinstance(node, dict):
+                if _factorable(node):
+                    k = _logic_key(node, defs)
+                    prods.setdefault(k, set()).add(prod)
+                    rep.setdefault(k, node)
+                for v in node.values():
+                    walk(v, prod)
+            elif isinstance(node, list):
+                for v in node:
+                    walk(v, prod)
+        for p, cfg in tree["products"].items():
+            walk(cfg, p)
+        cands = [k for k, ps in prods.items() if len(ps) >= 2]
+        return sorted(cands, key=len, reverse=True), rep   # 큰(바깥) 덩어리 먼저
+
+    seq = [0]
+    def new_name():
+        while True:
+            seq[0] += 1
+            nm = "공유_%d" % seq[0]
+            if nm not in defs:
+                return nm
+
+    fold_once(build_index())                               # ① 기존 def 로
+    for _ in range(200):                                   # ② 공통 def 신설(수렴까지, 상한은 폭주 방지)
+        cands, rep = cross_product_dups()
+        if not cands:
+            break
+        nm = new_name()
+        defs[nm] = rep[cands[0]]                            # 대표 블록을 그대로 def 본문으로(label·ref 포함)
+        tree["defs"] = defs
+        fold_once(build_index())                           # 신설 def 로 모든 복제 자리 되접기
     return n[0]
+
+
+def prune_unused_defs(tree):
+    """products 에서 전이적으로 도달하지 않는 def 를 지운다 — 채택이 candidate a 를 통째로 복사한 뒤 칸을
+    custom/b 로 갈아끼우면서 쓰이지 않게 된 잔재(죽은 def)를 치운다. 렌더·판정·공통 추출은 모두 products
+    에서 참조로 펼치므로, 미참조 def 제거는 동작에 영향이 없다(공통 섹션은 사용자 2+ 인 def 만 뽑는다)."""
+    defs = tree.get("defs") or {}
+    used = set()
+
+    def mark(name):
+        if name in used or name not in defs:
+            return
+        used.add(name)
+        scan(defs[name])
+
+    def scan(node):
+        if isinstance(node, dict):
+            if isinstance(node.get("def"), str):
+                mark(node["def"])
+            for v in node.values():
+                scan(v)
+        elif isinstance(node, list):
+            for v in node:
+                scan(v)
+
+    scan(tree.get("products") or {})
+    dead = [n for n in defs if n not in used]
+    for n in dead:
+        del defs[n]
+    return len(dead)
 
 
 def _derive_label(manual):
@@ -511,11 +639,12 @@ def adopt(slug):
                 un.append(u)
     tree["unexpressed"] = un
     refolded = refold_to_defs(tree)   # _inline 이 상품마다 복제한 규칙 덩어리를 다시 {"def":name} 로 되접음(로직 불변)
+    pruned = prune_unused_defs(tree)  # 채택 과정에서 대체돼 안 쓰이게 된 죽은 def 제거(동작 불변)
     fill_missing_labels(tree)
     cond.validate_tree(tree)
     write_text(os.path.join(BASE, "books", slug, "tree.json"), cond.compact_json(tree))
-    print("채택 트리 → books/%s/tree.json (%s) · 되접기 %d곳"
-          % (slug, tree["source"]["review"] or "전 칸 일치", refolded))
+    print("채택 트리 → books/%s/tree.json (%s) · 되접기 %d곳 · 죽은 def %d개 제거"
+          % (slug, tree["source"]["review"] or "전 칸 일치", refolded, pruned))
 
 
 # ------------------------------------------------------------------ 매도 규칙(exit) 이중 추출
@@ -597,6 +726,7 @@ def adopt_exits(slug):
     tree.setdefault("source", {})["exit_review"] = {p: (review.get(p) or {}).get("winner", "a(일치)")
                                                     for p in tree["products"]}
     refold_to_defs(tree)   # exit 규칙도 _inline 으로 펼쳐지므로 동일하게 되접음(로직 불변)
+    prune_unused_defs(tree)   # 채택 과정에서 안 쓰이게 된 죽은 def 제거(동작 불변)
     fill_missing_labels(tree)
     cond.validate_tree(tree)
     write_text(os.path.join(BASE, "books", slug, "tree.json"), cond.compact_json(tree))
