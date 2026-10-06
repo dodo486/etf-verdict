@@ -1,28 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""book-to-playbook 로컬 실시간 서버 — 정적 스냅샷(GitHub Pages)은 그대로 두고
-같은 페이지를 '살아 움직이게' 얹는 점진적 향상(progressive enhancement) 계층.
+"""book-to-playbook 로컬 실시간 서버 — 화면을 보는 유일한 경로(정적 스냅샷은 폐지됨).
 
-두 모드, 한 파일:
-  · GitHub Pages(정적)      → publish_pages.py 가 구운 스냅샷을 그대로 본다(서버 없음).
-  · 이 서버(python -m publish.serve) → 책 페이지(<slug>-playbook.html)를 열면 /api/verdict 를
-    폴링(또는 /events SSE 수신)해 값이 실시간으로 갱신된다.
+한 주소로 고정이다. books.json 에 어떤 책이 들어와도 **서버 재시작 없이** 바로 잡힌다
+(_slugs()·render_shell 이 매 요청 books.json 을 새로 읽는다). 매 요청 엔진을 새로 돌려
+그리므로 오래된 값이 '지금 값'처럼 보일 여지가 없다.
 
 엔드포인트
-  GET /api/verdict   판정 JSON(라이브). 엔진(books.json engine.daily) --json 을 그대로 재사용해
-                     계산하고, 짧은 TTL 캐시(기본 8초)로 잦은 폴링이 시세 창구를
-                     두드리지 않게 막는다. CORS 허용(Access-Control-Allow-Origin: *).
-  GET /events        SSE — ~15초마다 tick 을 밀어준다(캐시 무효화 후 최신 ts 동봉).
-                     브라우저가 tick 을 받으면 /api/verdict 를 한 번 더 당겨 다시 그린다.
-  GET / , /index.html  최신 판정을 #verdict-data 에 구워 넣은 책 페이지(루트로 바로 열림).
+  GET /                셸(책 선택) — 좌측 책목록 + 본문 iframe. 책을 눌러도 셸은 그대로, 본문만 바뀐다.
+  GET /<slug>/         그 책 페이지 — 요청 시점 라이브 판정을 구워 넣는다(assemble).
+  GET /api/verdict?slug=<책>  판정 JSON(라이브). 엔진(books.json engine.daily) --json 재사용 + 짧은
+                     TTL 캐시(기본 8초, 책별)로 잦은 폴링이 시세 창구를 안 두드리게. CORS 허용.
+  GET /events?slug=<책>       SSE — ~15초마다 tick(브라우저가 받으면 /api/verdict 를 다시 당겨 재렌더).
   기타 정적 파일       BASE 디렉터리에서 그대로 서빙(폰트·이미지 등).
 
-바인딩은 0.0.0.0(테일스케일/LAN 에서 폰으로 접속 가능). 포트는 PLAYBOOK_PORT
-환경변수(기본 8799).
+바인딩은 0.0.0.0(테일스케일/LAN 에서 폰으로 접속 가능). 포트는 PLAYBOOK_PORT 환경변수(기본 8799).
 
-설계 메모: 판정 계산부(compute_verdict)를 HTTP 배관과 분리해 둔다. 나중에
-서버리스 함수로 그대로 들어낼 수 있도록 '판정을 만드는 순수 호출부'만 떼어 둔 것.
-"""
+설계 메모: 판정 계산부(compute_verdict)를 HTTP 배관과 분리해 둔다 — 서버리스로 그대로 이관 가능하게."""
 import http.server
 import json
 import os
@@ -42,8 +36,13 @@ SSE_TICK = float(os.environ.get("PLAYBOOK_TICK", "15"))  # 초 — SSE tick 주�
 # 어느 책을 라이브로 띄울지는 books.json 에서 온다(코드에 특정 책을 박지 않는다).
 # BOOK_SLUG 로 덮어쓸 수 있고, 기본은 첫 live 책.
 from shared.paths import BASE, default_slug, book_engine, live_slugs, load_manifest   # noqa: E402
-SLUGS = live_slugs() or [default_slug()]               # 라이브로 띄울 책 전부(코드에 특정 책 안 박음)
-DEFAULT_SLUG = os.environ.get("BOOK_SLUG") or (SLUGS[0] if SLUGS else default_slug())
+DEFAULT_SLUG = os.environ.get("BOOK_SLUG") or (live_slugs() or [default_slug()])[0]
+
+
+def _slugs():
+    """지금 books.json 에 있는 라이브 책 전부 — 매 요청 새로 읽는다. 책을 추가하면 서버 재시작 없이
+    바로 셸 목록·라우팅·API 에 잡힌다(한 주소 고정, 어떤 책이 들어와도)."""
+    return live_slugs() or [DEFAULT_SLUG]
 
 # ------------------------------------------------------------------ 판정 계산부
 # (HTTP 배관과 분리 — 서버리스 함수로 그대로 이관 가능한 순수 호출부)
@@ -141,7 +140,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if route in ("/", "/index.html"):
             return self._serve_shell()
         m = re.match(r"^/([^/]+)/(?:index\.html)?$", route)
-        if m and m.group(1) in SLUGS:
+        if m and m.group(1) in _slugs():
             return self._serve_page(m.group(1))
         return super().do_GET()
 
@@ -164,7 +163,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
         force = "force" in qs
         slug = (qs.get("slug") or [DEFAULT_SLUG])[0]
-        if slug not in SLUGS:
+        if slug not in _slugs():
             slug = DEFAULT_SLUG
         try:
             data, cached = compute_verdict(slug, force=force)
@@ -179,7 +178,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def _serve_sse(self):
         qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
         slug = (qs.get("slug") or [DEFAULT_SLUG])[0]
-        if slug not in SLUGS:
+        if slug not in _slugs():
             slug = DEFAULT_SLUG
         try:
             self.send_response(200)
@@ -226,7 +225,7 @@ def _warm():
 
 if __name__ == "__main__":
     os.chdir(BASE)
-    print("로컬 실시간 서버 — 책: %s" % ", ".join(SLUGS))
+    print("로컬 실시간 서버 — 책: %s" % ", ".join(_slugs()))
     print("  로컬:      http://127.0.0.1:%d/  (셸 · 책 전환)" % PORT)
     print("  LAN/폰:    http://<이 컴퓨터 IP 또는 테일스케일 MagicDNS>:%d/" % PORT)
     print("  판정 JSON: http://127.0.0.1:%d/api/verdict?slug=<책>" % PORT)
