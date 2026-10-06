@@ -179,10 +179,11 @@
     const kidsHtml = (it.observed && isM) ? '' : kids;
     let ctl;
     if(isM){
+      // 수동도 자동과 같은 ●/○ 심볼 토글로(참/거짓 글자 대신 — 시각 언어 통일). 고른 것만 색이 켜진다.
       ctl = '<span class="ck-man" data-key="'+esc(mkey(it, path))+'"'+(it.shared?' title="여러 상품이 같이 보는 조건 — 한 번 체크하면 모든 상품에 적용"':'')+'>'
-          + '<button data-a="1" class="'+(a===true?'on':'')+'">참</button>'
-          + '<button data-a="0" class="'+(a===false?'on':'')+'">거짓</button>'
-          + (a!==undefined ? '<button data-a="x" title="답 지우기">↺</button>' : '') + '</span>';
+          + '<button data-a="1" class="t'+(a===true?' on':'')+'" title="참(맞음)">●</button>'
+          + '<button data-a="0" class="f'+(a===false?' on':'')+'" title="거짓(아님)">○</button>'
+          + (a!==undefined ? '<button data-a="x" class="rst" title="답 지우기">↺</button>' : '') + '</span>';
     } else ctl = MARK(val);
     const num = (!isM && typeof it.v === 'number') ? ' <span class="dataval">'+fmtV(it.v)+'</span>' : '';
     const why = isM ? '<div class="ck-why">✋ '+esc(it.manual)+'</div>' : (it.note ? '<div class="ck-why">'+esc(it.note)+'</div>' : (it.observed ? '<div class="ck-why">저자가 말한 시각의 값으로 자동 판정</div>' : ''));
@@ -341,36 +342,44 @@
   (function(){
     const st = document.createElement('style');
     st.textContent =
-      '#sheet-root{font-size:13px}'
-      +'#sheet-root .ck-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}'
-      // 칸 머리글(①필터 ②회피 …) — 슬림 섹션 바(왼쪽 색 띠로 강조)
-      +'#sheet-root .ck-zone{margin:16px 0 6px;padding:6px 11px;background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--mute);border-radius:7px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12.5px;font-weight:700;color:var(--head);line-height:1.35}'
+      '#sheet-root{font-size:13.5px}'
+      +'#sheet-root .ck-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}'
+      // 칸 머리글(①필터 ②회피 …) — 왼쪽 색 띠 바(참=초록·거짓=빨강)
+      +'#sheet-root .ck-zone{margin:20px 0 8px;padding:9px 13px;background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--mute);border-radius:9px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;font-weight:700;color:var(--head);line-height:1.4;letter-spacing:.01em}'
       +'#sheet-root .ck-zone.ok{border-left-color:var(--entry)} #sheet-root .ck-zone.bad{border-left-color:var(--warn)}'
-      +'#sheet-root .ck-zone .ck-zv{font-size:11px;font-weight:600;color:var(--mute);white-space:nowrap}'
+      +'#sheet-root .ck-zone .ck-zv{font-size:11.5px;font-weight:600;color:var(--mute);white-space:nowrap}'
       +'#sheet-root .ck-zone.ok .ck-zv{color:var(--entry)} #sheet-root .ck-zone.bad .ck-zv{color:var(--warn)}'
-      // 조건 한 칸 = 네모 박스(촘촘하게)
-      +'#sheet-root .ck-row{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 11px;margin:5px 0}'
+      // 조건 한 칸 = 카드(편안한 여백)
+      +'#sheet-root .ck-row{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 13px;margin:7px 0}'
       +'#sheet-root .ck-row.man{border-left:3px solid var(--gold)}'
-      // 중첩 조건은 카드 안 들여쓴 목록(얇은 레일)
-      +'#sheet-root .ck-kids{margin:6px 0 0 2px;border-left:1px solid var(--line);padding-left:11px;display:flex;flex-direction:column}'
-      +'#sheet-root .ck-kids .ck-row{background:transparent;border:none;border-radius:0;padding:4px 0;margin:0}'
-      +'#sheet-root .ck-grp{margin:0}#sheet-root .ck-op{font-size:10.5px;color:var(--mute);margin:1px 0 4px;letter-spacing:.02em}'
-      +'#sheet-root .ck-line{display:flex;gap:8px;align-items:flex-start}'
-      +'#sheet-root .ck-t{flex:1;font-size:13px;line-height:1.45;color:var(--text)}'
+      // 중첩 조건은 카드 안 들여쓴 목록
+      +'#sheet-root .ck-kids{margin:8px 0 0 3px;border-left:1px solid var(--line);padding-left:13px;display:flex;flex-direction:column}'
+      +'#sheet-root .ck-kids .ck-row{background:transparent;border:none;border-radius:0;padding:6px 0;margin:0}'
+      +'#sheet-root .ck-grp{margin:0}#sheet-root .ck-op{font-size:11px;color:var(--mute);margin:2px 0 5px;letter-spacing:.02em}'
+      +'#sheet-root .ck-line{display:flex;gap:10px;align-items:flex-start}'
+      +'#sheet-root .ck-t{flex:1;font-size:13.5px;line-height:1.5;color:var(--text)}'
       +'#sheet-root .ck-row.man .ck-t{color:var(--head)}'
-      +'#sheet-root .ck-opl{font-size:11px;color:var(--mute);margin-left:5px}'
-      +'#sheet-root .ck-why{font-size:11.5px;color:var(--mute);margin:3px 0 0 25px;line-height:1.45}'
-      // 측정 증거 줄 — 조건 밑 슬림 칩(실제 값 vs 기준)
-      +'#sheet-root .ck-ev{font-size:11.5px;color:var(--mute);margin:5px 0 0 25px;line-height:1.5;background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:3px 9px;display:inline-block}'
+      +'#sheet-root .ck-opl{font-size:11.5px;color:var(--mute);margin-left:6px}'
+      +'#sheet-root .ck-why{font-size:12px;color:var(--mute);margin:4px 0 0 32px;line-height:1.5}'
+      // 측정 증거 칩
+      +'#sheet-root .ck-ev{font-size:12px;color:var(--mute);margin:6px 0 0 32px;line-height:1.5;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:4px 10px;display:inline-block}'
       +'#sheet-root .ck-ev b{color:var(--head);font-weight:700}'
       +'#sheet-root .ck-ev .ev-x{color:var(--gold);font-weight:700}#sheet-root .ck-ev .ev-th{color:var(--mute)}#sheet-root .ck-ev .ev-sep{color:var(--line);margin:0 2px}'
       +'#sheet-root .ck-ev.miss{background:rgba(212,162,78,.10);border-color:var(--gold)}'
-      +'#sheet-root .ck-m{flex:none;width:16px;text-align:center;font-weight:800;font-size:12px;line-height:1.5}'
-      +'#sheet-root .ck-m.t{color:var(--entry)}#sheet-root .ck-m.f{color:var(--mute)}#sheet-root .ck-m.u{color:var(--gold)}#sheet-root .ck-m.n{color:var(--line)}'
-      +'#sheet-root .dataval{font-size:11.5px;color:var(--mute);font-weight:600;margin-left:4px}'
-      +'#sheet-root .ck-man{display:inline-flex;gap:4px;flex-wrap:wrap}#sheet-root .ck-man button{font-size:11px;padding:2px 9px;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--mute);cursor:pointer}'
-      +'#sheet-root .ck-man button.on{background:var(--gold);color:#111;border-color:transparent;font-weight:700}'
-      +'#sheet-root .ck-ref{font-size:10.5px;padding:0 6px;margin-left:5px;border:1px solid var(--line);border-radius:999px;color:var(--mute);cursor:pointer;text-decoration:none}'
+      // 마크(자동)·수동 토글 — 같은 원형 칩(통일된 시각 언어: ● 참 · ○ 거짓 · ? 모름, 참/거짓 글자 없음)
+      +'#sheet-root .ck-m{flex:none;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:12px;font-weight:800;line-height:1}'
+      +'#sheet-root .ck-m.t{color:var(--entry);background:rgba(63,185,80,.15)}'
+      +'#sheet-root .ck-m.f{color:var(--mute);background:rgba(122,129,148,.15)}'
+      +'#sheet-root .ck-m.u{color:var(--gold);background:rgba(212,162,78,.16)}'
+      +'#sheet-root .ck-m.n{color:var(--line);background:transparent}'
+      +'#sheet-root .ck-man{flex:none;display:inline-flex;gap:5px;align-items:center}'
+      +'#sheet-root .ck-man button{width:22px;height:22px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--mute);font-size:12px;font-weight:800;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .12s,background .12s,color .12s}'
+      +'#sheet-root .ck-man button:hover{border-color:var(--mute);color:var(--head)}'
+      +'#sheet-root .ck-man button.t.on{color:var(--entry);background:rgba(63,185,80,.16);border-color:var(--entry)}'
+      +'#sheet-root .ck-man button.f.on{color:var(--head);background:rgba(122,129,148,.2);border-color:var(--mute)}'
+      +'#sheet-root .ck-man button.rst{width:auto;padding:0 8px;border-radius:999px;font-size:11px;font-weight:600}'
+      +'#sheet-root .dataval{font-size:12px;color:var(--mute);font-weight:600;margin-left:4px}'
+      +'#sheet-root .ck-ref{font-size:11px;padding:0 7px;margin-left:6px;border:1px solid var(--line);border-radius:999px;color:var(--mute);cursor:pointer;text-decoration:none}'
       +'#sheet-root .ck-ref:hover{color:var(--head);border-color:var(--mute)}'
       +'#sheet-root .calcrow input{width:120px;margin-left:6px}';
     document.head.appendChild(st);
