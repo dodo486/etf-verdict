@@ -1428,17 +1428,25 @@ UPRO는 시장의 폭을 산다. S&P500에는 기술주 외에 금융·헬스케
   // 항목 하나(노드) — 숨김 잎은 계산에만 쓰고 그리지 않는다. 라벨 없는 묶음은 묶음 줄 없이 자식만 들여쓴다.
   // fill = 조건 칸에서 미응답 수동 조건에 넣을 값 — 실제 판정(등급)에 쓴 시각과 같게 받아(M3), 표시 마크가
   //   등급과 어긋나지 않게 한다. 안 넘기면 null(중립 — caution·exit 등 등급과 무관한 칸).
-  function node(it, path, ans, depth, fill){
+  function node(it, path, ans, depth, fill, seen){
     if(fill === undefined) fill = null;
     if(!it) return '';
     if(it.hidden && !it.kids) return '';
-    const kids = (it.kids||[]).map((c,i)=>node(c, path+'.'+i, ans, depth+1, fill)).join('');
+    if(!seen) seen = new Set();
+    // 표시 전용 중복 제거: 같은 조건(라벨+기준+측정값)이 한 패턴 안에서 되풀이되면 한 번만.
+    //   (streak/barssince 파생조건이 라벨 없이 안쪽 건물블록만 반복 노출되는 경우를 걷어낸다.)
+    //   zone 바로 밑 패턴마다 집합을 새로 둬서 다른 패턴끼리는 제거하지 않는다(각 카드가 자기 조건을 다 보이게).
+    const sig = (it.label || it.manual) ? ((it.label||it.manual)+'|'+(it.ref||'')+'|'+(it.detail?JSON.stringify(it.detail):'')) : null;
+    const dup = !!(sig && seen.has(sig));
+    if(sig) seen.add(sig);
+    const kids = (it.kids||[]).map((c,i)=>node(c, path+'.'+i, ans, depth+1, fill, depth===0 ? new Set() : seen)).join('');
     const showRow = it.label || it.manual !== undefined;
     if(!showRow){
       if(!kids) return '';
       const gop = OPW(it);
       return it.op ? '<div class="ck-grp">'+(gop?'<div class="ck-op">'+esc(gop)+'</div>':'')+kids+'</div>' : kids;
     }
+    if(dup) return '';   // 같은 조건을 이미 보여줬다 — 한 번만
     const isM = it.manual !== undefined && !(it.observed && it.v !== null && it.v !== undefined);
     const a = isM ? ans[mkey(it, path)] : undefined;
     // 미응답 수동 조건의 마크는 fill(판정에 쓴 시각)로 — 비워두면(null) 등급은 ✅ 인데 칸은 ? 로 떠 어긋난다.
@@ -1446,11 +1454,12 @@ UPRO는 시장의 폭을 산다. S&P500에는 기술주 외에 금융·헬스케
     const kidsHtml = (it.observed && isM) ? '' : kids;
     let ctl;
     if(isM){
-      // 수동도 자동과 같은 ●/○ 심볼 토글로(참/거짓 글자 대신 — 시각 언어 통일). 고른 것만 색이 켜진다.
-      ctl = '<span class="ck-man" data-key="'+esc(mkey(it, path))+'"'+(it.shared?' title="여러 상품이 같이 보는 조건 — 한 번 체크하면 모든 상품에 적용"':'')+'>'
-          + '<button data-a="1" class="t'+(a===true?' on':'')+'" title="참(맞음)">●</button>'
-          + '<button data-a="0" class="f'+(a===false?' on':'')+'" title="거짓(아님)">○</button>'
-          + (a!==undefined ? '<button data-a="x" class="rst" title="답 지우기">↺</button>' : '') + '</span>';
+      // 수동 조건 = 참/거짓 둘 중 하나를 고르는 것(체크박스 아님). 하나로 붙은 토글(세그먼트)로.
+      // 고른 쪽만 켜지고, 같은 걸 다시 누르면 해제(미확인)된다.
+      ctl = '<span class="ck-man" data-key="'+esc(mkey(it, path))+'"'+(it.shared?' title="여러 상품이 같이 보는 조건 — 한 번 고르면 모든 상품에 적용"':'')+'>'
+          + '<button data-a="1" class="seg t'+(a===true?' on':'')+'" title="이 조건이 참(맞음)">● 참</button>'
+          + '<button data-a="0" class="seg f'+(a===false?' on':'')+'" title="이 조건이 거짓(아님)">○ 거짓</button>'
+          + '</span>';
     } else ctl = MARK(val);
     const num = (!isM && typeof it.v === 'number') ? ' <span class="dataval">'+fmtV(it.v)+'</span>' : '';
     const why = isM ? '<div class="ck-why">✋ '+esc(it.manual)+'</div>' : (it.note ? '<div class="ck-why">'+esc(it.note)+'</div>' : (it.observed ? '<div class="ck-why">저자가 말한 시각의 값으로 자동 판정</div>' : ''));
@@ -1593,8 +1602,8 @@ UPRO는 시장의 폭을 산다. S&P500에는 기술주 외에 금융·헬스케
     root.querySelectorAll('.td-chip').forEach(el=>el.addEventListener('click',()=>{ curP = el.dataset.jump; store.cur = curP; save(); render(); }));
     root.querySelectorAll('.ck-man button').forEach(b=>b.addEventListener('click',ev=>{
       ev.stopPropagation();
-      const key = b.parentNode.dataset.key, ans = answers();
-      if(b.dataset.a === 'x') delete ans[key]; else ans[key] = b.dataset.a === '1';
+      const key = b.parentNode.dataset.key, ans = answers(), want = b.dataset.a === '1';
+      if(ans[key] === want) delete ans[key]; else ans[key] = want;   // 같은 걸 다시 누르면 해제
       save(); render();
     }));
     root.querySelectorAll('.ck-ref').forEach(a=>a.addEventListener('click',ev=>{
@@ -1639,12 +1648,13 @@ UPRO는 시장의 폭을 산다. S&P500에는 기술주 외에 금융·헬스케
       +'#sheet-root .ck-m.f{color:var(--mute);background:rgba(122,129,148,.15)}'
       +'#sheet-root .ck-m.u{color:var(--gold);background:rgba(212,162,78,.16)}'
       +'#sheet-root .ck-m.n{color:var(--line);background:transparent}'
-      +'#sheet-root .ck-man{flex:none;display:inline-flex;gap:5px;align-items:center}'
-      +'#sheet-root .ck-man button{width:22px;height:22px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--mute);font-size:12px;font-weight:800;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .12s,background .12s,color .12s}'
-      +'#sheet-root .ck-man button:hover{border-color:var(--mute);color:var(--head)}'
-      +'#sheet-root .ck-man button.t.on{color:var(--entry);background:rgba(63,185,80,.16);border-color:var(--entry)}'
-      +'#sheet-root .ck-man button.f.on{color:var(--head);background:rgba(122,129,148,.2);border-color:var(--mute)}'
-      +'#sheet-root .ck-man button.rst{width:auto;padding:0 8px;border-radius:999px;font-size:11px;font-weight:600}'
+      // 수동 토글 = 하나로 붙은 세그먼트(참|거짓) — 체크박스 2개가 아니라 '하나를 고르는' 한 컨트롤
+      +'#sheet-root .ck-man{flex:none;align-self:flex-start;display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}'
+      +'#sheet-root .ck-man button{border:0;background:transparent;color:var(--mute);font-size:11.5px;font-weight:700;line-height:1;padding:4px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;transition:background .12s,color .12s}'
+      +'#sheet-root .ck-man button+button{border-left:1px solid var(--line)}'
+      +'#sheet-root .ck-man button:hover{color:var(--head)}'
+      +'#sheet-root .ck-man button.t.on{background:rgba(63,185,80,.18);color:var(--entry)}'
+      +'#sheet-root .ck-man button.f.on{background:rgba(122,129,148,.22);color:var(--head)}'
       +'#sheet-root .dataval{font-size:12px;color:var(--mute);font-weight:600;margin-left:4px}'
       +'#sheet-root .ck-ref{font-size:11px;padding:0 7px;margin-left:6px;border:1px solid var(--line);border-radius:999px;color:var(--mute);cursor:pointer;text-decoration:none}'
       +'#sheet-root .ck-ref:hover{color:var(--head);border-color:var(--mute)}'
