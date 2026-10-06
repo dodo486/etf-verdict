@@ -913,6 +913,22 @@ def validate_tree(tree):
     return True
 
 
+def compact_json(tree, width=100):
+    """트리 → JSON 문자열. 작은 노드는 한 줄로 접고 구조만 들여써 사람이 검증하기 쉽게 한다.
+    (indent=1 은 {"px": "close"} 같은 조각까지 줄을 쪼개 수천 줄이 된다 — 한 줄에 다 들어가면 접는다.)"""
+    def fmt(o, depth):
+        line = json.dumps(o, ensure_ascii=False, separators=(", ", ": "))
+        if len(line) <= width or not isinstance(o, (dict, list)):
+            return line
+        br = "\n" + " " * (depth + 1)
+        if isinstance(o, dict):
+            body = [json.dumps(k, ensure_ascii=False) + ": " + fmt(v, depth + 1) for k, v in o.items()]
+            return "{" + br + ("," + br).join(body) + "\n" + " " * depth + "}"
+        body = [fmt(v, depth + 1) for v in o]
+        return "[" + br + ("," + br).join(body) + "\n" + " " * depth + "]"
+    return fmt(tree, 0)
+
+
 def zone_nodes(cfg):
     """상품 하나의 모든 식 [(칸, 라벨, ref, 식)] — 조건 칸은 칸 전체, 규칙 칸은 규칙마다."""
     out = [(sec, None, None, cfg[sec]) for sec in SECTIONS if sec in cfg]

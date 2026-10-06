@@ -448,7 +448,7 @@ def adopt(slug):
                 un.append(u)
     tree["unexpressed"] = un
     cond.validate_tree(tree)
-    write_text(os.path.join(BASE, "books", slug, "tree.json"), json.dumps(tree, ensure_ascii=False, indent=1))
+    write_text(os.path.join(BASE, "books", slug, "tree.json"), cond.compact_json(tree))
     print("채택 트리 → books/%s/tree.json (%s)" % (slug, tree["source"]["review"] or "전 칸 일치"))
 
 
@@ -531,7 +531,7 @@ def adopt_exits(slug):
     tree.setdefault("source", {})["exit_review"] = {p: (review.get(p) or {}).get("winner", "a(일치)")
                                                     for p in tree["products"]}
     cond.validate_tree(tree)
-    write_text(os.path.join(BASE, "books", slug, "tree.json"), json.dumps(tree, ensure_ascii=False, indent=1))
+    write_text(os.path.join(BASE, "books", slug, "tree.json"), cond.compact_json(tree))
     print("매도 규칙 채택 -> books/%s/tree.json %s" % (slug, tree["source"]["exit_review"]))
 
 

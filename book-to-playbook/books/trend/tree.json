@@ -13,11 +13,7 @@
    "QQQ.sizing": "custom",
    "IWM.sizing": "custom"
   },
-  "exit_review": {
-   "SPY": "custom",
-   "QQQ": "custom",
-   "IWM": "custom"
-  }
+  "exit_review": {"SPY": "custom", "QQQ": "custom", "IWM": "custom"}
  },
  "defs": {
   "env_stable": {
@@ -32,32 +28,12 @@
         {
          "label": "S&P500 선물 개장 직전 < 전일 종가",
          "ref": "1-1",
-         "lt": [
-          {
-           "px": "close",
-           "sym": "ES=F",
-           "tf": "1m"
-          },
-          {
-           "px": "close",
-           "sym": "ES=F"
-          }
-         ]
+         "lt": [{"px": "close", "sym": "ES=F", "tf": "1m"}, {"px": "close", "sym": "ES=F"}]
         },
         {
          "label": "나스닥 선물 개장 직전 < 전일 종가",
          "ref": "1-1",
-         "lt": [
-          {
-           "px": "close",
-           "sym": "NQ=F",
-           "tf": "1m"
-          },
-          {
-           "px": "close",
-           "sym": "NQ=F"
-          }
-         ]
+         "lt": [{"px": "close", "sym": "NQ=F", "tf": "1m"}, {"px": "close", "sym": "NQ=F"}]
         }
        ]
       }
@@ -67,20 +43,7 @@
     {
      "label": "변동성 안정: VIX 전일 대비 10% 이상 급등 아님",
      "ref": "1-2",
-     "not": {
-      "ge": [
-       {
-        "pct": [
-         {
-          "px": "close",
-          "sym": "^VIX"
-         },
-         1
-        ]
-       },
-       10
-      ]
-     },
+     "not": {"ge": [{"pct": [{"px": "close", "sym": "^VIX"}, 1]}, 10]},
      "note": "변동성 지수 = ^VIX (운영 판단 — 저자는 '변동성 지수'라고만 함)"
     },
     {
@@ -91,50 +54,13 @@
        {
         "label": "10년물 금리 전일 대비 0.1%p 초과 상승",
         "ref": "1-3",
-        "gt": [
-         {
-          "sub": [
-           {
-            "px": "close",
-            "sym": "^TNX"
-           },
-           {
-            "lag": [
-             {
-              "px": "close",
-              "sym": "^TNX"
-             },
-             1
-            ]
-           }
-          ]
-         },
-         0.1
-        ]
+        "gt": [{"sub": [{"px": "close", "sym": "^TNX"}, {"lag": [{"px": "close", "sym": "^TNX"}, 1]}]}, 0.1]
        },
        {
         "label": "10년물 금리 2거래일 연속 상승",
         "ref": "1-3",
         "ge": [
-         {
-          "streak": {
-           "gt": [
-            {
-             "px": "close",
-             "sym": "^TNX"
-            },
-            {
-             "lag": [
-              {
-               "px": "close",
-               "sym": "^TNX"
-              },
-              1
-             ]
-            }
-           ]
-          }
-         },
+         {"streak": {"gt": [{"px": "close", "sym": "^TNX"}, {"lag": [{"px": "close", "sym": "^TNX"}, 1]}]}},
          2
         ]
        }
@@ -148,98 +74,26 @@
   "idx_above_ma20": {
    "label": "기준 지수 종가 > 20일선",
    "ref": "프롤로그",
-   "gt": [
-    {
-     "px": "close",
-     "sym": "$index"
-    },
-    {
-     "ma": [
-      {
-       "px": "close",
-       "sym": "$index"
-      },
-      20
-     ]
-    }
-   ]
+   "gt": [{"px": "close", "sym": "$index"}, {"ma": [{"px": "close", "sym": "$index"}, 20]}]
   },
   "idx_hold_ma20_2d": {
    "label": "지수 20일선 종가 회복 후 2거래일 유지(3일 연속 종가 > 20일선)",
    "ref": "프롤로그",
    "ge": [
     {
-     "streak": {
-      "gt": [
-       {
-        "px": "close",
-        "sym": "$index"
-       },
-       {
-        "ma": [
-         {
-          "px": "close",
-          "sym": "$index"
-         },
-         20
-        ]
-       }
-      ]
-     }
+     "streak": {"gt": [{"px": "close", "sym": "$index"}, {"ma": [{"px": "close", "sym": "$index"}, 20]}]}
     },
     3
    ]
   },
   "avoid_common": {
    "any": [
-    {
-     "label": "최근 5거래일 20% 넘게 상승(추격 금지)",
-     "ref": "3-1",
-     "gt": [
-      {
-       "pct": [
-        {
-         "px": "close"
-        },
-        5
-       ]
-      },
-      20
-     ]
-    },
-    {
-     "label": "종가가 5일선에서 크게 벌어짐(단기 과열)",
-     "ref": "3-1",
-     "manual": "저자 미명시: 5일선 이격 '크게' — 숫자 없음"
-    },
+    {"label": "최근 5거래일 20% 넘게 상승(추격 금지)", "ref": "3-1", "gt": [{"pct": [{"px": "close"}, 5]}, 20]},
+    {"label": "종가가 5일선에서 크게 벌어짐(단기 과열)", "ref": "3-1", "manual": "저자 미명시: 5일선 이격 '크게' — 숫자 없음"},
     {
      "label": "고점 대비 종가 4% 이상 밀린 윗꼬리 마감",
      "ref": "3-2",
-     "ge": [
-      {
-       "mul": [
-        {
-         "div": [
-          {
-           "sub": [
-            {
-             "px": "high"
-            },
-            {
-             "px": "close"
-            }
-           ]
-          },
-          {
-           "px": "high"
-          }
-         ]
-        },
-        100
-       ]
-      },
-      4
-     ]
+     "ge": [{"mul": [{"div": [{"sub": [{"px": "high"}, {"px": "close"}]}, {"px": "high"}]}, 100]}, 4]
     },
     {
      "label": "거래량 전일 1.5배 이상 + 종가가 고점 아래로 밀림",
@@ -248,30 +102,9 @@
       {
        "label": "거래량 전일 대비 1.5배 이상",
        "ref": "3-2",
-       "ge": [
-        {
-         "div": [
-          {
-           "px": "volume"
-          },
-          {
-           "lag": [
-            {
-             "px": "volume"
-            },
-            1
-           ]
-          }
-         ]
-        },
-        1.5
-       ]
+       "ge": [{"div": [{"px": "volume"}, {"lag": [{"px": "volume"}, 1]}]}, 1.5]
       },
-      {
-       "label": "종가가 고점 아래로 밀림",
-       "ref": "3-2",
-       "manual": "저자 미명시: 고점 대비 얼마나 밀려야 하는지 숫자 없음"
-      }
+      {"label": "종가가 고점 아래로 밀림", "ref": "3-2", "manual": "저자 미명시: 고점 대비 얼마나 밀려야 하는지 숫자 없음"}
      ],
      "note": "거래량은 상품($self) 거래량 — 지수는 거래량 결측 가능"
     },
@@ -293,25 +126,7 @@
      "label": "S&P500 20일선 위 3일 연속",
      "ref": "2-1",
      "ge": [
-      {
-       "streak": {
-        "gt": [
-         {
-          "px": "close",
-          "sym": "^GSPC"
-         },
-         {
-          "ma": [
-           {
-            "px": "close",
-            "sym": "^GSPC"
-           },
-           20
-          ]
-         }
-        ]
-       }
-      },
+      {"streak": {"gt": [{"px": "close", "sym": "^GSPC"}, {"ma": [{"px": "close", "sym": "^GSPC"}, 20]}]}},
       3
      ]
     },
@@ -319,25 +134,7 @@
      "label": "나스닥100 20일선 위 3일 연속",
      "ref": "2-2",
      "ge": [
-      {
-       "streak": {
-        "gt": [
-         {
-          "px": "close",
-          "sym": "^NDX"
-         },
-         {
-          "ma": [
-           {
-            "px": "close",
-            "sym": "^NDX"
-           },
-           20
-          ]
-         }
-        ]
-       }
-      },
+      {"streak": {"gt": [{"px": "close", "sym": "^NDX"}, {"ma": [{"px": "close", "sym": "^NDX"}, 20]}]}},
       3
      ]
     }
@@ -350,30 +147,8 @@
    "ge": [
     {
      "across": {
-      "syms": [
-       "AAPL",
-       "MSFT",
-       "NVDA",
-       "AMZN",
-       "GOOGL"
-      ],
-      "cond": {
-       "gt": [
-        {
-         "px": "close",
-         "sym": "$s"
-        },
-        {
-         "lag": [
-          {
-           "px": "close",
-           "sym": "$s"
-          },
-          1
-         ]
-        }
-       ]
-      }
+      "syms": ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL"],
+      "cond": {"gt": [{"px": "close", "sym": "$s"}, {"lag": [{"px": "close", "sym": "$s"}, 1]}]}
      }
     },
     3
@@ -389,19 +164,7 @@
   "SPY": {
    "index": "^GSPC",
    "note": "2-1. 필터 = S&P500 20일선 위 + 2거래일 유지, 진입 = 전고점 돌파 후 2거래일 버팀",
-   "filter": {
-    "all": [
-     {
-      "def": "idx_above_ma20"
-     },
-     {
-      "def": "idx_hold_ma20_2d"
-     },
-     {
-      "def": "env_stable"
-     }
-    ]
-   },
+   "filter": {"all": [{"def": "idx_above_ma20"}, {"def": "idx_hold_ma20_2d"}, {"def": "env_stable"}]},
    "entry": {
     "label": "S&P500 20일선 회복 후 2거래일 유지(회복일+2일 = 3일 연속 종가 > 20일선)",
     "ref": "2-1",
@@ -411,42 +174,20 @@
       "ref": "2-1",
       "ge": [
        {
-        "streak": {
-         "gt": [
-          {
-           "px": "close",
-           "sym": "$index"
-          },
-          {
-           "ma": [
-            {
-             "px": "close",
-             "sym": "$index"
-            },
-            20
-           ]
-          }
-         ]
-        }
+        "streak": {"gt": [{"px": "close", "sym": "$index"}, {"ma": [{"px": "close", "sym": "$index"}, 20]}]}
        },
        3
       ]
      }
     ]
    },
-   "avoid": {
-    "def": "avoid_common"
-   },
+   "avoid": {"def": "avoid_common"},
    "caution": [
     {
      "label": "넓은 시장 아님(대표주 3개 미만 플러스) — 크게 가지 않음",
      "ref": "1-4",
      "note": "1-4 '대표주 3개 이상 같이 플러스일 때만 크게 간다·비중을 키운다' — 폭 미명시",
-     "when": {
-      "not": {
-       "def": "breadth_3up"
-      }
-     },
+     "when": {"not": {"def": "breadth_3up"}},
      "scale": null
     }
    ],
@@ -479,19 +220,7 @@
   "QQQ": {
    "index": "^NDX",
    "note": "2-2. 필터 = 나스닥100 20일선 위 + 2거래일 유지, 진입 = 짧은 눌림 끝 반등 + 대표 대형주 3개 이상(기술주 힘). 1-4 조심은 진입 조건과 같아 생략",
-   "filter": {
-    "all": [
-     {
-      "def": "idx_above_ma20"
-     },
-     {
-      "def": "idx_hold_ma20_2d"
-     },
-     {
-      "def": "env_stable"
-     }
-    ]
-   },
+   "filter": {"all": [{"def": "idx_above_ma20"}, {"def": "idx_hold_ma20_2d"}, {"def": "env_stable"}]},
    "entry": {
     "label": "나스닥100 20일선 회복 후 2거래일 유지(회복일+2일 = 3일 연속 종가 > 20일선)",
     "ref": "2-2",
@@ -502,32 +231,14 @@
       "ref": "2-2",
       "ge": [
        {
-        "streak": {
-         "gt": [
-          {
-           "px": "close",
-           "sym": "$index"
-          },
-          {
-           "ma": [
-            {
-             "px": "close",
-             "sym": "$index"
-            },
-            20
-           ]
-          }
-         ]
-        }
+        "streak": {"gt": [{"px": "close", "sym": "$index"}, {"ma": [{"px": "close", "sym": "$index"}, 20]}]}
        },
        3
       ]
      }
     ]
    },
-   "avoid": {
-    "def": "avoid_common"
-   },
+   "avoid": {"def": "avoid_common"},
    "caution": [],
    "sizing": {
     "label": "분할매수(프롤로그·2-4) — 상품 비중·분할 비율 저자 미명시",
@@ -565,21 +276,7 @@
      {
       "label": "러셀2000 종가 > 20일선",
       "ref": "2-3",
-      "gt": [
-       {
-        "px": "close",
-        "sym": "$index"
-       },
-       {
-        "ma": [
-         {
-          "px": "close",
-          "sym": "$index"
-         },
-         20
-        ]
-       }
-      ]
+      "gt": [{"px": "close", "sym": "$index"}, {"ma": [{"px": "close", "sym": "$index"}, 20]}]
      },
      {
       "label": "러셀2000 20일선 회복 후 2거래일 유지",
@@ -589,21 +286,7 @@
         "streak": {
          "label": "기준지수 종가 > 20일선",
          "ref": "2-1",
-         "gt": [
-          {
-           "px": "close",
-           "sym": "$index"
-          },
-          {
-           "ma": [
-            {
-             "px": "close",
-             "sym": "$index"
-            },
-            20
-           ]
-          }
-         ]
+         "gt": [{"px": "close", "sym": "$index"}, {"ma": [{"px": "close", "sym": "$index"}, 20]}]
         }
        },
        3
@@ -623,32 +306,12 @@
            {
             "label": "S&P500 선물 개장 직전 < 전일 종가",
             "ref": "1-1",
-            "lt": [
-             {
-              "px": "close",
-              "sym": "ES=F",
-              "tf": "1m"
-             },
-             {
-              "px": "close",
-              "sym": "ES=F"
-             }
-            ]
+            "lt": [{"px": "close", "sym": "ES=F", "tf": "1m"}, {"px": "close", "sym": "ES=F"}]
            },
            {
             "label": "나스닥 선물 개장 직전 < 전일 종가",
             "ref": "1-1",
-            "lt": [
-             {
-              "px": "close",
-              "sym": "NQ=F",
-              "tf": "1m"
-             },
-             {
-              "px": "close",
-              "sym": "NQ=F"
-             }
-            ]
+            "lt": [{"px": "close", "sym": "NQ=F", "tf": "1m"}, {"px": "close", "sym": "NQ=F"}]
            }
           ]
          }
@@ -658,20 +321,7 @@
        {
         "label": "VIX 전일 대비 +10% 이상 급등 아님",
         "ref": "1-2",
-        "not": {
-         "ge": [
-          {
-           "pct": [
-            {
-             "px": "close",
-             "sym": "^VIX"
-            },
-            1
-           ]
-          },
-          10
-         ]
-        }
+        "not": {"ge": [{"pct": [{"px": "close", "sym": "^VIX"}, 1]}, 10]}
        },
        {
         "label": "10년물 금리 급등 아님(하루 +0.1%p 초과 또는 2일 연속 상승이 아님)",
@@ -681,50 +331,13 @@
           {
            "label": "10년물 하루 0.1%p 넘게 상승",
            "ref": "1-3",
-           "gt": [
-            {
-             "sub": [
-              {
-               "px": "close",
-               "sym": "^TNX"
-              },
-              {
-               "lag": [
-                {
-                 "px": "close",
-                 "sym": "^TNX"
-                },
-                1
-               ]
-              }
-             ]
-            },
-            0.1
-           ]
+           "gt": [{"sub": [{"px": "close", "sym": "^TNX"}, {"lag": [{"px": "close", "sym": "^TNX"}, 1]}]}, 0.1]
           },
           {
            "label": "10년물 이틀 연속 상승",
            "ref": "1-3",
            "ge": [
-            {
-             "streak": {
-              "gt": [
-               {
-                "px": "close",
-                "sym": "^TNX"
-               },
-               {
-                "lag": [
-                 {
-                  "px": "close",
-                  "sym": "^TNX"
-                 },
-                 1
-                ]
-               }
-              ]
-             }
-            },
+            {"streak": {"gt": [{"px": "close", "sym": "^TNX"}, {"lag": [{"px": "close", "sym": "^TNX"}, 1]}]}},
             2
            ]
           }
@@ -744,32 +357,14 @@
       "ref": "2-3",
       "ge": [
        {
-        "streak": {
-         "gt": [
-          {
-           "px": "close",
-           "sym": "$index"
-          },
-          {
-           "ma": [
-            {
-             "px": "close",
-             "sym": "$index"
-            },
-            20
-           ]
-          }
-         ]
-        }
+        "streak": {"gt": [{"px": "close", "sym": "$index"}, {"ma": [{"px": "close", "sym": "$index"}, 20]}]}
        },
        3
       ]
      }
     ]
    },
-   "avoid": {
-    "def": "avoid_common"
-   },
+   "avoid": {"def": "avoid_common"},
    "caution": [],
    "sizing": {
     "label": "분할매수(프롤로그·2-4) — 상품 비중·분할 비율 저자 미명시",
@@ -799,11 +394,7 @@
   }
  },
  "unexpressed": [
-  {
-   "rule": "고점을 낮추지 않고 버티는지는 개장 후 직접 본다",
-   "ref": "1-1",
-   "reason": "데이터 없음: 장중(개장 후) 흐름"
-  },
+  {"rule": "고점을 낮추지 않고 버티는지는 개장 후 직접 본다", "ref": "1-1", "reason": "데이터 없음: 장중(개장 후) 흐름"},
   {
    "rule": "변동성이 다시 가라앉고 지수가 자리를 잡을 때까지 기다린다(VIX 급등 이후 재개 시점)",
    "ref": "1-2",
@@ -824,11 +415,7 @@
    "ref": "3-2",
    "reason": "저자 미명시: 보유분 축소 비율 없음 — 매도 규칙으로 옮기지 않음(새로 사지 않음은 avoid 에 반영)"
   },
-  {
-   "rule": "1차 익절: 수익 구간에서 일부 먼저 매도",
-   "ref": "3-3",
-   "reason": "저자 미명시: 수익 구간(몇 %)과 매도 비율('일부') 숫자 없음"
-  },
+  {"rule": "1차 익절: 수익 구간에서 일부 먼저 매도", "ref": "3-3", "reason": "저자 미명시: 수익 구간(몇 %)과 매도 비율('일부') 숫자 없음"},
   {
    "rule": "손절: 정해둔 손실선에 닿으면 이유 재론 없이 먼저 축소",
    "ref": "3-3",
