@@ -34,6 +34,7 @@
 """
 import json
 import os
+import re
 import sys
 from collections import namedtuple
 from datetime import datetime, timedelta
@@ -413,6 +414,32 @@ def _inline(node, defs):
     return node
 
 
+def _derive_label(manual):
+    """수동 사유(저자 미명시:/데이터 없음:/연산 없음:)에서 사람이 읽을 제목을 뽑는다.
+    머리말을 떼고, ' — ' 뒤 보조설명과 끝의 '(… 없음)' 괄호는 제목에선 덜어 간결하게(원문은 manual 에 그대로 남는다)."""
+    s = manual
+    for h in MANUAL_HEADS:
+        if s.startswith(h + ":"):
+            s = s[len(h) + 1:].strip()
+            break
+    s = s.split(" — ")[0].strip()
+    s = re.sub(r"\s*\((?:[^()]*(?:없음|미명시|기준 없음)[^()]*)\)\s*$", "", s).strip()
+    return s or manual
+
+
+def fill_missing_labels(node):
+    """label 없는 수동 잎에 manual 에서 파생한 label 을 채운다 — 화면에 '수동 확인'(이름 없음)으로
+    뜨거나 자동 잎이 hidden 으로 조용히 사라지는 걸 생성 단계에서 막는다. 로직(식)은 건드리지 않는다."""
+    if isinstance(node, dict):
+        if isinstance(node.get("manual"), str) and not node.get("label"):
+            node["label"] = _derive_label(node["manual"])
+        for v in node.values():
+            fill_missing_labels(v)
+    elif isinstance(node, list):
+        for v in node:
+            fill_missing_labels(v)
+
+
 def adopt(slug):
     """a 를 바탕으로, 심판이 b/custom 을 고른 칸만 갈아 끼워 tree.json 을 쓴다.
     매도 규칙(exit)은 exit_a/exit_b 절차(--adopt-exits)가 따로 채택하므로 이미 채택된 것을 그대로 둔다."""
@@ -447,6 +474,7 @@ def adopt(slug):
                 seen.add(k)
                 un.append(u)
     tree["unexpressed"] = un
+    fill_missing_labels(tree)
     cond.validate_tree(tree)
     write_text(os.path.join(BASE, "books", slug, "tree.json"), cond.compact_json(tree))
     print("채택 트리 → books/%s/tree.json (%s)" % (slug, tree["source"]["review"] or "전 칸 일치"))
@@ -530,6 +558,7 @@ def adopt_exits(slug):
         tree["products"][p]["exit"] = rules
     tree.setdefault("source", {})["exit_review"] = {p: (review.get(p) or {}).get("winner", "a(일치)")
                                                     for p in tree["products"]}
+    fill_missing_labels(tree)
     cond.validate_tree(tree)
     write_text(os.path.join(BASE, "books", slug, "tree.json"), cond.compact_json(tree))
     print("매도 규칙 채택 -> books/%s/tree.json %s" % (slug, tree["source"]["exit_review"]))
@@ -616,6 +645,21 @@ def _check_pair(slug, tree, ta, tb, hist, years, review):
     return stop
 
 
+def _nameless_manual(node, out=None):
+    """label 없는 수동 잎 목록 — 이게 있으면 화면에 '수동 확인'(이름 없음)으로 새거나
+    자동 잎이 hidden 으로 조용히 사라진다. adopt 의 fill_missing_labels 가 채워야 정상."""
+    out = [] if out is None else out
+    if isinstance(node, dict):
+        if isinstance(node.get("manual"), str) and not node.get("label"):
+            out.append(node["manual"][:40])
+        for v in node.values():
+            _nameless_manual(v, out)
+    elif isinstance(node, list):
+        for v in node:
+            _nameless_manual(v, out)
+    return out
+
+
 def check_book(slug, years):
     stop, warn = [], []
     print("== %s" % slug)
@@ -627,6 +671,11 @@ def check_book(slug, years):
     if tree is None:
         print("  ❌ tree.json 없음 — 라이브 책은 조건 트리로만 판정한다")
         return ["%s 트리 없음" % slug], []
+    # 0. 이름 없는 수동 조건 정지 — 체크리스트가 조용히 사라지거나 '수동 확인'으로만 뜨면 안 된다
+    nameless = _nameless_manual(tree)
+    if nameless:
+        stop.append("%s 이름 없는 수동 조건 %d개" % (slug, len(nameless)))
+        print("  ❌ label 없는 수동 잎 %d개 — 화면에 '수동 확인'으로 샌다: %s" % (len(nameless), nameless[:3]))
     review = _load(slug, "tree_review.json") or {}
     ta, tb = _load(slug, "tree_candidates/a.json"), _load(slug, "tree_candidates/b.json")
     for t in (ta, tb):
