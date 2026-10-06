@@ -214,10 +214,21 @@ def page_data(slug):
            "standard_exit_label": trades_mod.standard_label(), "periods": {}}
     for key, days in PAGE_PERIODS:
         res = run(slug, days, hist=hist, tree=tree)
+        prods = {}
+        for p in res["summary"]:
+            d = dict(res["summary"][p], trades=res["trades"][p])
+            # 새 계산기 지표(vectorbt) — 머리가 낸 '그 거래'(res["trades"])를 operations/portfolio 로 다시 굴려
+            #   자산곡선·MaxDD·샤프·총수익을 옛 지표 옆에 나란히 둔다(중복 수집 없음 — 같은 hist·같은 거래).
+            cs = hist.get(p) or []
+            cal = [c.date for c in cs]
+            closes = [c.close for c in cs]
+            tl = res["trades"].get(p, {}).get("trades") or []
+            d["vectorbt"] = portfolio.run_product(p, cal, closes, tl) if cal else None
+            prods[p] = d
         out["periods"][key] = {
             "days": days, "period": res["period"], "trading_days": res["trading_days"],
             "missing_symbols": res["missing_symbols"], "manual": res["manual"],
-            "products": {p: dict(res["summary"][p], trades=res["trades"][p]) for p in res["summary"]}}
+            "products": prods}
     return out
 
 

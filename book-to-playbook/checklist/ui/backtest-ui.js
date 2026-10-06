@@ -50,6 +50,11 @@
     '#panel-backtest details{margin-top:10px} #panel-backtest summary{cursor:pointer;color:var(--gold);font-weight:700;font-size:13.5px}' +
     '#panel-backtest .bt-tag{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 7px;border-radius:6px;border:1px solid var(--line);color:var(--mute);margin-left:6px}' +
     '#panel-backtest .bt-tag.std{color:var(--warn,#e5484d);border-color:var(--warn,#e5484d)}' +
+    '#panel-backtest .bt-vbt{margin:12px 0 2px}' +
+    '#panel-backtest .bt-metrics{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:6px}' +
+    '#panel-backtest .bt-mv{font-size:22px;font-weight:800;line-height:1.1}' +
+    '#panel-backtest .bt-ml{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.04em;margin-top:2px}' +
+    '#panel-backtest .bt-spark{width:100%;height:50px;display:block;margin-top:2px}' +
     '#panel-backtest table{min-width:560px}';
   document.head.appendChild(css);
 
@@ -59,6 +64,24 @@
   function win(v) { return v == null || isNaN(v) ? '—' : Math.round(v) + '%'; }
   function day(s) { return s ? s.slice(0, 4) + '-' + s.slice(4, 6) + '-' + s.slice(6, 8) : '—'; }
   function f(st) { return st && st.n ? pct(st.avg) + ' · ' + win(st.win) : '—'; }
+  // 자산곡선 스파크라인 — SVG 직접(외부 의존 0). eq = [{date,value}].
+  function spark(eq) {
+    if (!eq || eq.length < 2) return '';
+    var vs = eq.map(function (p) { return p.value; });
+    var mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs), rng = (mx - mn) || 1;
+    var W = 320, H = 50, n = eq.length;
+    var d = eq.map(function (p, i) {
+      var x = (i / (n - 1)) * W, y = H - ((p.value - mn) / rng) * (H - 6) - 3;
+      return (i ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1);
+    }).join(' ');
+    var col = vs[n - 1] >= vs[0] ? 'var(--entry,#3fb950)' : 'var(--warn,#e5484d)';
+    var area = 'M0 ' + H + ' ' + d.replace('M', 'L') + ' L' + W + ' ' + H + ' Z';
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" class="bt-spark">' +
+           '<path d="' + area + '" fill="' + col + '" opacity="0.1"/>' +
+           '<path d="' + d + '" fill="none" stroke="' + col + '" stroke-width="1.6"/></svg>';
+  }
+  function mdd(v) { return v == null || isNaN(v) ? '—' : '−' + Number(v).toFixed(1) + '%'; }
+  function sh(v) { return v == null || isNaN(v) ? '—' : Number(v).toFixed(2); }
 
   var cur = (D.periods['3y'] ? '3y' : Object.keys(D.periods)[0]);
 
@@ -84,6 +107,17 @@
       var std = T.exit_source && T.exit_source !== '책';
       h += '<div class="bt-prod"><h2>' + esc(p) + '<span class="bt-tag' + (std ? ' std' : '') + '">매도: ' + esc(T.exit_source || '-') + '</span></h2>';
       h += '<p class="bt-sub">기간 보유(처음~끝) ' + pct(S.buy_hold, 1) + '</p>';
+
+      // 포트폴리오 지표(vectorbt 계산기) — 총수익·MDD·샤프 + 자산곡선. 수수료·세금 반영(단순 가격차보다 보수적).
+      var V = S.vectorbt;
+      if (V) {
+        h += '<div class="bt-vbt"><div class="bt-metrics">' +
+             '<div><div class="bt-mv ' + (V.total_return != null && V.total_return >= 0 ? 'bt-best' : 'bt-warn') + '">' + pct(V.total_return) + '</div><div class="bt-ml">총수익</div></div>' +
+             '<div><div class="bt-mv">' + mdd(V.max_drawdown) + '</div><div class="bt-ml">MDD 최대낙폭</div></div>' +
+             '<div><div class="bt-mv ' + (V.sharpe != null && V.sharpe < 0 ? 'bt-warn' : '') + '">' + sh(V.sharpe) + '</div><div class="bt-ml">샤프(위험대비)</div></div>' +
+             '</div>' + spark(V.equity_curve) +
+             '<p class="bt-sub" style="margin:3px 0 0">자산곡선 · 수수료·세금 반영(vectorbt) · 시장 ' + esc((V.market_params || {}).market || '-') + '</p></div>';
+      }
 
       // 거래 성적
       var a = st.win, b = st.f20_win;
