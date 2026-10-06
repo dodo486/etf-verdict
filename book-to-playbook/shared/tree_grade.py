@@ -420,6 +420,37 @@ def _measure(node, defs, ctx, i, top=True):
     return facts
 
 
+def _measure_expr(e, defs, ctx, i):
+    """수동 조건의 measure 식을 그날 근거 숫자로 — [{op?, lhs, lhsd, rhs?, rhsd?, unit, inputs?}].
+    저자가 기준(비교 상수)을 줬으면 비교식이라 _measure 가 양쪽 값을 보여준다. 기준을 안 준(대개 그렇다)
+    '값만' 식이면(이격 %·5일 수익률·VIX 변화율 등) 그 값 하나를 fact 로 만들어 보여준다 — 사람이 그 숫자를
+    보고 손으로 참/거짓을 고른다. 값이 못 재지면(None) 빈 목록(붙일 증거 없음)."""
+    if isinstance(e, dict) and _is_cmp(e, defs):
+        return _measure(e, defs, ctx, i)         # 비교식 — 양쪽 값과 연산자까지
+    v = _meas_val(e, ctx, i)
+    if v is None:
+        return []
+    fact = {"lhs": v, "lhsd": _describe_operand(e, defs), "rhs": None, "rhsd": "",
+            "unit": _unit_of(e, defs)}
+    ins = []                                     # 파생값(변화율·산술)이면 무슨 원시 숫자로 나왔는지 함께
+    _inputs_of(e, ctx, i, defs, ins, set())
+    if ins:
+        fact["inputs"] = ins
+    return [fact]
+
+
+def _is_cmp(e, defs):
+    """식의 가장 바깥 연산이 비교(gt/ge/lt/le)인가 — def 는 펼쳐 본다."""
+    if not isinstance(e, dict):
+        return False
+    if "def" in e and e["def"] in defs and len([k for k in e if k not in cond.META]) == 1:
+        return _is_cmp(defs[e["def"]], defs)
+    try:
+        return cond._op_of(e) in cond.CMP
+    except cond.CondError:
+        return False
+
+
 def _view(node, defs, ctx, i, shared=False):
     """노드 하나 → 화면 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, hidden?}.
 
@@ -465,8 +496,11 @@ def _view(node, defs, ctx, i, shared=False):
         if not node.get("label"):
             item["hidden"] = True
     # 측정 증거 — 화면에 보이는 조건(라벨/수동/관측)에만 그날 실제 값을 붙인다.
+    #   수동(manual)인데 measure 식이 달려 있으면(저자가 기준은 안 줬지만 값은 잴 수 있는 조건) 그 식을 재서
+    #   근거 숫자를 붙인다 — 노드는 그대로 수동 유지(v 는 None, observed 설정·자동 판정 없음). 사람이 그 숫자를
+    #   보고 참/거짓을 손으로 고른다(깜깜이 판단 방지). measure 가 없는 보통 조건은 노드 자체에서 잰다.
     if node.get("label") or "manual" in node or "observe" in node:
-        facts = _measure(node, defs, ctx, i)
+        facts = _measure_expr(node["measure"], defs, ctx, i) if "measure" in node else _measure(node, defs, ctx, i)
         if facts:
             item["detail"] = facts
     return item

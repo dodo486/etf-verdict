@@ -78,7 +78,12 @@
 import json
 import math
 
-META = ("label", "ref", "id", "note")
+META = ("label", "ref", "id", "note", "measure")
+# measure = 수동(manual) 조건에 다는 '근거 숫자' 식. 저자가 기준(threshold)을 안 줘 자동 판정은 못 하지만,
+#   계산 가능한 값(종가·5일선·이격 %…)을 화면에 보여줘 사람이 깜깜이로 판단하지 않게 한다. META 로 둬서
+#   _op_of·labeled·labeled_all·warmup_of 가 전부 무시한다 — measure 는 '표시용 증거'일 뿐 등급·수동 극성·
+#   워밍업·수동 잎 목록에 절대 끼지 않는다(노드는 그대로 수동 유지). 그 식의 문법은 validate 가 따로 검사하고,
+#   그 식이 쓰는 심볼은 symbols_of 가 따로 모은다(수집 단계가 빠뜨리지 않게). 값 계산은 tree_grade._measure.
 PX_FIELDS = ("open", "high", "low", "close", "volume")
 POS_FIELDS = ("ret", "days", "maxret", "minret")
 ARITH = ("add", "sub", "mul", "div", "max", "min")
@@ -129,6 +134,12 @@ def validate(node, defs=None, path="$"):
         raise CondError("%s: 노드는 숫자 또는 객체여야 한다: %r" % (path, node))
     op = _op_of(node)
     v = node[op]
+
+    if "measure" in node:
+        # measure 는 수동 조건에만 단다(표시용 근거 숫자). 그 식은 보통의 값/조건 식이라 그대로 validate 한다.
+        if op not in ("manual", "observe"):
+            raise CondError("%s.measure: 수동(manual) 조건에만 단다(op=%s)" % (path, op))
+        validate(node["measure"], defs, path + ".measure")
 
     def two(name):
         if not (isinstance(v, list) and len(v) == 2):
@@ -980,6 +991,8 @@ def symbols_of(tree):
                     out.add(s)
             if "across" in n and isinstance(n["across"], dict):
                 out.update(n["across"].get("syms") or [])
+            if "measure" in n:
+                walk(n["measure"])        # measure 는 META(수동 증거 식)라 아래 루프가 건너뛴다 — 심볼은 모은다
             for k, x in n.items():
                 if k not in META:
                     walk(x)

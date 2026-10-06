@@ -414,6 +414,42 @@ def _inline(node, defs):
     return node
 
 
+def _is_rule_def(body):
+    """되접기 대상인 '규칙' def 인가 — 최상위 키가 {all,any,atleast,not} 중 하나이거나 본문에 manual 을 포함.
+    원시 부품({px}·{ma}·기준 없는 단순 비교)은 접지 않는다(펼친 형태가 작아 우연히 겹칠 수 있다)."""
+    if isinstance(body, dict) and any(k in ("all", "any", "atleast", "not") for k in body):
+        return True
+    return "manual" in json.dumps(body, ensure_ascii=False)
+
+
+def refold_to_defs(tree):
+    """adopt 가 _inline 으로 상품마다 복제한 규칙 덩어리를 다시 {"def":name} 참조로 되접는다(중복 제거).
+    로직은 안 바뀐다 — 참조는 렌더 시 같은 내용으로 펼쳐지므로. 규칙 def 만 대상, 가장 바깥 것부터 매치."""
+    defs = tree.get("defs") or {}
+    index = {}
+    for name, body in defs.items():
+        if not _is_rule_def(body):
+            continue
+        exp = _inline(body, defs)
+        index[json.dumps(exp, ensure_ascii=False, sort_keys=True)] = name
+
+    n = [0]
+
+    def walk(node):
+        if isinstance(node, dict):
+            name = index.get(json.dumps(node, ensure_ascii=False, sort_keys=True))
+            if name is not None:
+                n[0] += 1
+                return {"def": name}
+            return {k: walk(v) for k, v in node.items()}
+        if isinstance(node, list):
+            return [walk(x) for x in node]
+        return node
+
+    tree["products"] = walk(tree["products"])
+    return n[0]
+
+
 def _derive_label(manual):
     """수동 사유(저자 미명시:/데이터 없음:/연산 없음:)에서 사람이 읽을 제목을 뽑는다.
     머리말을 떼고, ' — ' 뒤 보조설명과 끝의 '(… 없음)' 괄호는 제목에선 덜어 간결하게(원문은 manual 에 그대로 남는다)."""
@@ -474,10 +510,11 @@ def adopt(slug):
                 seen.add(k)
                 un.append(u)
     tree["unexpressed"] = un
+    refolded = refold_to_defs(tree)   # _inline 이 상품마다 복제한 규칙 덩어리를 다시 {"def":name} 로 되접음(로직 불변)
     fill_missing_labels(tree)
     cond.validate_tree(tree)
     write_text(os.path.join(BASE, "books", slug, "tree.json"), cond.compact_json(tree))
-    print("채택 트리 → books/%s/tree.json (%s)" % (slug, tree["source"]["review"] or "전 칸 일치"))
+    print("채택 트리 → books/%s/tree.json (%s) · 되접기 %d곳" % (slug, tree["source"]["review"] or "전 칸 일치", refolded))
 
 
 # ------------------------------------------------------------------ 매도 규칙(exit) 이중 추출
@@ -558,6 +595,7 @@ def adopt_exits(slug):
         tree["products"][p]["exit"] = rules
     tree.setdefault("source", {})["exit_review"] = {p: (review.get(p) or {}).get("winner", "a(일치)")
                                                     for p in tree["products"]}
+    refold_to_defs(tree)   # exit 규칙도 _inline 으로 펼쳐지므로 동일하게 되접음(로직 불변)
     fill_missing_labels(tree)
     cond.validate_tree(tree)
     write_text(os.path.join(BASE, "books", slug, "tree.json"), cond.compact_json(tree))
