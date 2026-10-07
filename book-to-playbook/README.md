@@ -18,7 +18,7 @@
 | 폴더 | 구간 | 하는 일 | 산출물(다음 팀의 입력) |
 |---|---|---|---|
 | `playbook/` | ① 책 원본 → 플레이북 | 원문 소절 인덱싱 · 플레이북 본문 무결 | `source_index.json` · `<slug>-playbook.html` 의 `#src` |
-| `checklist/` | ② 플레이북 → 체크리스트 | 조건 트리 추출·검사·채택 · 화면 UI | **`books/<slug>/tree.json`** |
+| `checklist/` | ② 플레이북 → 체크리스트 | 조건 트리 추출·심판·검사 · 화면 UI | **`books/<slug>/tree.json`** |
 | `verdict/` | ③ 체크리스트 → 수집·판정 | 트리가 쓰는 심볼 수집(jhts) · 판정 · 백테스트 | `latest-verdict-<slug>.json` · `backtest-<slug>.json` |
 | `shared/` | 공통층 | **트리의 뜻 한 벌**(cond 문법·tree_grade 판정·trades 체결) · **시세 창구 md_feed** · paths·pages·notify | — |
 | `publish/` | 발행·서빙층 | 페이지 조립(정적 발행·로컬 서버 같은 함수) · 홈 | `PUBLIC/<slug>/index.html` |
@@ -32,7 +32,7 @@
    │
    └─[① 플레이북 작성·원문 대조 감사]──▶ <slug>-playbook.html #src
                                   │
-        [② 추출자 a·b(서로 모름) → 원문 사례 → 갈린 날 심판 → --adopt] ──▶ tree.json (체크리스트)
+        [② 추출자 a·b(서로 모름) · 원문 사례 → 심판이 최종 트리를 씀(비교 도구 사용) → 채점] ──▶ tree.json (체크리스트)
                                   │
    [③ cond.symbols_of(tree) → md_feed.histories(jhts, 없으면 수집 요청) → tree_grade → verdict_engine]
                                   │                                   └──▶ 알림 · latest-verdict-<slug>.json
@@ -49,13 +49,14 @@
 | `entry` | 살 자리인가 | 참 → ✅ 매수 후보 · 거짓 → ⚪ 관망 |
 | `caution` | 사더라도 금액을 줄일까 | 걸린 규칙마다 금액 × scale (폭 미명시면 표시만) |
 | `sizing` | 얼마나(비중)·나눠서(분할) | 총 투자금 대비 % · 차수별 비율(미명시면 null) |
-| `exit` | 보유분을 언제 얼마나 팔까 | 걸리면 다음 날 시가 매도 · 내 포지션(로컬 파일) 기준 판정 |
+| `exit` | 보유분을 언제 얼마나 팔까 | 걸리면 다음 봉 시가 매도 · 내 포지션(로컬 파일) 기준 판정 |
 
 시장 환경 점수·공격/균형/방어 모드·폭락 후 재진입처럼 **상품 여럿이 같이 보는 판단은 `defs` 에 한 번** 정의해
-각 칸이 참조한다(화면 맨 위 '공통 조건'). 자동으로 알 수 없는 조건은 `manual` 로 남기고 사유 머리를 단다:
-`저자 미명시:`(🟡가 정답) · `데이터 없음:`(jhts 수집 요청·데이터 연결 과제) · `연산 없음:`(원시 연산 추가 과제).
+각 칸이 참조한다(화면 맨 위 '공통 조건'). 조건의 신원은 식이다 — 저자가 숫자를 안 준 조건도 식으로 쓰고 그 숫자 자리만
+`"?"`(사람이 판단 — 🟡). 식으로 쓸 수 없는 것만 문장 수동: `저자 미명시: …(정성)` · `데이터 없음:`(수집·연결 과제) ·
+`연산 없음:`(원시 연산 추가 과제). 문법 정본은 `checklist/COND_DSL.md`, 작성 규칙은 역할 문서.
 
-봉 단위(`tf`)는 시세 노드의 속성이다 — 일봉·분봉을 따로 다루지 않는다. 지금 연결된 데이터는 일봉이라 `1d` 만 허용된다.
+봉 단위(`tf`: 1d·1m·5m)는 시세 노드의 속성이다 — 일봉·분봉을 따로 다루지 않는다. 데이터 연결 여부는 트리와 무관하다.
 
 ## 검증층 — 검사기 3개 (발행 관문, `run.py`)
 
@@ -73,9 +74,10 @@
 1. **원문 자르기**(①): `book_sources.json` 에 원문 위치 → `python -m playbook.book_source --write` (소절 인덱스).
 2. **플레이북**(①): 원문 소절마다 본문 + 요약 bullet. 저자 명시분만·원문 숫자·미명시 표기. 끝나면 **원문 대조 감사**
    (요약 bullet 에 원문에 없는 숫자·칸 배치가 섞이기 쉽다) → `python -m playbook.verify_source_integrity --accept --why "새 책"`.
-3. **체크리스트**(②): 서로 모르는 추출자 a·b 가 플레이북만 보고 `tree_candidates/a.json`·`b.json`(매도는 `exit_a`·`exit_b`) +
-   표현 못 한 규칙(`unexpressed`) → 다른 작성자가 원문만 보고 `scenarios.json` → `python -m checklist.verify_tree <slug> --dump 6`
-   → 심판이 원문과 대조해 `tree_review.json` → `--adopt`(+`--adopt-exits`) → `python -m checklist.verify_tree <slug>` 통과.
+3. **체크리스트**(②): 역할마다 지침 문서 하나 — 추출자 a·b(`checklist/EXTRACTOR.md`, 서로 모름)가 플레이북만 보고
+   규칙 목록 `<a|b>.rules.json` → 트리 `<a|b>.json` → 사례 작성자(`checklist/SCENARIO.md`)가 원문만 보고 `scenarios.json`
+   → 심판(`checklist/JUDGE.md`)이 비교 도구(`--dump`)로 다른 곳을 보고 원문과 대조해 최종 `tree.json`(`review` 포함)을 직접 쓴다
+   → `python -m checklist.verify_tree <slug>` 통과.
 4. **페이지**: `trend-playbook.html` 을 베이스로 `#src` 와 머리말만 교체(시트 패널은 `#verdict-data` + `#sheet-root` 골격 그대로).
 5. **등록**: `books.json` 에 항목(slug/title/tickers/desc/live/engine). `python -m verify_structure` 의 책 계약이 통과해야 한다.
 6. **배포**: `python run.py daily`.
@@ -100,14 +102,16 @@ python -m publish.serve                                         # 로컬 실시�
 
 | 파일 | 역할 |
 |---|---|
-| `SKILL.md` | 스킬 정의(트리거·새 책 절차) |
+| `SKILL.md` | 진행자 지침 — 전 구간 공통(트리거·절대 규칙·새 책 절차) |
+| `checklist/README.md` | 구간② 진행 절차(역할 ↔ 지침 문서·원칙·실패 시) |
 | `books.json` | 책 목록 매니페스트(SSOT) — 홈·레일·엔진 선택 |
-| `books/<slug>/tree.json` | **체크리스트(조건 트리)** — 채택본 |
-| `books/<slug>/tree_candidates/` · `scenarios.json` · `tree_review.json` | 이중 추출 후보 · 원문 사례 · 심판 기록 |
+| `books/<slug>/tree.json` | **체크리스트(조건 트리)** — 심판이 쓴 최종본 |
+| `books/<slug>/tree_candidates/` · `scenarios.json` | 이중 추출 — 규칙 목록 `<a|b>.rules.json`·트리 `<a|b>.json` · 원문 사례 |
 | `books/<slug>/source_index.json` | 원문 소절 인덱스(본문 없음 — 키·제목·줄범위·해시) |
-| `books/<slug>/positions.json` | 내 포지션(커밋 안 함 — 로컬 화면에서만 매도·분할 판정) |
-| `checklist/COND_DSL.md` | 조건 트리 작성 지침 |
-| `checklist/verify_tree.py` | 트리 검사·채택 |
+| `books/<slug>/positions.json` | 내 포지션(커밋 안 함 — 로컬 화면에서만 매도·분할 판정, 형식은 `SETUP.md`) |
+| `checklist/EXTRACTOR.md` · `SCENARIO.md` · `JUDGE.md` | 추출자 · 사례 작성자 · 심판 지침(역할마다 하나 — 서브에이전트 프롬프트 정본) |
+| `checklist/COND_DSL.md` | 트리 문법(트리를 쓰는 추출자·심판의 참고서) |
+| `checklist/verify_tree.py` | 트리 검사(트리를 만들지 않음) |
 | `checklist/ui/*.js` · `checklist/inject_ui.py` | 화면 JS(책 무관 공유) · 페이지 주입 |
 | `shared/cond.py` · `shared/tree_grade.py` · `shared/trades.py` | 트리 문법·평가기 · 판정(등급·금액·비중·포지션) · 체결(분할·매도) |
 | `shared/md_feed.py` | **jhts 시세 창구 — 유일한 수집 입구**(없으면 수집 요청) |
