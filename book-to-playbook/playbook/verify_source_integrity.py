@@ -51,7 +51,7 @@ from datetime import datetime
 
 from shared import paths  # noqa: F401  (경로·UTF-8 출력 고정)
 from shared.paths import BASE
-from shared.pages import book_pages, report_stale
+from playbook.pages import book_pages, report_stale
 
 # 기준 해시는 이 팀(①)의 소유물이라 팀 폴더 안에 산다(커밋 대상).
 BASELINE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source_baseline.json")

@@ -11,6 +11,7 @@
 '소비'하는 돈·성적 계산기다(단방향 폭포수: operations 는 shared/verdict 산출물을 읽기만 한다).
 
 팀 경계: 다른 팀(playbook·checklist) 코드를 import 하지 않는다. 공용은 shared/ 만.
-`import jhts` 는 shared/md_feed.py 에서만 허용된다. 네트워크 모듈(urllib 등)은 이 팀
-전체에서 금지다 — 알림 송신은 shared/notify.py 가 맡는다. 경계는 verify_teams.py 가 기계로 강제한다.
+`import jhts` 는 shared/md_feed.py 에서만 허용된다. 네트워크 모듈(urllib 등)은 이 팀에서
+알림 송신 전용인 verdict/notify.py 한 파일만 허용된다(verify_teams.py ALLOW 의 명시 예외) —
+시세 수집용 네트워크 코드는 여전히 금지다. 경계는 verify_teams.py 가 기계로 강제한다.
 """

@@ -20,7 +20,7 @@
 | `playbook/` | ① 책 원본 → 플레이북 | 원문 소절 인덱싱 · 플레이북 본문 무결 | `source_index.json` · `<slug>-playbook.html` 의 `#src` |
 | `checklist/` | ② 플레이북 → 체크리스트 | 조건 트리 추출·심판·검사 · 화면 UI | **`books/<slug>/tree.json`** |
 | `verdict/` | ③ 체크리스트 → 수집·판정 | 트리가 쓰는 심볼 수집(jhts) · 판정 · 백테스트 | `latest-verdict-<slug>.json` · `backtest-<slug>.json` |
-| `shared/` | 공통층 | **트리의 뜻 한 벌**(cond 문법·tree_grade 판정·trades 체결) · **시세 창구 md_feed** · paths·pages·notify | — |
+| `shared/` | 공통층 | **트리의 뜻 한 벌**(cond 문법·tree_grade 판정·trades 체결) · **시세 창구 md_feed** · paths | — |
 | `publish/` | 발행·서빙층 | 페이지 조립(정적 발행·로컬 서버 같은 함수) · 홈 | `PUBLIC/<slug>/index.html` |
 | (루트) | 조립·감사 | `run.py`(러너) · `verify_structure.py`(구조·책 계약) · `verify_teams.py`(경계) | — |
 
@@ -115,8 +115,8 @@ python -m publish.serve                                         # 로컬 실시�
 | `checklist/ui/*.js` · `checklist/inject_ui.py` | 화면 JS(책 무관 공유) · 페이지 주입 |
 | `shared/cond.py` · `shared/tree_grade.py` · `shared/trades.py` | 트리 문법·평가기 · 판정(등급·금액·비중·포지션) · 체결(분할·매도) |
 | `shared/md_feed.py` | **jhts 시세 창구 — 유일한 수집 입구**(없으면 수집 요청) |
-| `verdict/verdict_engine.py` · `verdict/backtest.py` | 오늘 판정 · 과거 신호·거래 성적 |
+| `verdict/verdict_engine.py` · `verdict/notify.py` | 오늘 판정 · 알림 송신(텔레그램·데스크톱, 구간③ 소유) |
 | `publish/publish_pages.py` · `publish/serve.py` · `publish/build_home.py` | 페이지 조립·발행 · 로컬 실시간 서버 · 홈 |
-| `playbook/book_source.py` · `playbook/verify_source_integrity.py` | 원문 소절 인덱스 · 플레이북 본문 무결 |
+| `playbook/book_source.py` · `playbook/verify_source_integrity.py` · `playbook/pages.py` | 원문 소절 인덱스 · 플레이북 본문 무결 · 책 페이지 찾기·신선도 |
 | `playbook/book_sources.json` · `playbook/source_baseline.json` | 원문 위치 · 본문 해시 기준(커밋 대상) |
 | `SETUP.md` · `RUN.md` | 설치·스케줄 등록 · 로컬 서버/폰에서 보기 |

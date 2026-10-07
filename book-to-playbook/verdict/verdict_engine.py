@@ -25,7 +25,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 
 from shared.paths import BASE, book_meta
-from shared.notify import send_telegram, send_desktop
+from verdict.notify import send_telegram, send_desktop
 from shared import cond, md_feed, tree_grade
 
 SOURCE = "jhts 시세팀(일봉)"
@@ -319,8 +319,8 @@ def build_text(top):
     return "\n".join(L)
 
 
-# 알림 발신(send_telegram/send_desktop)은 shared/notify.py 로 나갔다 —
-# 이 팀에는 네트워크 코드를 두지 않는다(verify_teams.py 가 강제).
+# 알림 발신(send_telegram/send_desktop)은 같은 팀 verdict/notify.py 가 맡는다 —
+# 네트워크 코드(urllib)는 그 한 파일에만 허용된다(verify_teams.py ALLOW 의 명시 예외).
 def _cli():
     argv = sys.argv[1:]
     slug = next((a for a in argv if not a.startswith("-")), None)
