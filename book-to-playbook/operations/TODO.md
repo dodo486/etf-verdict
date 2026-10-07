@@ -39,3 +39,21 @@
 ## 🟢 데이터 (선행조건)
 
 - **jhts 실데이터 교체** + 작업용으로 임시로 쓴 **yfinance 흔적 완전 삭제**(MIGRATION_NOTES 삭제 체크리스트).
+
+## 📋 소스 꼬리표 인벤토리 (`grep -rInE "TODO|FIXME|TEMP|HACK|XXX|임시|옛|더이상" operations/*.py`)
+
+설거지 세션(2026-10-08)이 기계로 훑은 결과. 코드 로직은 손대지 않았다. 대부분은 "옛 정의와의 parity"를
+설명하는 **의도적 docstring**(삭제·구현 대상 아님)이고, 실제 미완 과제는 위 🔴/🟡/🟢 절에 이미 들어 있다.
+
+- [ ] `portfolio.py:38` — docstring: parity(옛 계산기와 숫자 일치) — (의도적보류: parity 설명 주석, 삭제 불필요)
+- [ ] `portfolio.py:129` — docstring: parity(거래수·승률·거래당평균 등 옛 정의)·position_facts·limits_unapplied — (의도적보류: 반환 계약 설명)
+- [ ] `driver.py:7` — docstring: "옛날엔 asof 판정 루프가 둘로 중복됐다"(통합 경위 설명) — (의도적보류: 이력 설명, 동작 불변)
+- [ ] `driver.py:180` — docstring: "backtest.run 의 옛 일봉 루프를 이리로 옮긴 것"(속도·결과 보존) — (의도적보류: 이력 설명)
+- [ ] `backtest.py:28` — docstring: 거래수·승률·거래당평균의 "옛 정의" parity 동반 표기 — (의도적보류: 출력 설명)
+- [ ] `backtest.py:221` — 주석: vectorbt 자산곡선·MaxDD·샤프·총수익을 "옛 지표 옆에" 표기(중복 수집 없음) — (의도적보류: 설계 주석)
+- [ ] `backtest.py:268` — 출력 라벨: "포트폴리오 지표(vectorbt) · parity(옛 정의)" — (의도적보류: 사용자 표시 라벨)
+- [ ] `backtest.py:269` — 출력 헤더 포맷 문자열에 "parity(옛정의)" — (의도적보류: 표 헤더)
+- [ ] `backtest.py:290` — 출력 주석: 거래수·승률·거래당평균은 "옛 정의 그대로" — (의도적보류: 사용자 안내)
+
+> 요약: `TODO/FIXME/TEMP/HACK/XXX` 태그 **0건**. 걸린 9건은 전부 "옛(정의)" 문자열로, parity 설명용
+> docstring·라벨이다 — **구현필요/삭제가능 없음, 전부 의도적보류**. 실제 열려 있는 구간④ 과제는 위 🔴/🟡/🟢 절이 정본.

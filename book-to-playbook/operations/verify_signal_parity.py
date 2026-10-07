@@ -133,7 +133,10 @@ def build_text(reports):
 def main():
     argv = sys.argv[1:]
     window = int(argv[argv.index("--window") + 1]) if "--window" in argv else WINDOW
-    slugs = [argv[argv.index("--slug") + 1]] if "--slug" in argv else (live_slugs() or ["trend", "moneycopy"])
+    slugs = [argv[argv.index("--slug") + 1]] if "--slug" in argv else live_slugs()
+    if not slugs:
+        print("live 책이 없습니다(books.json 의 live:true). --slug <책> 으로 지정하세요.", file=sys.stderr)
+        return 2
     reports = [compare(s, window) for s in slugs]
     print(build_text(reports))
     ok = all(r["total"] and not r["mismatches"] for r in reports) and any(r["total"] for r in reports)

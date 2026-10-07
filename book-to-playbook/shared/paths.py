@@ -7,11 +7,9 @@
 
 경로 결정 순서
   BASE   = $BOOK_TO_PLAYBOOK_HOME  또는  이 파일이 있는 폴더(shared/)의 부모
-  PUBLIC = $BOOK_TO_PLAYBOOK_PUBLIC 또는  (부모가 배포 리포면 부모) 아니면 BASE/public
   LOGS   = BASE/logs
 
-부모 폴더에 `.nojekyll`이 있으면 그 폴더를 GitHub Pages 배포 루트로 본다.
-(이 리포 구조: <repo>/.nojekyll + <repo>/book-to-playbook/ → PUBLIC=<repo>)
+화면은 로컬 실시간 서버(publish.serve)가 매 요청 그린다 — 정적 발행(GitHub Pages)은 폐지됐다.
 """
 import os
 import sys
@@ -37,18 +35,6 @@ BASE = os.environ.get("BOOK_TO_PLAYBOOK_HOME") or os.path.dirname(
 BASE = os.path.abspath(BASE)
 
 
-def _detect_public():
-    env = os.environ.get("BOOK_TO_PLAYBOOK_PUBLIC")
-    if env:
-        return os.path.abspath(env)
-    parent = os.path.dirname(BASE)
-    # 부모가 이미 GitHub Pages 배포 루트면 거기에 바로 쓴다(리포 안에서 실행하는 경우)
-    if os.path.exists(os.path.join(parent, ".nojekyll")):
-        return parent
-    return os.path.join(BASE, "public")
-
-
-PUBLIC = _detect_public()
 LOGS = os.path.join(BASE, "logs")
 
 
@@ -97,7 +83,7 @@ def load_env_file(p):
 
 # ---------------------------------------------------------------- 책 레지스트리
 # 배포·서빙·엔진호출이 특정 책에 안 박히도록, "어느 책?"은 books.json 에서 온다.
-# 파일 규칙(책-무관): 플레이북 원본 = BASE/<slug>-playbook.html · 배포 = PUBLIC/<slug>/.
+# 파일 규칙(책-무관): 플레이북 원본 = BASE/<slug>-playbook.html.
 import json as _json
 
 
@@ -148,11 +134,6 @@ def playbook_src(slug):
     return os.path.join(BASE, "%s-playbook.html" % slug)
 
 
-def public_book_dir(slug):
-    """그 책의 배포 디렉터리(PUBLIC/<slug>/)."""
-    return os.path.join(PUBLIC, slug)
-
-
 # ---------------------------------------------------------------- 산출물(아티팩트) 경로
 # 파이프라인이 주고받는 파일 이름을 여기 한 곳에서만 짓는다 — 예전엔 run.py·publish·backtest·
 # verify_structure 가 "latest-verdict-<slug>.json" 식 이름을 각자 손으로 적어, 규칙을 바꾸면
@@ -174,6 +155,5 @@ def source_index_path(slug):
 
 if __name__ == "__main__":
     print("BASE   =", BASE)
-    print("PUBLIC =", PUBLIC)
     print("LOGS   =", LOGS)
     print("platform =", sys.platform)

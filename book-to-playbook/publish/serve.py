@@ -89,7 +89,7 @@ def render_page(slug):
         data, _ = compute_verdict(slug)
     except Exception:
         data = None
-    return assemble(slug, data, public=False).encode("utf-8")
+    return assemble(slug, data).encode("utf-8")
 
 
 def render_shell():

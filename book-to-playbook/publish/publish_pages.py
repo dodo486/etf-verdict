@@ -74,16 +74,12 @@ def _inject_backtest(html, slug):
     return html.replace("</body>", block + "</body>", 1)
 
 
-def assemble(slug, data, public=True):
-    """책 페이지 한 장을 조립한다 — 정적 발행(publish)과 로컬 실시간 서버(serve)가 같이 쓰는 단일 경로.
+def assemble(slug, data):
+    """책 페이지 한 장을 조립한다 — 로컬 실시간 서버(serve)가 쓰는 단일 경로.
     판정(#verdict-data) · 공유 UI(ui/*.js) · 책 레일 · 소절 원문 · 백테스트 탭을 얹는다.
-    public=True 면 내 포지션(로컬 개인 파일에서 온 값)을 판정에서 뺀다 — 공개 페이지에 싣지 않는다."""
+    (로컬 전용이라 내 포지션을 그대로 싣는다 — 정적 발행이 폐지돼 '공개 페이지' 분기는 없다.)"""
     html = read_text(playbook_src(slug))
     if data is not None:
-        if public:
-            data = dict(data, verdicts=[{k: x for k, x in v.items() if k != "positions"}
-                                        for v in data.get("verdicts", [])])
-            data.pop("positions_note", None)
         if not VERDICT_RE.search(html):
             raise ValueError("verdict-data 블록을 찾지 못함(%s)" % slug)
         blob = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")

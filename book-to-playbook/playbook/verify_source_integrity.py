@@ -51,7 +51,7 @@ from datetime import datetime
 
 from shared import paths  # noqa: F401  (경로·UTF-8 출력 고정)
 from shared.paths import BASE
-from playbook.pages import book_pages, report_stale
+from playbook.pages import book_pages
 
 # 기준 해시는 이 팀(①)의 소유물이라 팀 폴더 안에 산다(커밋 대상).
 BASELINE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source_baseline.json")
@@ -104,7 +104,6 @@ def main(argv):
     if not pages:
         print("검사할 책 페이지를 찾지 못했습니다.", file=sys.stderr)
         return 2
-    stale = report_stale(pages)
 
     base = load_baseline()
     cur, bad, new = {}, [], []
@@ -129,10 +128,6 @@ def main(argv):
             print("✗ %-8s 원문이 바뀜: %s" % (slug, ", ".join(NAMES.get(k, k) for k in diff)))
         else:
             print("✓ %-8s 원문 그대로 — 플레이북 본문 %d줄" % (slug, len(parts["src"].splitlines())))
-
-    if accept and stale:
-        print("\n낡은 배포본을 기준으로 박을 수 없습니다. 발행 후 다시 --accept 하세요.")
-        return 1
 
     if accept:
         # 감사 기록: accept_log 는 slug 키와 충돌하지 않는 전용 최상위 키.

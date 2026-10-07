@@ -24,21 +24,9 @@ python3 --version       # macOS
 | 값 | 결정 방식 |
 |---|---|
 | `BASE` | `$BOOK_TO_PLAYBOOK_HOME` → 없으면 **이 폴더**(book-to-playbook 루트 — `shared/`의 부모) |
-| `PUBLIC` | `$BOOK_TO_PLAYBOOK_PUBLIC` → 없으면 **부모 폴더에 `.nojekyll`이 있으면 그 부모**, 아니면 `BASE/public` |
 | `LOGS` | `BASE/logs` |
 
-즉 두 가지 배치가 모두 된다.
-
-```
-# (A) 리포 안에서 바로 — PUBLIC = 리포 루트
-<repo>/.nojekyll
-<repo>/trend/index.html        ← 발행 대상
-<repo>/book-to-playbook/       ← BASE
-
-# (B) 스킬 폴더에 두고 public/ 으로 — 기존 macOS 배치
-~/.claude/skills/book-to-playbook/          ← BASE
-~/.claude/skills/book-to-playbook/public/   ← PUBLIC (별도 배포 리포)
-```
+어느 폴더에 두든 그대로 돈다 — 화면은 로컬 실시간 서버(`publish.serve`)가 매 요청 그린다(정적 발행·GitHub Pages 폐지).
 
 현재 값 확인:
 
@@ -68,7 +56,7 @@ PYTHONPATH=C:\Users\<사용자>\jhts
 
 ```
 python run.py daily        # 판정 → 백테스트 → 발행 (장 마감 후)
-python run.py watch        # 저자가 말한 시각(개장 10분 전 등)마다 판정 → 발행
+python run.py watch [--every N]  # asof=지금 기준 N분(기본 5)마다 재판정 → 발행(장중 포함)
 python run.py publish      # 재판정 없이 현재 JSON으로 발행만
 ```
 
@@ -129,7 +117,7 @@ launchctl unload ~/Library/LaunchAgents/com.book-to-playbook.daily.plist   # 해
 schtasks /Create /TN "book-to-playbook daily" /SC WEEKLY /D TUE,WED,THU,FRI,SAT /ST 08:00 ^
   /TR "\"D:\book-to-playbook\run.cmd\" daily"
 
-:: 저자가 말한 시각(개장 10분 전 등)마다 판정 — 21:30 에 띄우면 그날 시각까지 기다렸다 판정한다(서머타임 자동)
+:: 장중 재판정(asof=지금 기준) — 21:30 에 띄우면 그때부터 --every N 분마다 재판정·발행한다(종료 전까지)
 schtasks /Create /TN "book-to-playbook watch" /SC WEEKLY /D MON,TUE,WED,THU,FRI /ST 21:30 ^
   /TR "\"D:\book-to-playbook\run.cmd\" watch"
 ```
@@ -151,15 +139,13 @@ schtasks /Delete /TN "book-to-playbook daily" /F            :: 해제
 ```
 
 화면의 청산·분할 판정은 이 파일의 보유분에 대해 낸다. 없으면 규칙 목록만 보인다. 개인 정보라 `.gitignore` 대상이고
-공개 페이지에는 실리지 않는다(로컬 서버 화면에서만 보인다).
+로컬 서버 화면에서만 보인다.
 
-## 5. 자동 발행(git)
-
-`PUBLIC` 이 git 리포이고 `origin` 이 있으면 실행 끝에 자동으로 커밋·푸시한다.
-푸시를 원치 않으면 `--no-push`, 아예 건드리지 않으려면 `--no-git`.
+## 5. 줄바꿈(git)
 
 `.gitattributes` 로 `eol=lf` 를 고정해 두었다 — 이게 없으면 맥과 윈도우가
 같은 결과물을 서로 다른 줄바꿈으로 써서 매 실행마다 파일 전체가 diff로 뜬다.
+(정적 발행·자동 push 는 폐지됐다 — 커밋은 직접 한다. 화면은 `publish.serve` 가 맡는다.)
 
 ## 6. 문제가 생기면
 
@@ -169,5 +155,5 @@ schtasks /Delete /TN "book-to-playbook daily" /F            :: 해제
 | 판정이 전부 ❔ 판정 불가 | jhts 시세 조회 실패. `logs/cron.log` 의 stderr, 페이지 상단 '시세 없음 → 수집 요청' 확인 |
 | 🟡 확인 대기만 나온다 | 수동(✋) 조건(개장 전·장중·저자 미명시)이 있어서다 — 체크리스트에서 직접 체크하면 등급이 다시 계산된다 |
 | `판정 파일 없음 — 발행 중단` | `run.py daily` 가 먼저 돌아야 한다(jhts 가 PYTHONPATH 에 있는지 확인) |
-| 발행은 됐는데 사이트가 그대로 | 푸시 안 됨(`--no-push`/origin 없음) 또는 GitHub Pages 반영 지연 |
+| 값이 안 바뀐다 | 캐시 TTL(기본 8초) 대기 또는 `/api/verdict?force=1` · 서버 재시작(`publish.serve`) |
 | `python` 을 못 찾음(Windows) | `BOOK_TO_PLAYBOOK_PYTHON` 에 python.exe 전체 경로 지정 |

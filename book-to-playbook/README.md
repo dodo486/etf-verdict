@@ -19,9 +19,10 @@
 |---|---|---|---|
 | `playbook/` | ① 책 원본 → 플레이북 | 원문 소절 인덱싱 · 플레이북 본문 무결 | `source_index.json` · `<slug>-playbook.html` 의 `#src` |
 | `checklist/` | ② 플레이북 → 체크리스트 | 조건 트리 추출·심판·검사 · 화면 UI | **`books/<slug>/tree.json`** |
-| `verdict/` | ③ 체크리스트 → 수집·판정 | 트리가 쓰는 심볼 수집(jhts) · 판정 · 백테스트 | `latest-verdict-<slug>.json` · `backtest-<slug>.json` |
+| `verdict/` | ③ 체크리스트 → 수집·판정 | 트리가 쓰는 심볼 수집(jhts) · 판정 | `latest-verdict-<slug>.json` |
+| `operations/` | ④ 확정 트리 → 돈·성적 계산기 | 백테스트·장중·웹뷰어가 소비하는 vectorbt 돈/지표 계산(단방향 폭포수: verdict 산출물·shared 규칙결과를 읽기만) | `backtest-<slug>.json` |
 | `shared/` | 공통층 | **트리의 뜻 한 벌**(cond 문법·tree_grade 판정·trades 체결) · **시세 창구 md_feed** · paths | — |
-| `publish/` | 발행·서빙층 | 페이지 조립(정적 발행·로컬 서버 같은 함수) · 홈 | `PUBLIC/<slug>/index.html` |
+| `publish/` | 발행·서빙층 | 페이지 조립(로컬 실시간 서버) · 홈 | (serve 가 매 요청 그림) |
 | (루트) | 조립·감사 | `run.py`(러너) · `verify_structure.py`(구조·책 계약) · `verify_teams.py`(경계) | — |
 
 트리의 뜻(문법·등급·체결)을 shared/ 에 한 벌만 두는 이유: ②가 트리를 검사할 때 본 동작과 ③이 판정할 때의 동작이
@@ -37,7 +38,7 @@
    [③ cond.symbols_of(tree) → md_feed.histories(jhts, 없으면 수집 요청) → tree_grade → verdict_engine]
                                   │                                   └──▶ 알림 · latest-verdict-<slug>.json
                                   │
-             [publish.assemble: 판정 + ui/*.js + 레일 + 원문 + 백테스트] ──▶ 공개 페이지 / 로컬 실시간
+             [publish.assemble: 판정 + ui/*.js + 레일 + 원문 + 백테스트] ──▶ publish.serve(로컬 실시간)
 ```
 
 ## 체크리스트 — 판정 여섯 칸 (`checklist/COND_DSL.md`)
@@ -88,10 +89,10 @@
 
 ```
 python run.py daily        # 판정 → 백테스트 → 발행 → 검사 3종 → (통과 시) git 커밋·푸시
-python run.py watch        # 저자가 말한 시각(예: 개장 10분 전)마다 기다렸다 판정 → 발행 (매일 밤 한 번 띄움)
+python run.py watch [--every N] # asof=지금 기준 N분(기본 5)마다 재판정 → 발행(백테스트 제외) — 장중 조건은 분봉이 연결되면 살아난다
 python run.py publish      # 재판정 없이 발행만
 python -m verdict.verdict_engine <slug> [--json] [--no-send]   # 오늘 판정
-python -m verdict.backtest <slug> [--days 365] | --page        # 백테스트(로그 / 페이지 탭 데이터)
+python -m operations.backtest <slug> [--days 365] | --page     # 백테스트(로그 / 페이지 탭 데이터, 구간④)
 python -m publish.serve                                         # 로컬 실시간 서버(RUN.md)
 ```
 

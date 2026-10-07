@@ -59,7 +59,7 @@ description: 트레이딩 책을 읽어 실전 매매 플레이북 + 기계가 �
 - 스캔 PDF만 있음 → 먼저 이미지화→OCR→청킹(jhts 파이프라인 재사용) 후 1)
 
 ## 판정 운영
-`python run.py daily` — 책마다 `verdict.verdict_engine`(알림 + latest-verdict JSON) → `verdict.backtest --page` → 발행 →
+`python run.py daily` — 책마다 `verdict.verdict_engine`(알림 + latest-verdict JSON) → `operations.backtest --page`(구간④) → 발행 →
 검사 3종 → 통과 시 git 커밋·푸시. `python run.py watch [--every N]` 는 asof=지금으로 N분마다 재판정(장중 포함).
 알림은 `telegram.env`(TELEGRAM_BOT_TOKEN/CHAT_ID)가 있으면 텔레그램, 없으면 데스크톱. 시세는 jhts 패키지(`PYTHONPATH`)에서만
 온다. 스케줄 등록·내 포지션 파일은 `SETUP.md`.

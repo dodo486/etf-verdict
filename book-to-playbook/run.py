@@ -13,8 +13,6 @@ homebrew·python.org·Microsoft Store 어느 설치본이든 그대로 동작한
   python -m publish.serve    # 화면 보기 — 셸(책목록)+모든 책을 실시간 서빙(정적 스냅샷 폐지)
 
 옵션
-  --no-git     발행 후 git commit/push 생략
-  --no-push    commit 은 하되 push 는 생략
   --quiet      콘솔 출력 최소화(로그 파일에는 그대로 남음)
   --no-verify-tree  트리 검수(verify_tree)·원시함수 검사(verify_primitives) 생략 — 트리를
                     만들 때 한 번 검수하면 되는 것이라, 트리가 더 안 바뀌면 끈다(발행물 점검
@@ -34,7 +32,7 @@ import sys
 from datetime import datetime
 
 from shared import paths
-from shared.paths import BASE, PUBLIC, LOGS, ensure_dir, load_env_file, write_text
+from shared.paths import BASE, LOGS, ensure_dir, load_env_file, write_text
 
 PY = sys.executable or "python3"
 
@@ -125,44 +123,6 @@ class Runner:
         return p.returncode, out, err
 
 
-def git(args, cwd):
-    return subprocess.run(["git"] + args, cwd=cwd, capture_output=True, text=True)
-
-
-def publish_git(r, do_push=True):
-    """PUBLIC 이 git 리포면 커밋(+푸시). origin 이 없으면 조용히 건너뛴다."""
-    if not os.path.isdir(os.path.join(PUBLIC, ".git")):
-        r.say("git: %s 는 리포가 아님 — 건너뜀" % PUBLIC)
-        return
-    has_origin = git(["remote", "get-url", "origin"], PUBLIC).returncode == 0
-
-    st = git(["status", "--porcelain"], PUBLIC)
-    if not st.stdout.strip():
-        r.say("git: 변경 없음")
-        return
-
-    msg = "auto: %s 판정 갱신" % datetime.now().strftime("%Y-%m-%d")
-
-    git(["add", "-A"], PUBLIC)
-    # 커밋 신원은 이 저장소의 git 설정(user.name/email)을 그대로 쓴다 — 코드에 박지 않는다.
-    c = git(["commit", "-qm", msg], PUBLIC)
-    if c.returncode != 0:
-        r.say("git: 커밋 실패 — %s" % (c.stderr or c.stdout).strip()[:300])
-        return
-    r.say("git: 커밋 완료 — %s" % msg)
-
-    if not do_push:
-        r.say("git: --no-push 지정 — 푸시 생략")
-        return
-    if not has_origin:
-        r.say("git: origin 없음 — 푸시 생략")
-        return
-    br = git(["rev-parse", "--abbrev-ref", "HEAD"], PUBLIC).stdout.strip() or "main"
-    p = git(["push", "-q", "origin", br], PUBLIC)
-    r.say("git: 푸시 %s" % ("완료 (%s)" % br if p.returncode == 0
-                            else "실패 — %s" % (p.stderr or "").strip()[:300]))
-
-
 def main(argv):
     modes = [a for a in argv if not a.startswith("-")]
     mode = modes[0] if modes else "daily"
@@ -173,8 +133,6 @@ def main(argv):
         return 2
 
     quiet = "--quiet" in argv
-    no_git = "--no-git" in argv
-    no_push = "--no-push" in argv
     # 트리 검수(verify_tree)·원시함수 검사(verify_primitives)는 트리를 '만들 때' 한 번 하면 되는
     # 것이라(python -m checklist.verify_tree <slug>), 트리가 더 안 바뀌면 daily 가 매번 다시 돌 필요가
     # 없다. --no-verify-tree 로 그 둘을 끈다(발행물 점검 verify_structure 는 트리와 무관해 항상 돈다).
@@ -187,7 +145,7 @@ def main(argv):
             print("%s 로드 (%d개 키)" % (envfile, len(loaded)))
 
     r = Runner(mode, quiet)
-    r.say("=== %s 시작 · %s · BASE=%s · PUBLIC=%s" % (mode, sys.platform, BASE, PUBLIC))
+    r.say("=== %s 시작 · %s · BASE=%s" % (mode, sys.platform, BASE))
 
     # 어느 엔진을 돌릴지는 books.json 에서 온다(코드에 특정 책을 박지 않는다).
     live = paths.live_slugs()
@@ -203,14 +161,10 @@ def main(argv):
             if mode == "daily":
                 r.step("operations.backtest", [slug, "--page"], required=False)
 
-    # 정적 발행(스냅샷)은 폐지됐다 — latest-verdict 스냅샷·정적 PUBLIC 페이지를 만들지 않는다.
-    # 화면은 라이브 서버(publish.serve)가 매 요청 엔진을 새로 돌려 그린다(오래된 값이 '지금 값'처럼 안 보이게).
+    # 정적 발행(GitHub Pages)은 폐지됐다 — 화면은 라이브 서버(publish.serve)가 매 요청 엔진을
+    # 새로 돌려 그린다(오래된 값이 '지금 값'처럼 안 보이게). 파일로 굽지도, 레포에 push 하지도 않는다.
 
-    # ---- 검사 3종 — 반드시 여기(publish/build_home 직후 · git 커밋/푸시 이전)에서 돈다.
-    #
-    # 왜 이 위치인가: 구조 게이트의 원문 무결 검사는 PUBLIC/<slug>/index.html(방금 위에서 새로
-    # 쓴 배포본)을 작업본보다 우선 읽는다. publish 후 · git 커밋 전이면 "방금 만든 페이지"를
-    # 검사하면서도, 걸렸을 때 그 페이지가 아직 공개 사이트로 안 나간 상태다.
+    # ---- 검사 3종 — 판정·백테스트 뒤에 돈다.
     #
     #   ① verify_structure          형식·구조(팀 경계·플레이북 본문 해시·책 계약)
     #   ② verdict.verify_primitives 조건 트리 원시 연산이 계산을 맞게 하나(실행 검사)
@@ -244,14 +198,10 @@ def main(argv):
             blocking.append("%s — 비정상 종료(%d)" % (script, codes[script]))
 
     if blocking:
-        r.say("=== 발행 정지 — 아래 검사가 실패해 git 커밋/푸시를 하지 않습니다:")
+        r.say("=== 발행 정지 — 아래 검사가 실패했습니다:")
         for b in blocking:
             r.say("    - %s" % b)
         r.failed.extend(blocking)
-    elif no_git:
-        r.say("git: --no-git 지정 — 건너뜀")
-    else:
-        publish_git(r, do_push=not no_push)
 
     if r.failed:
         r.say("=== 실패 단계: %s" % ", ".join(r.failed))

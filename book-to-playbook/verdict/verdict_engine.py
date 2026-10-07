@@ -275,7 +275,7 @@ def render(slug, asof=None):
     top["refs"] = ref_map(tree)
     top["missing"] = {s: md_feed.requested().get(s, "-") for s, cs in hist.items() if not cs}
     if positions:
-        top["positions_note"] = "내 포지션(books/%s/positions.json) 기준 — 공개 페이지에는 실리지 않는다" % slug
+        top["positions_note"] = "내 포지션(books/%s/positions.json) 기준 — 로컬 화면에서만 쓴다" % slug
     return top
 
 

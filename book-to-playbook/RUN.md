@@ -1,13 +1,10 @@
 # 로컬 실시간 서버 (M3) + 폰에서 보기
 
-book-to-playbook 판정 페이지를 **두 모드**로 쓸 수 있다.
+book-to-playbook 판정 페이지는 **로컬 실시간 서버**로 본다(정적 발행·GitHub Pages 는 폐지됐다).
 
-| 모드 | 여는 법 | 동작 |
-|------|---------|------|
-| **정적 스냅샷** | GitHub Pages URL | 빌드 때 구운 값 그대로 (`⏸ 스냅샷 · 빌드 …`). 서버 불필요. |
-| **로컬 실시간** | `python3 -m publish.serve` 로 띄운 서버 | 15초마다 `/api/verdict` 폴링(또는 `/events` SSE) → 값이 살아 움직임 (`🟢 실시간 · jhts(marketdata) · 갱신 HH:MM:SS`). |
-
-정적 페이지는 서버가 없으면 `fetch('/api/verdict')` 가 조용히 실패하고 스냅샷을 그대로 유지한다(에러·콘솔 스팸 없음). 진행형 향상(progressive enhancement)이라 GitHub Pages 는 그대로 계속 돈다.
+| 여는 법 | 동작 |
+|---------|------|
+| `python3 -m publish.serve` 로 띄운 서버 | 매 요청 엔진을 새로 돌려 그리고, 15초마다 `/api/verdict` 폴링(또는 `/events` SSE)으로 값이 살아 움직인다 (`🟢 실시간 · jhts(marketdata) · 갱신 HH:MM:SS`). |
 
 ## 1. 서버 켜기
 
