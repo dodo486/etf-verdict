@@ -47,7 +47,8 @@
   function or3(vs){ if(vs.some(v=>v===true)) return true; if(vs.some(v=>v===null)) return null; return false; }
   // 수동 조건의 답은 조건 자체로 묶는다: 여러 상품이 같이 보는 정의 안(shared)이면 책 전체에 하나,
   //   아니면 상품마다 하나. path 앞머리(상품 이름 또는 'common')에서 상품을 꺼낸다.
-  function mkey(it, path){ return (it.shared ? '*' : path.split('.')[0]) + '|' + it.manual; }
+  // 수동 답 열쇠 — "?" 식은 엔진이 준 식 열쇠(it.mkey: 같은 식 = 같은 질문), 문장 수동은 그 문장.
+  function mkey(it, path){ return (it.shared ? '*' : path.split('.')[0]) + '|' + (it.mkey || it.manual); }
   function ev(it, fill, ans, path){
     if(it.manual !== undefined){
       if(it.observed && it.v !== null && it.v !== undefined) return it.v;   // 저자 시각에 관측됨 — 자동
@@ -56,7 +57,6 @@
     if(!it.op) return it.v === undefined ? null : it.v;
     const k = it.kids || [];
     if(it.op === 'not'){ const x = ev(k[0], fill===null?null:!fill, ans, path+'.0'); return x===null?null:!x; }
-    if(it.op === 'ref') return ev(k[0], fill, ans, path+'.0');
     const vs = k.map((c,i)=>ev(c, fill, ans, path+'.'+i));
     if(it.op === 'all') return and3(vs);
     if(it.op === 'any') return or3(vs);
@@ -152,7 +152,9 @@
       // 입력값(lead)이 있으면 파생값 이름(lhsd)은 생략 — 입력이 이미 설명한다
       const L = lead + (lead ? '' : (d.lhsd ? esc(d.lhsd)+' ' : '')) + lv;
       // 기준이 상수(rhsd 없음)면 "· 기준 op 값", 다른 식이면 "op 설명 값" — 단위는 양쪽에 같게 붙인다
+      //   상수 자리가 비었으면(rhs 없음·설명 없음) 저자가 기준을 안 준 "?" 식 — '기준 ?'로 보여 사람이 숫자를 보고 고르게
       const R = d.rhsd ? ' '+(EVSYM[d.op]||'')+' '+esc(d.rhsd)+' <b>'+fmtMeas(d.rhs)+u+'</b>'
+              : (d.rhs === null || d.rhs === undefined) ? ' <span class="ev-th">· 기준 '+(EVSYM[d.op]||'')+' ? (저자 미명시)</span>'
                        : ' <span class="ev-th">· 기준 '+(EVSYM[d.op]||'')+' '+fmtMeas(d.rhs)+u+'</span>';
       return L + R;
     });
@@ -184,7 +186,8 @@
     const a = isM ? ans[mkey(it, path)] : undefined;
     // 미응답 수동 조건의 마크는 fill(판정에 쓴 시각)로 — 비워두면(null) 등급은 ✅ 인데 칸은 ? 로 떠 어긋난다.
     const val = isM ? (a === undefined ? fill : a) : (it.op ? ev(it, fill, ans, path) : it.v);
-    const kidsHtml = (it.observed && isM) ? '' : kids;
+    // folded = 같은 칸 다른 곳에 이미 펼쳐 둔 조건(엔진이 표시) — 계산(ev)은 kids 로 그대로 하되 화면엔 한 줄만.
+    const kidsHtml = ((it.observed && isM) || it.folded) ? '' : kids;
     let ctl;
     if(isM){
       // 수동 조건 = 참/거짓 둘 중 하나를 고르는 것(체크박스 아님). 하나로 붙은 토글(세그먼트)로.
@@ -199,7 +202,7 @@
     const opw = OPW(it); const opl = opw ? ' <span class="ck-opl">'+esc(opw)+'</span>' : '';
     return '<div class="ck-row'+(isM?' man':' auto')+'" '+(it.ref?'data-ref="'+esc(it.ref)+'"':'')+'>'
       + '<div class="ck-line">'+ctl+'<span class="ck-t">'+esc(it.label || '수동 확인')+opl+num+refChip(it.ref)+'</span></div>'
-      + why + evLine(it.detail) + (kidsHtml ? '<div class="ck-kids">'+kidsHtml+'</div>' : '') + '</div>';
+      + why + (it.folded && kids ? '<div class="ck-why">↕ 세부 조건은 이 칸에 따로 펼쳐 둠</div>' : '') + evLine(it.detail) + (kidsHtml ? '<div class="ck-kids">'+kidsHtml+'</div>' : '') + '</div>';
   }
   function zoneHead(title, want, val){
     const ok = val === null ? '' : (val === want ? ' ok' : ' bad');

@@ -35,18 +35,24 @@
   아니면 None 이다. 덧셈·뺄셈(상수)은 하한을 유지하고, 그 밖의 연산(창·곱·나눗셈)에선 None 이 된다.
 
 수동(manual)
-  {"manual": "사유"} 는 자동으로 알 수 없는 조건(장중·뉴스 등). 값은 평가 시 manual_as 로
+  {"manual": "사유"} 는 식으로 쓸 수 없는 조건(순수 주관·데이터 없음·연산 없음). 값은 평가 시 manual_as 로
   주어진다(엔진이 '확인되면/안 되면' 두 번 평가해 '확인 대기'를 가린다). 데이터 None 과 다르다.
   극성: not 아래의 수동은 반대 값을 받는다(manual_as=True 는 '수동이 전부 구역에 유리하게 풀림'
   이라는 뜻 — '겹치면 쉼' = not(all(.., 수동)) 에서 낙관 평가가 오히려 겹침을 가정하던 버그를 막는다).
 
+모르는 값 "?"
+  저자가 숫자(기준·기간·개수)를 안 준 조건도 식으로 적는다 — 모르는 숫자 자리만 "?" 로 둔다.
+    "SOXL 이 5일선에서 너무 벌어짐" → {"ge": [(SOXL ÷ MA5(SOXL) − 1)×100, "?"]}
+  "?" 를 품은 판단 노드(비교의 양쪽 식 어디든 "?", 또는 atleast 의 n 이 "?")는 수동처럼 사람이 참/거짓을 정한다
+  (manual_as·극성 규칙 그대로). 화면은 비교의 알려진 쪽 값을 근거 숫자로 보여준다. 식이 조건의 신원이라
+  같은 식이면 같은 조건이다(문장·이름과 무관). 수치로 정할 수 없는 순수 주관만 {"manual": "저자 미명시: …(정성)"}.
+
 문법 (JSON) — 허용 키 밖은 전부 오류(조용히 무시하지 않는다):
-  숫자          3, 1.5            (상수)
+  숫자          3, 1.5            (상수)   "?" = 저자가 안 준 숫자(모르는 값) — 숫자가 들어갈 자리 어디든
   시세          {"px": "close"|"open"|"high"|"low"|"volume", "sym": 심볼?, "tf": 봉?}   sym 기본 "$self",
                 tf 기본 "1d"(일봉 — asof 이하 '확정(settled)' 일봉; 장중 asof 면 아직 마감 안 된 그날 일봉은
                 None, 즉 전일 종가까지만 본다). tf "1m"(분봉 — asof 이하 마지막 분봉, 장중 값). tf "5m"(5분봉 —
-                세션 안 1분봉을 5분 OHLC 로 집계한 뒤 asof 이하 마지막 5분봉). 분봉/5분봉 데이터가 연결되기
-                전까진 늘 모름(None)이라 장중 조건은 observe 로 감싸 None→manual 로 떨어진다.
+                세션 안 1분봉을 5분 OHLC 로 집계한 뒤 asof 이하 마지막 5분봉). 데이터가 없으면 모름(None).
   산술          {"add"|"sub"|"mul"|"div"|"max"|"min": [a, b]}   max/min = 같은 날 두 값 중 큰/작은 값
                 {"abs": a}
   선택          {"case": [[c1, v1], [c2, v2], ...], "else": v}   위에서부터 처음 참인 c 의 v.
@@ -64,9 +70,8 @@
                 {"minsince"|"maxsince": [c, s]}  c 가 마지막으로 참이었던 날부터 오늘까지 s 의 최저/최고
   여러 종목     {"across": {"syms": [...], "cond": c}}   c 가 참인 종목 수(c 안에서 "$s" = 그 종목)
   수동          {"manual": "사유"}
-  관측·수동     {"observe": c, "manual": "사유"}   c 를 계산할 수 있으면 그 값, 관측값이 없어 모름이면 수동처럼
-                (manual_as) 푼다 — 장중 관측 조건(개장 전 선물 등): asof 기준 분봉이 있으면 자동, 분봉이
-                없으면(아직 연결 전·그 시각 분봉 미보관) 지금처럼 사람 확인(🟡).
+  관측·수동     {"observe": c, "manual": "사유"}   c 를 계산할 수 있으면 그 값, 모름이면 수동처럼(manual_as) 푼다
+                (평가기 기능 — 작성 규칙은 역할 문서. 추출 지침은 이 노드를 쓰라고 하지 않는다).
   포지션        {"pos": "ret"|"days"|"maxret"|"minret"}   매도(exit)·2차 이후 분할 매수 규칙 안에서만.
                 ret = 평균 매입가 대비 오늘 종가 수익률(%), days = 첫 매수일부터 지난 봉(첫 매수일 0),
                 maxret/minret = 첫 매수일~오늘 종가 수익률의 최고/최저. 매수 전 날은 None.
@@ -78,18 +83,15 @@
 import json
 import math
 
-META = ("label", "ref", "id", "note", "measure")
-# measure = 수동(manual) 조건에 다는 '근거 숫자' 식. 저자가 기준(threshold)을 안 줘 자동 판정은 못 하지만,
-#   계산 가능한 값(종가·5일선·이격 %…)을 화면에 보여줘 사람이 깜깜이로 판단하지 않게 한다. META 로 둬서
-#   _op_of·labeled·labeled_all·warmup_of 가 전부 무시한다 — measure 는 '표시용 증거'일 뿐 등급·수동 극성·
-#   워밍업·수동 잎 목록에 절대 끼지 않는다(노드는 그대로 수동 유지). 그 식의 문법은 validate 가 따로 검사하고,
-#   그 식이 쓰는 심볼은 symbols_of 가 따로 모은다(수집 단계가 빠뜨리지 않게). 값 계산은 tree_grade._measure.
+META = ("label", "ref", "id", "note")
+UNKNOWN = "?"             # 저자가 안 준 숫자 — 이 자리를 품은 판단 노드는 수동(사람이 정함)
+UNKNOWN_REASON = "저자 미명시: 기준 숫자를 주지 않음(식의 ? 자리)"
 PX_FIELDS = ("open", "high", "low", "close", "volume")
 POS_FIELDS = ("ret", "days", "maxret", "minret")
 ARITH = ("add", "sub", "mul", "div", "max", "min")
 TIMEFRAMES = ("1d", "1m", "5m")  # 봉 길이 — asof 축에서 자른다. 일봉은 확정(settled) 일봉, 분봉은 asof 이하
                            # 마지막 분봉, 5분봉은 1분봉을 세션 안에서 5분 OHLC 로 집계한 뒤 asof 이하 마지막.
-                           # 분봉/5분봉 데이터가 연결되기 전까진 "1m"/"5m" 조회는 늘 None(장중 observe → manual).
+                           # 데이터가 없으면 None(모름).
 WINDOW = ("ma", "ema", "stdev", "highest", "lowest", "sum")
 CMP = ("gt", "ge", "lt", "le")
 STREAK_CAP = 400          # 연속·경과일을 거꾸로 셀 때의 상한(데이터 길이보다 길면 무의미)
@@ -123,29 +125,63 @@ def _op_of(node):
     return keys[0]
 
 
+def _has_unknown(x, defs, seen=frozenset()):
+    """식 안에 "?"(저자가 안 준 숫자)가 있나 — def 는 펼쳐 본다."""
+    if x == UNKNOWN:
+        return True
+    if isinstance(x, list):
+        return any(_has_unknown(y, defs, seen) for y in x)
+    if isinstance(x, dict):
+        d = x.get("def")
+        if isinstance(d, str) and d in defs and d not in seen and _has_unknown(defs[d], defs, seen | {d}):
+            return True
+        return any(_has_unknown(y, defs, seen) for k, y in x.items() if k not in META and k != "def")
+    return False
+
+
+def is_unknown(node, defs=None):
+    """"?" 를 품은 판단 노드인가 — 비교(gt/ge/lt/le)의 양쪽 식 어디든 "?", 또는 atleast 의 n 이 "?".
+    저자가 숫자를 안 줘 기계가 참/거짓을 못 정하니 수동처럼 사람이 정한다(manual_as·극성 규칙 그대로)."""
+    if not isinstance(node, dict):
+        return False
+    try:
+        op = _op_of(node)
+    except CondError:
+        return False
+    if op in CMP:
+        return _has_unknown(node[op], defs or {})
+    return op == "atleast" and node["atleast"] == UNKNOWN
+
+
+def is_manual(node, defs=None):
+    """사람이 참/거짓을 정하는 잎 — 문장 수동({"manual"}·observe) 또는 "?" 를 품은 식."""
+    return isinstance(node, dict) and ("manual" in node or is_unknown(node, defs))
+
+
+def manual_text(node):
+    """수동 잎의 사유 문장 — 문장 수동은 그 문장, "?" 식은 공통 사유(무엇을 재는지는 식이 말한다)."""
+    return node["manual"] if "manual" in node else UNKNOWN_REASON
+
+
 def validate(node, defs=None, path="$"):
     """문법 검사. 모르는 연산·키·인자 개수·필드는 전부 CondError(위치 포함)."""
     defs = defs or {}
     if isinstance(node, bool):
         raise CondError("%s: 불리언 상수는 쓰지 않는다(빈 all/any 를 쓴다)" % path)
-    if isinstance(node, (int, float)):
+    if isinstance(node, (int, float)) or node == UNKNOWN:
         return
     if not isinstance(node, dict):
         raise CondError("%s: 노드는 숫자 또는 객체여야 한다: %r" % (path, node))
     op = _op_of(node)
     v = node[op]
 
-    if "measure" in node:
-        # measure 는 수동 조건에만 단다(표시용 근거 숫자). 그 식은 보통의 값/조건 식이라 그대로 validate 한다.
-        if op not in ("manual", "observe"):
-            raise CondError("%s.measure: 수동(manual) 조건에만 단다(op=%s)" % (path, op))
-        validate(node["measure"], defs, path + ".measure")
-
     def two(name):
         if not (isinstance(v, list) and len(v) == 2):
             raise CondError("%s.%s: 인자 2개 [a, b] 여야 한다" % (path, name))
 
     def posint(x, what):
+        if x == UNKNOWN:
+            return
         if not (isinstance(x, int) and not isinstance(x, bool) and x >= 1):
             raise CondError("%s.%s: %s 은 1 이상의 정수여야 한다: %r" % (path, op, what, x))
 
@@ -175,7 +211,7 @@ def validate(node, defs=None, path="$"):
         two(op)
         validate(v[0], defs, path + "." + op + "[0]")
         if op == "lag":
-            if not (isinstance(v[1], int) and not isinstance(v[1], bool) and v[1] >= 0):
+            if v[1] != UNKNOWN and not (isinstance(v[1], int) and not isinstance(v[1], bool) and v[1] >= 0):
                 raise CondError("%s.lag: k 는 0 이상의 정수" % path)
         else:
             posint(v[1], "n")
@@ -470,8 +506,8 @@ def _daily_axis(node, ctx, s_sym):
             if sym == "$s":
                 return None                 # across 안 — 심볼 미확정, 안전하게 당기지 않음
             syms.add(ctx.bind(sym))
-        elif op in _NON_DAILY:
-            return None                     # 수동·포지션·across — 1d-순수 아님
+        elif op in _NON_DAILY or is_unknown(n, ctx.defs):
+            return None                     # 수동("?" 식 포함)·포지션·across — 1d-순수 아님
     if not syms:
         return None                         # px 잎이 없는 순수 숫자/비교식 — 당길 일봉축이 없음
     maps = [ctx.settled_map(sym) for sym in syms]
@@ -505,8 +541,14 @@ def _series(node, ctx, s_sym):
     L = len(ctx.cal)
     if isinstance(node, (int, float)) and not isinstance(node, bool):
         return [float(node)] * L
+    if node == UNKNOWN:
+        return [None] * L                    # 모르는 숫자 — 값은 모름(판단은 그것을 품은 노드가 수동으로)
     op = _op_of(node)
     v = node[op]
+    if is_unknown(node, ctx.defs):
+        return [ctx.manual_as] * L           # 저자가 숫자를 안 준 판단 — 사람이 정한다(수동과 같은 규칙)
+    if op in WINDOW + ("lag", "pct", "rsi", "count") and v[1] == UNKNOWN:
+        return [None] * L                    # 기간을 모름 — 값도 모름
     R = lambda n: series(n, ctx, s_sym)                                   # 논리 묶음용(제외 표지 그대로)
     S = lambda n: [None if x is EXCLUDED else x for x in series(n, ctx, s_sym)]   # 그 밖의 연산용
 
@@ -798,7 +840,9 @@ ZONES = SECTIONS + ("caution", "sizing", "exit")        # 반드시 다 적는 �
 # 판정 JSON(verdict_engine 이 VD.zones 로 실어보냄, ZONES 순서)을 받아 쓴다.
 ZONE_LABELS = {"filter": "필터", "avoid": "회피", "entry": "진입",
                "caution": "조심", "sizing": "비중·분할", "exit": "매도"}
-TREE_TOP = ("version", "defs", "products", "source", "note", "unexpressed")
+TREE_TOP = ("version", "defs", "products", "source", "note", "unexpressed", "review")
+# review = 심판의 판정 근거(구간② 검사기만 읽는다 — 판정·체결엔 안 쓴다): sections{"상품.칸": {winner a|b|custom, why, cases}},
+#   exits{상품: {winner, why}}, scenario_overrides{사례 이름: 사유}, fire_ack{경고문: 사유}. 최종 트리와 한 파일 — 심판만 쓴다.
 PRODUCT_KEYS = ("index", "note", "exit_note") + ZONES
 EXIT_KEYS = ("label", "ref", "note", "when", "sell")
 CAUTION_KEYS = ("label", "ref", "note", "when", "scale")
@@ -924,20 +968,55 @@ def validate_tree(tree):
     return True
 
 
-def compact_json(tree, width=100):
-    """트리 → JSON 문자열. 작은 노드는 한 줄로 접고 구조만 들여써 사람이 검증하기 쉽게 한다.
-    (indent=1 은 {"px": "close"} 같은 조각까지 줄을 쪼개 수천 줄이 된다 — 한 줄에 다 들어가면 접는다.)"""
+def compact_json(obj, width=100):
+    """구간② 파일(후보 a·b · 사례 · 최종 트리)의 유일한 직렬화 — 사람이 검증하기 쉽게 줄 수를 늘리지 않는다.
+    한 줄(width)에 들어가는 노드는 한 줄로 접고, 안 들어가면 구조만 들여쓴다. 숫자·문자열만 든 긴 목록(사례의 시세
+    배열 등)은 원소마다 줄을 바꾸지 않고 width 안에서 이어 붙인다. (indent=1 은 {"px": "close"} 같은 조각까지
+    줄을 쪼개 수천 줄이 된다 — 실제로 moneycopy tree.json 이 9135줄까지 부풀었다.)"""
+    def one(o):
+        return json.dumps(o, ensure_ascii=False, separators=(", ", ": "))
+
     def fmt(o, depth):
-        line = json.dumps(o, ensure_ascii=False, separators=(", ", ": "))
+        line = one(o)
         if len(line) <= width or not isinstance(o, (dict, list)):
             return line
-        br = "\n" + " " * (depth + 1)
+        pad = " " * (depth + 1)
+        if isinstance(o, list) and all(not isinstance(x, (dict, list)) for x in o):
+            rows, cur = [], ""
+            for x in (one(x) for x in o):
+                if cur and len(pad) + len(cur) + len(x) + 2 > width:
+                    rows.append(cur + ",")
+                    cur = x
+                else:
+                    cur = x if not cur else cur + ", " + x
+            rows.append(cur)
+            return "[\n" + "\n".join(pad + r for r in rows) + "\n" + " " * depth + "]"
+        br = "\n" + pad
         if isinstance(o, dict):
-            body = [json.dumps(k, ensure_ascii=False) + ": " + fmt(v, depth + 1) for k, v in o.items()]
+            body = [one(k) + ": " + fmt(v, depth + 1) for k, v in o.items()]
             return "{" + br + ("," + br).join(body) + "\n" + " " * depth + "}"
         body = [fmt(v, depth + 1) for v in o]
         return "[" + br + ("," + br).join(body) + "\n" + " " * depth + "]"
-    return fmt(tree, 0)
+    return fmt(obj, 0) + "\n"
+
+
+def fmt_files(paths):
+    """JSON 파일을 compact_json 형식으로 다시 쓴다(내용 불변 — 다시 읽어 같은지 확인). 추출자·사례 작성자·심판이
+    파일을 쓴 뒤 부르는 공통 도구: python -m shared.cond fmt <파일...>"""
+    for p in paths:
+        obj = json.load(open(p, encoding="utf-8"))
+        text = compact_json(obj)
+        if json.loads(text) != obj:
+            raise CondError("%s: 직렬화가 내용을 바꿨다(버그)" % p)
+        with open(p, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
+        print("%s — %d줄" % (p, text.count("\n")))
+
+
+def is_compact(path):
+    """파일이 compact_json 형식 그대로인가(검사기용)."""
+    raw = open(path, encoding="utf-8").read()
+    return raw == compact_json(json.loads(raw))
 
 
 def zone_nodes(cfg):
@@ -991,8 +1070,6 @@ def symbols_of(tree):
                     out.add(s)
             if "across" in n and isinstance(n["across"], dict):
                 out.update(n["across"].get("syms") or [])
-            if "measure" in n:
-                walk(n["measure"])        # measure 는 META(수동 증거 식)라 아래 루프가 건너뛴다 — 심볼은 모은다
             for k, x in n.items():
                 if k not in META:
                     walk(x)
@@ -1011,10 +1088,24 @@ def symbols_of(tree):
 
 
 def labeled(node, defs=None, acc=None):
-    """라벨 달린 노드 목록(설명·통계용) — def 를 펼쳐 따라간다."""
+    """라벨 달린 노드 목록(설명·통계용) — def 를 펼쳐 따라간다.
+    def 참조 자리는 화면과 같게 'def 본문 위에 자리 META(label·ref·note)를 덮은' 노드 하나로 센다 — 자리의
+    원문 출처(ref)를 잃지 않고, 자리와 본문을 두 번 세지도 않는다."""
     acc = [] if acc is None else acc
     defs = defs or {}
     if isinstance(node, dict):
+        x = node.get("def")
+        if isinstance(x, str) and x in defs and isinstance(defs[x], dict) \
+                and all(k == "def" or k in META for k in node):
+            body = defs[x]
+            site = {k: v for k, v in node.items() if k in ("label", "ref", "note")}
+            eff = dict(body, **site) if site else body
+            if eff.get("label"):
+                acc.append(eff)
+            for k, y in body.items():
+                if k not in META:
+                    labeled(y, defs, acc)
+            return acc
         if node.get("label"):
             acc.append(node)
         for k, x in node.items():
@@ -1029,7 +1120,7 @@ def labeled(node, defs=None, acc=None):
 
 
 def manual_leaves(node, defs=None):
-    return [n for n in labeled_all(node, defs) if isinstance(n, dict) and "manual" in n]
+    return [n for n in labeled_all(node, defs) if is_manual(n, defs)]
 
 
 def labeled_all(node, defs=None, acc=None):
@@ -1081,6 +1172,10 @@ def warmup_of(node, defs=None, _seen=None):
     op = _op_of(node)
     v = node[op]
     w = lambda n: warmup_of(n, defs, _seen)
+    if is_unknown(node, defs):
+        return 0                             # 사람이 정하는 판단 — 기계 lookback 없음
+    if op in WINDOW + ("rsi", "lag", "pct", "count") and v[1] == UNKNOWN:
+        return w(v[0])                       # 기간을 모름 — 그 값은 늘 모름이라 이 창은 워밍업에 안 넣는다
     if op == "px":
         return 0
     if op == "def":
@@ -1131,3 +1226,11 @@ def tree_warmup(tree, prod=None):
         for sec in SECTIONS:
             mx = max(mx, warmup_of(cfg[sec], defs))
     return mx
+
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) >= 3 and sys.argv[1] == "fmt":
+        fmt_files(sys.argv[2:])
+    else:
+        print("사용: python -m shared.cond fmt <json 파일...>   (구간② 파일 공통 직렬화)")

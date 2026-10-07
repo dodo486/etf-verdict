@@ -174,7 +174,7 @@ class ProductEval:
     def caution_state(self, i):
         """[{label, ref, note, scale, value, manual}] — value 는 수동 = 모름으로 둔 평가."""
         return [{"label": r["label"], "ref": r.get("ref"), "note": r.get("note"), "scale": r.get("scale"),
-                 "value": ser[i], "manual": [n["manual"] for n in cond.manual_leaves(r["when"], self.defs)]}
+                 "value": ser[i], "manual": [cond.manual_text(n) for n in cond.manual_leaves(r["when"], self.defs)]}
                 for r, ser in self.caution]
 
     def weight_of(self, i):
@@ -231,7 +231,7 @@ class ProductEval:
             for n in cond.manual_leaves(node, self.defs):
                 if i is not None and "observe" in n and cond.series(n["observe"], self.ctx[None])[i] is not None:
                     continue
-                out.append((z, n.get("label") or n["manual"], n.get("ref")))
+                out.append((z, n.get("label") or cond.manual_text(n), n.get("ref")))
         return out
 
 
@@ -386,7 +386,7 @@ def _measure(node, defs, ctx, i, top=True):
         return []
     if "def" in node and node["def"] in defs and len([k for k in node if k not in cond.META]) == 1:
         return _measure(defs[node["def"]], defs, ctx, i, top)
-    if not top and (node.get("label") or "manual" in node or "observe" in node):
+    if not top and (node.get("label") or cond.is_manual(node, defs) or "observe" in node):
         return []
     try:
         op = cond._op_of(node)
@@ -397,7 +397,8 @@ def _measure(node, defs, ctx, i, top=True):
         lhsd = _describe_operand(a, defs)
         fact = {"op": op,
                 "lhs": _meas_val(a, ctx, i), "lhsd": lhsd,
-                "rhs": _meas_val(b, ctx, i), "rhsd": _describe_operand(b, defs),
+                "rhs": _meas_val(b, ctx, i),
+                "rhsd": _describe_operand(b, defs),     # "?"(저자가 안 준 기준)면 rhs None·rhsd '' — 화면이 '기준 ?'로
                 "unit": _unit_of(a, defs)}
         ins = []                           # 파생값(변화율·산술)이면 무슨 원시 숫자로 나왔는지 함께 보여준다
         _inputs_of(a, ctx, i, defs, ins, set())
@@ -420,87 +421,73 @@ def _measure(node, defs, ctx, i, top=True):
     return facts
 
 
-def _measure_expr(e, defs, ctx, i):
-    """수동 조건의 measure 식을 그날 근거 숫자로 — [{op?, lhs, lhsd, rhs?, rhsd?, unit, inputs?}].
-    저자가 기준(비교 상수)을 줬으면 비교식이라 _measure 가 양쪽 값을 보여준다. 기준을 안 준(대개 그렇다)
-    '값만' 식이면(이격 %·5일 수익률·VIX 변화율 등) 그 값 하나를 fact 로 만들어 보여준다 — 사람이 그 숫자를
-    보고 손으로 참/거짓을 고른다. 값이 못 재지면(None) 빈 목록(붙일 증거 없음)."""
-    if isinstance(e, dict) and _is_cmp(e, defs):
-        return _measure(e, defs, ctx, i)         # 비교식 — 양쪽 값과 연산자까지
-    v = _meas_val(e, ctx, i)
-    if v is None:
-        return []
-    fact = {"lhs": v, "lhsd": _describe_operand(e, defs), "rhs": None, "rhsd": "",
-            "unit": _unit_of(e, defs)}
-    ins = []                                     # 파생값(변화율·산술)이면 무슨 원시 숫자로 나왔는지 함께
-    _inputs_of(e, ctx, i, defs, ins, set())
-    if ins:
-        fact["inputs"] = ins
-    return [fact]
+def _strip_meta(node):
+    """META 를 모든 깊이에서 뗀 식 — "?" 수동 잎의 답 열쇠(같은 식 = 같은 질문)."""
+    if isinstance(node, dict):
+        return {k: _strip_meta(v) for k, v in node.items() if k not in cond.META}
+    if isinstance(node, list):
+        return [_strip_meta(x) for x in node]
+    return node
 
 
-def _is_cmp(e, defs):
-    """식의 가장 바깥 연산이 비교(gt/ge/lt/le)인가 — def 는 펼쳐 본다."""
-    if not isinstance(e, dict):
-        return False
-    if "def" in e and e["def"] in defs and len([k for k in e if k not in cond.META]) == 1:
-        return _is_cmp(defs[e["def"]], defs)
-    try:
-        return cond._op_of(e) in cond.CMP
-    except cond.CondError:
-        return False
-
-
-def _view(node, defs, ctx, i, shared=False):
+def _view(node, defs, ctx, i, shared=False, fold=frozenset()):
     """노드 하나 → 화면 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, hidden?}.
 
     · 논리 노드(all/any/atleast/not)는 op 와 자식 항목 전부를 담는다 — 화면이 사람이 체크한 수동 조건으로
       같은 3값 논리를 다시 계산할 수 있게(not 아래 수동은 극성이 뒤집힌다 — cond 와 같은 규칙).
     · 그 밖의 노드는 그날 값(v)이 고정된 잎이다. 라벨이 없으면 hidden(화면에 안 보이지만 계산엔 쓴다),
       안쪽에 라벨 달린 노드가 있으면 참고용 kids(op 없음 — 다시 계산하지 않는다)로 붙인다.
-    · 라벨 없는 정의 참조는 정의 본문으로, 라벨 달린 정의 참조는 op "ref"(값 = 유일한 자식)로.
+    · 정의 참조는 정의 본문 항목 하나로(자리 META 를 덮어) — 같은 조건을 두 줄로 그리지 않는다.
     · 상품마다 값이 같은 정의(product_specific 아님) 안의 수동 조건은 shared=True — 화면에서 한 번 체크하면
       그 조건을 쓰는 모든 상품에 같은 답이 들어간다(같은 시장 사실이므로).
+    · fold = 화면 다른 곳에 이미 펼쳐 둔 정의 이름들 — 그 참조는 folded 표시(화면은 한 줄, 계산은 kids).
     v 는 수동 = 모름(None)으로 둔 그날 값이다."""
-    if "def" in node and node["def"] in defs and not node.get("label")             and not [k for k in node if k not in cond.META and k != "def"]:
+    if "def" in node and node["def"] in defs and not [k for k in node if k not in cond.META and k != "def"]:
+        # 정의 참조 = 정의 본문 항목 하나(자리 META label·ref·note 를 덮어서) — '자리 줄 + 본문 줄'로 같은 조건을
+        #   두 번 그리지 않고, 자리의 원문 출처는 지킨다(cond.labeled 와 같은 규칙).
         body = defs[node["def"]]
-        return _view(body, defs, ctx, i, shared or not product_specific(body, defs))
+        site = {k: v for k, v in node.items() if k in ("label", "ref", "note")}
+        eff = dict(body, **site) if site and isinstance(body, dict) else body
+        item = _view(eff, defs, ctx, i, shared or not product_specific(body, defs), fold)
+        if node["def"] in fold:
+            item["folded"] = True    # 같은 화면 다른 곳에 펼쳐 둔 조건 — 계산엔 kids 를 쓰되 화면엔 한 줄로
+        return item
     skip = ("of", "sym", "tf", "else") + (("manual",) if "observe" in node else ())
     op = next((k for k in node if k not in cond.META and k not in skip), None)
     item = {"v": cond.series(node, ctx)[i]}
     for k in ("label", "ref", "note"):
         if node.get(k):
             item[k] = node[k]
-    if op in ("manual", "observe"):
+    if cond.is_unknown(node, defs):
+        # 저자가 숫자를 안 준 식("?") — 사람이 정하는 수동 잎. 답을 묶는 열쇠는 식(문장 아님 — 같은 식 = 같은 질문).
+        item["manual"] = cond.UNKNOWN_REASON
+        item["mkey"] = "?" + json.dumps(_strip_meta(node), ensure_ascii=False, sort_keys=True)
+        if shared:
+            item["shared"] = True
+    elif op in ("manual", "observe"):
         item["manual"] = node["manual"]
         if shared:
             item["shared"] = True
         if op == "observe":
             item["observed"] = True              # v 가 있으면 관측값(자동), 없으면 사람 확인
-            item["kids"] = [_view(node["observe"], defs, ctx, i, shared)]
+            item["kids"] = [_view(node["observe"], defs, ctx, i, shared, fold)]
     elif op in LOGICAL:
         kids = node[op] if op in ("all", "any") else (node["of"] if op == "atleast" else [node["not"]])
         kctx = ctx.flipped() if op == "not" else ctx
         item["op"] = op
         if op == "atleast":
             item["n"] = node["atleast"]
-        item["kids"] = [_view(k, defs, kctx, i, shared) for k in kids]
-    elif op == "def":
-        body = defs[node["def"]]
-        item["op"] = "ref"
-        item["kids"] = [_view(body, defs, ctx, i, shared or not product_specific(body, defs))]
+        item["kids"] = [_view(k, defs, kctx, i, shared, fold) for k in kids]
     else:
-        inner = [_view(k, defs, ctx, i, shared) for k in _labeled_inside(node, defs)]
+        inner = [_view(k, defs, ctx, i, shared, fold) for k in _labeled_inside(node, defs)]
         if inner:
             item["kids"] = inner
         if not node.get("label"):
             item["hidden"] = True
-    # 측정 증거 — 화면에 보이는 조건(라벨/수동/관측)에만 그날 실제 값을 붙인다.
-    #   수동(manual)인데 measure 식이 달려 있으면(저자가 기준은 안 줬지만 값은 잴 수 있는 조건) 그 식을 재서
-    #   근거 숫자를 붙인다 — 노드는 그대로 수동 유지(v 는 None, observed 설정·자동 판정 없음). 사람이 그 숫자를
-    #   보고 참/거짓을 손으로 고른다(깜깜이 판단 방지). measure 가 없는 보통 조건은 노드 자체에서 잰다.
-    if node.get("label") or "manual" in node or "observe" in node:
-        facts = _measure_expr(node["measure"], defs, ctx, i) if "measure" in node else _measure(node, defs, ctx, i)
+    # 측정 증거 — 화면에 보이는 조건(라벨/수동/관측)에 그날 실제 값을 붙인다. "?" 식이면 알려진 쪽 값이
+    #   근거 숫자다(기준은 저자가 안 줬으니 사람이 그 숫자를 보고 참/거짓을 고른다 — 깜깜이 판단 방지).
+    if node.get("label") or cond.is_manual(node, defs) or "observe" in node:
+        facts = _measure(node, defs, ctx, i)
         if facts:
             item["detail"] = facts
     return item
@@ -537,7 +524,10 @@ def _top_labeled(node, defs):
     if node.get("label"):
         return [node]
     if "def" in node and node["def"] in defs:
-        return _top_labeled(defs[node["def"]], defs)
+        # 참조 자리 META(label·ref·note)를 def 본문 위에 덮는다 — cond.labeled 와 같은 규칙(자리의 원문 출처 보존)
+        site = {k: v for k, v in node.items() if k in ("label", "ref", "note")}
+        body = defs[node["def"]]
+        return _top_labeled(dict(body, **site) if site and isinstance(body, dict) else body, defs)
     kids = node.get("all") or node.get("any") or (node.get("of") if "atleast" in node else None) or []
     out = []
     for k in kids:

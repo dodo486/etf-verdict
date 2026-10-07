@@ -73,19 +73,55 @@ def _def_users(tree):
 
 
 def common_items(tree, pe):
-    """라벨 달린 정의 중 상품 둘 이상이 같이 보는 것(상품마다 값이 다른 식 제외)."""
+    """라벨 달린 정의 중 상품 둘 이상이 같이 보는 것(상품마다 값이 다른 식 제외) — 공통 칸에서 조건마다 한 번만 펼친다.
+
+    · 다른 공통 조건 안에 들어 있는 정의는 따로 나열하지 않는다(그 펼침에 보인다).
+    · 단, 공통 칸 안에서 두 번 이상 펼쳐질 정의(모드 둘이 같이 쓰는 '반도체 과열', 한 조건 안에 두 번 쓰인 점수 등)는
+      따로 한 번 나열하고, 그 밖의 자리에선 folded(한 줄 — 계산엔 그대로 쓰임)로 둔다. 가장 바깥 것부터 정한다."""
     defs = tree.get("defs") or {}
-    out = []
     users = _def_users(tree)
     i = len(pe.cal) - 1
-    for name, node in defs.items():
-        if not (isinstance(node, dict) and node.get("label")):
-            continue
-        if len(users.get(name, ())) < 2 or tree_grade.product_specific(node, defs):
-            continue
+    shared = [name for name, node in defs.items()
+              if isinstance(node, dict) and node.get("label")
+              and len(users.get(name, ())) >= 2 and not tree_grade.product_specific(node, defs)]
+
+    def refs(n, stop, acc):
+        """n 안의 정의 참조를 센다 — stop(따로 나열한 정의) 안으로는 들어가지 않는다."""
+        if isinstance(n, dict):
+            x = n.get("def")
+            if isinstance(x, str) and x in defs:
+                acc[x] = acc.get(x, 0) + 1
+                if x not in stop:
+                    refs(defs[x], stop, acc)
+            for k, y in n.items():
+                if k not in cond.META and k != "def":
+                    refs(y, stop, acc)
+        elif isinstance(n, list):
+            for y in n:
+                refs(y, stop, acc)
+        return acc
+
+    inside = set()
+    for name in shared:
+        inside |= set(refs(defs[name], set(), {}))
+    listed = [name for name in shared if name not in inside]
+    for _ in range(len(shared)):
+        cnt = {}
+        for name in listed:
+            for x, c in refs(defs[name], set(listed), {}).items():
+                cnt[x] = cnt.get(x, 0) + c
+        cands = {x for x, c in cnt.items() if c >= 2 and x in shared and x not in listed}
+        outer = {x for x in cands if not any(x in refs(defs[y], set(listed), {}) for y in cands if y != x)}
+        if not outer:
+            break
+        listed = [name for name in shared if name in set(listed) | outer]   # 정의 순서 유지
+    fold = frozenset(listed)
+    out = []
+    for name in listed:
+        node = defs[name]
         v = cond.series(node, pe.ctx[None])[i]
         out.append({"name": name, "label": node["label"], "ref": node.get("ref"), "v": v,
-                    "view": tree_grade._view(node, defs, pe.ctx[None], i, shared=True)})
+                    "view": tree_grade._view(node, defs, pe.ctx[None], i, shared=True, fold=fold - {name})})
     return out
 
 
