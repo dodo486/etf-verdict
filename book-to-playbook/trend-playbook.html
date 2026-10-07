@@ -1131,7 +1131,8 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
     const ok = val === null ? '' : (val === want ? ' ok' : ' bad');
     return '<div class="grouplabel ck-zone'+ok+'">'+title+' <span class="ck-zv">'+(val===true?'참':val===false?'거짓':'확인 필요')+'</span></div>';
   }
-  function sellText(s){ return s==='all' ? '남은 전량' : (s.initial!==undefined ? '산 물량의 '+Math.round(s.initial*100)+'%' : '남은 물량의 '+Math.round(s.remaining*100)+'%'); }
+  function sellText(s){ if(s==='all') return '남은 전량'; const ini = s.initial!==undefined, f = ini ? s.initial : s.remaining;
+    return (ini ? '산 물량의 ' : '남은 물량의 ')+(f==null ? '? (비율 저자 미명시)' : Math.round(f*100)+'%'); }
   function cautionOf(v, ans){
     let f = 1; const unspec = [], unk = [];
     (v.caution||[]).forEach((c,i)=>{

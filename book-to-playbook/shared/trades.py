@@ -9,7 +9,7 @@ exit/sizing 규칙을 읽어, 그 규칙을 봉마다 평가해 체결 일정·�
 규칙 리더
   · exits_of    : 책에 매도 규칙이 있으면 그걸, 없으면 표준(STANDARD)을. (규칙 목록, 출처) 로 돌려준다.
   · tranches_of : 분할 매수 차수. 저자가 비율을 안 줬으면(frac null) 전량 한 번(비율을 지어내지 않는다).
-  · tranche_note: 위의 '비율 미명시' 사실을 결과에 표시할 문구.
+  · unsized_note: 분할 비율·매도 비율 '저자 미명시'를 백테스트가 어떻게 계산했는지 결과에 표시할 문구.
   · standard_label / STANDARD : 책에 매도 규칙이 없는 상품에 쓰는 '책 무관 기본값'(결과엔 '표준 기준(책 아님)').
     표준 규칙의 숫자(+9%/−5%/10일)는 코드가 아니라 shared/exit_defaults.json 한 곳에 있다(하드코딩 0 — grade_rules 패턴).
 
@@ -59,14 +59,23 @@ def exits_of(tree, prod):
 
 def tranches_of(tree, prod):
     """시뮬레이션에 쓰는 분할 — 저자가 비율을 안 줬으면(frac null) 전량 한 번으로 계산한다
-    (비율을 지어내지 않는다 — 결과에 tranche_note 로 표시)."""
+    (비율을 지어내지 않는다 — 결과에 unsized_note 로 표시)."""
     trs = (tree["products"][prod].get("sizing") or {}).get("tranches") or FULL
     return FULL if trs[0].get("frac") is None else trs
 
 
-def tranche_note(tree, prod):
+def _sell_frac(sell):
+    """매도 비율 — "all" 이면 1, 아니면 initial/remaining 의 값(null = 저자 미명시)."""
+    return 1 if sell == "all" else next(iter(sell.values()))
+
+
+def unsized_note(tree, prod, exits):
+    """저자가 비율을 안 준 수량 자리를 백테스트가 어떻게 계산했는지 — 없으면 None."""
     trs = (tree["products"][prod].get("sizing") or {}).get("tranches") or []
-    return "분할 비율 저자 미명시 — 전량 한 번 매수로 계산" if trs and trs[0].get("frac") is None else None
+    out = ["분할 비율 저자 미명시 — 전량 한 번 매수로 계산"] if trs and trs[0].get("frac") is None else []
+    out += ["매도 비율 저자 미명시 「%s」 — 팔지 않은 것으로 계산" % r["label"]
+            for r in exits if _sell_frac(r["sell"]) is None]
+    return " · ".join(out) or None
 
 
 # ------------------------------------------------------------------ 규칙 평가 워크: 신호·규칙 → 체결 일정(buys/sells)
@@ -84,7 +93,7 @@ def build_trades(tree, prod, hist, cal, starts, exits, tranches=None):
       · 매도: 매일 종가에 규칙 평가 → 걸리면 다음 날 시가에. 규칙마다 한 번만(같은 날 여럿이면 적힌 순서).
         sell "all"=남은 전량 · {"initial":f}=그때까지 산 물량의 f · {"remaining":f}=남은 물량의 f.
       · 수익률 = (판 금액 + 남은 물량 × 마지막 종가) ÷ 산 금액 − 1. 미청산은 마지막 종가로 평가.
-      · manual 은 '매매가 안 나가는 쪽'으로 푼다(manual_as=False).
+      · manual 은 '매매가 안 나가는 쪽'으로 푼다(manual_as=False). 매도 비율 null(저자 미명시)도 같은 쪽 — 팔지 않는다.
 
     starts = 신호 시작일 인덱스 목록. tranches 생략 = 트리의 분할(tranches_of)."""
     tranches = tranches if tranches is not None else tranches_of(tree, prod)
@@ -123,6 +132,8 @@ def build_trades(tree, prod, hist, cal, starts, exits, tranches=None):
                 if k in fired or whens[k][d] is not True:
                     continue
                 fired.add(k)
+                if _sell_frac(r["sell"]) is None:
+                    continue                      # 비율 저자 미명시 — 팔지 않는다(unsized_note 로 표시)
                 if d + 1 >= L or not opens[d + 1]:
                     continue                      # 다음 날이 없다 — 체결 못 함(미청산으로 남는다)
                 sell = r["sell"]

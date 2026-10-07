@@ -107,6 +107,7 @@
       var std = T.exit_source && T.exit_source !== '책';
       h += '<div class="bt-prod"><h2>' + esc(p) + '<span class="bt-tag' + (std ? ' std' : '') + '">매도: ' + esc(T.exit_source || '-') + '</span></h2>';
       h += '<p class="bt-sub">기간 보유(처음~끝) ' + pct(S.buy_hold, 1) + '</p>';
+      if (T.unsized_note) h += '<p class="bt-sub">⚠ ' + esc(T.unsized_note) + '</p>';
 
       // 포트폴리오 지표(vectorbt 계산기) — 총수익·MDD·샤프 + 자산곡선. 수수료·세금 반영(단순 가격차보다 보수적).
       var V = S.vectorbt;

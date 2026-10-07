@@ -131,7 +131,7 @@ def run(slug, days=365, hist=None, tree=None, unobserved=None):
             prev = b
         exits, src = trades_mod.exits_of(tree, p)
         tl = trades_mod.build_trades(tree, p, hist, cal, starts, exits)
-        trade_res[p] = {"exit_source": src, "tranche_note": trades_mod.tranche_note(tree, p),
+        trade_res[p] = {"exit_source": src, "unsized_note": trades_mod.unsized_note(tree, p, exits),
                         "stats": trades_mod._parity_stats(tl), "trades": tl}
         manual[p] = [{"section": s, "rule": l, "ref": r} for s, l, r in pe.manual_items()]
         if prow and period is None:

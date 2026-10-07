@@ -874,17 +874,22 @@ def _rule_list(rules, keys, path, need):
     return out
 
 
+def _frac_or_null(f):
+    """수량 자리(scale·frac·sell 비율) — 0 초과 1 이하의 수, 또는 null(저자 미명시)."""
+    return f is None or (isinstance(f, (int, float)) and not isinstance(f, bool) and 0 < f <= 1)
+
+
 def validate_exits(rules, defs, path):
-    """매도 규칙 목록: [{label, ref, when, sell}] — sell = "all" | {"initial": f} | {"remaining": f}."""
+    """매도 규칙 목록: [{label, ref, when, sell}] — sell = "all" | {"initial": f} | {"remaining": f}.
+    f = 0<f<=1, 또는 null(줄일 비율 저자 미명시 — caution.scale·tranches.frac 과 같은 규칙)."""
     for pp, r in _rule_list(rules, EXIT_KEYS, path, ("label", "when", "sell")):
         validate(r["when"], defs, pp + ".when")
         sell = r["sell"]
         ok = sell == "all" or (isinstance(sell, dict) and len(sell) == 1
                                and next(iter(sell)) in ("initial", "remaining")
-                               and isinstance(next(iter(sell.values())), (int, float))
-                               and 0 < next(iter(sell.values())) <= 1)
+                               and _frac_or_null(next(iter(sell.values()))))
         if not ok:
-            raise CondError("%s.sell: \"all\" 또는 {\"initial\"|\"remaining\": 0~1} 이어야 한다" % pp)
+            raise CondError("%s.sell: \"all\" 또는 {\"initial\"|\"remaining\": 0~1|null} 이어야 한다" % pp)
 
 
 def validate_caution(rules, defs, path):
@@ -896,7 +901,7 @@ def validate_caution(rules, defs, path):
         if "scale" not in r:
             raise CondError("%s: scale 을 명시한다(폭을 저자가 안 줬으면 null)" % pp)
         sc = r["scale"]
-        if sc is not None and not (isinstance(sc, (int, float)) and not isinstance(sc, bool) and 0 < sc <= 1):
+        if not _frac_or_null(sc):
             raise CondError("%s.scale: 0 초과 1 이하의 수 또는 null" % pp)
 
 
@@ -920,7 +925,7 @@ def validate_sizing(sz, defs, path):
         if "frac" not in t:
             raise CondError("%s: frac 을 명시한다(저자가 비율을 안 줬으면 null)" % pp)
         f = t["frac"]
-        if f is not None and not (isinstance(f, (int, float)) and not isinstance(f, bool) and 0 < f <= 1):
+        if not _frac_or_null(f):
             raise CondError("%s.frac: 0 초과 1 이하 또는 null" % pp)
         if k == 0 and "when" in t:
             raise CondError("%s: 1차는 when 없이 매수 신호 날 산다" % pp)

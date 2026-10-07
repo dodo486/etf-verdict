@@ -317,6 +317,10 @@ def t_pos(rng):
             FAILS.append("잘못된 매도 규칙 통과: %r" % ex)
         except cond.CondError:
             pass
+    try:
+        cond.validate_exits([{"label": "축소", "when": {"gt": [{"pos": "ret"}, 1]}, "sell": {"remaining": None}}], {}, "exit")
+    except cond.CondError as e:
+        FAILS.append("매도 비율 null(저자 미명시) 거부: %s" % e)
 
 
 def t_trades():
@@ -368,6 +372,11 @@ def t_trades():
     tree, hist, cal = mk(rows)
     t = trades_mod.build_trades(tree, "X", hist, cal, [0], [{"label": "1차", "when": {"ge": [R, 7]}, "sell": {"initial": 0.3}}])[0]
     check(len(t["sells"]) == 1, "규칙 한 번만")
+    # (5) 매도 비율 null(저자 미명시) — 걸려도 팔지 않고 문구로 드러낸다
+    ex = [{"label": "축소", "when": {"ge": [R, 7]}, "sell": {"remaining": None}}]
+    t = trades_mod.build_trades(tree, "X", hist, cal, [0], ex)[0]
+    check(t["sells"] == [] and not t["closed"], "비율 미명시 매도는 팔지 않음 %r" % t["sells"])
+    check("「축소」" in (trades_mod.unsized_note(tree, "X", ex) or ""), "비율 미명시 매도 문구")
     # (5) 마지막 날 신호 → 다음 날이 없어 체결 못 함(미청산), fixed20 은 20거래일 모자라면 None
     rows = [(100, 100), (100, 100), (100, 120)]
     tree, hist, cal = mk(rows)
