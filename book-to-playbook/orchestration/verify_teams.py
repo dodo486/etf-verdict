@@ -11,6 +11,7 @@
   · operations/ 구간④ 확정 트리 → 돈·성적 계산기(백테스트 엔진)
   · shared/     공통층(모든 팀이 쓰는 유일한 공용 코드)
   · publish/    발행·서빙층(팀 산출물의 소비자·조립자)
+  · orchestration/ 조립·감사층(run 러너·verify_structure·verify_teams — 전 구간을 실행·검사만)
 
 팀 사이 인터페이스는 **코드가 아니라 산출물 파일**(books/<slug>/*.json)이다.
 팀 코드가 다른 팀 코드를 import 하는 순간 그 약속이 깨지고, 예전처럼
@@ -34,7 +35,7 @@
 
 ## 사용
 
-    python -m verify_teams        # 위반 있으면 exit 1 (run.py 발행 게이트에 포함)
+    python -m orchestration.verify_teams   # 위반 있으면 exit 1 (orchestration.run 발행 게이트에 포함)
 """
 import ast
 import os
@@ -44,7 +45,7 @@ from shared import paths  # noqa: F401  (경로·UTF-8 출력 고정)
 from shared.paths import BASE
 
 TEAMS = ("playbook", "checklist", "verdict")
-LAYERS = TEAMS + ("shared", "publish", "operations")
+LAYERS = TEAMS + ("shared", "publish", "operations", "orchestration")
 
 # 시세 자가수집에 쓰이는 모듈들 — 팀 폴더에서 보이면 그 자체로 위반.
 NET_MODULES = {"urllib", "http", "requests", "socket", "aiohttp", "httpx"}

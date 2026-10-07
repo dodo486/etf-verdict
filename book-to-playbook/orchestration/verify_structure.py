@@ -8,7 +8,7 @@
   ③ checklist.verify_tree     — 체크리스트(조건 트리)가 원문 뜻대로 동작하나(이중 추출·원문 사례·발화 통계)
 
 여기 묶는 것과 등급:
-  verify_teams                     팀 경계·jhts 단일 창구        0 통과 · 그 외 정지
+  orchestration.verify_teams       팀 경계·jhts 단일 창구        0 통과 · 그 외 정지
   playbook.verify_source_integrity 플레이북 본문 불변(해시)        0 통과 · 그 외 정지
   책 계약(이 파일)                  라이브 책마다:
       · books/<slug>/source_index.json — 원문이 소절 단위로 잘려 있다(소절 키 = 체크리스트 ref)
@@ -18,7 +18,7 @@
                                     위반 → 정지
 
 종료코드: 0 통과 · 1 정지.
-사용: python -m verify_structure
+사용: python -m orchestration.verify_structure
 """
 import json
 import os
@@ -29,7 +29,7 @@ from shared import paths  # noqa: F401  (UTF-8 출력)
 from shared.paths import BASE, live_slugs, playbook_src, read_text
 from shared import cond
 
-CHECKS = ["verify_teams", "playbook.verify_source_integrity"]
+CHECKS = ["orchestration.verify_teams", "playbook.verify_source_integrity"]
 PAGE_IDS = ('id="src"', 'id="verdict-data"', 'id="sheet-root"')
 
 

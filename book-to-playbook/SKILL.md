@@ -29,7 +29,7 @@ description: 트레이딩 책을 읽어 실전 매매 플레이북 + 기계가 �
 
 ## ⛔ 절대 규칙 3 — 검사는 실행으로, 책이 계약에 맞춘다
 
-검사는 글자가 아니라 실행으로 본다(검사기 3개, `run.py` 가 매 발행마다 돈다). 통과시키려고 검사를 느슨하게 만들지 않는다.
+검사는 글자가 아니라 실행으로 본다(검사기 3개, `orchestration.run` 이 매 발행마다 돈다). 통과시키려고 검사를 느슨하게 만들지 않는다.
 책 계약(`verify_structure`): 원문 소절 인덱스 · 트리 문법(여섯 칸 전부) · 트리 ref 가 실제 소절 · 페이지 구획과 UI 사본.
 
 ## 새 책 절차
@@ -43,7 +43,7 @@ description: 트레이딩 책을 읽어 실전 매매 플레이북 + 기계가 �
 3) 페이지        trend-playbook.html 을 베이스로 #src·머리말(제목·상품 소개)만 교체.
                  시트 패널은 #verdict-data + #sheet-root 골격 그대로(UI 는 publish/ui/*.js 가 주입된다).
 4) 체크리스트    checklist/README.md 절차대로(추출자 a·b → 사례 작성자 → 심판 → verify_tree 통과)
-5) 등록·배포     books.json 에 항목(slug/title/tickers/desc/live/engine.daily) → python run.py daily
+5) 등록·배포     books.json 에 항목(slug/title/tickers/desc/live/engine.daily) → python -m orchestration.run daily
 ```
 
 ### 검사 실패 → 고칠 곳 (체크리스트 채점 `verify_tree` 는 `checklist/README.md`)
@@ -59,7 +59,7 @@ description: 트레이딩 책을 읽어 실전 매매 플레이북 + 기계가 �
 - 스캔 PDF만 있음 → 먼저 이미지화→OCR→청킹(jhts 파이프라인 재사용) 후 1)
 
 ## 판정 운영
-`python run.py daily` — 책마다 `verdict.verdict_engine`(알림 + latest-verdict JSON) → `operations.backtest --page`(구간④) → 발행 →
-검사 3종 → 통과 시 git 커밋·푸시. `python run.py watch [--every N]` 는 asof=지금으로 N분마다 재판정(장중 포함).
+`python -m orchestration.run daily` — 책마다 `verdict.verdict_engine`(알림 + latest-verdict JSON) → `operations.backtest --page`(구간④) → 발행 →
+검사 3종. `python -m orchestration.run watch [--every N]` 는 asof=지금으로 N분마다 재판정(장중 포함).
 알림은 `telegram.env`(TELEGRAM_BOT_TOKEN/CHAT_ID)가 있으면 텔레그램, 없으면 데스크톱. 시세는 jhts 패키지(`PYTHONPATH`)에서만
 온다. 스케줄 등록·내 포지션 파일은 `SETUP.md`.

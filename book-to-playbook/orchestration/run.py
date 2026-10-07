@@ -7,8 +7,8 @@ run.sh(bash + /opt/homebrew/bin/python3 하드코딩)를 대체한다.
 homebrew·python.org·Microsoft Store 어느 설치본이든 그대로 동작한다.
 
 사용법
-  python run.py daily        # 판정(체크리스트 = 조건 트리) → 알림 → 백테스트 (장 마감 후). 화면은 라이브 서버가 맡는다.
-  python run.py watch [--every N]  # asof=지금 기준으로 N분(기본 5)마다 재판정(백테스트 제외).
+  python -m orchestration.run daily        # 판정(체크리스트 = 조건 트리) → 알림 → 백테스트 (장 마감 후). 화면은 라이브 서버가 맡는다.
+  python -m orchestration.run watch [--every N]  # asof=지금 기준으로 N분(기본 5)마다 재판정(백테스트 제외).
                              #   장중 조건은 asof(관측 시점) 기준 분봉을 본다 — 분봉이 연결되면 그대로 살아난다.
   python -m publish.serve    # 화면 보기 — 셸(책목록)+모든 책을 실시간 서빙(정적 스냅샷 폐지)
 
@@ -170,7 +170,7 @@ def main(argv):
     #   ② verdict.verify_primitives 조건 트리 원시 연산이 계산을 맞게 하나(실행 검사)
     #   ③ checklist.verify_tree     체크리스트가 원문 뜻대로 동작하나(이중 추출·원문 사례·발화 통계·비중 합)
     # 등급: 0 통과 · 1 정지 · 2 경고.
-    checks = ["verify_structure"]   # 발행물·구조 점검 — 트리와 무관, 항상 돈다
+    checks = ["orchestration.verify_structure"]   # 발행물·구조 점검 — 트리와 무관, 항상 돈다
     if not no_verify_tree:
         checks += ["verdict.verify_primitives", "checklist.verify_tree"]
     else:
@@ -186,7 +186,7 @@ def main(argv):
         r.say("  [%s] 종료코드 %d" % (script, code))
 
     blocking = []
-    labels = {"verify_structure": "형식·구조 위반",
+    labels = {"orchestration.verify_structure": "형식·구조 위반",
               "verdict.verify_primitives": "원시함수 계산 오류",
               "checklist.verify_tree": "규칙 동작 검사 실패(트리 없음·미심판 불일치·원문 사례 불일치 등)"}
     for script in checks:

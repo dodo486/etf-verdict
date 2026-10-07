@@ -55,23 +55,23 @@ PYTHONPATH=C:\Users\<사용자>\jhts
 ## 3. 수동 실행
 
 ```
-python run.py daily        # 판정 → 백테스트 → 발행 (장 마감 후)
-python run.py watch [--every N]  # asof=지금 기준 N분(기본 5)마다 재판정 → 발행(장중 포함)
-python run.py publish      # 재판정 없이 현재 JSON으로 발행만
+python -m orchestration.run daily        # 판정 → 백테스트 → 발행 (장 마감 후)
+python -m orchestration.run watch [--every N]  # asof=지금 기준 N분(기본 5)마다 재판정 → 발행(장중 포함)
+python -m orchestration.run publish      # 재판정 없이 현재 JSON으로 발행만
 ```
 
-옵션: `--no-git`(커밋/푸시 생략) · `--no-push`(커밋만) · `--quiet`
+옵션: `--quiet`(콘솔 최소화) · `--no-verify-tree`(트리 검수 생략 — 트리 안정 후)
 
 래퍼도 있다 — macOS/Linux는 `./run.sh`, Windows는 `run.cmd`.
 파이썬 경로를 고정하고 싶으면 `BOOK_TO_PLAYBOOK_PYTHON` 환경변수를 쓴다.
 
-첫 실행은 `--no-git` 으로 결과를 눈으로 확인한 뒤 자동화에 걸 것.
+첫 실행은 콘솔 출력을 눈으로 확인한 뒤 자동화에 걸 것(자동 git 푸시는 없다 — 커밋은 직접 한다).
 
 ## 4. 스케줄 등록
 
 운용 주기: **화~토 08:00 (KST)** — 미국 장 마감 후 종가 기준 판정. 필요에 맞게 바꾼다.
 (이건 발행 스케줄일 뿐 판정 시점의 제한이 아니다 — 판정은 보는 그 순간(asof) 기준이고, 장중에도
-`python run.py watch [--every N]` 이 asof=지금으로 N분마다 재판정한다.)
+`python -m orchestration.run watch [--every N]` 이 asof=지금으로 N분마다 재판정한다.)
 
 ### macOS (launchd)
 

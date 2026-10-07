@@ -40,5 +40,5 @@
 
 ## 실행 환경 메모
 
-- 검증: `verify_teams.py`·`verify_structure.py` 는 **레포 루트 스크립트**(`python -m verdict.*` 아님). venv = `.venv`.
+- 검증: `orchestration/verify_teams.py`·`verify_structure.py` 는 **조립·감사층**(`python -m orchestration.verify_teams` / `.verify_structure`). venv = `.venv`.
 - `scenarios.json` 은 옛 즉석본이라 신뢰 말 것 — 구간② 재실행 시 `SCENARIO.md`(② 단계)가 자동으로 새로 덮어쓴다.

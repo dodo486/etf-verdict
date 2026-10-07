@@ -13,7 +13,7 @@
 ## 팀 구조 (폴더 = 조직도)
 
 팀 코드는 **자기 팀 + shared/**만 import 한다 — 팀 사이 인터페이스는 산출물 파일(`books/<slug>/*.json`)이다.
-경계는 `verify_teams.py` 가 매 발행마다 기계로 강제한다.
+경계는 `orchestration/verify_teams.py` 가 매 발행마다 기계로 강제한다.
 
 | 폴더 | 구간 | 하는 일 | 산출물(다음 팀의 입력) |
 |---|---|---|---|
@@ -23,7 +23,7 @@
 | `operations/` | ④ 확정 트리 → 돈·성적 계산기 | 백테스트·장중·웹뷰어가 소비하는 vectorbt 돈/지표 계산(단방향 폭포수: verdict 산출물·shared 규칙결과를 읽기만) | `backtest-<slug>.json` |
 | `shared/` | 공통층 | **트리의 뜻 한 벌**(cond 문법·tree_grade 판정·trades 체결) · **시세 창구 md_feed** · paths | — |
 | `publish/` | 발행·서빙층 | 화면 UI(ui/*.js 주입) · 페이지 조립 · 로컬 실시간 서버 · 홈 | (serve 가 매 요청 그림) |
-| (루트) | 조립·감사 | `run.py`(러너) · `verify_structure.py`(구조·책 계약) · `verify_teams.py`(경계) | — |
+| `orchestration/` | 조립·감사 | `run.py`(러너) · `verify_structure.py`(구조·책 계약) · `verify_teams.py`(경계) — 전 구간 실행·검사 | — |
 
 트리의 뜻(문법·등급·체결)을 shared/ 에 한 벌만 두는 이유: ②가 트리를 검사할 때 본 동작과 ③이 판정할 때의 동작이
 **같은 코드**여야 둘이 갈라지지 않는다.
@@ -59,7 +59,7 @@
 
 봉 단위(`tf`: 1d·1m·5m)는 시세 노드의 속성이다 — 일봉·분봉을 따로 다루지 않는다. 데이터 연결 여부는 트리와 무관하다.
 
-## 검증층 — 검사기 3개 (발행 관문, `run.py`)
+## 검증층 — 검사기 3개 (발행 관문, `orchestration.run`)
 
 | # | 검사기 | 보는 것 |
 |---|---|---|
@@ -80,24 +80,24 @@
    → 심판(`checklist/JUDGE.md`)이 비교 도구(`--dump`)로 다른 곳을 보고 원문과 대조해 최종 `tree.json`(`review` 포함)을 직접 쓴다
    → `python -m checklist.verify_tree <slug>` 통과.
 4. **페이지**: `trend-playbook.html` 을 베이스로 `#src` 와 머리말만 교체(시트 패널은 `#verdict-data` + `#sheet-root` 골격 그대로).
-5. **등록**: `books.json` 에 항목(slug/title/tickers/desc/live/engine). `python -m verify_structure` 의 책 계약이 통과해야 한다.
-6. **배포**: `python run.py daily`.
+5. **등록**: `books.json` 에 항목(slug/title/tickers/desc/live/engine). `python -m orchestration.verify_structure` 의 책 계약이 통과해야 한다.
+6. **배포**: `python -m orchestration.run daily`.
 
 수집 요청서는 없다 — 트리가 쓰는 심볼이 곧 수집 목록이고, jhts 에 없는 심볼은 수집 요청이 자동으로 남는다.
 
 ## 실행
 
 ```
-python run.py daily        # 판정 → 백테스트 → 발행 → 검사 3종 → (통과 시) git 커밋·푸시
-python run.py watch [--every N] # asof=지금 기준 N분(기본 5)마다 재판정 → 발행(백테스트 제외) — 장중 조건은 분봉이 연결되면 살아난다
-python run.py publish      # 재판정 없이 발행만
+python -m orchestration.run daily        # 판정 → 백테스트 → 발행 → 검사 3종
+python -m orchestration.run watch [--every N] # asof=지금 기준 N분(기본 5)마다 재판정 → 발행(백테스트 제외) — 장중 조건은 분봉이 연결되면 살아난다
+python -m orchestration.run publish      # 재판정 없이 발행만
 python -m verdict.verdict_engine <slug> [--json] [--no-send]   # 오늘 판정
 python -m operations.backtest <slug> [--days 365] | --page     # 백테스트(로그 / 페이지 탭 데이터, 구간④)
 python -m publish.serve                                         # 로컬 실시간 서버(RUN.md)
 ```
 
 환경: jhts 시세 패키지가 pip 설치가 아니면 `PYTHONPATH=<jhts 경로>` 를 줘야 시세가 들어온다(없으면 판정이 ❔).
-스케줄러로 돌릴 때는 `local.env`(커밋 안 함, `local.env.example` 참고)에 적어 두면 `run.py` 가 읽는다.
+스케줄러로 돌릴 때는 `local.env`(커밋 안 함, `local.env.example` 참고)에 적어 두면 `orchestration.run` 이 읽는다.
 
 ## 구성 파일
 

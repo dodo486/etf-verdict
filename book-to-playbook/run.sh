@@ -21,4 +21,5 @@ if [ -z "$PY" ]; then
 fi
 
 if [ "$#" -eq 0 ]; then set -- daily; fi
-exec "$PY" "$DIR/run.py" "$@"
+cd "$DIR" || exit 1
+exec "$PY" -m orchestration.run "$@"

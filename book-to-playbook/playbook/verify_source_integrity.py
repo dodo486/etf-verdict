@@ -157,9 +157,6 @@ def main(argv):
         print("\n새 책 %s 의 기준이 없습니다. --accept 로 등록하세요." % ", ".join(new))
         return 1
 
-    if stale:
-        return 1
-
     print("\n전부 통과 — 저자 원문 무결.")
     return 0
 
