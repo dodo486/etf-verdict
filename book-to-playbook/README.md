@@ -18,11 +18,11 @@
 | 폴더 | 구간 | 하는 일 | 산출물(다음 팀의 입력) |
 |---|---|---|---|
 | `playbook/` | ① 책 원본 → 플레이북 | 원문 소절 인덱싱 · 플레이북 본문 무결 | `source_index.json` · `<slug>-playbook.html` 의 `#src` |
-| `checklist/` | ② 플레이북 → 체크리스트 | 조건 트리 추출·심판·검사 · 화면 UI | **`books/<slug>/tree.json`** |
+| `checklist/` | ② 플레이북 → 체크리스트 | 조건 트리 추출·심판·검사 | **`books/<slug>/tree.json`** |
 | `verdict/` | ③ 체크리스트 → 수집·판정 | 트리가 쓰는 심볼 수집(jhts) · 판정 | `latest-verdict-<slug>.json` |
 | `operations/` | ④ 확정 트리 → 돈·성적 계산기 | 백테스트·장중·웹뷰어가 소비하는 vectorbt 돈/지표 계산(단방향 폭포수: verdict 산출물·shared 규칙결과를 읽기만) | `backtest-<slug>.json` |
 | `shared/` | 공통층 | **트리의 뜻 한 벌**(cond 문법·tree_grade 판정·trades 체결) · **시세 창구 md_feed** · paths | — |
-| `publish/` | 발행·서빙층 | 페이지 조립(로컬 실시간 서버) · 홈 | (serve 가 매 요청 그림) |
+| `publish/` | 발행·서빙층 | 화면 UI(ui/*.js 주입) · 페이지 조립 · 로컬 실시간 서버 · 홈 | (serve 가 매 요청 그림) |
 | (루트) | 조립·감사 | `run.py`(러너) · `verify_structure.py`(구조·책 계약) · `verify_teams.py`(경계) | — |
 
 트리의 뜻(문법·등급·체결)을 shared/ 에 한 벌만 두는 이유: ②가 트리를 검사할 때 본 동작과 ③이 판정할 때의 동작이
@@ -113,7 +113,7 @@ python -m publish.serve                                         # 로컬 실시�
 | `checklist/EXTRACTOR.md` · `SCENARIO.md` · `JUDGE.md` | 추출자 · 사례 작성자 · 심판 지침(역할마다 하나 — 서브에이전트 프롬프트 정본) |
 | `checklist/COND_DSL.md` | 트리 문법(트리를 쓰는 추출자·심판의 참고서) |
 | `checklist/verify_tree.py` | 트리 검사(트리를 만들지 않음) |
-| `checklist/ui/*.js` · `checklist/inject_ui.py` | 화면 JS(책 무관 공유) · 페이지 주입 |
+| `publish/ui/*.js` · `publish/inject_ui.py` | 화면 JS(책 무관 공유) · 페이지 주입 |
 | `shared/cond.py` · `shared/tree_grade.py` · `shared/trades.py` | 트리 문법·평가기 · 판정(등급·금액·비중·포지션) · 체결(분할·매도) |
 | `shared/md_feed.py` | **jhts 시세 창구 — 유일한 수집 입구**(없으면 수집 요청) |
 | `verdict/verdict_engine.py` · `verdict/notify.py` | 오늘 판정 · 알림 송신(텔레그램·데스크톱, 구간③ 소유) |

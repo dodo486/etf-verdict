@@ -41,7 +41,7 @@ description: 트레이딩 책을 읽어 실전 매매 플레이북 + 기계가 �
                  → 전사 대조 감사(별도 서브에이전트) → python -m playbook.verify_source_integrity --accept --why "새 책".
                  산출물 2개: 전사본(=구간② 입력) · 사람용 요약 뷰(비핵심·파생). 세부는 playbook/PLAYBOOK.md.
 3) 페이지        trend-playbook.html 을 베이스로 #src·머리말(제목·상품 소개)만 교체.
-                 시트 패널은 #verdict-data + #sheet-root 골격 그대로(UI 는 checklist/ui/*.js 가 주입된다).
+                 시트 패널은 #verdict-data + #sheet-root 골격 그대로(UI 는 publish/ui/*.js 가 주입된다).
 4) 체크리스트    checklist/README.md 절차대로(추출자 a·b → 사례 작성자 → 심판 → verify_tree 통과)
 5) 등록·배포     books.json 에 항목(slug/title/tickers/desc/live/engine.daily) → python run.py daily
 ```

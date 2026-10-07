@@ -40,8 +40,8 @@ HTML 안의 것은 사본일 뿐이고, 고치는 곳은 언제나 `ui/<name>.js
 
 ## 사용
 
-    python -m checklist.inject_ui <target.html>            # 모든 구획을 ui/<name>.js 로 갱신 주입
-    python -m checklist.inject_ui <target.html> --check    # 사본과 파일이 다르면 exit 1
+    python -m publish.inject_ui <target.html>            # 모든 구획을 ui/<name>.js 로 갱신 주입
+    python -m publish.inject_ui <target.html> --check    # 사본과 파일이 다르면 exit 1
 
 책-무관: 대상 HTML 경로만 받는다(특정 책 하드코딩 없음).
 import 해서 `inject(html)` / `check(html)` 로도 쓴다(모든 구획을 한 번에 처리).
@@ -55,7 +55,8 @@ import os
 import re
 import sys
 
-# UI JS 는 이 팀(checklist/)의 소유물이라 팀 폴더 안(checklist/ui/)에 함께 산다.
+# UI JS 는 발행·서빙층(publish/)의 소유물이라 publish/ui/ 에 함께 산다 — 화면 표시는 '발행'의 일이다
+# (예전엔 구간② checklist/ 에 있었으나, 트리 만들기와 섞이지 않게 publish 로 옮겼다).
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
 # 이름 → ui/<name>.js. 대상 HTML 에 그 이름의 센티넬 구간이 있을 때만 처리한다.

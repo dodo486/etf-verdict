@@ -71,7 +71,7 @@ def book_contract(slug):
         for pid in PAGE_IDS:
             if pid not in html:
                 bad.append("책 페이지에 %s 가 없다" % pid)
-        from checklist.inject_ui import check as ui_check
+        from publish.inject_ui import check as ui_check
         ok, msg = ui_check(html)
         if not ok:
             bad.append("공유 UI 구획: %s" % msg.split("\n")[0])
