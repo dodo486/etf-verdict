@@ -239,7 +239,7 @@ def t_live_path():
     # 실전 경로 = 판정기(trading/signal/judge) + 그 Decision 을 판정 JSON 으로 빚는 web/verdict_view(구간③은 web 을 import
     #   하지 않으므로 소스 글자로 읽는다).
     for name, src in (("trading/signal/judge.py", inspect.getsource(judge)),
-                      ("web/verdict_view.py", read_text(os.path.join(BASE, "web", "verdict_view.py")))):
+                      ("web/display/verdict_view.py", read_text(os.path.join(BASE, "web", "display", "verdict_view.py")))):
         check('unobserved="exclude"' not in src and "unobserved='exclude'" not in src,
               "%s 실전 경로가 unobserved=exclude 를 쓰지 않아야(백테스트 전용)" % name)
 

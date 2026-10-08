@@ -3,7 +3,7 @@
 """구간③ 공통 도구 — 여러 진입점이 똑같이 하던 '책 열기' 한 곳.
 
 open_history(slug) : 트리 열고(출입구) · 없으면 정지 · 시세는 Grade.history_back 로 받는다.
-  backtest.run · web.backtest_page · verify_trading 이
+  backtest.run · web.display.backtest_page · verify_trading 이
   각자 복붙하던 preamble(로드+가드+시세)을 흡수한다. tree·hist 를 주면 그대로 쓴다(바깥이 이미 받아둔 걸 두 번 안 받게).
 """
 from checklist.tradeTool import Grade

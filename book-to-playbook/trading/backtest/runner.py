@@ -22,9 +22,9 @@
 '✅+🟡' 줄은 수동 조건이 전부 확인됐다고 가정한 낙관치다.
 
 사용:
-    python -m trading.backtest <slug> [--days 365]   → books/<slug>/logs/backtest.json (일별 행 뺀 요약은 stdout)
-(책 페이지 '백테스트' 탭 데이터는 웹 화면층 web/backtest_page.py 가 이 run() 결과로 빚는다 —
- 자산곡선·MaxDD·샤프 등 계산기 지표는 web.backtest_page 가 trading.portfolio 를 직접 불러 낸다.)
+    python -m trading.backtest.runner <slug> [--days 365]   → books/<slug>/logs/backtest.json (일별 행 뺀 요약은 stdout)
+(책 페이지 '백테스트' 탭 데이터는 웹 화면층 web/display/backtest_page.py 가 이 run() 결과로 빚는다 —
+ 자산곡선·MaxDD·샤프 등 계산기 지표는 web.display.backtest_page 가 trading.portfolio 를 직접 불러 낸다.)
 """
 import json
 import statistics
@@ -138,12 +138,12 @@ def run(slug, days=365, hist=None, tree=None, unobserved=None):
             "summary": summary, "trades": trade_res, "daily": rows, "generated": today.isoformat(timespec="seconds")}
 
 
-# ------------------------------------------------------------------ CLI(디버그용 — JSON. 화면 데이터는 web.backtest_page 가 빚는다)
+# ------------------------------------------------------------------ CLI(디버그용 — JSON. 화면 데이터는 web.display.backtest_page 가 빚는다)
 def _cli():
     argv = sys.argv[1:]
     slug = next((a for a in argv if not a.startswith("-") and not a.isdigit()), None)
     if not slug:
-        print("사용법: python -m trading.backtest <slug> [--days 365]", file=sys.stderr)
+        print("사용법: python -m trading.backtest.runner <slug> [--days 365]", file=sys.stderr)
         sys.exit(2)
     days = int(argv[argv.index("--days") + 1]) if "--days" in argv else 365
     unobserved = "exclude" if "--exclude-unobserved" in argv else None

@@ -84,9 +84,9 @@ def assemble(slug, data):
             raise ValueError("verdict-data 블록을 찾지 못함(%s)" % slug)
         blob = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
         html = VERDICT_RE.sub(lambda m: m.group(1) + blob + m.group(3), html)
-    from web.inject_ui import inject as _inject_ui
+    from web.display.inject_ui import inject as _inject_ui
     html = _inject_ui(html)
-    from web.inject_nav import inject as _inject_nav
+    from web.display.inject_nav import inject as _inject_nav
     html = _inject_nav(html, slug)
     html = _inject_source(html, slug)
     return _inject_backtest(html, slug)

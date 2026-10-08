@@ -7,7 +7,7 @@
 대조한다.
 
 --pages — 라이브 책마다 책 페이지(books/<slug>/playbook.html)에 #src · #verdict-data · #sheet-root 와 공유 UI 구획
-전부가 있고 사본이 web/ui/*.js 와 같은가(web.inject_ui.check). 실패 → 정지.
+전부가 있고 사본이 web/ui/*.js 와 같은가(web.display.inject_ui.check). 실패 → 정지.
 
 사용: python -m web.verify_view            (실패 있으면 exit 1)
       python -m web.verify_view --pages    (책 페이지 구조 — orchestration.run 이 항상 돌린다)
@@ -19,7 +19,7 @@ from shared import paths  # noqa: F401  (UTF-8 출력)
 from shared.paths import live_slugs, playbook_html, read_text
 from checklist.tradeTool import Grade
 from checklist.tree_gateway import TreeGateway, empty_product, synthetic
-from web import condition_view as cv
+from web.display import condition_view as cv
 
 Candle = namedtuple("Candle", "date open high low close volume")
 C = {"px": "close"}
@@ -63,7 +63,7 @@ def page_contract(slug):
         for pid in PAGE_IDS:
             if pid not in html:
                 bad.append("책 페이지에 %s 가 없다" % pid)
-        from web.inject_ui import check as ui_check
+        from web.display.inject_ui import check as ui_check
         ok, msg = ui_check(html)
         if not ok:
             bad.append("공유 UI 구획: %s" % msg.split("\n")[0])

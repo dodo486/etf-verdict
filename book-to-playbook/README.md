@@ -53,9 +53,9 @@
 python -m orchestration.run daily        # 판정 → 백테스트 탭 데이터 → 검사
 python -m orchestration.run check [--no-verify-tree] [--parity]   # 검사만 전부(CHECKS) — 요약 + 종료코드
 python -m orchestration.run watch [--every N] # asof=지금 기준 N분(기본 5)마다 재판정(백테스트 제외) — 장중 조건은 분봉이 연결되면 살아난다
-python -m web.verdict_view <slug> [--json] [--no-send]       # 오늘 판정(판정 JSON·알림)
+python -m web.display.verdict_view <slug> [--json] [--no-send]       # 오늘 판정(판정 JSON·알림)
 python -m trading.backtest.runner <slug> [--days 365]   # 백테스트(로그·JSON)
-python -m web.backtest_page <slug>                            # 책 페이지 '백테스트' 탭 데이터
+python -m web.display.backtest_page <slug>                            # 책 페이지 '백테스트' 탭 데이터
 python -m web.serve                                           # 로컬 실시간 서버(RUN.md)
 ```
 
@@ -79,12 +79,12 @@ python -m web.serve                                           # 로컬 실시간
 | `checklist/EXTRACTOR.md` · `SCENARIO.md` · `JUDGE.md` | 추출자 · 사례 작성자 · 심판 지침(역할마다 하나 — 서브에이전트 프롬프트 정본) |
 | `checklist/COND_DSL.md` | 트리 문법(트리를 쓰는 추출자·심판의 참고서) |
 | `checklist/verify_tree.py` | 트리 검사(트리를 만들지 않음) |
-| `web/ui/*.js` · `web/inject_ui.py` | 화면 JS(책 무관 공유) · 페이지 주입 |
+| `web/ui/*.js` · `web/display/inject_ui.py` | 화면 JS(책 무관 공유) · 페이지 주입 |
 | `checklist/tree_gateway.py` · `tradeTool.py` | 구간② 공개 DSL — 트리 출입구 · Cond(문법·평가기) · Grade(등급의 뜻 — 등급·금액·비중·워밍업·시세 조달) |
 | `trading/signal/{judge,engine}.py` · `trading/backtest/{trades,portfolio,runner}.py` · `trading/notify/{telegram,desktop}.py` | ① 신호(판정기·라이브 엔진) · ② 백테스트 소비(체결·vectorbt 돈·러너) · ② 알림 소비 |
 | `shared/md_feed.py` | **jhts 시세 창구 — 유일한 수집 입구**(없으면 수집 요청) |
-| `web/verdict_view.py` · `trading/notify.py` | 판정 JSON·알림 문장(books.json engine.daily) · 알림 송신(텔레그램·데스크톱) |
-| `web/book_page.py` · `web/serve.py` · `web/build_home.py` · `web/backtest_page.py` | 페이지 조립 · 로컬 실시간 서버 · 홈 · 백테스트 탭 데이터 |
+| `web/display/verdict_view.py` · `trading/notify/{telegram,desktop}.py` | 판정 JSON·알림 문장(books.json engine.daily) · 알림 송신(텔레그램·데스크톱) |
+| `web/display/book_page.py` · `web/serve.py` · `web/display/build_home.py` · `web/display/backtest_page.py` | 페이지 조립 · 로컬 실시간 서버 · 홈 · 백테스트 탭 데이터 |
 | `playbook/book_source.py` · `playbook/verify_source_integrity.py` · `playbook/pages.py` | 원문 소절 인덱스 · 플레이북 본문 무결 · 책 페이지 찾기·신선도 |
 | `playbook/book_sources.json` · `playbook/source_baseline.json` | 원문 위치 · 본문 해시 기준(커밋 대상) |
 | `SETUP.md` · `RUN.md` | 설치·스케줄 등록 · 로컬 서버/폰에서 보기 |

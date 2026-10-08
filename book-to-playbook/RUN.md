@@ -38,7 +38,7 @@ PLAYBOOK_PORT=9000 python3 -m web.serve
 | 경로 | 내용 |
 |------|------|
 | `GET /` `GET /index.html` | 최신 판정을 구워 넣은 플레이북 페이지(루트로 바로 열림, 이후 스스로 갱신) |
-| `GET /api/verdict` | 판정 JSON(라이브). `web.verdict_view`(books.json engine.daily) 로 계산, 8초 TTL 캐시, CORS 허용 |
+| `GET /api/verdict` | 판정 JSON(라이브). `web.display.verdict_view`(books.json engine.daily) 로 계산, 8초 TTL 캐시, CORS 허용 |
 | `GET /events` | SSE — 15초마다 tick. 브라우저가 받으면 `/api/verdict` 를 한 번 더 당겨 다시 그림 |
 | 기타 | `BASE` 디렉터리 정적 파일 서빙 |
 

@@ -50,7 +50,7 @@ description: 트레이딩 책을 읽어 실전 매매 플레이북 + 기계가 �
 
 | 실패 | 뜻 | 고칠 곳 |
 |---|---|---|
-| verify_tree --contract · verify_view --pages | 소절 인덱스·트리 문법·ref · 페이지 구획·UI 사본 | 해당 산출물을 만든 단계를 다시(UI 사본은 `python -m web.inject_ui <페이지>`) |
+| verify_tree --contract · verify_view --pages | 소절 인덱스·트리 문법·ref · 페이지 구획·UI 사본 | 해당 산출물을 만든 단계를 다시(UI 사본은 `python -m web.display.inject_ui <페이지>`) |
 | verify_code | 폴더 경계·주인 표 위반 | 위반 줄을 주인 파일의 공개 함수로(검사·표를 느슨하게 하지 않는다) |
 | verify_source_integrity | 플레이북 본문이 바뀜 | 의도한 원문 대조 수정이면 `--accept --why`, 아니면 되돌린다 |
 | verify_primitives · verify_trading | 원시 연산·체결 계산 오류 | `checklist/tradeTool.py`·`trading/trades.py`(책 쪽이 아니다) |
@@ -60,7 +60,7 @@ description: 트레이딩 책을 읽어 실전 매매 플레이북 + 기계가 �
 - 스캔 PDF만 있음 → 먼저 이미지화→OCR→청킹(jhts 파이프라인 재사용) 후 1)
 
 ## 판정 운영
-`python -m orchestration.run daily` — 책마다 `web.verdict_view`(판정 → 알림) → `web.backtest_page`(백테스트 탭 데이터) →
+`python -m orchestration.run daily` — 책마다 `web.display.verdict_view`(판정 → 알림) → `web.display.backtest_page`(백테스트 탭 데이터) →
 검사. `python -m orchestration.run watch [--every N]` 는 asof=지금으로 N분마다 재판정(장중 포함).
 알림은 `telegram.env`(TELEGRAM_BOT_TOKEN/CHAT_ID)가 있으면 텔레그램, 없으면 데스크톱. 시세는 jhts 패키지(`PYTHONPATH`)에서만
 온다. 스케줄 등록·내 포지션 파일은 `SETUP.md`.

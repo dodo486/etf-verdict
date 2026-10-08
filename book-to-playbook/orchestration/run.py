@@ -188,7 +188,7 @@ def main(argv):
             r.step(daily, [slug])                                              # 알림 포함 본 실행 — 화면은 라이브 서버가 맡는다
             # 책 페이지 '백테스트' 탭 데이터(1년·3년) — 장 마감 후(daily)만. 실패해도 막지 않는다.
             if mode == "daily":
-                r.step("web.backtest_page", [slug], required=False)
+                r.step("web.display.backtest_page", [slug], required=False)
 
     # 정적 발행(GitHub Pages)은 폐지됐다 — 화면은 라이브 서버(web.serve)가 매 요청 엔진을
     # 새로 돌려 그린다(오래된 값이 '지금 값'처럼 안 보이게). 파일로 굽지도, 레포에 push 하지도 않는다.

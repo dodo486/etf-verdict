@@ -4,7 +4,7 @@
 결과를 화면이 읽는 요약(일별 행 제외, 1년·3년)으로 빚는다. 백테스트를 다시 정의하지 않는다.
 
 사용:
-    python -m web.backtest_page <slug>   → books/<slug>/backtest.json (책 페이지 조립 web/book_page 가 탭으로 심는다)
+    python -m web.display.backtest_page <slug>   → books/<slug>/backtest.json (책 페이지 조립 web/book_page 가 탭으로 심는다)
 """
 import json
 import sys
@@ -52,7 +52,7 @@ def page_data(slug):
 def _cli():
     slug = next((a for a in sys.argv[1:] if not a.startswith("-")), None)
     if not slug:
-        print("사용법: python -m web.backtest_page <slug>", file=sys.stderr)
+        print("사용법: python -m web.display.backtest_page <slug>", file=sys.stderr)
         sys.exit(2)
     path = backtest_json(slug)
     write_text(path, json.dumps(page_data(slug), ensure_ascii=False, separators=(",", ":"), default=str))
