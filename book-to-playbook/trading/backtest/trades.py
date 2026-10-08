@@ -47,7 +47,7 @@ from collections import namedtuple
 
 from checklist.tradeTool import Cond
 from checklist.tree_gateway import Qty
-from trading.judge import Holding
+from trading.signal.judge import Holding
 
 FULL = [{"label": "전량", "frac": 1.0}]          # 한 번에 전량 — 트리 규칙 형식 그대로 두고 쓸 때 gw.as_rules 로 감싼다
 NO_EXIT_NOTE = "책에 매도 규칙 없음 — 매수 신호만 평가"   # 매도 정책 "none" 의 표시 문구(백테스트 탭·판정 화면이 받아 쓴다)

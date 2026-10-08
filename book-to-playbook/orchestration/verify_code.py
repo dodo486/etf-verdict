@@ -72,7 +72,7 @@ NET_MODULES = {"urllib", "http", "requests", "socket", "aiohttp", "httpx"}
 # 규칙 2·3 의 명시적 예외 — 예외는 여기 한 곳에만 적는다(코드 곳곳에 흩지 않는다).
 ALLOW = {
     ("shared", "md_feed.py"): {"jhts"},                     # 유일한 시세 창구
-    ("trading", "notify.py"): {"urllib"},                   # 알림 '송신' 전용(수집 아님) — 구간③ 소유, 이 한 파일만
+    ("trading", "notify/telegram.py"): {"urllib"},          # 알림 '송신' 전용(수집 아님) — 구간③ 소유, 이 한 파일만
     ("web", "serve.py"): {"http", "urllib"},                # 로컬 서버(서빙·URL 파싱)
 }
 
@@ -341,7 +341,7 @@ OWNERS = [
              ("checklist/tradeTool.py", "amount_factor"): ({"scale"}, "caution_state 결과(판정 JSON caution 항목)"),
              ("trading/verify_trading.py", "t_trades"): ({"entry", "exit"}, "거래 dict 검사"),
              ("trading/verify_trading.py", "parity_text"): ({"products"}, "파리티 보고 dict"),
-             ("trading/portfolio.py", "run_product"): ({"sell"}, "주문 dict 의 매도 표시"),
+             ("trading/backtest/portfolio.py", "run_product"): ({"sell"}, "주문 dict 의 매도 표시"),
              ("web/verdict_view.py", "ref_map"): ({"unexpressed"}, "판정 JSON refs 항목을 만드는 자리"),
              ("web/verdict_view.py", "render"): ({"sizing", "weight"}, "판정 JSON verdict.sizing 을 읽어 현금 % 계산"),
              ("web/verdict_view.py", "build_text"): ({"sizing", "weight", "exit"}, "판정 JSON 을 알림 문장으로"),
@@ -349,16 +349,16 @@ OWNERS = [
     dict(concept="책 산출물 경로", owners=("shared/paths.py",), match=m_book_paths,
          why="books/<slug>/ 아래 산출물 경로를 짓는 곳은 하나 — 옛 루트 산출물로 되돌아가지 않게",
          hint="shared/paths.py(book_dir·book_file…)로", allow={}),
-    dict(concept="매도 정책", owners=("trading/trades.py",), match=m_exit_policy, everywhere=m_std_exit_gone,
+    dict(concept="매도 정책", owners=("trading/backtest/trades.py",), match=m_exit_policy, everywhere=m_std_exit_gone,
          why="책에 매도 규칙이 없을 때의 정책은 trades.exit_policy 하나(\"none\" = 대체 규칙 없이 매수 신호만 평가) — "
              "폐지된 표준 매도(대체 규칙·숫자 파일·출처 글자·플래그)는 주인 포함 어디서도 되살리지 않는다",
          hint="trades.exit_policy · 화면은 exit_policy 필드와 no_exit_note 문구로", allow={}),
-    dict(concept="금액 정책", owners=("trading/trades.py",), match=m_amount_policy,
+    dict(concept="금액 정책", owners=("trading/backtest/trades.py",), match=m_amount_policy,
          why="매수 크기(비중 × 분할 × 조심 배수)와 모름(폭 미명시·확인 필요·비중 모름)을 어떻게 셀지는 trades.size_of 하나 — "
              "그 사실은 Judge.amount 한 경로로만(라이브 화면 = 백테스트)",
          hint="Judge.amount 로 사실을, trades.size_of 로 크기를",
-         allow={("trading/judge.py", "amount"): (AMOUNT_FACTS, "Judge.amount — 그날 사실(Amount)을 꺼내는 한 경로")}),
-    dict(concept="수량 변환", owners=("trading/trades.py",), match=m_qty_convert,
+         allow={("trading/signal/judge.py", "amount"): (AMOUNT_FACTS, "Judge.amount — 그날 사실(Amount)을 꺼내는 한 경로")}),
+    dict(concept="수량 변환", owners=("trading/backtest/trades.py",), match=m_qty_convert,
          why="'얼마나'(Qty: cash·budget·order·bought·held)를 물량으로 바꾸는 곳은 trades.to_units 하나 — 매수(분할)·매도·"
              "비중·조심이 같은 변환을 지난다. 밖은 Qty 를 건네기만 하고 basis 를 가르거나 셈하지 않는다",
          hint="trades.to_units(Qty, Ledger) · 화면은 엔진이 낸 units·sell 문장으로",

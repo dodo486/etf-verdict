@@ -38,7 +38,7 @@ from datetime import datetime, timedelta, timezone
 from shared.paths import BASE, live_slugs, read_text  # (UTF-8 출력 고정 포함)
 from checklist.tradeTool import Grade
 from checklist.tree_gateway import TreeGateway, empty_product, synthetic
-from trading import trades as trades_mod
+from trading.backtest import trades as trades_mod
 from trading.commonTool import open_history
 
 Candle = namedtuple("Candle", "date open high low close volume")
@@ -160,7 +160,7 @@ def t_trades():
 def t_no_exit():
     """매도 정책 — 책에 매도 규칙이 없으면("none") 거래를 지어내지 않고(대체 매도 규칙 없음) 매수 신호 뒤
     N거래일 보유 수익률(summary 의 ✅+🟡 줄)만 남는다. 규칙이 있으면 "book" — 거래 시뮬레이션."""
-    from trading import backtest
+    from trading.backtest import runner
     today = datetime.now()
     cal = [(today - timedelta(days=60 - k)).strftime("%Y%m%d") for k in range(60)]
     hist = {"X": [Candle(d, 100 + k, 101 + k, 99 + k, 100 + k, 1000) for k, d in enumerate(cal)]}
@@ -168,12 +168,12 @@ def t_no_exit():
     for exits, pol in (([], "none"), (ex, "book")):
         tree = TreeGateway.of(synthetic({"X": empty_product(exit=exits)}))
         check(trades_mod.exit_policy(tree, "X") == pol, "exit_policy %r" % pol)
-        res = backtest.run("x", 365, hist=hist, tree=tree)
+        res = runner.run("x", 365, hist=hist, tree=tree)
         t = res["trades"]["X"]
         check(t["exit_policy"] == pol, "backtest 매도 정책 %r" % t)
         if pol == "none":
             check(set(t) == {"exit_policy"}, "매도 규칙 없음 — 거래를 만들지 않는다 %r" % sorted(t))
-            b = res["summary"]["X"]["grades"][backtest.BUY_OR_CONFIRM]
+            b = res["summary"]["X"]["grades"][runner.BUY_OR_CONFIRM]
             check(b["signals"] == 1 and b["fwd"][5]["n"] == 1, "매도 규칙 없음 — 매수 신호 뒤 N일 보유만 %r" % b)
         else:
             check(t["stats"]["trades"] == 1 and t["trades"][0]["closed"], "매도 규칙 있음 — 거래 시뮬레이션 %r" % t["stats"])
@@ -182,7 +182,7 @@ def t_no_exit():
 def t_sizing():
     """금액 정책(trades.size_of) — 매수 크기 = 분할 비율 × 비중(%)/100 × 조심 배수. 크기는 그날 판정의 Judge.amount
     (라이브 화면과 같은 경로)에서 온다. 폭 미명시 조심·확인 필요 조심·비중 모름은 ×1 로 두고 횟수를 센다."""
-    from trading.judge import Judge
+    from trading.signal.judge import Judge
     R = {"pos": "ret"}
     ON = {"gt": [{"px": "close"}, 0]}                     # 늘 참
     rows = [(100, 100), (100, 100), (100, 106), (106, 106), (106, 108), (108, 108)]
@@ -235,10 +235,10 @@ def t_sizing():
 def t_live_path():
     """실전 판정 경로가 cond.Ctx 를 unobserved="exclude"(관측 못 한 조건 빼기 — 백테스트 전용)로 만들지 않는다 —
     라이브 판정·화면(#verdict-data)이 백테스트 규칙으로 판정하지 않게(checklist.verify_primitives 의 실행 불변식과 짝)."""
-    from trading import judge
-    # 실전 경로 = 판정기(trading/judge) + 그 Decision 을 판정 JSON 으로 빚는 web/verdict_view(구간③은 web 을 import
+    from trading.signal import judge
+    # 실전 경로 = 판정기(trading/signal/judge) + 그 Decision 을 판정 JSON 으로 빚는 web/verdict_view(구간③은 web 을 import
     #   하지 않으므로 소스 글자로 읽는다).
-    for name, src in (("trading/judge.py", inspect.getsource(judge)),
+    for name, src in (("trading/signal/judge.py", inspect.getsource(judge)),
                       ("web/verdict_view.py", read_text(os.path.join(BASE, "web", "verdict_view.py")))):
         check('unobserved="exclude"' not in src and "unobserved='exclude'" not in src,
               "%s 실전 경로가 unobserved=exclude 를 쓰지 않아야(백테스트 전용)" % name)
@@ -258,14 +258,14 @@ def _asof_of(date_str):
 def compare(slug, window=WINDOW):
     """한 책의 두 경로를 실제로 돌려 (상품·날짜)별 (key, grade) 를 비교한다.
     → {total, match, mismatches:[{prod, date, bt_key, bt_grade, live_key, live_grade}], products, window}."""
-    from trading import backtest               # 패리티만 쓰는 실제 드라이버 진입점(1·2 검사는 안 부른다)
-    from trading.judge import Judge, truncate
+    from trading.backtest import runner               # 패리티만 쓰는 실제 드라이버 진입점(1·2 검사는 안 부른다)
+    from trading.signal.judge import Judge, truncate
     # 라이브 판정(render)과 같은 방식으로 전체 일봉을 한 번 받는다(워밍업 포함).
     # window 만큼 + 워밍업을 넉넉히 — backtest.run 의 days 도 이 창을 덮게 준다.
     tree, full = open_history(slug, window * 2 + 30)
 
     # 백테스트 경로: 실제 드라이버 진입점. daily 행에서 (prod, date) → (key, grade).
-    bt = backtest.run(slug, days=window * 2 + 30, hist=full, tree=tree)
+    bt = runner.run(slug, days=window * 2 + 30, hist=full, tree=tree)
     bt_daily = {(r["prod"], r["date"]): (r["key"], r["grade"]) for r in bt["daily"]}
 
     mismatches = []

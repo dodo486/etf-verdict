@@ -30,9 +30,10 @@ from shared.paths import book_log, book_meta, write_text
 from shared import md_feed
 from checklist.tradeTool import Cond
 from checklist.tradeTool import Grade
-from trading import engine
-from trading.trades import NO_EXIT_NOTE, exit_policy, live_units, sell_text
-from trading.notify import send_telegram, send_desktop
+from trading.signal import engine
+from trading.backtest.trades import NO_EXIT_NOTE, exit_policy, live_units, sell_text
+from trading.notify.telegram import send_telegram
+from trading.notify.desktop import send_desktop
 from web import condition_view as cv
 
 SOURCE = "jhts 시세팀(일봉)"

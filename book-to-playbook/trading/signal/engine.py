@@ -20,7 +20,7 @@ import os
 from shared.paths import positions_json
 from checklist.tradeTool import Grade
 from checklist.tree_gateway import TreeGateway
-from trading.judge import Holding, Judge
+from trading.signal.judge import Holding, Judge
 
 
 def load_positions(slug):

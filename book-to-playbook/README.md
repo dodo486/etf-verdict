@@ -54,7 +54,7 @@ python -m orchestration.run daily        # 판정 → 백테스트 탭 데이터
 python -m orchestration.run check [--no-verify-tree] [--parity]   # 검사만 전부(CHECKS) — 요약 + 종료코드
 python -m orchestration.run watch [--every N] # asof=지금 기준 N분(기본 5)마다 재판정(백테스트 제외) — 장중 조건은 분봉이 연결되면 살아난다
 python -m web.verdict_view <slug> [--json] [--no-send]       # 오늘 판정(판정 JSON·알림)
-python -m trading.backtest <slug> [--days 365]   # 백테스트(로그·JSON)
+python -m trading.backtest.runner <slug> [--days 365]   # 백테스트(로그·JSON)
 python -m web.backtest_page <slug>                            # 책 페이지 '백테스트' 탭 데이터
 python -m web.serve                                           # 로컬 실시간 서버(RUN.md)
 ```
@@ -81,7 +81,7 @@ python -m web.serve                                           # 로컬 실시간
 | `checklist/verify_tree.py` | 트리 검사(트리를 만들지 않음) |
 | `web/ui/*.js` · `web/inject_ui.py` | 화면 JS(책 무관 공유) · 페이지 주입 |
 | `checklist/tree_gateway.py` · `tradeTool.py` | 구간② 공개 DSL — 트리 출입구 · Cond(문법·평가기) · Grade(등급의 뜻 — 등급·금액·비중·워밍업·시세 조달) |
-| `trading/judge.py` · `engine.py` · `trades.py` · `portfolio.py` · `backtest.py` | 판정기(Judge·Decision·Holding·signal_series·truncate) · 라이브 판정 엔진 · 체결 워크(분할·매도) · vectorbt 계산기 · 백테스트 |
+| `trading/signal/{judge,engine}.py` · `trading/backtest/{trades,portfolio,runner}.py` · `trading/notify/{telegram,desktop}.py` | ① 신호(판정기·라이브 엔진) · ② 백테스트 소비(체결·vectorbt 돈·러너) · ② 알림 소비 |
 | `shared/md_feed.py` | **jhts 시세 창구 — 유일한 수집 입구**(없으면 수집 요청) |
 | `web/verdict_view.py` · `trading/notify.py` | 판정 JSON·알림 문장(books.json engine.daily) · 알림 송신(텔레그램·데스크톱) |
 | `web/book_page.py` · `web/serve.py` · `web/build_home.py` · `web/backtest_page.py` | 페이지 조립 · 로컬 실시간 서버 · 홈 · 백테스트 탭 데이터 |

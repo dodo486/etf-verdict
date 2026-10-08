@@ -13,8 +13,8 @@ from datetime import datetime
 from shared.paths import backtest_json, write_text
 from checklist.tradeTool import Grade
 from trading.commonTool import open_history
-from trading import portfolio, trades
-from trading.backtest import BUY_OR_CONFIRM, HORIZONS, run
+from trading.backtest import portfolio, trades
+from trading.backtest.runner import BUY_OR_CONFIRM, HORIZONS, run
 
 PAGE_PERIODS = (("1y", 365), ("3y", 1095))
 

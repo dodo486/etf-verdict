@@ -50,7 +50,7 @@ import os
 
 from shared.paths import read_text
 from shared import md_feed
-from trading.trades import _parity_stats, _position_facts
+from trading.backtest.trades import _parity_stats, _position_facts
 
 _CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "market_config.json")
 _CONFIG = None

@@ -32,8 +32,8 @@ import sys
 from datetime import datetime, timedelta
 
 from shared.paths import book_log, write_text
-from trading import trades
-from trading.judge import signal_series
+from trading.backtest import trades
+from trading.signal.judge import signal_series
 from trading.commonTool import open_history
 
 HORIZONS = (5, 10, 20)
