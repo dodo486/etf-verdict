@@ -259,6 +259,11 @@ def _meas_val(e, ctx, i):
     return round(v, 1) if a >= 100 else round(v, 2) if a >= 1 else round(v, 3)
 
 
+def _n(k):
+    """창 길이·lag 자리 숫자 → 글자. 저자가 안 준 숫자("?")는 그대로 "?"."""
+    return "?" if k == cond.UNKNOWN else "%d" % k
+
+
 def _describe_operand(e, defs):
     """값 표현식 → 짧은 사람 설명(없으면 '' — 그럼 숫자만 보여준다). 복합식(산술 등)은 라벨이 설명하므로 생략."""
     if not isinstance(e, dict):
@@ -276,15 +281,15 @@ def _describe_operand(e, defs):
         core = base if sym in ("$self", "$index") else "%s %s" % (sym, base)
         return pre + core
     if op in ("ma", "ema"):
-        return "%d일선" % e[op][1] if op == "ma" else "%d일 지수이평" % e[op][1]
+        return "%s일선" % _n(e[op][1]) if op == "ma" else "%s일 지수이평" % _n(e[op][1])
     if op in ("highest", "lowest", "sum", "stdev"):
         m = {"highest": "최고", "lowest": "최저", "sum": "합계", "stdev": "변동성"}
-        return "%d일 %s" % (e[op][1], m[op])
+        return "%s일 %s" % (_n(e[op][1]), m[op])
     if op == "pct":
-        return "전일 대비 변화율" if e["pct"][1] == 1 else "%d일 전 대비 변화율" % e["pct"][1]
+        return "전일 대비 변화율" if e["pct"][1] == 1 else "%s일 전 대비 변화율" % _n(e["pct"][1])
     if op == "lag":
         inner = _describe_operand(e["lag"][0], defs)
-        return ("%s " % inner if inner else "") + "%d일 전" % e["lag"][1]
+        return ("%s " % inner if inner else "") + "%s일 전" % _n(e["lag"][1])
     if op == "streak":
         return "연속 참 일수"
     if op == "count":
@@ -292,7 +297,7 @@ def _describe_operand(e, defs):
     if op == "barssince":
         return "마지막 참 이후 일수"
     if op == "rsi":
-        return "RSI%d" % e["rsi"][1]
+        return "RSI%s" % _n(e["rsi"][1])
     if op == "pos":
         return {"ret": "수익률(%)", "days": "보유일", "maxret": "최고수익(%)",
                 "minret": "최저수익(%)"}.get(e["pos"], "포지션")
@@ -350,7 +355,7 @@ def _inputs_of(e, ctx, i, defs, acc, seen, top=True):
         s, k = e["pct"]
         base = _describe_operand(s, defs) or "값"
         add("오늘 " + base, _meas_val(s, ctx, i))
-        add("%d일 전" % k, _meas_val({"lag": [s, k]}, ctx, i))
+        add("%s일 전" % _n(k), _meas_val({"lag": [s, k]}, ctx, i))
         return
     if op in cond.ARITH:
         for sub in e[op]:

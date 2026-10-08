@@ -738,6 +738,10 @@ def t_grade():
     hid = pe.view({"atleast": 1, "of": [jump, {"manual": "y"}]}, len(xs) - 1)
     check(hid["op"] == "atleast" and hid["n"] == 1 and hid["kids"][0].get("hidden") is True
           and hid["kids"][0]["v"] is True, "라벨 없는 잎은 hidden 으로 값과 함께 %r" % hid)
+    # 창 길이·lag 가 "?"(저자 미명시)인 식도 근거 설명이 죽지 않는다 — "?일" 로 보인다
+    unk = {"label": "최근 ?일 급등", "ge": [{"pct": [C, "?"]}, {"lowest": [C, "?"]}]}
+    d = pe.view(unk, len(xs) - 1).get("detail") or []
+    check(d and d[0]["lhsd"] == "?일 전 대비 변화율" and d[0]["rhsd"] == "?일 최저", "\"?\" 창 설명 %r" % d)
 
 
 # ------------------------------------------------------------------ 데이터 완전성 가드(워밍업 부족 → 불완전)
