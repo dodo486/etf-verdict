@@ -21,6 +21,9 @@
 
 이 둘은 **독립**이다(구조 이관은 지금 당장 가능, 서버 권위는 tree.json 재생성 뒤라야 테스트 가능).
 
+> **✅ 둘 다 끝남.** §3 이관은 구조 개편 때, §4 서버 권위는 2026-10-08 work/behavior 브랜치에서(아래 §4-0 결과).
+> 화면 JS 평가기는 삭제됐고 등급·칸 값·금액은 서버가 사람이 답한 수동까지 반영해 낸다.
+
 ---
 
 ## 1. 웹/표시 코드 전수 지도 (지금 어디 있고 무엇을 하나)
@@ -150,6 +153,21 @@
 ---
 
 ## 4. 서버 권위(A) 통합 스케치 — 화면 재계산 제거
+
+### 4-0. ✅ 결과 (2026-10-08, work/behavior)
+- (a) `checklist/cond.Ctx(answers=)` — 조건별 수동답 맵. 열쇠 = `cond.answer_key` = (shared ? `*` : 상품) + `|` +
+  `cond.manual_key`(문장 | `?`+식). 답 > manual_as, not 아래에서도 잎 값 그대로. 상품마다 같은 정의 안이면 `Ctx.shared()`
+  (`*` 열쇠). `product_specific`·`strip_meta` 는 cond 로 옮겨 하나(condition_view 는 그걸 쓴다). 검사 `verify_primitives` '수동 답'.
+  `ProductEval(answers=)`·`Judge(answers=)` 는 넘기기만(등급 사다리 코드는 그대로).
+- (b) `web.verdict_view.render(slug, asof=None, answers=None)` — 무답이면 바이트 동일, 답을 주면 `top["answers"]` 로 되돌려 준다.
+- (c) `web/serve.py` — `POST /api/verdict {slug, answers}` in-process(캐시 안 함), 무답 GET + TTL 캐시는 그대로.
+- (d) `web/ui/checklist-ui.js` 평가기(`and3/or3/ev/gradeKey/gradeView/zoneFill/selfCheck/canGrade/GRADE_RULES/cautionOf`) 삭제.
+  토글 → `live-ui` 의 `__refreshVerdict`(답이 있으면 POST, 폴링도 같은 답) → 받은 판정을 그대로 그림. `mkey` 는 답을
+  모으는 열쇠로만 남음(서버 `answer_key` 와 같은 규칙). 칸 머리 값은 서버 opt==pes 면 그 값, 아니면 서버 값.
+  `verify_code` '등급 사다리' 행의 TEMPORARY 허용 줄 삭제.
+- 파리티: 옛 JS 평가기(삭제 전 원문을 node 로 실행) vs 서버, moneycopy 후보 a.json(+ 조심 배수·비중을 숫자로 바꾼 사본)
+  × 답 조합 15개 × 3상품 = 90건(등급·금액 배수·폭 미명시·확인 필요·칸 값) 불일치 0. 로컬 서버 POST 45건 불일치 0, 브라우저
+  토글 왕복 확인. 남은 것: 판정 JSON 의 `grade_rules` 는 무답 출력 바이트 동일을 지키려 남겼다(화면은 안 씀 — 다음 출력 변경 때 뺀다).
 
 ### 4-1. 현재 (왜 화면이 다시 계산하나)
 - 서버는 `GET /api/verdict` 에서 엔진을 **subprocess**로 돌려 판정 JSON을 준다(~1초). 토글마다 이걸 치면 느리다.

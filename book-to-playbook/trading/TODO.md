@@ -23,7 +23,7 @@
 - **할 일(구간③ 백테스트 재개 때):** 실데이터 + 트리 생기면 → 엔진에 "장중 데이터 부재 None → 🟡/EXCLUDED"
   자동 트리거 설치 → `observe` 래퍼 전부 제거 → `verify_primitives` 불변식 + 백테스트 파리티로 등가성 증명.
 - **영향 파일:** `checklist/cond.py`, `checklist/grade.py`, `checklist/verify_primitives.py`,
-  `checklist/verify_tree.py`, `trading/backtest.py`·`timeline.py`, `web/ui/checklist-ui.js`,
+  `checklist/verify_tree.py`, `trading/backtest.py`·`timeline.py`,
   `COND_DSL.md`·`MIGRATION_NOTES.md`.
 
 ## 🟡 기능 (구간② tree.json 재생성 후)

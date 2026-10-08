@@ -90,13 +90,14 @@ class Decision:
 
 class Judge:
     """한 상품 판정기 — 생성 때 ProductEval 을 전체 달력에 한 번 세운다.
-    asof = 관측 시각(UTC datetime, None 이면 지금) · unobserved 가 "exclude" 면 관측 못 한 장중 조건을 빼고 판단(백테스트 전용)."""
+    asof = 관측 시각(UTC datetime, None 이면 지금) · unobserved 가 "exclude" 면 관측 못 한 장중 조건을 빼고 판단(백테스트 전용)
+    · answers = 사람이 답한 수동 {cond.answer_key: 참/거짓}(라이브 화면의 수동 체크 — 서버가 그 답으로 등급을 낸다)."""
 
-    def __init__(self, gw, prod, hist, cal=None, asof=None, unobserved=None):
+    def __init__(self, gw, prod, hist, cal=None, asof=None, unobserved=None, answers=None):
         self.gw, self.prod, self.hist = gw, prod, hist
         self.cs = hist.get(prod) or []
         self.cal = [c.date for c in self.cs] if cal is None else cal
-        self.pe = ProductEval(gw, prod, hist, self.cal, unobserved, asof)
+        self.pe = ProductEval(gw, prod, hist, self.cal, unobserved, asof, answers)
 
     @property
     def warmup(self):

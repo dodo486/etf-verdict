@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 """화면층 검사기 — 조건 → 화면 항목(condition_view._view)의 구조·측정 증거(책 무관 · 크기 고정) + 책 페이지 구조(--pages).
 
-판정 JSON 의 view 는 화면 3값 엔진(checklist-ui)이 사람이 체크한 수동 조건으로 등급을 다시 낼 때 쓰는 모양이다.
-그 모양(논리 노드의 op·kids, 라벨 없는 잎의 hidden, "?" 창 설명)을 손으로 정한 답과 대조한다.
+판정 JSON 의 view 는 화면(checklist-ui)이 조건 칸을 그리고 수동 조건의 답 열쇠(mkey·shared)를 만드는 모양이다
+(값은 서버가 낸다 — 서버 권위). 그 모양(논리 노드의 op·kids, 라벨 없는 잎의 hidden, "?" 창 설명)을 손으로 정한 답과
+대조한다.
 
 --pages — 라이브 책마다 책 페이지(books/<slug>/playbook.html)에 #src · #verdict-data · #sheet-root 와 공유 UI 구획
 전부가 있고 사본이 web/ui/*.js 와 같은가(web.inject_ui.check). 실패 → 정지.

@@ -233,8 +233,8 @@ def t_sizing():
 
 
 def t_live_path():
-    """실전 판정 경로가 cond.Ctx 를 unobserved="exclude" 로 만들지 않는다 — EXCLUDED 가 화면(#verdict-data)에 실리면
-    화면 3값 엔진(checklist-ui)엔 그 개념이 없어 등급이 갈라진다(checklist.verify_primitives 의 실행 불변식과 짝)."""
+    """실전 판정 경로가 cond.Ctx 를 unobserved="exclude"(관측 못 한 조건 빼기 — 백테스트 전용)로 만들지 않는다 —
+    라이브 판정·화면(#verdict-data)이 백테스트 규칙으로 판정하지 않게(checklist.verify_primitives 의 실행 불변식과 짝)."""
     from trading import judge
     # 실전 경로 = 판정기(trading/judge) + 그 Decision 을 판정 JSON 으로 빚는 web/verdict_view(구간③은 web 을 import
     #   하지 않으므로 소스 글자로 읽는다).

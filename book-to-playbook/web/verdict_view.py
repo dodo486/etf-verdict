@@ -20,7 +20,7 @@ books.json 의 engine.daily 가 이 모듈이다(python -m web.verdict_view <slu
   refs    : {원문 소절: {auto, manual, zones[], prods[], unexpressed?[{rule, reason}]}}
             플레이북 소절별 체크리스트 반영 현황 + 트리로 못 옮긴 규칙과 그 사유
 view 는 노드 하나당 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, hidden?} (condition_view._view)
-— 수동은 '모름'으로 둔 그날 값. 화면은 사람이 체크한 수동 조건으로 같은 3값 논리를 다시 계산한다.
+— 수동은 '모름'(사람이 답했으면 그 답 — render(answers=))으로 둔 그날 값. 화면은 다시 계산하지 않고 그대로 그린다.
 """
 import json
 import os
@@ -67,9 +67,10 @@ def common_items(gw, pe):
     defs = gw.defs()
     users = gw.def_users()
     i = len(pe.cal) - 1
+    ctx = pe.ctx[None].shared()            # 공통 칸 = 상품마다 같은 판단 — 사람의 답 열쇠 "*"(답이 없으면 그대로)
     shared = [name for name, node in defs.items()
               if isinstance(node, dict) and node.get("label")
-              and len(users.get(name, ())) >= 2 and not cv.product_specific(node, defs)]
+              and len(users.get(name, ())) >= 2 and not cond.product_specific(node, defs)]
 
     def refs(n, stop, acc):
         """n 안의 정의 참조를 센다 — stop(따로 나열한 정의) 안으로는 들어가지 않는다."""
@@ -105,9 +106,9 @@ def common_items(gw, pe):
     out = []
     for name in listed:
         node = defs[name]
-        v = cond.series(node, pe.ctx[None])[i]
+        v = cond.series(node, ctx)[i]
         out.append({"name": name, "label": node["label"], "ref": node.get("ref"), "v": v,
-                    "view": cv._view(node, defs, pe.ctx[None], i, shared=True, fold=fold - {name})})
+                    "view": cv._view(node, defs, ctx, i, shared=True, fold=fold - {name})})
     return out
 
 
@@ -147,10 +148,11 @@ def ref_map(gw):
 
 
 # ------------------------------------------------------------------ 상품 하나
-def product_verdict(gw, p, hist, positions, asof=None):
-    """상품 하나의 판정 JSON — 판정은 Judge(라이브 = 달력 마지막 봉)가 내고, 여기는 그 Decision 을 화면 모양으로 빚는다."""
+def product_verdict(gw, p, hist, positions, asof=None, answers=None):
+    """상품 하나의 판정 JSON — 판정은 Judge(라이브 = 달력 마지막 봉)가 내고, 여기는 그 Decision 을 화면 모양으로 빚는다.
+    answers = 사람이 답한 수동(Judge 참고) — 등급·칸 값·금액이 그 답으로 풀린다."""
     base = {"prod": p, "index": gw.index(p), "note": gw.note(p)}
-    j = Judge(gw, p, hist, asof=asof)
+    j = Judge(gw, p, hist, asof=asof, answers=answers)
     if not j.cs:
         req = md_feed.requested().get(p, "-")
         return dict(base, key="unknown", grade=GRADES["unknown"],
@@ -229,15 +231,18 @@ def _static_view(node, defs, index=None):
 
 
 # ------------------------------------------------------------------ 책 하나
-def render(slug, asof=None):
-    """asof = 관측 시각(UTC datetime). None 이면 지금 — 장중(tf="1m") 조건을 이 시점 이하로 자른다."""
+def render(slug, asof=None, answers=None):
+    """asof = 관측 시각(UTC datetime). None 이면 지금 — 장중(tf="1m") 조건을 이 시점 이하로 자른다.
+    answers = 화면에서 사람이 답한 수동 {cond.answer_key: 참/거짓} — 서버가 그 답으로 등급·칸 값·금액을 낸다
+    (서버 권위 — 화면은 다시 계산하지 않는다). None 이면 답 없는 판정(옛 출력 그대로), 주면 top["answers"] 로 되돌려 준다."""
     tree = TreeGateway.load(slug)
     now = datetime.now(timezone.utc).astimezone()
     top = {"slug": slug, "title": book_title(slug), "ts": now.isoformat(), "source": SOURCE,
            "verdicts": [], "common": [], "refs": {}, "missing": {}, "cash": None,
            # 등급 글자표(키→라벨)를 실어보낸다 — 화면이 따로 복붙하지 않고 이걸 받아 쓴다(단일 출처).
            "grades": GRADES,
-           # 등급 판정 사다리(데이터) 도 같이 실어, 화면이 같은 표로 등급을 다시 낸다(복붙 금지).
+           # 등급 판정 사다리(데이터) — 화면은 더 이상 등급을 다시 내지 않는다(서버 권위: answers 로 서버가 낸다).
+           #   판정 JSON 모양을 그대로 두려고(서버 권위 전환 때 무답 출력 바이트 동일) 남겼다 — 다음 출력 변경 때 뺀다.
            "grade_rules": GRADE_RULES,
            # 여섯 칸 키→한글 이름표(화면 머리글용) — cond.ZONE_LABELS 가 정본이다. 화면(shared-ui zw)이
            #   복붙하지 않고 이걸 받아 쓴다. 머리글 번호 순서대로(①필터 ②회피 ③진입 …) 실어보낸다.
@@ -254,7 +259,7 @@ def render(slug, asof=None):
     pe0 = None
     weights, all_known = [], True
     for p in tree.products():
-        v, pe = product_verdict(tree, p, hist, positions, asof=asof)
+        v, pe = product_verdict(tree, p, hist, positions, asof=asof, answers=answers)
         top["verdicts"].append(v)
         pe0 = pe0 or pe
         sz = v.get("sizing") or {}
@@ -270,6 +275,8 @@ def render(slug, asof=None):
         top["common"] = common_items(tree, pe0)
     top["refs"] = ref_map(tree)
     top["missing"] = {s: md_feed.requested().get(s, "-") for s, cs in hist.items() if not cs}
+    if answers is not None:
+        top["answers"] = answers
     if positions:
         top["positions_note"] = "내 포지션(books/%s/positions.json) 기준 — 로컬 화면에서만 쓴다" % slug
     return top

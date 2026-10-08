@@ -34,8 +34,8 @@ GRADES = {
     "unknown": "❔ 판정 불가",
 }
 # 등급 판정 사다리의 '뜻'은 코드가 아니라 데이터(checklist/grade_rules.json)에 있다 — 규칙을 바꾸면
-# 거기 한 곳만 고친다. 파이썬(grade_key)과 화면(checklist-ui.gradeKey)이 같은 표를 읽는다.
-# 판정 JSON 에도 실어보내(web/verdict_view) 화면이 복붙 없이 받아 쓴다.
+# 거기 한 곳만 고친다. 등급을 내는 곳은 grade_key 하나 — 화면은 판정 JSON 의 key 를 그대로 그린다(서버 권위:
+# 사람이 답한 수동도 서버가 cond.Ctx answers 로 풀어 등급을 다시 낸다).
 GRADE_RULES = json.load(
     open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "grade_rules.json"), encoding="utf-8"))
 # 판정 전에 과거 시세를 며칠치(달력일) 미리 당겨올지 — '워밍업'. 트리가 쓰는 가장 긴 창
@@ -91,15 +91,17 @@ def session_closes(symbols, cal, asof):
 class ProductEval:
     """한 상품의 여섯 칸을 전체 달력에 대해 한 번 계산해 둔다."""
 
-    def __init__(self, gw, prod, hist, cal, unobserved=None, asof=None):
+    def __init__(self, gw, prod, hist, cal, unobserved=None, asof=None, answers=None):
         """gw = TreeGateway. unobserved="exclude" = 관측값이 없는 장중 조건(observe)을 빼고 판단한다(백테스트 비교용).
         asof = 관측 시각(UTC datetime) — 장중(tf="1m"/"5m") 조건을 이 시점 이하로 자르고, 일봉은 asof 이하
-        확정(settled) 봉만 본다(미확정 그날 일봉은 None). None 이면 실제 지금(일봉은 마지막 확정봉)."""
+        확정(settled) 봉만 본다(미확정 그날 일봉은 None). None 이면 실제 지금(일봉은 마지막 확정봉).
+        answers = 사람이 답한 수동 {cond.answer_key: 참/거짓} — 등급·금액·비중이 그 답으로 풀린다(서버 권위).
+        None 이면 옛 동작 그대로."""
         defs, index = gw.defs(), gw.index(prod)
         self.gw, self.prod, self.index, self.defs, self.cal, self.hist = gw, prod, index, defs, list(cal), hist
         sc = session_closes(gw.symbols(), list(cal), asof)
         mk = lambda m: cond.Ctx(hist, cal, prod, index, defs, manual_as=m, unobserved=unobserved,
-                                asof=asof, session_close=sc)
+                                asof=asof, session_close=sc, answers=answers)
         self.ctx = {True: mk(True), False: mk(False), None: mk(None)}
         neutral = {"filter": True, "entry": True, "avoid": False}      # 칸 전체가 빠지면 그 칸은 제약 없음
 

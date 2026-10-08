@@ -49,6 +49,12 @@ import 방향: `shared ← playbook · checklist(공개 DSL) ← trading ← web
   매수(분할 차수)·매도(산/남은 물량 비율)·비중·조심이 전부 지난다(주인 표 '수량 변환'). 라이브 화면 금액도 엔진이 낸
   `units`(`trades.live_units`)·매도 문장(`sell_text`)만 그린다. moneycopy 후보 a.json 은 scale 전부 null·비중 "?" 라
   숫자가 그대로다(지어내지 않음 — 횟수만 표시).
+- **서버 권위(web-consolidation-plan §4 끝)** — 화면 JS 평가기 삭제. 수동 체크 → `POST /api/verdict {slug, answers}` →
+  서버가 `cond.Ctx(answers=)`(열쇠 `cond.answer_key`)로 등급·칸 값·금액을 내고 화면은 그대로 그린다(폴링도 같은 답을 보냄).
+  `render(answers=None)` 은 바이트 동일. 옛 JS 와 서버 파리티 90건 불일치 0. 주인 표 '등급 사다리' TEMPORARY 허용 삭제.
+- **아직 안 한 것** — 키스톤(tree.json 재생성)은 그대로. 백테스트 계산기는 1 unit = 시작자본 고정이라 손실 뒤 다음 진입이
+  남은 현금보다 클 수 있다(매도 규칙 없는 사본에서 옛 표준 매도로 SOXL 총수익 −162% 관측 — 표준 매도 폐지로 그 경로는
+  사라졌지만 계산기 자체 문제는 남음).
 
 ## 🔴 키스톤 — tree.json 재생성 (모든 게 이걸로 막힘)
 
@@ -64,7 +70,7 @@ import 방향: `shared ← playbook · checklist(공개 DSL) ← trading ← web
 ## 🟡 키스톤 이후 (순서 있음 — 둘 다 cond.py 고쳐서 동시 금지)
 
 1. **계산기 부품** — 지표별 전용 연산(ATR·VWAP 등)은 만들지 않는다. 기본 부품 + 조합 예시, pandas 구현 — 트리 v3 와 함께(`docs/action-grammar-draft.md` 9절).
-2. **A 서버권위(적② 제거)** — 화면이 등급을 직접 재계산하는 중복(`web/ui/checklist-ui.js` 의 `ev/and3/or3/gradeKey/cautionOf`) 제거 — 끝나면 `orchestration/verify_code.py` 주인 표 '등급 사다리' 행의 TEMPORARY 허용 줄도 지운다. `cond.Ctx` 에 조건별 수동답 맵 추가 → `web.verdict_view.render(answers=)` → `web/serve.py` in-process → 마지막에 JS 평가기 삭제. **tree.json 재생성 뒤 파리티 검증(화면 등급==엔진 등급) 가능.** 상세 = `web-consolidation-plan.md` §4.
+2. ~~A 서버권위~~ — ✅ 끝(위 work/behavior). 남은 정리: 판정 JSON 의 `grade_rules`(화면이 안 씀) 빼기 — 다음 출력 변경 때.
 
 
 ## 검증 명령 (venv = `book-to-playbook/.venv`)

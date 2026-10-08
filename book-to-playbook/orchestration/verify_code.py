@@ -368,11 +368,7 @@ OWNERS = [
          hint="판정 JSON 의 zones·grades·grade_rules 로", allow={}),
     dict(concept="등급 사다리", owners=("checklist/grade.py",), match=m_grade_ladder,
          why="날짜별 등급·금액 배수를 내는 곳은 grade 하나 — 두 벌이면 엔진과 화면 등급이 갈라진다",
-         hint="판정 JSON 의 key 를 그대로",
-         allow={
-             # TEMPORARY — 화면 3값 엔진(수동 체크 → 등급 재계산). '서버 권위' 단계에서 그 재계산을 지우며 이 줄도 지운다.
-             ("web/ui/checklist-ui.js", None): (None, "TEMPORARY: 화면 수동 체크 재등급 — 서버 권위 단계에서 삭제"),
-         }),
+         hint="판정 JSON 의 key 를 그대로(수동 답은 POST /api/verdict — 서버가 cond.Ctx answers 로 낸다)", allow={}),
 ]
 SELF = "orchestration/verify_code.py"      # 표 자신(금지 표식 목록을 들고 있다) — 표식 검사에서 뺀다
 

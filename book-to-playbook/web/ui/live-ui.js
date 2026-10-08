@@ -28,10 +28,19 @@
     return true;
   }
 
+  // 판정을 받는다 — 화면에서 사람이 답한 수동 조건(checklist-ui 의 __verdictAnswers)이 있으면 POST 로 함께 보내
+  //   서버가 그 답까지 반영한 판정을 낸다(서버 권위 — 화면은 다시 계산하지 않는다). 답이 없으면 캐시되는 GET.
   function fetchVerdict(){
-    return fetch(q('/api/verdict'), {cache:'no-store'})
-      .then(function(r){ if(!r.ok) throw new Error('http '+r.status); return r.json(); });
+    var ans = null;
+    try { ans = window.__verdictAnswers ? window.__verdictAnswers() : null; } catch(e){ ans = null; }
+    var req = ans && Object.keys(ans).length
+      ? fetch('/api/verdict', {method:'POST', cache:'no-store', headers:{'Content-Type':'application/json'},
+                               body: JSON.stringify({slug: SLUG, answers: ans})})
+      : fetch(q('/api/verdict'), {cache:'no-store'});
+    return req.then(function(r){ if(!r.ok) throw new Error('http '+r.status); return r.json(); });
   }
+  // 수동 답을 바꾼 화면(checklist-ui)이 부른다 — 답까지 반영한 판정을 받아 다시 그린다(성공 여부를 돌려준다).
+  window.__refreshVerdict = function(){ return fetchVerdict().then(applyData); };
 
   // 1) 라이브 엔드포인트 탐지 — 실패하면 라이브 아님(값 없음) 상태로 둔다.
   fetchVerdict().then(function(data){

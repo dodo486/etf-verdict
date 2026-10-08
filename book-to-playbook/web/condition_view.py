@@ -8,21 +8,9 @@
   · _measure 외  '무엇을 재서 얼마였나'(측정 증거)
   · reason_of    등급 사유 한 줄
 """
-import json
-
 from checklist import cond
 
 LOGICAL = ("all", "any", "atleast", "not")
-
-
-def product_specific(node, defs):
-    """$self/$index/pos 를 쓰는 식은 상품마다 값이 달라진다 — 여러 상품이 '같이 보는' 판단이 아니다."""
-    for n in cond.labeled_all(node, defs):
-        if "px" in n and n.get("sym", "$self") in ("$self", "$index"):
-            return True
-        if "pos" in n:
-            return True
-    return False
 
 
 # ------------------------------------------------------------------ 측정 증거(실제 값)
@@ -203,15 +191,6 @@ def _measure(node, defs, ctx, i, top=True):
     return facts
 
 
-def _strip_meta(node):
-    """META 를 모든 깊이에서 뗀 식 — "?" 수동 잎의 답 열쇠(같은 식 = 같은 질문)."""
-    if isinstance(node, dict):
-        return {k: _strip_meta(v) for k, v in node.items() if k not in cond.META}
-    if isinstance(node, list):
-        return [_strip_meta(x) for x in node]
-    return node
-
-
 def _view(node, defs, ctx, i, shared=False, fold=frozenset()):
     """노드 하나 → 화면 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, hidden?}.
 
@@ -220,8 +199,8 @@ def _view(node, defs, ctx, i, shared=False, fold=frozenset()):
     · 그 밖의 노드는 그날 값(v)이 고정된 잎이다. 라벨이 없으면 hidden(화면에 안 보이지만 계산엔 쓴다),
       안쪽에 라벨 달린 노드가 있으면 참고용 kids(op 없음 — 다시 계산하지 않는다)로 붙인다.
     · 정의 참조는 정의 본문 항목 하나로(자리 META 를 덮어) — 같은 조건을 두 줄로 그리지 않는다.
-    · 상품마다 값이 같은 정의(product_specific 아님) 안의 수동 조건은 shared=True — 화면에서 한 번 체크하면
-      그 조건을 쓰는 모든 상품에 같은 답이 들어간다(같은 시장 사실이므로).
+    · 상품마다 값이 같은 정의(cond.product_specific 아님) 안의 수동 조건은 shared=True — 한 번 답하면 그 조건을 쓰는
+      모든 상품에 같은 답이 들어간다(같은 시장 사실이므로). 답 열쇠 규칙은 cond.answer_key 하나(서버가 판정).
     · fold = 화면 다른 곳에 이미 펼쳐 둔 정의 이름들 — 그 참조는 folded 표시(화면은 한 줄, 계산은 kids).
     v 는 수동 = 모름(None)으로 둔 그날 값이다."""
     if "def" in node and node["def"] in defs and not [k for k in node if k not in cond.META and k != "def"]:
@@ -230,7 +209,8 @@ def _view(node, defs, ctx, i, shared=False, fold=frozenset()):
         body = defs[node["def"]]
         site = {k: v for k, v in node.items() if k in ("label", "ref", "note")}
         eff = dict(body, **site) if site and isinstance(body, dict) else body
-        item = _view(eff, defs, ctx, i, shared or not product_specific(body, defs), fold)
+        sh = shared or not cond.product_specific(body, defs)
+        item = _view(eff, defs, ctx.shared() if sh else ctx, i, sh, fold)   # 답 열쇠 "*" 문맥(답이 없으면 그대로)
         if node["def"] in fold:
             item["folded"] = True    # 같은 화면 다른 곳에 펼쳐 둔 조건 — 계산엔 kids 를 쓰되 화면엔 한 줄로
         return item
@@ -243,7 +223,7 @@ def _view(node, defs, ctx, i, shared=False, fold=frozenset()):
     if cond.is_unknown(node, defs):
         # 저자가 숫자를 안 준 식("?") — 사람이 정하는 수동 잎. 답을 묶는 열쇠는 식(문장 아님 — 같은 식 = 같은 질문).
         item["manual"] = cond.UNKNOWN_REASON
-        item["mkey"] = "?" + json.dumps(_strip_meta(node), ensure_ascii=False, sort_keys=True)
+        item["mkey"] = cond.manual_key(node)
         if shared:
             item["shared"] = True
     elif op in ("manual", "observe"):

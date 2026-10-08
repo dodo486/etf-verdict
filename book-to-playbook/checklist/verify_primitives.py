@@ -17,11 +17,13 @@
   5. 문법 — 모르는 키·인자 수·빈 구역은 거부, 올바른 트리는 통과
   6. 표현력 회귀 — 이번에 발견된 버그 유형을 트리로 적어 원문 뜻대로 나오는지
   7. 트리 출입구(TreeGateway) 계약 — 판정·백테스트·검사기가 트리에 묻는 질문의 답 모양
+  8. 사람이 답한 수동(Ctx answers) — 답 열쇠 규칙·극성·공통 정의·등급까지(서버 권위의 바탕)
   (체결 워크·실전 경로는 trading/verify_trading.py, 화면 설명 구조는 web/verify_view.py 가 본다)
 
 사용: python -m checklist.verify_primitives   (실패 있으면 exit 1)
 """
 import itertools
+import json
 import math
 import random
 import sys
@@ -626,6 +628,42 @@ def t_grade():
     check(w is None and alt == [14.0, 34.0], "수동 모드 비중은 모름 + 범위 %r %r" % (w, alt))
 
 
+def t_answers():
+    """사람이 답한 수동(Ctx answers) — 열쇠 = (shared ? "*" : 상품) + "|" + (문장 | "?" 식). 답은 manual_as 보다 먼저,
+    not 아래에서도 잎 값 그대로(not 이 뒤집을 뿐), 없는 열쇠는 manual_as, answers=None 이면 옛 동작 그대로."""
+    from checklist import grade
+    cal = ["2022%04d" % i for i in range(3)]
+    hist = {p: [Candle(d, 100, 100, 100, 100, 1000) for d in cal] for p in ("A", "B", "M")}
+    m = {"manual": "실적 좋음"}
+    unk = {"ge": [{"px": "close", "sym": "M"}, "?"], "label": "M 높음"}
+    defs = {"시장": {"all": [{"manual": "시장 좋음"}, {"gt": [{"px": "close", "sym": "M"}, 0]}]},
+            "자기": {"all": [{"manual": "자기 확인"}, {"gt": [C, 0]}]}}
+
+    def v(node, ma, answers):
+        return cond.series(node, cond.Ctx(hist, cal, "A", None, defs, manual_as=ma, answers=answers))[0]
+    k = cond.answer_key
+    check(k(m, "A", False) == "A|실적 좋음" and k(m, "A", True) == "*|실적 좋음", "답 열쇠(상품·공통)")
+    check(k(unk, "A", False) == "A|?" + json.dumps({"ge": [{"px": "close", "sym": "M"}, "?"]}, ensure_ascii=False,
+                                                    sort_keys=True), "답 열쇠(\"?\" 식 — META 뗀 식)")
+    for ma in (True, False, None):
+        for ans in (True, False):
+            check(v(m, ma, {"A|실적 좋음": ans}) is ans, "답이 manual_as(%r) 보다 먼저" % ma)
+            check(v({"not": m}, ma, {"A|실적 좋음": ans}) is (not ans), "not 아래 답은 잎 값 그대로(not 이 뒤집음)")
+        check(v({"not": m}, ma, {}) is ma and v({"not": m}, ma, None) is ma, "답 없으면 극성 규칙 그대로(%r)" % ma)
+    check(v(m, None, {"B|실적 좋음": True}) is None, "다른 상품의 답은 안 먹는다")
+    check(v({"def": "시장"}, None, {"*|시장 좋음": True}) is True and v({"def": "시장"}, None, {"A|시장 좋음": True}) is None,
+          "공통 정의(상품마다 같은 값) 안 수동 = \"*\" 열쇠")
+    check(v({"def": "자기"}, None, {"A|자기 확인": True}) is True and v({"def": "자기"}, None, {"*|자기 확인": True}) is None,
+          "상품마다 다른 정의($self) 안 수동 = 상품 열쇠")
+    check(v(unk, True, {k(unk, "A", False): False}) is False, "\"?\" 식도 답으로 풀린다")
+    obs = {"observe": {"gt": [C, 0]}, "manual": "장중"}
+    check(v(obs, None, {"A|장중": False}) is True, "관측된 observe 는 답보다 관측값")
+    tree = TreeGateway.of(synthetic({"A": empty_product(entry={"all": [m]})}))
+    got = [grade.ProductEval(tree, "A", hist, cal, answers=a).grade_key(2)
+           for a in (None, {"A|실적 좋음": True}, {"A|실적 좋음": False})]
+    check(got == ["confirm", "buy", "wait"], "등급까지 답으로 풀린다(확인 대기 → 매수 후보·관망) %r" % got)
+
+
 # ------------------------------------------------------------------ 데이터 완전성 가드(워밍업 부족 → 불완전)
 def t_warmup_guard():
     """★ 실제 발견된 버그 방지(영구): 시세가 rate-limit 로 잘려(워밍업 부족) 와도 엔진이 그 불완전 데이터로
@@ -739,9 +777,9 @@ def t_regress():
 
 def t_no_excluded_live():
     """불변식(화면 Fix #1): 실전 판정이 쓰는 문맥(unobserved != "exclude")에서는 EXCLUDED 가 절대 나오지 않는다.
-    EXCLUDED/빈-전부-제외 노드가 브라우저(web/verdict_view → #verdict-data)에 실리면, 화면 3값 엔진
-    (checklist-ui ev/and3/or3)에는 그 개념이 없어 null 로 오해해 등급이 엔진과 갈라진다. 그 입력이 애초에
-    실전 경로로 올 수 없음을 여기서 강제한다.
+    EXCLUDED 는 '관측 못 한 조건을 빼고 판단'(백테스트 전용)이라, 실전 판정·화면(#verdict-data — 서버가 사람이 답한
+    수동까지 반영해 내는 판정)에 섞이면 라이브가 백테스트 규칙으로 판정하게 된다. 그 입력이 애초에 실전 경로로 올 수
+    없음을 여기서 강제한다.
 
     여기서는 기본/실전 문맥에서 관측값 없는 observe·수동·그 논리 묶음(전부 제외가 될 법한 묶음)조차 EXCLUDED 를
     내지 않고 true/false/None 만 냄을 실행으로 확인한다. 실전 판정 경로가 unobserved="exclude" 를 쓰지 않는지는
@@ -846,7 +884,8 @@ def main():
                      ("혼합 tf·확정봉·look-ahead 0", t_settled_mtf),
                      ("등급·금액", t_grade), ("데이터 완전성 가드(워밍업)", t_warmup_guard),
                      ("표현력 회귀", t_regress),
-                     ("EXCLUDED 실전 불변식", t_no_excluded_live), ("트리 출입구 계약", t_gateway)):
+                     ("EXCLUDED 실전 불변식", t_no_excluded_live), ("트리 출입구 계약", t_gateway),
+                     ("수동 답(answers)", t_answers)):
         before = len(FAILS)
         try:
             fn()

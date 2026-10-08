@@ -11,6 +11,9 @@
   GET /<slug>/         그 책 페이지 — 요청 시점 라이브 판정을 구워 넣는다(assemble).
   GET /api/verdict?slug=<책>  판정 JSON(라이브). 엔진(books.json engine.daily) --json 재사용 + 짧은
                      TTL 캐시(기본 8초, 책별)로 잦은 폴링이 시세 창구를 안 두드리게. CORS 허용.
+  POST /api/verdict   body {slug, answers:{답 열쇠: true|false}} — 화면에서 사람이 답한 수동 조건까지 반영한 판정
+                     (서버 권위: 화면은 등급을 다시 계산하지 않는다). web.verdict_view.render(answers=) 를 in-process 로
+                     부른다(토글 지연 줄이기). 답마다 결과가 달라 캐시하지 않는다(무답 GET 캐시와 섞이지 않게).
   GET /events?slug=<책>       SSE — ~15초마다 tick(브라우저가 받으면 /api/verdict 를 다시 당겨 재렌더).
   기타 정적 파일       BASE 디렉터리에서 그대로 서빙(폰트·이미지 등).
 
@@ -81,6 +84,27 @@ def compute_verdict(slug, force=False):
     return data, False
 
 
+_render_lock = threading.Lock()
+
+
+def compute_verdict_answers(slug, answers):
+    """사람이 답한 수동까지 반영한 판정 — in-process(web.verdict_view.render). 캐시하지 않는다(답마다 다르다)."""
+    from web.verdict_view import render
+    with _render_lock:                        # 시세 창구·평가를 한 번에 하나씩(스레드 서버)
+        data = render(slug, answers=answers)
+    data["live"] = True
+    return data
+
+
+def _answers_of(body):
+    """POST 본문 → (slug, answers) — answers 는 {문자열 열쇠: 참/거짓} 만 받는다(그 밖은 ValueError)."""
+    req = json.loads(body.decode("utf-8") or "{}")
+    ans = req.get("answers")
+    if not isinstance(ans, dict) or not all(isinstance(k, str) and isinstance(v, bool) for k, v in ans.items()):
+        raise ValueError("answers 는 {열쇠: true|false} 여야 한다")
+    return req.get("slug"), ans
+
+
 def render_page(slug):
     """책 slug 페이지 HTML — 요청 시점의 라이브 판정(내 포지션 포함)을 구워 넣는다. 조립은 assemble 하나로.
     판정 계산이 실패해도 페이지는 내보낸다(프런트가 폴링으로 재시도)."""
@@ -143,6 +167,23 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if m and m.group(1) in _slugs():
             return self._serve_page(m.group(1))
         return super().do_GET()
+
+    def do_POST(self):
+        if urllib.parse.urlparse(self.path).path != "/api/verdict":
+            return self._send(b"not found", "text/plain; charset=utf-8", 404)
+        try:
+            slug, answers = _answers_of(self.rfile.read(int(self.headers.get("Content-Length") or 0)))
+        except (ValueError, TypeError) as ex:
+            return self._send(json.dumps({"error": str(ex)}, ensure_ascii=False).encode("utf-8"),
+                              "application/json; charset=utf-8", 400)
+        if slug not in _slugs():
+            slug = DEFAULT_SLUG
+        try:
+            body = json.dumps(compute_verdict_answers(slug, answers), ensure_ascii=False).encode("utf-8")
+            self._send(body, "application/json; charset=utf-8")
+        except Exception as ex:
+            self._send(json.dumps({"error": str(ex)}, ensure_ascii=False).encode("utf-8"),
+                       "application/json; charset=utf-8", 500)
 
     def _serve_shell(self):
         try:

@@ -39,6 +39,9 @@
   주어진다(엔진이 '확인되면/안 되면' 두 번 평가해 '확인 대기'를 가린다). 데이터 None 과 다르다.
   극성: not 아래의 수동은 반대 값을 받는다(manual_as=True 는 '수동이 전부 구역에 유리하게 풀림'
   이라는 뜻 — '겹치면 쉼' = not(all(.., 수동)) 에서 낙관 평가가 오히려 겹침을 가정하던 버그를 막는다).
+  사람이 답한 수동(Ctx answers — 조건별 답 맵)은 그 답이 manual_as 보다 먼저다. 답은 잎의 참/거짓 그 자체라
+  not 아래에서도 뒤집지 않는다(not 이 그 값을 뒤집을 뿐). 답 열쇠 = answer_key — (shared ? "*" : 상품) + "|" +
+  manual_key(잎). shared = 상품마다 값이 같은 정의(product_specific 아님) 안의 잎 — 한 번 답하면 모든 상품에 같다.
 
 모르는 값 "?"
   저자가 숫자(기준·기간·개수)를 안 준 조건도 식으로 적는다 — 모르는 숫자 자리만 "?" 로 둔다.
@@ -163,6 +166,37 @@ def manual_text(node):
     return node["manual"] if "manual" in node else UNKNOWN_REASON
 
 
+def strip_meta(node):
+    """META 를 모든 깊이에서 뗀 식 — "?" 수동 잎의 답 열쇠(같은 식 = 같은 질문)."""
+    if isinstance(node, dict):
+        return {k: strip_meta(v) for k, v in node.items() if k not in META}
+    if isinstance(node, list):
+        return [strip_meta(x) for x in node]
+    return node
+
+
+def manual_key(node):
+    """수동 잎의 답 열쇠 본체 — 문장 수동(manual·observe)은 그 문장, "?" 식은 "?" + 식(META 뗀 JSON)."""
+    if "manual" in node:
+        return node["manual"]
+    return "?" + json.dumps(strip_meta(node), ensure_ascii=False, sort_keys=True)
+
+
+def answer_key(node, prod, shared):
+    """사람이 답한 수동의 열쇠 — 여러 상품이 같이 보는 정의 안(shared)이면 책 전체에 하나("*"), 아니면 상품마다."""
+    return ("*" if shared else prod) + "|" + manual_key(node)
+
+
+def product_specific(node, defs):
+    """$self/$index/pos 를 쓰는 식은 상품마다 값이 달라진다 — 여러 상품이 '같이 보는' 판단이 아니다."""
+    for n in labeled_all(node, defs):
+        if "px" in n and n.get("sym", "$self") in ("$self", "$index"):
+            return True
+        if "pos" in n:
+            return True
+    return False
+
+
 def validate(node, defs=None, path="$"):
     """문법 검사. 모르는 연산·키·인자 개수·필드는 전부 CondError(위치 포함)."""
     defs = defs or {}
@@ -267,13 +301,15 @@ class Ctx:
     """평가 문맥. hist={심볼: [Candle(date,open,high,low,close,volume)]}, cal=날짜 목록."""
 
     def __init__(self, hist, cal, self_sym, index_sym=None, defs=None, manual_as=None, pos=None, asof=None,
-                 unobserved=None, session_close=None):
+                 unobserved=None, session_close=None, answers=None, shared=False):
         """pos = (첫 매수일 인덱스, 평균 매입가 | 날짜별 평균 매입가 목록) — 매도·분할 규칙 평가 때만.
         asof = 관측 시각(UTC datetime) — 분봉(tf="1m"/"5m") 필드를 이 시각 이하로 자른다. None 이면 실제 지금.
         session_close = {심볼: {YYYYMMDD: 그날 정규장 마감(UTC datetime, tz-aware)}} — 일봉 확정(settled) 경계.
           거래소 캘린더(md_feed.sessions)에서 캐려 밖(cond)에서 넣는다(평가기는 jhts 를 모른다). 장중 asof 에서
           '마감이 asof 이후'인 일봉은 아직 미확정이므로 None 으로 가린다(look-ahead 0). asof=None 이거나 캘린더가
-          비면(미설치·조회 실패) 아무것도 가리지 않는다 — 없는 캘린더가 조용히 일봉을 전부 지우지 않게."""
+          비면(미설치·조회 실패) 아무것도 가리지 않는다 — 없는 캘린더가 조용히 일봉을 전부 지우지 않게.
+        answers = {answer_key: True|False} — 사람이 답한 수동(없는 열쇠는 manual_as). None 이면 옛 동작 그대로.
+        shared = 지금 상품마다 값이 같은 정의 안을 평가 중(answers 의 열쇠가 "*")."""
         self.pos = pos
         self.asof = asof          # 관측 시각(UTC datetime) — 분봉 조회를 이 시각 이하로 자른다. None 이면 실제 지금
         self.unobserved = unobserved  # None = 관측값 없는 observe 는 수동처럼 · "exclude" = 그 조건을 빼고 판단(백테스트)
@@ -288,17 +324,39 @@ class Ctx:
         self._memo = {}
         self._smap = {}       # 심볼 → settled_map 캐시(일봉축 마지막 확정 index 지도)
         self._flip = None
+        self.answers = answers
+        self._shared = shared
+        self._shr = None
 
     def flipped(self):
-        """수동 가정을 뒤집은 문맥(not 아래 평가용). 시세 캐시는 공유한다."""
+        """수동 가정을 뒤집은 문맥(not 아래 평가용). 시세 캐시는 공유한다. 사람의 답(answers)은 뒤집지 않는다."""
         if self.manual_as is None:
             return self
         if self._flip is None:
             f = Ctx(self.hist, self.cal, self.self_sym, self.index_sym, self.defs, not self.manual_as, self.pos,
-                    self.asof, self.unobserved, self.session_close)
+                    self.asof, self.unobserved, self.session_close, self.answers, self._shared)
             f._px, f._smap, f._flip = self._px, self._smap, self
             self._flip = f
         return self._flip
+
+    def shared(self):
+        """상품마다 값이 같은 정의 안을 평가하는 문맥(답 열쇠 "*"). 답이 없거나 이미 그 문맥이면 자기 자신."""
+        if self.answers is None or self._shared:
+            return self
+        if self._shr is None:
+            s = Ctx(self.hist, self.cal, self.self_sym, self.index_sym, self.defs, self.manual_as, self.pos,
+                    self.asof, self.unobserved, self.session_close, self.answers, True)
+            s._px, s._smap = self._px, self._smap
+            self._shr = s
+        return self._shr
+
+    def manual_value(self, node):
+        """수동 잎 하나의 값 — 사람이 답했으면 그 답, 아니면 manual_as(극성 반영된 가정)."""
+        if self.answers is not None:
+            a = self.answers.get(answer_key(node, self.self_sym, self._shared))
+            if a is not None:
+                return a
+        return self.manual_as
 
     def bind(self, sym):
         if sym == "$self":
@@ -546,7 +604,7 @@ def _series(node, ctx, s_sym):
     op = _op_of(node)
     v = node[op]
     if is_unknown(node, ctx.defs):
-        return [ctx.manual_as] * L           # 저자가 숫자를 안 준 판단 — 사람이 정한다(수동과 같은 규칙)
+        return [ctx.manual_value(node)] * L  # 저자가 숫자를 안 준 판단 — 사람이 정한다(수동과 같은 규칙)
     if op in WINDOW + ("lag", "pct", "rsi", "count") and v[1] == UNKNOWN:
         return [None] * L                    # 기간을 모름 — 값도 모름
     R = lambda n: series(n, ctx, s_sym)                                   # 논리 묶음용(제외 표지 그대로)
@@ -797,10 +855,10 @@ def _series(node, ctx, s_sym):
         return out
 
     if op == "manual":
-        return [ctx.manual_as] * L
+        return [ctx.manual_value(node)] * L
 
     if op == "observe":
-        miss = EXCLUDED if ctx.unobserved == "exclude" else ctx.manual_as
+        miss = EXCLUDED if ctx.unobserved == "exclude" else ctx.manual_value(node)
         return [miss if x is None else x for x in S(v)]
 
     if op == "pos":
@@ -827,7 +885,9 @@ def _series(node, ctx, s_sym):
         return out
 
     if op == "def":
-        return S(ctx.defs[v])
+        body = ctx.defs[v]                   # 상품마다 값이 같은 정의 안의 수동 답은 책 전체에 하나(답 열쇠 "*")
+        c = ctx if ctx.answers is None or product_specific(body, ctx.defs) else ctx.shared()
+        return [None if x is EXCLUDED else x for x in series(body, c, s_sym)]
 
     raise CondError("모르는 연산 %r" % op)
 
