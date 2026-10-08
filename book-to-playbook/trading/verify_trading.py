@@ -4,6 +4,7 @@
 
 조건 트리 원시함수·등급 검사는 구간② checklist/verify_primitives.py 가 하고, 여기는 그 위에서 도는 구간③ 코드만 본다.
   1. 거래 시뮬레이터 — 손으로 답을 셀 수 있는 시세로 진입·분할 매도·동시 발동·미청산·보유 중 신호 건너뛰기
+     · 매도 정책 — 책에 매도 규칙이 없으면 거래 없이 매수 신호 뒤 N거래일 보유만(대체 매도 규칙을 지어내지 않는다)
   2. 실전 판정 경로는 unobserved="exclude"(백테스트 전용)를 쓰지 않는다 — 소스로 확인
   3. (--parity) 신호 패리티 — "백테스트 신호 == 실시간 신호"를 **실제 진입점으로 돌려** 증명한다(라이브 책의 tree.json·시세 필요).
 
@@ -155,6 +156,29 @@ def t_trades():
     check([b["qty"] for b in t["buys"]] == [1.0], "분할 비율 미명시 = 전량 한 번")
 
 
+def t_no_exit():
+    """매도 정책 — 책에 매도 규칙이 없으면("none") 거래를 지어내지 않고(대체 매도 규칙 없음) 매수 신호 뒤
+    N거래일 보유 수익률(summary 의 ✅+🟡 줄)만 남는다. 규칙이 있으면 "book" — 거래 시뮬레이션."""
+    from trading import backtest
+    today = datetime.now()
+    cal = [(today - timedelta(days=60 - k)).strftime("%Y%m%d") for k in range(60)]
+    hist = {"X": [Candle(d, 100 + k, 101 + k, 99 + k, 100 + k, 1000) for k, d in enumerate(cal)]}
+    ex = [{"label": "익절", "when": {"ge": [{"pos": "ret"}, 5]}, "sell": "all"}]
+    for exits, pol in (([], "none"), (ex, "book")):
+        tree = TreeGateway.of(synthetic({"X": empty_product(exit=exits)}))
+        check(trades_mod.exit_policy(tree, "X") == pol, "exit_policy %r" % pol)
+        res = backtest.run("x", 365, hist=hist, tree=tree)
+        t = res["trades"]["X"]
+        check(t["exit_policy"] == pol, "backtest 매도 정책 %r" % t)
+        if pol == "none":
+            check(set(t) == {"exit_policy"}, "매도 규칙 없음 — 거래를 만들지 않는다 %r" % sorted(t))
+            b = res["summary"]["X"]["grades"][backtest.BUY_OR_CONFIRM]
+            check(b["signals"] == 1 and b["fwd"][5]["n"] == 1, "매도 규칙 없음 — 매수 신호 뒤 N일 보유만 %r" % b)
+            check(trades_mod.NO_EXIT_NOTE in backtest.build_text(res), "매도 규칙 없음 문구")
+        else:
+            check(t["stats"]["trades"] == 1 and t["trades"][0]["closed"], "매도 규칙 있음 — 거래 시뮬레이션 %r" % t["stats"])
+
+
 def t_live_path():
     """실전 판정 경로가 cond.Ctx 를 unobserved="exclude" 로 만들지 않는다 — EXCLUDED 가 화면(#verdict-data)에 실리면
     화면 3값 엔진(checklist-ui)엔 그 개념이 없어 등급이 갈라진다(checklist.verify_primitives 의 실행 불변식과 짝)."""
@@ -260,7 +284,8 @@ def parity_main(argv):
 def main(argv):
     if "--parity" in argv:
         return parity_main(argv)
-    for name, fn in (("거래 시뮬레이터", t_trades), ("실전 경로 unobserved", t_live_path)):
+    for name, fn in (("거래 시뮬레이터", t_trades), ("매도 정책(규칙 없음)", t_no_exit),
+                     ("실전 경로 unobserved", t_live_path)):
         before = len(FAILS)
         try:
             fn()

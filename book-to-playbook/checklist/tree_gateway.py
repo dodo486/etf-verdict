@@ -105,7 +105,7 @@ class TreeGateway:
 
     @staticmethod
     def as_rules(raw):
-        """트리 형식의 규칙 dict 목록(표준 매도 exit_defaults·전량 한 번 등) → [Rule]."""
+        """트리 형식의 규칙 dict 목록(전량 한 번·검사기 합성 규칙 등) → [Rule]."""
         return [Rule(r) for r in raw]
 
     # ---------------------------------------------------------------- 형식 검사
@@ -193,7 +193,7 @@ class TreeGateway:
         return [Rule(t) for t in (self._p(prod).get("sizing") or {}).get("tranches") or []]
 
     def exit_rules(self, prod):
-        """책의 매도 규칙 [Rule(label, ref, note, when, sell)] — 없으면 [](표준 기본값은 trades.exits_of 가 붙인다)."""
+        """책의 매도 규칙 [Rule(label, ref, note, when, sell)] — 없으면 [](그때의 정책은 trades.exit_policy — 대체 규칙을 붙이지 않는다)."""
         return [Rule(r) for r in self._p(prod).get("exit") or []]
 
     def expressions(self, prod):

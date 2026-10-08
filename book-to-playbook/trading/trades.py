@@ -4,15 +4,13 @@
 exit/sizing 규칙을 읽어, 그 규칙을 봉마다 평가해 체결 일정·거래 요약을 만든다(책 무관, 돈·수수료·지표 없음).
 
 이 모듈은 '규칙'만 다룬다 — 돈·수수료·성적(자산곡선·MaxDD·샤프)은 계산기(trading/portfolio)가
-build_trades 결과(체결 일정)를 받아서 낸다. '책에 매도 규칙이 없으면'(표준 매도 대체 — 지금은 백테스트만) 정책의 주인도 이 파일.
+build_trades 결과(체결 일정)를 받아서 낸다. 매도 정책(책에 매도 규칙이 없으면 어떻게 하나)의 주인도 이 파일.
 
 규칙 리더
-  · exits_of    : 책에 매도 규칙이 있으면 그걸, 없으면 표준(STANDARD)을. (규칙 목록, 출처) 로 돌려준다.
-  · uses_standard_exit : 표준을 쓰나(불리언) — 화면은 출처 글자('책')와 비교하지 않고 이 플래그(exit_standard)를 본다.
+  · exit_policy : 매도 정책 "book"(책 매도 규칙으로 청산 시뮬레이션) | "none"(책에 매도 규칙 없음 — 대체 규칙을
+                  지어내지 않고 매수 신호 뒤 N거래일 보유 수익률로만 평가, 표시 문구 NO_EXIT_NOTE). 모두 이걸 묻는다.
   · tranches_of : 분할 매수 차수. 저자가 비율을 안 줬으면(frac null) 전량 한 번(비율을 지어내지 않는다).
   · unsized_note: 분할 비율·매도 비율 '저자 미명시'를 백테스트가 어떻게 계산했는지 결과에 표시할 문구.
-  · standard_label / STANDARD : 책에 매도 규칙이 없는 상품에 쓰는 '책 무관 기본값'(결과엔 '표준 기준(책 아님)').
-    표준 규칙의 숫자(+9%/−5%/10일)는 코드가 아니라 trading/exit_defaults.json 한 곳에 있다(하드코딩 0 — grade_rules 패턴).
 
 규칙 평가 워크(돈·수수료·지표 없음)
   · build_trades   : 머리(tree)가 정한 진입 신호·분할·매도 규칙을 받아 '한 진입 → 그 청산까지'의
@@ -24,46 +22,20 @@ build_trades 결과(체결 일정)를 받아서 낸다. '책에 매도 규칙이
 
 트리는 호출자가 넘긴 TreeGateway(gw — checklist/tree_gateway.py)로 읽는다 — 규칙은 gw 가 건네는 Rule(label·when·sell·frac…)로만 다룬다.
 """
-import json
-import os
 import statistics
 
 from checklist import cond
 from trading.judge import Holding
 
-# 표준 매도 규칙의 '정본'은 코드가 아니라 데이터(trading/exit_defaults.json)에 있다 — 숫자를 코드에 복붙하지 않는다.
-STANDARD = json.load(
-    open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "exit_defaults.json"),
-         encoding="utf-8"))["standard"]
 FULL = [{"label": "전량", "frac": 1.0}]          # 한 번에 전량 — 트리 규칙 형식 그대로 두고 쓸 때 gw.as_rules 로 감싼다
+NO_EXIT_NOTE = "책에 매도 규칙 없음 — 매수 신호만 평가"   # 매도 정책 "none" 의 표시 문구(백테스트 탭·판정 화면이 받아 쓴다)
 
 
-def _std_const(field, op):
-    """STANDARD 에서 (pos.<field> op 상수) 꼴 규칙의 상수를 꺼낸다 — 숫자를 다시 적지 않고 구조에서 끌어온다."""
-    for r in STANDARD:
-        w = r.get("when") or {}
-        args = w.get(op)
-        if args and isinstance(args[0], dict) and args[0].get("pos") == field:
-            return args[1]
-    return None
-
-
-def standard_label():
-    """표준 매도 규칙의 짧은 표시 문자열(예 '+9%/−5%/10일') — STANDARD config 에서 파생(단일 출처).
-    숫자는 전부 exit_defaults.json 에서 끌어온다 — 화면·코드 어디에도 복붙하지 않는다."""
-    tp, sl, dys = _std_const("ret", "ge"), _std_const("ret", "le"), _std_const("days", "ge")
-    return ("+%g%%/%g%%/%g일" % (tp, sl, dys)).replace("-", "−")  # 음수 부호만 유니코드 글리프로(숫자는 config)
-
-
-def exits_of(gw, prod):
-    """(규칙 목록, 출처) — 책 규칙이 없으면 표준."""
-    ex = gw.exit_rules(prod)
-    return (ex, "책") if ex else (gw.as_rules(STANDARD), "표준 기준(책 아님)")
-
-
-def uses_standard_exit(gw, prod):
-    """책에 매도 규칙이 없어 표준을 쓰나 — exits_of 의 출처 글자 대신 화면이 보는 플래그(글자 비교 금지)."""
-    return not gw.exit_rules(prod)
+def exit_policy(gw, prod):
+    """매도 정책 — 이 함수 하나가 주인이다(밖은 이걸 묻는다). "book" = 책의 매도 규칙으로 청산까지 시뮬레이션.
+    "none" = 책에 매도 규칙이 없다 → 대체 매도 규칙을 지어내지 않고, 거래 시뮬레이션 없이 매수 신호 뒤
+    N거래일 보유 수익률(backtest 의 HORIZONS)로만 평가한다(화면 문구 NO_EXIT_NOTE)."""
+    return "book" if gw.exit_rules(prod) else "none"
 
 
 def tranches_of(gw, prod):

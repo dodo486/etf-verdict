@@ -3,7 +3,7 @@
 
   · judge.py            Judge(한 상품·한 시점 판정) · Decision(판정 사실) · Holding(보유 상태 — pos 주입 한 곳)
   · timeline.py         Timeline — 시간을 밟으며 매 asof 판정(일봉 벡터 1회계산 / 분봉 asof 축, finest_tf)
-  · trades.py           체결 워크 — 매도·분할 규칙 → 체결 일정(다음 봉 시가·단위 물량, 돈 없음) · 표준 매도(exit_defaults.json)
+  · trades.py           체결 워크 — 매도·분할 규칙 → 체결 일정(다음 봉 시가·단위 물량, 돈 없음) · 매도 정책(exit_policy — 책에 매도 규칙 없으면 매수 신호만 평가)
   · portfolio.py        계산기(모의 실행) — 체결 일정 → vectorbt 돈·지표(market_config.json) · LiveExecutor 빈 자리
   · backtest.py         백테스트 러너(신호 성적·거래 성적·vectorbt·장중)
   · replay.py           장중 재생(신호만)

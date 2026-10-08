@@ -14,7 +14,8 @@ books.json 의 engine.daily 가 이 모듈이다(python -m web.verdict_view <slu
              zones{filter,avoid,entry: view[]}, opt{..}, pes{..},     조건 칸 셋의 중첩 설명 + 낙관·비관 값
              caution[{label, ref, scale, v, manual, view}], amount{factor, unspecified, unknown},
              sizing{label, ref, weight, weight_range, tranches[{label, ref, frac, note, view?}]},
-             exit[{label, ref, sell, note, view}], positions[...]}    positions = 내 포지션(로컬 파일)이 있을 때만
+             exit[{label, ref, sell, note, view}], exit_policy("book"|"none" — trades.exit_policy),
+             positions[...]}                                         positions = 내 포지션(로컬 파일)이 있을 때만
   refs    : {원문 소절: {auto, manual, zones[], prods[], unexpressed?[{rule, reason}]}}
             플레이북 소절별 체크리스트 반영 현황 + 트리로 못 옮긴 규칙과 그 사유
 view 는 노드 하나당 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, hidden?} (condition_view._view)
@@ -31,6 +32,7 @@ from checklist import cond
 from checklist.grade import GRADES, GRADE_RULES, WARMUP_DAYS, history
 from checklist.tree_gateway import TreeGateway
 from trading.judge import Holding, Judge
+from trading.trades import NO_EXIT_NOTE, exit_policy
 from trading.notify import send_telegram, send_desktop
 from web import condition_view as cv
 
@@ -184,7 +186,8 @@ def product_verdict(gw, p, hist, positions, asof=None):
                                        view=_static_view(t.when, defs, index))
                                   for t in gw.tranches(p)]},
              exit=[{"label": r.label, "ref": r.ref, "sell": r.sell, "note": r.note,
-                    "view": _static_view(r.when, defs, index)} for r in gw.exit_rules(p)])
+                    "view": _static_view(r.when, defs, index)} for r in gw.exit_rules(p)],
+             exit_policy=exit_policy(gw, p))
     pos = [dict(_holding_view(hs, defs, i), entry_date=x["entry_date"], entry_px=x["entry_px"], filled=x.get("filled", 1))
            for hs, x in zip(d.holdings, xs)]
     if pos:
@@ -236,7 +239,9 @@ def render(slug, asof=None):
            # 여섯 칸 키→한글 이름표(화면 머리글용) — cond.ZONE_LABELS 가 정본이다. 화면(shared-ui zw)이
            #   복붙하지 않고 이걸 받아 쓴다. 머리글 번호 순서대로(①필터 ②회피 ③진입 …) 실어보낸다.
            "zones": {s: cond.ZONE_LABELS[s]
-                     for s in ("filter", "avoid", "entry", "caution", "sizing", "exit")}}
+                     for s in ("filter", "avoid", "entry", "caution", "sizing", "exit")},
+           # 매도 정책 "none"(책에 매도 규칙 없음) 문구 — 정본 trading/trades.NO_EXIT_NOTE(화면이 받아 쓴다).
+           "no_exit_note": NO_EXIT_NOTE}
     if tree is None:
         top["error"] = "조건 트리 없음 — books/%s/tree.json 이 있어야 판정한다" % slug
         return top

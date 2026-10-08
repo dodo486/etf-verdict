@@ -28,23 +28,22 @@ def page_data(slug):
     out = {"slug": slug, "generated": datetime.now().isoformat(timespec="seconds"),
            "horizons": list(HORIZONS), "grades": list(GRADES.values()),
            "buy_or_confirm": BUY_OR_CONFIRM,
-           # 표준 매도 규칙의 짧은 표시(예 '+9%/−5%/10일') — trading/trades.STANDARD 에서 파생(단일 출처).
-           #   화면(backtest-ui)은 이 값을 받아 쓰고 숫자를 복붙하지 않는다.
-           "standard_exit_label": trades.standard_label(), "periods": {}}
+           # 매도 정책 "none"(책에 매도 규칙 없음)일 때 화면이 그대로 쓰는 문구 — 정본 trading/trades.NO_EXIT_NOTE.
+           "no_exit_note": trades.NO_EXIT_NOTE, "periods": {}}
     for key, days in PAGE_PERIODS:
         res = run(slug, days, hist=hist, tree=tree)
         prods = {}
         for p in res["summary"]:
             d = dict(res["summary"][p], trades=res["trades"][p])
-            # 표준 매도를 썼나 — 화면(backtest-ui)은 trades 의 출처 글자와 비교하지 않고 이 플래그만 본다.
-            d["exit_standard"] = trades.uses_standard_exit(tree, p)
+            # 매도 정책("book"|"none") — 화면(backtest-ui)은 이 필드만 본다(정본 trades.exit_policy).
+            d["exit_policy"] = res["trades"][p]["exit_policy"]
             # 계산기 지표(vectorbt) — 판정기가 낸 '그 거래'(res["trades"])를 portfolio 로 다시 굴려
             #   자산곡선·MaxDD·샤프·총수익을 옛 지표 옆에 나란히 둔다(중복 수집 없음 — 같은 hist·같은 거래).
             cs = hist.get(p) or []
             cal = [c.date for c in cs]
             closes = [c.close for c in cs]
-            tl = res["trades"].get(p, {}).get("trades") or []
-            d["vectorbt"] = portfolio.run_product(p, cal, closes, tl) if cal else None
+            tl = res["trades"][p].get("trades")       # 매도 정책 "none" 이면 거래 없음 — 계산기 생략
+            d["vectorbt"] = portfolio.run_product(p, cal, closes, tl) if cal and tl is not None else None
             prods[p] = d
         out["periods"][key] = {
             "days": days, "period": res["period"], "trading_days": res["trading_days"],

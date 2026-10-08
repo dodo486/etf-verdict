@@ -15,6 +15,9 @@
     같은 상승을 여러 번 번 것처럼 부풀려진다.
   · 비교 기준 = 같은 종목에 '아무 날이나' 진입했을 때(전체 거래일)의 같은 수익률.
 
+거래 성적(진입 → 책 매도 규칙으로 청산)은 매도 정책(trades.exit_policy)이 "book" 일 때만 낸다 — 책에 매도 규칙이
+없으면("none") 대체 매도 규칙을 지어내지 않고 위의 신호 검증(매수 신호 뒤 N거래일 보유)만 남는다.
+
 수동(manual) 조건은 과거를 확인할 수 없다. ✅(확인 없이도 매수)와 🟡(확인되면 매수)를 따로 세고,
 '✅+🟡' 줄은 수동 조건이 전부 확인됐다고 가정한 낙관치다.
 
@@ -124,7 +127,8 @@ def run(slug, days=365, hist=None, tree=None, unobserved=None):
             incomplete[p] = {"required_warmup": j.warmup, "incomplete_days": inc_days}
         rows.extend(prow)
         summary[p] = _summarize(prow, cs)
-        # 거래: 매수 신호(✅·🟡) 시작일 다음 날 시가 진입 → 매도 규칙으로 청산(보유 중 신호는 건너뜀)
+        # 거래: 매수 신호(✅·🟡) 시작일 다음 날 시가 진입 → 책 매도 규칙으로 청산(보유 중 신호는 건너뜀).
+        #   매도 정책(trades.exit_policy)이 "none"(책에 매도 규칙 없음)이면 거래를 만들지 않는다.
         pos_of = {d: i for i, d in enumerate(cal)}
         starts, prev = [], False
         for r in prow:
@@ -132,10 +136,14 @@ def run(slug, days=365, hist=None, tree=None, unobserved=None):
             if b and not prev:
                 starts.append(pos_of[r["date"]])
             prev = b
-        exits, src = trades.exits_of(tree, p)
-        tl = trades.build_trades(tree, p, hist, cal, starts, exits)
-        trade_res[p] = {"exit_source": src, "unsized_note": trades.unsized_note(tree, p, exits),
-                        "stats": trades._parity_stats(tl), "trades": tl}
+        pol = trades.exit_policy(tree, p)
+        if pol == "none":           # 책에 매도 규칙 없음 — 거래를 지어내지 않는다(매수 신호 뒤 N거래일 보유만: summary)
+            trade_res[p] = {"exit_policy": pol}
+        else:
+            exits = tree.exit_rules(p)
+            tl = trades.build_trades(tree, p, hist, cal, starts, exits)
+            trade_res[p] = {"exit_policy": pol, "unsized_note": trades.unsized_note(tree, p, exits),
+                            "stats": trades._parity_stats(tl), "trades": tl}
         manual[p] = [{"section": s, "rule": l, "ref": r} for s, l, r in j.manual_items()]
         if prow and period is None:
             period = [prow[0]["date"], prow[-1]["date"], len(prow)]
@@ -172,15 +180,18 @@ def build_text(res):
         L.append("  %-16s %5s %4s  " % ("(아무 날)", "", "")
                  + "  ".join(_fmt(s["baseline"][h]) for h in HORIZONS))
     L.append("")
-    L.append("■ 거래 성적 — 매수 신호 다음날 시가 진입 · 매도 규칙으로 청산 vs 같은 진입 20거래일 보유")
-    L.append("  %-5s %-14s %4s %4s  %-18s %6s  %-18s" % ("상품", "매도 기준", "거래", "미청산",
-                                                      "매도규칙 승률·평균", "보유일", "20일보유 승률·평균"))
+    L.append("■ 거래 성적 — 매수 신호 다음날 시가 진입 · 책 매도 규칙으로 청산 vs 같은 진입 20거래일 보유")
+    L.append("  %-5s %4s %4s  %-18s %6s  %-18s" % ("상품", "거래", "미청산",
+                                                "매도규칙 승률·평균", "보유일", "20일보유 승률·평균"))
     for p, t in res["trades"].items():
+        if t["exit_policy"] == "none":
+            L.append("  %-5s %s → 위 '%s' 줄(매수 신호 뒤 N거래일 보유)" % (p, trades.NO_EXIT_NOTE, BUY_OR_CONFIRM))
+            continue
         st = t["stats"]
         a = "%3.0f%% %+6.2f%%" % (st["win"], st["avg"]) if "win" in st else "      -      "
         b = "%3.0f%% %+6.2f%%" % (st["f20_win"], st["f20_avg"]) if "f20_win" in st else "      -      "
-        L.append("  %-5s %-14s %4d %4d  %-18s %6s  %-18s" % (p, t["exit_source"], st["trades"], st["open"], a,
-                                                         "%.1f" % st["days"] if "days" in st else "-", b))
+        L.append("  %-5s %4d %4d  %-18s %6s  %-18s" % (p, st["trades"], st["open"], a,
+                                                   "%.1f" % st["days"] if "days" in st else "-", b))
         if st["rule_hits"]:
             L.append("        매도 발동: " + " · ".join("%s %d" % kv for kv in st["rule_hits"].items()))
     man = [(p, m) for p, ms in res["manual"].items() for m in ms]
@@ -216,8 +227,9 @@ def run_vectorbt(slug, days=365, hist=None, tree=None, unobserved=None):
         cs = hist.get(p) or []
         cal = [c.date for c in cs]
         closes = [c.close for c in cs]
-        tl = res["trades"].get(p, {}).get("trades") or []
-        vbt_products[p] = portfolio.run_product(p, cal, closes, tl)
+        t = res["trades"].get(p) or {}
+        # 매도 정책 "none"(책에 매도 규칙 없음) — 굴릴 거래가 없다(매수 신호 뒤 N거래일 보유만 — run 의 summary)
+        vbt_products[p] = None if t.get("exit_policy") == "none" else portfolio.run_product(p, cal, closes, t["trades"])
     return {"slug": slug, "title": res["title"], "period": res["period"],
             "trading_days": res["trading_days"], "engine": "vectorbt",
             "old_trades": res["trades"], "vectorbt": vbt_products,
@@ -237,6 +249,9 @@ def build_vectorbt_text(vres):
             % ("상품", "시장", "총수익", "MaxDD", "샤프", "자산점", "거래", "승률", "거래당평균"))
     L.append(head)
     for p, v in vres["vectorbt"].items():
+        if v is None:
+            L.append("  %-6s %s — 계산기 생략" % (p, trades.NO_EXIT_NOTE))
+            continue
         mk = v["market_params"]["market"]
         pa = v["parity"]
         old = vres["old_trades"].get(p, {}).get("stats", {})
@@ -330,11 +345,14 @@ def run_intraday(slug, hist=None, tree=None, limit=None):
         cal, mh = _minute_axis(hist, p, timeline)
         closes = [c.close for c in mh.get(p)]
         starts = _starts_from_series(rows, cal)
-        exits, src = trades.exits_of(tree, p)
-        tl = trades.build_trades(tree, p, mh, cal, starts, exits)   # 분봉 축에 체결 일정(다음봉 시가 진입)
-        vbt_products[p] = portfolio.run_product(p, cal, closes, tl) if cal else None
+        pol = trades.exit_policy(tree, p)
+        if pol == "book" and cal:
+            tl = trades.build_trades(tree, p, mh, cal, starts, tree.exit_rules(p))   # 분봉 축 체결 일정(다음봉 시가 진입)
+            vbt_products[p] = portfolio.run_product(p, cal, closes, tl)
+        else:
+            vbt_products[p] = None          # 분봉 없음 · 또는 책에 매도 규칙 없음(거래를 지어내지 않는다)
         signal_summary[p] = {"points": len(rows), "buy_signals": len(starts),
-                             "exit_source": src, "bars": len(cal)}
+                             "exit_policy": pol, "bars": len(cal)}
     return {"slug": slug, "title": tree.book(slug),
             "engine": "vectorbt-intraday", "finest_tf": tf, "prods": prods,
             "sessions": sessions, "points": len(timeline), "signals": signal_summary,
@@ -352,12 +370,13 @@ def build_intraday_text(ires):
     L.append("")
     L.append("■ 분봉 신호 + 포트폴리오 지표(vectorbt · 분봉 축) — bars=분봉 틱 수, 보유일=분봉 틱 수(일 아님)")
     head = ("  %-6s %-6s %6s %6s %9s %8s %7s   | %-14s %5s %6s %8s"
-            % ("상품", "시장", "틱수", "매수", "총수익", "MaxDD", "샤프", "매도기준", "거래", "승률", "거래당평균"))
+            % ("상품", "시장", "틱수", "매수", "총수익", "MaxDD", "샤프", "매도 정책", "거래", "승률", "거래당평균"))
     L.append(head)
     for p, v in ires["vectorbt"].items():
         sg = ires["signals"][p]
         if v is None:
-            L.append("  %-6s  (분봉 봉 없음 — 그 상품은 장중 데이터가 비어 재생 불가)" % p)
+            L.append("  %-6s  %s" % (p, trades.NO_EXIT_NOTE if sg["exit_policy"] == "none"
+                                     else "(분봉 봉 없음 — 그 상품은 장중 데이터가 비어 재생 불가)"))
             continue
         mk = v["market_params"]["market"]
         pa = v["parity"]
@@ -367,7 +386,7 @@ def build_intraday_text(ires):
         win = "%5.1f%%" % pa["win"] if "win" in pa else "   -  "
         avg = "%+7.2f%%" % pa["avg"] if "avg" in pa else "   -    "
         L.append("  %-6s %-6s %6d %6d %9s %8s %7s   | %-14s %4d %6s %8s"
-                 % (p, mk, sg["bars"], sg["buy_signals"], tr, dd, sh, sg["exit_source"],
+                 % (p, mk, sg["bars"], sg["buy_signals"], tr, dd, sh, sg["exit_policy"],
                     pa.get("trades", 0), win, avg))
     L.append("")
     L.append("※ 축이 '분봉 한 틱'이라 보유일·MaxDD·샤프는 분봉 축 기준(샤프 연율화는 봉 간격으로 맞췄다 — 짧은 구간은 참고용).")

@@ -4,7 +4,8 @@
  * 페이지 로드 때 .tab 목록을 한 번 묶으므로, 그 전에 버튼·패널을 만들어 두면 기존 탭 전환에 그대로 묶인다.
  * 순서가 어긋나도 깨지지 않게 자기 클릭 처리도 따로 둔다.
  *
- * 보이는 것: 1년/3년 전환 · 상품별 거래 성적(책 매도 규칙 vs 같은 진입 20일 보유 vs 아무 날) ·
+ * 보이는 것: 1년/3년 전환 · 상품별 거래 성적(책 매도 규칙 vs 같은 진입 20일 보유 vs 아무 날 — 책에 매도 규칙이
+ * 없으면(exit_policy "none") 거래 대신 매수 신호 뒤 N일 보유 수익률만) ·
  * 등급별 일수·신호·5/10/20일 수익률 · 거래 목록(무엇을 언제 얼마 팔았나) · 수동 조건과 가정.
  */
 (function () {
@@ -49,7 +50,7 @@
     '#panel-backtest .bt-muted{color:var(--mute)}' +
     '#panel-backtest details{margin-top:10px} #panel-backtest summary{cursor:pointer;color:var(--gold);font-weight:700;font-size:13.5px}' +
     '#panel-backtest .bt-tag{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 7px;border-radius:6px;border:1px solid var(--line);color:var(--mute);margin-left:6px}' +
-    '#panel-backtest .bt-tag.std{color:var(--warn,#e5484d);border-color:var(--warn,#e5484d)}' +
+    '#panel-backtest .bt-tag.none{color:var(--gold);border-color:var(--gold)}' +
     '#panel-backtest .bt-vbt{margin:12px 0 2px}' +
     '#panel-backtest .bt-metrics{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:6px}' +
     '#panel-backtest .bt-mv{font-size:22px;font-weight:800;line-height:1.1}' +
@@ -104,8 +105,8 @@
 
     Object.keys(P.products).forEach(function (p) {
       var S = P.products[p], T = S.trades || {}, st = T.stats || {};
-      var std = !!S.exit_standard;   // 표준 매도를 썼나 — 엔진 플래그(web/backtest_page, trades.uses_standard_exit)
-      h += '<div class="bt-prod"><h2>' + esc(p) + '<span class="bt-tag' + (std ? ' std' : '') + '">매도: ' + esc(T.exit_source || '-') + '</span></h2>';
+      var none = S.exit_policy === 'none';   // 매도 정책(web/backtest_page — 정본 trades.exit_policy): 책에 매도 규칙 없음
+      h += '<div class="bt-prod"><h2>' + esc(p) + (none ? '<span class="bt-tag none">' + esc(D.no_exit_note) + '</span>' : '') + '</h2>';
       h += '<p class="bt-sub">기간 보유(처음~끝) ' + pct(S.buy_hold, 1) + '</p>';
       if (T.unsized_note) h += '<p class="bt-sub">⚠ ' + esc(T.unsized_note) + '</p>';
 
@@ -120,13 +121,22 @@
              '<p class="bt-sub" style="margin:3px 0 0">자산곡선 · 수수료·세금 반영(vectorbt) · 시장 ' + esc((V.market_params || {}).market || '-') + '</p></div>';
       }
 
+      if (none) {
+        // 책에 매도 규칙이 없다 — 거래(청산)를 지어내지 않고 매수 신호 뒤 N거래일 보유 수익률만(엔진 summary 의 ✅+🟡 줄)
+        var B = (S.grades || {})[D.buy_or_confirm] || {};
+        h += '<h3>' + esc(D.no_exit_note) + ' — 매수 신호 다음 날 시가에 사서 N거래일 보유 (평균 · 승률)</h3><div class="tablewrap"><table><thead><tr><th>방식</th><th>신호</th>';
+        H.forEach(function (n) { h += '<th>' + n + '일 후</th>'; });
+        h += '</tr></thead><tbody><tr><td>매수 신호(' + esc(D.buy_or_confirm) + ')</td><td>' + (B.signals || 0) + '</td>';
+        H.forEach(function (n) { h += '<td>' + f((B.fwd || {})[String(n)]) + '</td>'; });
+        h += '</tr><tr><td class="bt-muted">아무 날에나 (비교 기준)</td><td class="bt-muted">—</td>';
+        H.forEach(function (n) { h += '<td class="bt-muted">' + f((S.baseline || {})[String(n)]) + '</td>'; });
+        h += '</tr></tbody></table></div>';
+      } else {
       // 거래 성적
       var a = st.win, b = st.f20_win;
       h += '<h3>거래 성적 — 매도 규칙의 효과</h3><div class="tablewrap"><table><thead><tr>' +
            '<th>방식</th><th>거래</th><th>승률</th><th>평균 수익률</th><th>평균 보유</th><th>비고</th></tr></thead><tbody>';
-      // 표준 매도의 수치(+9%/−5%/10일)는 파이썬(trading/trades.STANDARD)에서 파생해 D.standard_exit_label 로 실려 온다 — 복붙 금지.
-      var stdLabel = '표준 매도(' + (D.standard_exit_label || '표준 기준') + ')';
-      h += '<tr><td>' + (std ? stdLabel : '책 매도 규칙') + '</td><td>' + (st.trades || 0) + '</td>' +
+      h += '<tr><td>책 매도 규칙</td><td>' + (st.trades || 0) + '</td>' +
            '<td class="' + (a != null && b != null && a > b ? 'bt-best' : '') + '">' + win(a) + '</td><td>' + pct(st.avg) + '</td>' +
            '<td>' + (st.days != null ? st.days.toFixed(1) + '일' : '—') + '</td>' +
            '<td>' + (st.open ? '<span class="bt-warn">미청산 ' + st.open + '건(승률 제외)</span>' : '') + '</td></tr>';
@@ -139,6 +149,7 @@
       if (st.rule_hits && Object.keys(st.rule_hits).length) {
         h += '<p class="bt-sub" style="margin-top:6px">매도 발동: ' + Object.keys(st.rule_hits).map(function (k) {
           return esc(k) + ' ' + st.rule_hits[k] + '회'; }).join(' · ') + '</p>';
+      }
       }
 
       // 등급별
@@ -181,7 +192,7 @@
     });
     h += '<div class="note" style="margin-top:26px"><b>읽는 법·한계</b><ul style="margin:6px 0 0;padding-left:18px">' +
          '<li>매수 신호 = ✅ 매수 후보 + 🟡 확인 대기. 🟡 는 아래 <b>수동 조건이 모두 통과했다고 가정</b>한 낙관치다(과거 장중·개장 전 상태는 확인할 수 없다).</li>' +
-         '<li>거래 성적: 한 상품에 포지션 하나 — 보유 중의 신호는 건너뛴다. 매도는 종가 판정 → 다음 날 시가 체결. 저자가 준 규칙만 쓰고 안전장치 손절은 넣지 않는다(미청산이 그 결과).</li>' +
+         '<li>거래 성적: 한 상품에 포지션 하나 — 보유 중의 신호는 건너뛴다. 매도는 종가 판정 → 다음 날 시가 체결. 저자가 준 규칙만 쓰고 안전장치 손절은 넣지 않는다(미청산이 그 결과). 책에 매도 규칙이 없는 상품은 대체 매도 규칙을 지어내지 않고 매수 신호 뒤 N거래일 보유 수익률만 본다.</li>' +
          '<li>표본이 작으면(거래 수십 건 이하) 우연의 영향이 크다. 과거 성적은 미래를 보장하지 않는다.</li>';
     if (P.missing_symbols && P.missing_symbols.length) h += '<li class="bt-warn">시세를 못 받은 심볼: ' + esc(P.missing_symbols.join(', ')) + '</li>';
     h += '</ul>';

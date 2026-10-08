@@ -33,6 +33,14 @@ import 방향: `shared ← playbook · checklist(공개 DSL) ← trading ← web
 (`verify_code` 주인 표 '트리 원본 키') — 트리 형식(여섯 칸 → rules 목록) 교체 시 TreeGateway + 문법(`checklist/cond.py`)만 고친다.
 판정은 라이브·백테스트·재생 모두 `trading.judge.Judge` 하나를 지난다(라이브 = 달력 마지막 봉 `latest()`).
 
+## ✅ work/behavior 브랜치 (동작 변경 — 미푸시)
+
+- **표준 매도 폐지(C안)** — 책에 매도 규칙이 없으면 대체 매도 규칙(옛 +9%/−5%/10일)을 지어내지 않는다. 매도 정책 주인 =
+  `trading.trades.exit_policy(gw, prod)` → `"book"`(책 매도 규칙으로 청산 시뮬레이션) | `"none"`(거래 없이 매수 신호 뒤
+  5·10·20거래일 보유 수익률만 — 백테스트 summary 의 ✅+🟡 줄). 화면은 `exit_policy` 필드 + `no_exit_note` 문구
+  ("책에 매도 규칙 없음 — 매수 신호만 평가")만 본다(백테스트 탭·판정 화면 ⑥칸). `verify_code` 주인 표 '매도 정책' 행이
+  폐지된 표준 매도 이름·문구를 주인 포함 어디서도 막는다(`everywhere`).
+
 ## 🔴 키스톤 — tree.json 재생성 (모든 게 이걸로 막힘)
 
 `books/*/tree.json` 이 레포에 없다(구간② 개편으로 "심판이 그때그때 생성"). 이게 없어 판정·백테스트·서버·파리티검증이 전부 멈춤(`checklist.verify_tree --contract` 책계약 실패).

@@ -13,7 +13,7 @@
   · web/           화면층 — 판정·백테스트 결과를 화면 모양으로 빚고 서빙(판정을 다시 내지 않는다)
   · orchestration/ 조립·감사층(run 러너·이 검사 — 전 구간을 실행·검사만)
 
-② 결정 하나 = 주인 하나. 같은 결정(트리 키 배치·책 산출물 경로·표준 매도·칸/등급 이름표·등급 사다리…)이 두 곳에
+② 결정 하나 = 주인 하나. 같은 결정(트리 키 배치·책 산출물 경로·매도 정책·칸/등급 이름표·등급 사다리…)이 두 곳에
 적히면 한쪽만 고쳐져 갈라진다. 그래서 개념마다 주인 파일과 '주인 밖에서 보이면 안 되는 표식'을 표 하나(OWNERS)에 적는다.
 
 ## 무엇을 강제하나
@@ -33,7 +33,8 @@
   규칙 3  네트워크 모듈(urllib·http·requests·socket·aiohttp·httpx) import 금지 — 시세 자가수집이 다시 자라나는
           길목을 막는다. 명시 예외(ALLOW)만: 알림 송신 trading/notify.py, 로컬 서빙 web/serve.py.
 
-  주인 표(OWNERS) — 한 줄 = 개념 · 주인 파일 · 주인 밖 금지 표식(매처) · 사유 · 명시 예외.
+  주인 표(OWNERS) — 한 줄 = 개념 · 주인 파일 · 주인 밖 금지 표식(매처) · 사유 · 명시 예외
+          (everywhere = 주인 안까지 포함해 어디서도 안 되는 표식 — 폐지된 결정이 되살아나지 않게).
           파이썬은 AST(식별자·docstring 아닌 문자열 상수)로, web/ui/*.js 는 주석을 뗀 코드·문자열 리터럴로 본다
           (주석·docstring 의 설명 글은 걸리지 않는다). 이 파일은 표 자신이라 표식 검사에서 뺀다.
           예외는 행의 allow 한 곳에만 — {(파일, 함수|None): (표식 묶음|None=전부, 사유)}.
@@ -236,27 +237,28 @@ def m_book_paths(src):
     return out
 
 
-# 표준 매도(책에 매도 규칙이 없을 때의 대체) — 정본 이름·데이터 파일·출처 문구.
-STD_SOURCE = "표준 기준(책 아님)"
+# 매도 정책 — 책에 매도 규칙이 없으면 어떻게 하나(정본 trades.exit_policy: "book" | "none" = 매수 신호만 평가).
+#   폐지된 '표준 매도'(대체 매도 규칙·그 숫자 파일·출처 글자·화면 플래그)의 이름은 주인 포함 어디서도 다시 쓰지 않는다.
+STD_GONE = ("STANDARD", "exit_defaults", "standard_label", "uses_standard_exit", "exit_standard",
+            "standard_exit_label", "exits_of", "exit_source")
+STD_GONE_TEXT = ("표준 기준", "표준 매도")
 
 
 def m_exit_policy(src):
+    """주인 밖 — 매도 정책 함수(exit_policy)를 또 정의하는 자리."""
     if src.kind == "py":
-        return ([(ln, f, x) for ln, f, x in _py_names(src) if x == "STANDARD"]
-                + [(ln, f, "exit_defaults") for ln, f, v in _py_strs(src) if "exit_defaults" in v]
-                + [(ln, f, STD_SOURCE) for ln, f, v in _py_strs(src) if v == STD_SOURCE])
-    return ([(ln, None, x) for ln, x in _js_hits(src, r"\bSTANDARD\b|exit_defaults")]
-            + [(ln, None, STD_SOURCE) for ln, v in src.lits if v == STD_SOURCE])
+        return [(n.lineno, n.name, n.name) for n, _ in _py_nodes(src.tree)
+                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == "exit_policy"]
+    return [(ln, None, x) for ln, x in _js_hits(src, r"\bfunction\s+exit_?[pP]olicy\s*\(")]
 
 
-# 매도 출처 이름표 — trades.exits_of 가 돌려주는 '책' 글자. 화면은 이 글자와 비교하지 않고 exit_standard 플래그를 본다.
-BOOK_SOURCE = "책"
-
-
-def m_exit_source(src):
+def m_std_exit_gone(src):
+    """어디서든(주인 포함) — 폐지된 표준 매도의 이름·문구."""
     if src.kind == "py":
-        return [(ln, f, BOOK_SOURCE) for ln, f, v in _py_strs(src) if v == BOOK_SOURCE]
-    return [(ln, None, BOOK_SOURCE) for ln, v in src.lits if v == BOOK_SOURCE]
+        return ([(ln, f, x) for ln, f, x in _py_names(src) if x in STD_GONE]
+                + [(ln, f, t) for ln, f, v in _py_strs(src) for t in STD_GONE + STD_GONE_TEXT if t in v])
+    return ([(ln, None, x) for ln, x in _js_hits(src, r"\b(?:%s)\b" % "|".join(STD_GONE))]
+            + [(ln, None, t) for ln, v in src.lits for t in STD_GONE_TEXT if t in v])
 
 
 def _labels():
@@ -305,12 +307,10 @@ OWNERS = [
     dict(concept="책 산출물 경로", owners=("shared/paths.py",), match=m_book_paths,
          why="books/<slug>/ 아래 산출물 경로를 짓는 곳은 하나 — 옛 루트 산출물로 되돌아가지 않게",
          hint="shared/paths.py(book_dir·book_file…)로", allow={}),
-    dict(concept="표준 매도", owners=("trading/trades.py",), match=m_exit_policy,
-         why="책에 매도 규칙이 없을 때의 대체 정책·숫자(exit_defaults.json)·출처 문구는 trades 하나 — 밖은 exits_of·standard_label 만 부른다",
-         hint="trades.exits_of / standard_label / uses_standard_exit 로", allow={}),
-    dict(concept="매도 출처 이름표", owners=("trading/trades.py",), match=m_exit_source,
-         why="exits_of 의 출처 글자('책')와 비교하지 않는다 — 화면은 exit_standard 플래그(web/backtest_page)를 본다",
-         hint="uses_standard_exit · exit_standard 플래그로", allow={}),
+    dict(concept="매도 정책", owners=("trading/trades.py",), match=m_exit_policy, everywhere=m_std_exit_gone,
+         why="책에 매도 규칙이 없을 때의 정책은 trades.exit_policy 하나(\"none\" = 대체 규칙 없이 매수 신호만 평가) — "
+             "폐지된 표준 매도(대체 규칙·숫자 파일·출처 글자·플래그)는 주인 포함 어디서도 되살리지 않는다",
+         hint="trades.exit_policy · 화면은 exit_policy 필드와 no_exit_note 문구로", allow={}),
     dict(concept="칸·등급 이름표", owners=("checklist/cond.py", "checklist/grade.py"), match=m_labels,
          why="cond.ZONE_LABELS · grade.GRADES · grade_rules.json 이 정본 — 화면은 판정 JSON(zones·grades·grade_rules)으로 받는다",
          hint="판정 JSON 의 zones·grades·grade_rules 로", allow={}),
@@ -339,9 +339,11 @@ def owner_hits(srcs):
     bad = []
     for row in OWNERS:
         for src in srcs:
-            if src.rel in row["owners"] or src.rel == SELF:
+            if src.rel == SELF:
                 continue
-            for line, func, token in row["match"](src):
+            hits = [] if src.rel in row["owners"] else row["match"](src)
+            hits += row["everywhere"](src) if row.get("everywhere") else []     # 주인도 예외 없는 표식
+            for line, func, token in hits:
                 if not _allowed(row, src.rel, func, token):
                     bad.append((src.rel, "%d행 %s%r — [%s] 주인은 %s. %s"
                                 % (line, ("%s() " % func) if func else "", token, row["concept"],

@@ -1,8 +1,0 @@
-{
-  "_doc": "표준 매도 규칙 — 정본(한 곳). 책에 매도 규칙이 없는 상품에만 쓰는 '책 무관 기본값'이다(결과엔 '표준 기준(책 아님)'으로 표시). 머리측 규칙 리더(trading/trades.exits_of)가 이 한 벌을 읽는다 — 코드에 +9%/−5%/10일 같은 숫자 리터럴을 두지 않는다(grade_rules.json·market_config.json 과 같은 패턴). when 문법은 COND_DSL(shared/cond) 과 같다. pos.ret/pos.days 는 매도 규칙 평가 때 글루(계산기)가 넣는 포지션 값이다.",
-  "standard": [
-    {"label": "표준 익절 +9%", "when": {"ge": [{"pos": "ret"}, 9]}, "sell": "all"},
-    {"label": "표준 손절 −5%", "when": {"le": [{"pos": "ret"}, -5]}, "sell": "all"},
-    {"label": "표준 기간만료 10거래일", "when": {"ge": [{"pos": "days"}, 10]}, "sell": "all"}
-  ]
-}

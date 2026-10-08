@@ -1184,6 +1184,10 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
         h += '<p class="subtle" style="margin:6px 0 0">보유 포지션 없음 — 내 포지션은 로컬 파일(books/&lt;slug&gt;/positions.json)에 적으면 로컬 서버 화면에서 규칙별로 판정됩니다(공개 페이지에는 안 실림).</p>';
       }
     }
+    else if(v.exit_policy === 'none'){
+      // 매도 정책(엔진 필드 exit_policy — 정본 trading/trades.exit_policy): 책에 매도 규칙이 없다 — 문구도 엔진(VD.no_exit_note)
+      h += '<div class="grouplabel ck-zone" style="color:var(--entry)">⑥ '+esc(zl('exit'))+'</div><p class="subtle" style="margin:6px 0 0">'+esc(VD.no_exit_note || '')+'</p>';
+    }
     return h;
   }
 
