@@ -84,7 +84,7 @@ def compute_verdict(slug, force=False):
 def render_page(slug):
     """책 slug 페이지 HTML — 요청 시점의 라이브 판정(내 포지션 포함)을 구워 넣는다. 조립은 assemble 하나로.
     판정 계산이 실패해도 페이지는 내보낸다(프런트가 폴링으로 재시도)."""
-    from publish.publish_pages import assemble
+    from web.book_page import assemble
     try:
         data, _ = compute_verdict(slug)
     except Exception:
@@ -94,7 +94,7 @@ def render_page(slug):
 
 def render_shell():
     """책 선택 셸(홈) — books.json 의 모든 책을 좌측 목록에, 본문은 /<slug>/ 를 라이브로 띄운다."""
-    from publish.build_home import render_home
+    from web.build_home import render_home
     return render_home(load_manifest()).encode("utf-8")
 
 

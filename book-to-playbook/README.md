@@ -12,17 +12,17 @@
 
 ## 팀 구조 (폴더 = 조직도)
 
-팀 코드는 **자기 팀 + shared/**만 import 한다 — 팀 사이 인터페이스는 산출물 파일(`books/<slug>/*.json`)이다.
-경계는 `orchestration/verify_teams.py` 가 매 발행마다 기계로 강제한다.
+import 방향은 한 방향이다 — `shared ← playbook · checklist(공개 DSL) ← trading ← web` (orchestration 은 조립만).
+구간②는 트리의 언어(공개 DSL: `tree_gateway`·`cond`·`grade`)를 내놓고, 구간③·화면은 그것만 import 한다.
+경계는 `orchestration/verify_teams.py` 가 기계로 강제한다.
 
-| 폴더 | 구간 | 하는 일 | 산출물(다음 팀의 입력) |
+| 폴더 | 구간 | 하는 일 | 산출물 |
 |---|---|---|---|
-| `playbook/` | ① 책 원본 → 플레이북 | 원문 소절 인덱싱 · 플레이북 본문 무결 | `source_index.json` · `<slug>-playbook.html` 의 `#src` |
-| `checklist/` | ② 플레이북 → 체크리스트 | 조건 트리 추출·심판·검사 · 트리의 언어(출입구·문법·등급) | **`books/<slug>/tree.json`** |
-| `verdict/` | ③ 체크리스트 → 수집·판정 | 트리가 쓰는 심볼 수집(jhts) · 판정 | `latest-verdict-<slug>.json` |
-| `operations/` | ④ 확정 트리 → 돈·성적 계산기 | 백테스트·장중·웹뷰어가 소비하는 vectorbt 돈/지표 계산(단방향 폭포수: verdict 산출물·shared 규칙결과를 읽기만) | `backtest-<slug>.json` |
+| `playbook/` | ① 책 원본 → 전사본 | 원문 소절 인덱싱 · 플레이북 본문 무결 | `source_index.json` · `<slug>-playbook.html` 의 `#src` |
+| `checklist/` | ② 전사본 → 체크리스트 | 조건 트리 추출·심판·검사 · 트리의 언어(출입구·문법·등급) | **`books/<slug>/tree.json`** |
+| `trading/` | ③ 판정·백테스트·장중 | Judge(한 시점 판정)·Timeline(시간 축)·체결 워크·vectorbt 계산기·재생·알림 | (판정은 web 이 화면으로) · `backtest-<slug>.json` 재료 |
+| `web/` | 화면 | 판정 JSON·백테스트 탭 데이터 빚기 · 화면 JS 주입 · 페이지 조립 · 로컬 실시간 서버 · 홈 | (serve 가 매 요청 그림) · `backtest-<slug>.json` |
 | `shared/` | 공통층 | **시세 창구 md_feed** · paths | — |
-| `publish/` | 발행·서빙층 | 화면 UI(ui/*.js 주입) · 페이지 조립 · 로컬 실시간 서버 · 홈 | (serve 가 매 요청 그림) |
 | `orchestration/` | 조립·감사 | `run.py`(러너) · `verify_structure.py`(구조·책 계약) · `verify_teams.py`(경계) — 전 구간 실행·검사 | — |
 
 트리의 뜻(문법 cond·등급 grade)을 checklist/ 에 한 벌만 두고 ③이 그걸 import 하는 이유: ②가 트리를 검사할 때 본 동작과 ③이 판정할 때의 동작이
@@ -35,10 +35,10 @@
                                   │
         [② 추출자 a·b(서로 모름) · 원문 사례 → 심판이 최종 트리를 씀(비교 도구 사용) → 채점] ──▶ tree.json (체크리스트)
                                   │
-   [③ TreeGateway.symbols() → md_feed.histories(jhts, 없으면 수집 요청) → checklist.grade → verdict_engine]
-                                  │                                   └──▶ 알림 · latest-verdict-<slug>.json
+   [③ TreeGateway.symbols() → md_feed.histories(jhts, 없으면 수집 요청) → trading.Judge(checklist.grade)]
+                                  │                                   └──▶ 알림(trading.notify)
                                   │
-             [publish.assemble: 판정 + ui/*.js + 레일 + 원문 + 백테스트] ──▶ publish.serve(로컬 실시간)
+             [web: verdict_view(판정 JSON) · book_page(판정 + ui/*.js + 레일 + 원문 + 백테스트)] ──▶ web.serve(로컬 실시간)
 ```
 
 ## 체크리스트 — 판정 여섯 칸 (`checklist/COND_DSL.md`)
@@ -88,12 +88,12 @@
 ## 실행
 
 ```
-python -m orchestration.run daily        # 판정 → 백테스트 → 발행 → 검사 3종
-python -m orchestration.run watch [--every N] # asof=지금 기준 N분(기본 5)마다 재판정 → 발행(백테스트 제외) — 장중 조건은 분봉이 연결되면 살아난다
-python -m orchestration.run publish      # 재판정 없이 발행만
-python -m verdict.verdict_engine <slug> [--json] [--no-send]   # 오늘 판정
-python -m operations.backtest <slug> [--days 365] | --page     # 백테스트(로그 / 페이지 탭 데이터, 구간④)
-python -m publish.serve                                         # 로컬 실시간 서버(RUN.md)
+python -m orchestration.run daily        # 판정 → 백테스트 탭 데이터 → 검사
+python -m orchestration.run watch [--every N] # asof=지금 기준 N분(기본 5)마다 재판정(백테스트 제외) — 장중 조건은 분봉이 연결되면 살아난다
+python -m web.verdict_view <slug> [--json] [--no-send]       # 오늘 판정(판정 JSON·알림)
+python -m trading.backtest <slug> [--days 365] [--engine vectorbt | --intraday]   # 백테스트(로그)
+python -m web.backtest_page <slug>                            # 책 페이지 '백테스트' 탭 데이터
+python -m web.serve                                           # 로컬 실시간 서버(RUN.md)
 ```
 
 환경: jhts 시세 패키지가 pip 설치가 아니면 `PYTHONPATH=<jhts 경로>` 를 줘야 시세가 들어온다(없으면 판정이 ❔).
@@ -113,11 +113,12 @@ python -m publish.serve                                         # 로컬 실시�
 | `checklist/EXTRACTOR.md` · `SCENARIO.md` · `JUDGE.md` | 추출자 · 사례 작성자 · 심판 지침(역할마다 하나 — 서브에이전트 프롬프트 정본) |
 | `checklist/COND_DSL.md` | 트리 문법(트리를 쓰는 추출자·심판의 참고서) |
 | `checklist/verify_tree.py` | 트리 검사(트리를 만들지 않음) |
-| `publish/ui/*.js` · `publish/inject_ui.py` | 화면 JS(책 무관 공유) · 페이지 주입 |
-| `checklist/cond.py` · `checklist/grade.py` · `trading/trades.py` | 트리 문법·평가기 · 판정(등급·금액·비중·포지션) · 체결(분할·매도) |
+| `web/ui/*.js` · `web/inject_ui.py` | 화면 JS(책 무관 공유) · 페이지 주입 |
+| `checklist/tree_gateway.py` · `cond.py` · `grade.py` | 구간② 공개 DSL — 트리 출입구 · 문법·평가기 · 등급의 뜻(등급·금액·비중·워밍업) |
+| `trading/judge.py` · `timeline.py` · `trades.py` · `portfolio.py` · `backtest.py` | 판정기(Judge·Decision·Holding) · 시간 축 · 체결 워크(분할·매도) · vectorbt 계산기 · 백테스트 |
 | `shared/md_feed.py` | **jhts 시세 창구 — 유일한 수집 입구**(없으면 수집 요청) |
-| `verdict/verdict_engine.py` · `verdict/notify.py` | 오늘 판정 · 알림 송신(텔레그램·데스크톱, 구간③ 소유) |
-| `publish/publish_pages.py` · `publish/serve.py` · `publish/build_home.py` | 페이지 조립·발행 · 로컬 실시간 서버 · 홈 |
+| `web/verdict_view.py` · `trading/notify.py` | 판정 JSON·알림 문장(books.json engine.daily) · 알림 송신(텔레그램·데스크톱) |
+| `web/book_page.py` · `web/serve.py` · `web/build_home.py` · `web/backtest_page.py` | 페이지 조립 · 로컬 실시간 서버 · 홈 · 백테스트 탭 데이터 |
 | `playbook/book_source.py` · `playbook/verify_source_integrity.py` · `playbook/pages.py` | 원문 소절 인덱스 · 플레이북 본문 무결 · 책 페이지 찾기·신선도 |
 | `playbook/book_sources.json` · `playbook/source_baseline.json` | 원문 위치 · 본문 해시 기준(커밋 대상) |
 | `SETUP.md` · `RUN.md` | 설치·스케줄 등록 · 로컬 서버/폰에서 보기 |

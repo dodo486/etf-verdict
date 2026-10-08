@@ -1,6 +1,6 @@
 /* 백테스트 탭 — 책 무관. #backtest-data(verdict.backtest --page 산출물)가 있으면 탭·패널을 만들어 그린다.
  *
- * 이 스크립트는 checklist-ui 보다 **먼저** 실행된다(publish_pages 가 그 앞에 주입) — checklist-ui 가
+ * 이 스크립트는 checklist-ui 보다 **먼저** 실행된다(web/book_page 가 그 앞에 주입) — checklist-ui 가
  * 페이지 로드 때 .tab 목록을 한 번 묶으므로, 그 전에 버튼·패널을 만들어 두면 기존 탭 전환에 그대로 묶인다.
  * 순서가 어긋나도 깨지지 않게 자기 클릭 처리도 따로 둔다.
  *

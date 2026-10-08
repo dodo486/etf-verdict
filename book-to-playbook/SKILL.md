@@ -41,7 +41,7 @@ description: 트레이딩 책을 읽어 실전 매매 플레이북 + 기계가 �
                  → 전사 대조 감사(별도 서브에이전트) → python -m playbook.verify_source_integrity --accept --why "새 책".
                  산출물 2개: 전사본(=구간② 입력) · 사람용 요약 뷰(비핵심·파생). 세부는 playbook/PLAYBOOK.md.
 3) 페이지        trend-playbook.html 을 베이스로 #src·머리말(제목·상품 소개)만 교체.
-                 시트 패널은 #verdict-data + #sheet-root 골격 그대로(UI 는 publish/ui/*.js 가 주입된다).
+                 시트 패널은 #verdict-data + #sheet-root 골격 그대로(UI 는 web/ui/*.js 가 주입된다).
 4) 체크리스트    checklist/README.md 절차대로(추출자 a·b → 사례 작성자 → 심판 → verify_tree 통과)
 5) 등록·배포     books.json 에 항목(slug/title/tickers/desc/live/engine.daily) → python -m orchestration.run daily
 ```
@@ -52,14 +52,14 @@ description: 트레이딩 책을 읽어 실전 매매 플레이북 + 기계가 �
 |---|---|---|
 | verify_structure 책 계약 | 소절 인덱스·트리 문법·ref·페이지 구획 | 해당 산출물을 만든 단계를 다시 |
 | verify_source_integrity | 플레이북 본문이 바뀜 | 의도한 원문 대조 수정이면 `--accept --why`, 아니면 되돌린다 |
-| verify_primitives | 원시 연산·체결 계산 오류 | `checklist/cond.py`·`trades.py`(책 쪽이 아니다) |
+| verify_primitives · verify_trading | 원시 연산·체결 계산 오류 | `checklist/cond.py`·`trading/trades.py`(책 쪽이 아니다) |
 
 ## 입력
 - 정제된 텍스트(.md) 있음 → 바로 1)
 - 스캔 PDF만 있음 → 먼저 이미지화→OCR→청킹(jhts 파이프라인 재사용) 후 1)
 
 ## 판정 운영
-`python -m orchestration.run daily` — 책마다 `verdict.verdict_engine`(알림 + latest-verdict JSON) → `operations.backtest --page`(구간④) → 발행 →
-검사 3종. `python -m orchestration.run watch [--every N]` 는 asof=지금으로 N분마다 재판정(장중 포함).
+`python -m orchestration.run daily` — 책마다 `web.verdict_view`(판정 → 알림) → `web.backtest_page`(백테스트 탭 데이터) →
+검사. `python -m orchestration.run watch [--every N]` 는 asof=지금으로 N분마다 재판정(장중 포함).
 알림은 `telegram.env`(TELEGRAM_BOT_TOKEN/CHAT_ID)가 있으면 텔레그램, 없으면 데스크톱. 시세는 jhts 패키지(`PYTHONPATH`)에서만
 온다. 스케줄 등록·내 포지션 파일은 `SETUP.md`.

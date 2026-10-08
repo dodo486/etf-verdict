@@ -739,7 +739,7 @@ def t_regress():
 
 def t_no_excluded_live():
     """불변식(화면 Fix #1): 실전 판정이 쓰는 문맥(unobserved != "exclude")에서는 EXCLUDED 가 절대 나오지 않는다.
-    EXCLUDED/빈-전부-제외 노드가 브라우저(verdict_engine → #verdict-data)에 실리면, 화면 3값 엔진
+    EXCLUDED/빈-전부-제외 노드가 브라우저(web/verdict_view → #verdict-data)에 실리면, 화면 3값 엔진
     (checklist-ui ev/and3/or3)에는 그 개념이 없어 null 로 오해해 등급이 엔진과 갈라진다. 그 입력이 애초에
     실전 경로로 올 수 없음을 여기서 강제한다.
 

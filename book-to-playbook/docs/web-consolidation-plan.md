@@ -1,7 +1,9 @@
 # 목표#1 리팩토링 설계서 — 웹/표시 코드를 publish 로 모으기 + 서버 권위 통합
 
 > 작성: 2026-10-08 · 읽기 전용 분석(코드/문서 수정·git 없음) · 작업 루트 `book-to-playbook/`, git 루트는 상위 `etf-verdict/`
-> 검증 명령은 전부 venv `book-to-playbook/.venv` 로. 예: `./.venv/bin/python -m verify_teams`
+> 검증 명령은 전부 venv `book-to-playbook/.venv` 로. 예: `./.venv/bin/python -m orchestration.verify_teams`
+> **경로 갱신(2026-10 구조 개편)**: §3 이관은 끝났고 그 뒤 `publish/` 는 `web/` 으로, 판정 엔진 `verdict/verdict_engine.py` 는
+> 판정기 `trading/judge.py`(Judge) + 화면 JSON `web/verdict_view.py` 로 나뉘었다. §1~§3 은 그때 기록 그대로 두고, 남은 일(§4)은 새 경로로 적는다.
 
 ---
 
@@ -168,18 +170,17 @@
     같은 공식으로 재구성. **키 규칙 불일치 = 등급 갈라짐**이므로 여기가 가장 조심할 곳.
 - `checklist/grade.py` 는 **건드리지 않는다**(사장님 제약). `grade_key` 는 이미 `opt/pes`로 등급을 내므로,
   답을 반영한 opt/pes를 만들 수 있으면 등급 해소는 기존 코드를 그대로 탄다.
-  → 구현 위치는 `verdict_engine`(구간③)에서 Ctx에 답을 넣어 ProductEval을 다시 돌리는 얇은 경로.
+  → 구현 위치는 `trading/judge.Judge`(구간③)에서 Ctx에 답을 넣어 ProductEval을 다시 돌리는 얇은 경로.
 
-**(b) `verdict_engine.render(slug, asof=None, answers=None)` — 답으로 등급 해소**
+**(b) `web.verdict_view.render(slug, asof=None, answers=None)` — 답으로 등급 해소**
 - `answers`(수동키→불리언)를 받아 ProductEval/Ctx에 흘려, 답 반영된 `key`(등급)·zones 표시값을 낸다.
 - `answers=None`(기본)이면 지금과 100% 동일 출력(하위호환). → 알림/CLI/첫 렌더 경로 안 깨짐.
 - grade_rules 데이터로 등급 해소(이미 그 구조). grade는 호출만 하고 수정 안 함.
 
-**(c) `publish/serve.py` — in-process 평가 + 답 전달**
+**(c) `web/serve.py` — in-process 평가 + 답 전달**
 - 지금 subprocess(~1초)를 토글 지연의 원인. 토글 응답용으로 **in-process** 경로를 추가:
-  `from verdict.verdict_engine import render` 를 직접 호출(serve는 publish라 verdict import 가능 —
-  verify_teams 규칙상 publish는 조립자, 팀 import 허용).
-  - 단 **네트워크 규칙4 주의**: serve.py는 `http`,`urllib`만 ALLOW. `verdict_engine` 자체는 네트워크 안 씀
+  `from web.verdict_view import render` 를 직접 호출(같은 web 층 — verify_teams 규칙 1 상 web 은 trading 도 import 가능).
+  - 단 **네트워크 규칙3 주의**: serve.py는 `http`,`urllib`만 ALLOW. `verdict_view` 자체는 네트워크 안 씀
     (시세는 shared/md_feed 창구). import 추가는 규칙 위반 아님.
 - 새 엔드포인트(안): `POST /api/verdict` (body=answers JSON) 또는 `GET /api/verdict?...&ans=<base64json>`.
   답을 render에 넘겨 완성 판정을 반환. 기존 무답 GET은 그대로(캐시).
@@ -194,7 +195,7 @@
 
 ### 4-3. 순서 (안 깨지게)
 1. (a) Ctx에 `manual_answers` 추가 — 기본 None이면 기존과 동일. 단위검증: `verify_primitives`.
-2. (b) `render(..., answers=)` 추가 — answers=None 동일 출력. `verdict_engine` CLI/JSON 회귀 확인.
+2. (b) `render(..., answers=)` 추가 — answers=None 동일 출력. `web.verdict_view` CLI/JSON 회귀 확인.
 3. (c) serve에 답-포함 엔드포인트 + in-process 경로. 로컬 서버로 토글 왕복 수동 테스트(지연<100ms 목표).
 4. (d) 마지막에 `checklist-ui.js` 평가기 삭제 + 토글→서버 왕복으로 교체. inject_ui `--check` 로 드리프트 0.
 5. 전구간 검증: `verify_teams`·`verify_structure`·`verify_primitives`·`checklist.verify_tree`.
@@ -233,8 +234,8 @@ ls book-to-playbook/books/*/tree.json   # 재생성 여부(§5 게이트)
 ```
 검증(모두 venv):
 ```
-./.venv/bin/python -m verify_teams
-./.venv/bin/python -m verify_structure
+./.venv/bin/python -m orchestration.verify_teams
+./.venv/bin/python -m orchestration.verify_structure
 ./.venv/bin/python -m checklist.verify_primitives
 ./.venv/bin/python -m checklist.verify_tree   # tree.json 있을 때
 ```

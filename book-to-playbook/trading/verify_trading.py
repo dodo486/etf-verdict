@@ -9,10 +9,11 @@
 사용: python -m trading.verify_trading   (실패 있으면 exit 1)
 """
 import inspect
+import os
 import sys
 from collections import namedtuple
 
-from shared import paths  # noqa: F401  (UTF-8 출력)
+from shared.paths import BASE, read_text  # (UTF-8 출력 고정 포함)
 from checklist.tree_gateway import TreeGateway, empty_product, synthetic
 from trading import trades as trades_mod
 
@@ -135,10 +136,13 @@ def t_trades():
 def t_live_path():
     """실전 판정 경로가 cond.Ctx 를 unobserved="exclude" 로 만들지 않는다 — EXCLUDED 가 화면(#verdict-data)에 실리면
     화면 3값 엔진(checklist-ui)엔 그 개념이 없어 등급이 갈라진다(checklist.verify_primitives 의 실행 불변식과 짝)."""
-    from verdict import verdict_engine
-    src = inspect.getsource(verdict_engine)
-    check('unobserved="exclude"' not in src and "unobserved='exclude'" not in src,
-          "verdict_engine 실전 경로가 unobserved=exclude 를 쓰지 않아야(백테스트 전용)")
+    from trading import judge
+    # 실전 경로 = 판정기(trading/judge) + 그 Decision 을 판정 JSON 으로 빚는 web/verdict_view(구간③은 web 을 import
+    #   하지 않으므로 소스 글자로 읽는다).
+    for name, src in (("trading/judge.py", inspect.getsource(judge)),
+                      ("web/verdict_view.py", read_text(os.path.join(BASE, "web", "verdict_view.py")))):
+        check('unobserved="exclude"' not in src and "unobserved='exclude'" not in src,
+              "%s 실전 경로가 unobserved=exclude 를 쓰지 않아야(백테스트 전용)" % name)
 
 
 def main():

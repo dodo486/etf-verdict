@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 """알림 발신(텔레그램·데스크톱) — 시세와 무관한 송신 전용(구간③ 소유).
 
-판정 결과로 알림을 쏘는 곳이 구간③(verdict) 하나뿐이라 이 팀 안에 둔다. 다만 알림용
+판정 결과로 알림을 쏘는 곳이 구간③(trading) 하나뿐이라 이 팀 안에 둔다. 다만 알림용
 urllib 가 들어 있어 "팀 폴더엔 네트워크 코드 금지(= 시세 자가수집 재발 방지)" 규칙과
-부딪히므로, verify_teams.py ALLOW 에 (verdict, notify.py): {urllib} 로 **이 한 파일만**
+부딪히므로, verify_teams.py ALLOW 에 (trading, notify.py): {urllib} 로 **이 한 파일만**
 예외를 둔다. 여기는 데이터를 **보내기만** 한다 — 시세를 받아오는 코드는 이 파일에 올 수 없다.
 """
 import json

@@ -26,7 +26,7 @@ python3 --version       # macOS
 | `BASE` | `$BOOK_TO_PLAYBOOK_HOME` → 없으면 **이 폴더**(book-to-playbook 루트 — `shared/`의 부모) |
 | `LOGS` | `BASE/logs` |
 
-어느 폴더에 두든 그대로 돈다 — 화면은 로컬 실시간 서버(`publish.serve`)가 매 요청 그린다(정적 발행·GitHub Pages 폐지).
+어느 폴더에 두든 그대로 돈다 — 화면은 로컬 실시간 서버(`web.serve`)가 매 요청 그린다(정적 발행·GitHub Pages 폐지).
 
 현재 값 확인:
 
@@ -55,9 +55,8 @@ PYTHONPATH=C:\Users\<사용자>\jhts
 ## 3. 수동 실행
 
 ```
-python -m orchestration.run daily        # 판정 → 백테스트 → 발행 (장 마감 후)
-python -m orchestration.run watch [--every N]  # asof=지금 기준 N분(기본 5)마다 재판정 → 발행(장중 포함)
-python -m orchestration.run publish      # 재판정 없이 현재 JSON으로 발행만
+python -m orchestration.run daily        # 판정 → 백테스트 탭 데이터 → 검사 (장 마감 후)
+python -m orchestration.run watch [--every N]  # asof=지금 기준 N분(기본 5)마다 재판정(장중 포함)
 ```
 
 옵션: `--quiet`(콘솔 최소화) · `--no-verify-tree`(트리 검수 생략 — 트리 안정 후)
@@ -145,7 +144,7 @@ schtasks /Delete /TN "book-to-playbook daily" /F            :: 해제
 
 `.gitattributes` 로 `eol=lf` 를 고정해 두었다 — 이게 없으면 맥과 윈도우가
 같은 결과물을 서로 다른 줄바꿈으로 써서 매 실행마다 파일 전체가 diff로 뜬다.
-(정적 발행·자동 push 는 폐지됐다 — 커밋은 직접 한다. 화면은 `publish.serve` 가 맡는다.)
+(정적 발행·자동 push 는 폐지됐다 — 커밋은 직접 한다. 화면은 `web.serve` 가 맡는다.)
 
 ## 6. 문제가 생기면
 
@@ -155,5 +154,5 @@ schtasks /Delete /TN "book-to-playbook daily" /F            :: 해제
 | 판정이 전부 ❔ 판정 불가 | jhts 시세 조회 실패. `logs/cron.log` 의 stderr, 페이지 상단 '시세 없음 → 수집 요청' 확인 |
 | 🟡 확인 대기만 나온다 | 수동(✋) 조건(개장 전·장중·저자 미명시)이 있어서다 — 체크리스트에서 직접 체크하면 등급이 다시 계산된다 |
 | `판정 파일 없음 — 발행 중단` | `run.py daily` 가 먼저 돌아야 한다(jhts 가 PYTHONPATH 에 있는지 확인) |
-| 값이 안 바뀐다 | 캐시 TTL(기본 8초) 대기 또는 `/api/verdict?force=1` · 서버 재시작(`publish.serve`) |
+| 값이 안 바뀐다 | 캐시 TTL(기본 8초) 대기 또는 `/api/verdict?force=1` · 서버 재시작(`web.serve`) |
 | `python` 을 못 찾음(Windows) | `BOOK_TO_PLAYBOOK_PYTHON` 에 python.exe 전체 경로 지정 |

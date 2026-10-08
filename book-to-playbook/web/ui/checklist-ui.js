@@ -2,7 +2,7 @@
   'use strict';
   /* ============================================================
      실전 체크리스트 — 조건 트리 판정 결과(#verdict-data)만 그린다 (책 무관 · 종목 하드코딩 없음)
-     · 트리를 직접 읽지 않는다. 구간③ 판정 엔진(verdict_engine)이 낸 칸별 설명(view)을 그대로 그린다.
+     · 트리를 직접 읽지 않는다. 판정 화면 데이터(web/verdict_view)가 낸 칸별 설명(view)을 그대로 그린다.
      · 사람이 체크하는 건 수동(✋) 조건뿐이다. 체크하면 엔진과 같은 3값 논리로 등급을 다시 낸다
        (자동 조건은 잠겨 있다). 첫 렌더에서 '아무것도 체크 안 함' 결과가 엔진 값과 같은지 스스로 확인하고,
        다르면 경고를 띄운다 — 화면 계산이 엔진과 조용히 갈라지지 않게.
@@ -38,7 +38,7 @@
        관측값 없는 observe 가 내는 EXCLUDED 표지와, '자식이 모두 EXCLUDED 인 논리 묶음'(빈 묶음) 처리가 있다
        (cond.py 의 _Excluded / all·any 의 vals 필터 / "cols and not vals → EXCLUDED" 참고).
        이 화면 엔진(ev/and3/or3)에는 그 3값째가 없다 — true/false/null 뿐이다.
-     ★ 괜찮은 이유: EXCLUDED 는 백테스트 전용(unobserved="exclude")이고, 매일 판정 JSON(verdict_engine →
+     ★ 괜찮은 이유: EXCLUDED 는 백테스트 전용(unobserved="exclude")이고, 매일 판정 JSON(web/verdict_view →
        #verdict-data)은 그 모드로 돌지 않아 브라우저에 EXCLUDED/빈-전부-제외 노드가 실려오지 않는다.
        만약 그런 노드가 실전 판정 JSON 에 새어 들어오면 이 엔진은 그걸 null 로 오해해 등급이 엔진과 갈라질 수 있다.
      ☞ 따라서 'EXCLUDED/전부-제외 논리 노드는 실전 판정 JSON 에 절대 실리면 안 된다'는 불변식을 파이썬에서

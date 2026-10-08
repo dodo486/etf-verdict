@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """books.json → 책 선택 앱 셸(좌측 책목록 + 본문 iframe) HTML.
 
-순수 함수 render_home(manifest) 하나뿐이다 — 파일을 쓰지 않는다. 라이브 서버(publish.serve)가
+순수 함수 render_home(manifest) 하나뿐이다 — 파일을 쓰지 않는다. 라이브 서버(web.serve)가
 홈(`/`)을 그릴 때 이걸 그대로 쓴다. 정적 발행(파일로 굽기)은 폐지됐다 — 오래된 스냅샷이 매매를
 오도하지 않게, 화면은 라이브 서버가 매 요청 엔진을 새로 돌려 그린다.
 """

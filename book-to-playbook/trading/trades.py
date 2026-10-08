@@ -3,8 +3,8 @@
 """매도·분할 규칙 리더 + 규칙 평가 워크(구간③) — 트리(books/<slug>/tree.json)의
 exit/sizing 규칙을 읽어, 그 규칙을 봉마다 평가해 체결 일정·거래 요약을 만든다(책 무관, 돈·수수료·지표 없음).
 
-이 모듈은 '규칙'만 다룬다 — 돈·수수료·성적(자산곡선·MaxDD·샤프)은 계산기(operations/portfolio)가 낸다
-(단방향 폭포수: 계산기가 build_trades 결과(체결 일정)를 받아 돈·지표를 낸다. 여기서 operations 를 부르지 않는다).
+이 모듈은 '규칙'만 다룬다 — 돈·수수료·성적(자산곡선·MaxDD·샤프)은 계산기(trading/portfolio)가
+build_trades 결과(체결 일정)를 받아서 낸다. '책에 매도 규칙이 없으면'(표준 매도 대체 — 지금은 백테스트만) 정책의 주인도 이 파일.
 
 규칙 리더
   · exits_of    : 책에 매도 규칙이 있으면 그걸, 없으면 표준(STANDARD)을. (규칙 목록, 출처) 로 돌려준다.
@@ -15,9 +15,9 @@ exit/sizing 규칙을 읽어, 그 규칙을 봉마다 평가해 체결 일정·�
 
 규칙 평가 워크(돈·수수료·지표 없음)
   · build_trades   : 머리(tree)가 정한 진입 신호·분할·매도 규칙을 받아 '한 진입 → 그 청산까지'의
-                     체결 일정(buys/sells)을 만든다. 포지션 사실(진입가·평단·ret·maxret·days)은 봉마다
-                     여기서 계산하고, cond.py(순수 규칙 평가기)는 그 값을 pos 로 '읽어' exit/분할 규칙만
-                     평가한다(단방향 폭포수). 돈·수수료는 손대지 않는다 — 그건 계산기(operations)의 일.
+                     체결 일정(buys/sells)을 만든다. 평단은 봉마다 여기서 계산해 보유(judge.Holding — 라이브
+                     보유 화면과 같은 pos 주입 문맥)로 cond 에 넣고, cond 는 그 값을 '읽어' exit/분할 규칙만
+                     평가한다. 돈·수수료는 손대지 않는다 — 그건 계산기(portfolio)의 일.
   · _parity_stats  : 머리가 정한 거래 경계(한 진입→청산)로 집계한 거래 요약(거래수·승률·거래당 평균 등).
   · _position_facts: 지금 열려 있는(미청산) 마지막 거래의 사실(진입가·평단·현재수익률·보유일 등).
 
@@ -28,6 +28,7 @@ import os
 import statistics
 
 from checklist import cond
+from trading.judge import Holding
 
 # 표준 매도 규칙의 '정본'은 코드가 아니라 데이터(trading/exit_defaults.json)에 있다 — 숫자를 코드에 복붙하지 않는다.
 STANDARD = json.load(
@@ -83,9 +84,8 @@ def unsized_note(gw, prod, exits):
 # ------------------------------------------------------------------ 규칙 평가 워크: 신호·규칙 → 체결 일정(buys/sells)
 def build_trades(gw, prod, hist, cal, starts, exits, tranches=None):
     """머리(tree — gw)가 정한 진입 신호·분할·매도 규칙을 받아 '한 진입 → 그 청산까지'의 거래 목록을 만든다.
-    포지션 사실(진입가·평단·ret·maxret·days)은 여기(규칙 평가 워크)가 봉마다 계산하고,
-    cond.py(순수 규칙 평가기)는 그 포지션 값을 pos 로 '읽어' exit/분할 규칙만 평가한다(단방향 폭포수).
-    돈·수수료·지표는 손대지 않는다 — 그건 계산기(operations/portfolio)가 이 결과를 받아서 한다.
+    평단은 여기(규칙 평가 워크)가 봉마다 계산해 Holding 으로 주입하고, cond.py(순수 규칙 평가기)는 그 포지션 값을
+    pos 로 '읽어' exit/분할 규칙만 평가한다. 돈·수수료·지표는 손대지 않는다 — 그건 계산기(portfolio)가 한다.
 
     규약(계산기가 체결 타이밍을 다시 정하지 않는다):
       · 물량 단위 = 전체 1.0. 분할이 없거나 비율 미명시(frac null)면 1차에 1.0 전량.
@@ -103,7 +103,6 @@ def build_trades(gw, prod, hist, cal, starts, exits, tranches=None):
     cs = {c.date: c for c in hist.get(prod) or []}
     opens = [cs[d].open if d in cs else None for d in cal]
     closes = [cs[d].close if d in cs else None for d in cal]
-    index, defs = gw.index(prod), gw.defs()
     L = len(cal)
     out, free_from = [], 0
     for s in starts:
@@ -122,7 +121,7 @@ def build_trades(gw, prod, hist, cal, starts, exits, tranches=None):
             avg = sum(b["qty"] * b["px"] for b in buys) / q
             for k in range(frm, L):
                 cost[k] = avg
-            ctx = cond.Ctx(hist, cal, prod, index, defs, manual_as=False, pos=(e, list(cost)))
+            ctx = Holding(e, list(cost)).ctx(gw, prod, hist, cal, manual_as=False)
             return ([cond.series(r.when, ctx) for r in exits],
                     [cond.series(t.when, ctx) if t.when is not None else None for t in tranches])
 

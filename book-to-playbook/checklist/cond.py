@@ -838,7 +838,7 @@ def _series(node, ctx, s_sym):
 SECTIONS = ("filter", "entry", "avoid")                 # 조건 칸(등급)
 ZONES = SECTIONS + ("caution", "sizing", "exit")        # 반드시 다 적는 여섯 칸
 # 여섯 칸의 한글 이름표 — 여기 한 곳이 정본이다. 화면(shared-ui.js ZW)은 복붙하지 않고
-# 판정 JSON(verdict_engine 이 VD.zones 로 실어보냄, ZONES 순서)을 받아 쓴다.
+# 판정 JSON(web/verdict_view 가 VD.zones 로 실어보냄, ZONES 순서)을 받아 쓴다.
 ZONE_LABELS = {"filter": "필터", "avoid": "회피", "entry": "진입",
                "caution": "조심", "sizing": "비중·분할", "exit": "매도"}
 

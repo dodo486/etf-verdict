@@ -1,63 +1,50 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""신호 패리티 검사 — "백테스트 신호 == 실시간 신호"를 **실제 드라이버로 돌려** 증명한다 (구간④).
+"""신호 패리티 검사 — "백테스트 신호 == 실시간 신호"를 **실제 진입점으로 돌려** 증명한다 (구간③).
 
-## 왜 있나
+## 왜 남아 있나
 
-앞 세 단계(트리거 → asof → 평가)가 백테스트와 실시간에서 **같은 시점(asof)에 같은 신호·등급**을
-내지 못하면, 백테스트 성적은 실전과 무관한 숫자가 된다. 그래서 이 검사가 최우선 correctness 게이트다.
-raw ProductEval 끼리 비교하는 건 두 경로가 같은 클래스를 쓰니 trivial 하다 — 여기서는 **두 드라이버의
-실제 진입점**을 각각 타서, 입력(hist·cal·asof·index) 구성까지 포함해 결과가 일치하는지 본다.
+백테스트와 라이브는 이제 같은 판정기(Judge.grade)를 지난다. 그래도 둘이 **구조적으로 같을 수는 없다** —
+입력이 다르기 때문이다: 백테스트는 전체 이력을 한 번 세워 과거 날 i 를 꺼내고(asof 없음), 라이브는 그날 D 마감
+직후 가진 이력(D 이하로 잘린 hist)으로 마지막 봉을 asof(그날 마감 시각)에 판정한다. 이 둘이 같으려면 cond 연산이
+인과적이고(미래를 안 봄) asof 확정봉 가리기(settled)가 일봉 마감과 맞아야 한다 — 그걸 실행으로 확인하는 게 이 검사다.
 
-## 두 경로 (실제 드라이버 진입점)
+## 두 경로 (실제 진입점)
 
-  · 백테스트 경로 : `operations.backtest.run(slug, days=N)` 의 `daily` 행 → {date, prod, key, grade}.
-                    (내부에서 ProductEval(tree, p, hist, cal).grade_key(i) 를 전체 달력에 돌린다.)
-  · 실시간 경로   : 각 과거일 D 에 대해 `verdict.verdict_engine.product_verdict(tree, p, hist, {}, asof)`.
-                    라이브 드라이버(render)가 하는 그대로 — hist 는 grade.history 로 받은 일봉,
-                    asof 는 그날 마감 시점(UTC), index 는 트리의 기준 지수 — 로 호출한다. 다만 라이브는 늘
-                    "마지막 봉(len(cal)-1)"을 판정하므로, 과거일 D 를 재생하려면 그 hist 를 **D 이하로
-                    잘라** 마지막 봉이 D 가 되게 한다(라이브가 D 마감 직후 봤을 그 데이터 그대로).
-                    부작용(파일쓰기·알림)이 있는 render 대신, 그 안에서 상품 하나를 판정하는
-                    product_verdict 를 같은 방식으로 호출한다.
+  · 백테스트 경로 : `trading.backtest.run(slug, days=N)` 의 `daily` 행 → {date, prod, key, grade}.
+                    (내부에서 Timeline 이 Judge(tree, p, hist, cal).grade(i) 를 전체 달력에 돌린다.)
+  · 실시간 경로   : 각 과거일 D 에 대해 hist 를 D 이하로 잘라(Timeline.truncate) `Judge(tree, p, hist, asof).latest()`
+                    — 라이브 판정(web.verdict_view.product_verdict)이 등급을 얻는 바로 그 호출이다.
+                    asof 는 그날 마감 시점(UTC).
 
 ## 무엇을 비교하나
 
-trend·moneycopy 전 상품 × 창(데이터 있는 최근 WINDOW 거래일) 전부에서, 두 경로의 (key, grade) 가
-**일치**하는지. 불일치가 하나라도 있으면 (상품·날짜·백테스트·실시간) 을 전부 나열한다 — 숨기지 않는다.
+전 상품 × 창(데이터 있는 최근 WINDOW 거래일) 전부에서, 두 경로의 (key, grade) 가 **일치**하는지. 불일치가 하나라도
+있으면 (상품·날짜·백테스트·실시간) 을 전부 나열한다 — 숨기지 않는다.
 
 ## 분봉(장중)에 대하여
 
-분봉 데이터는 아직 연결 전이라(minutes 비어 있음) 장중(tf="1m") observe 조건은 두 경로 모두 None→manual
-로 떨어진다(의도된 동작). 따라서 이 검사는 **일봉 신호**의 패리티를 증명한다. 분봉이 연결되면 같은 코드가
-그 축도 덮는다(asof 를 분봉 범위로 주면 된다).
-
-## 단방향(폭포수)
-
-이 파일은 operations/(구간④)에 있고 verdict·shared·operations.backtest(전부 downward/동일)만 import
-한다. 상류(playbook·checklist·verdict·shared)는 이 파일을 import 하지 않는다 — verify_teams 가 강제.
+분봉 데이터가 없으면 장중(tf="1m") observe 조건은 두 경로 모두 None→manual 로 떨어진다(의도된 동작). 따라서 이 검사는
+**일봉 신호**의 패리티를 증명한다. 분봉이 연결되면 같은 코드가 그 축도 덮는다(asof 를 분봉 범위로 주면 된다).
 
 ## 사용
 
-    python -m operations.verify_signal_parity [--window 120] [--slug trend]
+    python -m trading.verify_signal_parity [--window 120] [--slug trend]
     → 일치율 보고. 100% 면 "신호 PARITY ✅", exit 0. 불일치 있으면 전체 목록 + exit 1.
 """
 import sys
 from datetime import datetime, timedelta, timezone
 
 from shared.paths import live_slugs
-from checklist import grade
+from checklist.grade import GRADES, WARMUP_DAYS, history
 from checklist.tree_gateway import TreeGateway
-from operations import backtest, driver
-from verdict import verdict_engine
+from trading import backtest
+from trading.judge import Judge
+from trading.timeline import Timeline
 
 WINDOW = 120            # 비교할 최근 거래일 수(상품마다 데이터 있는 범위 안에서)
 CLOSE_HHMM_UTC = 21     # 미 증시 마감 ≈ 21:00 UTC(서머타임 20:00·표준 21:00) — asof 를 '그날 마감 시점'으로
                         # 둘 때의 시각. 분봉이 없어 일봉 결과엔 영향 없지만, 라이브와 같은 모양의 asof 를 준다.
-
-# 날짜 자르기(hist → upto 이하)는 통합 스테핑 코어와 한 벌을 쓴다(단일 출처 — 파리티가 쓰는 바로 그 함수를
-# 장중 백테스트도 쓴다). 500/400/500 류 드리프트 방지(tree_grade 주석 경고).
-_truncate = driver._truncate
 
 
 def _asof_of(date_str):
@@ -72,10 +59,9 @@ def compare(slug, window=WINDOW):
     if tree is None:
         raise SystemExit("books/%s/tree.json 없음" % slug)
 
-    # 라이브 드라이버(render)와 같은 방식으로 전체 일봉을 한 번 받는다(워밍업 포함).
+    # 라이브 판정(render)과 같은 방식으로 전체 일봉을 한 번 받는다(워밍업 포함).
     # window 만큼 + 워밍업을 넉넉히 — backtest.run 의 days 도 이 창을 덮게 준다.
-    full = grade.history(
-        tree, (datetime.now() - timedelta(days=window * 2 + grade.WARMUP_DAYS + 30)).strftime("%Y%m%d"))
+    full = history(tree, (datetime.now() - timedelta(days=window * 2 + WARMUP_DAYS + 30)).strftime("%Y%m%d"))
 
     # 백테스트 경로: 실제 드라이버 진입점. daily 행에서 (prod, date) → (key, grade).
     bt = backtest.run(slug, days=window * 2 + 30, hist=full, tree=tree)
@@ -94,10 +80,9 @@ def compare(slug, window=WINDOW):
             bt_row = bt_daily.get((p, d))
             if bt_row is None:
                 continue
-            # 실시간 경로: 라이브 드라이버가 D 마감 직후 봤을 입력으로 product_verdict 호출.
-            th = _truncate(full, d)
-            v, _pe = verdict_engine.product_verdict(tree, p, th, {}, asof=_asof_of(d))
-            live_row = (v["key"], v["grade"])
+            # 실시간 경로: 라이브가 D 마감 직후 봤을 입력(D 이하 이력·그날 마감 asof)으로 Judge.latest.
+            key, _close = Judge(tree, p, Timeline.truncate(full, d), asof=_asof_of(d)).latest()
+            live_row = (key, GRADES[key])
             total += 1
             if live_row != bt_row:
                 mismatches.append({"prod": p, "date": d, "bt_key": bt_row[0], "bt_grade": bt_row[1],

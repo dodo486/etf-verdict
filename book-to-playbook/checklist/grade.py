@@ -35,12 +35,12 @@ GRADES = {
 }
 # 등급 판정 사다리의 '뜻'은 코드가 아니라 데이터(checklist/grade_rules.json)에 있다 — 규칙을 바꾸면
 # 거기 한 곳만 고친다. 파이썬(grade_key)과 화면(checklist-ui.gradeKey)이 같은 표를 읽는다.
-# 판정 JSON 에도 실어보내(verdict_engine) 화면이 복붙 없이 받아 쓴다.
+# 판정 JSON 에도 실어보내(web/verdict_view) 화면이 복붙 없이 받아 쓴다.
 GRADE_RULES = json.load(
     open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "grade_rules.json"), encoding="utf-8"))
 # 판정 전에 과거 시세를 며칠치(달력일) 미리 당겨올지 — '워밍업'. 트리가 쓰는 가장 긴 창
 # (예: 52주 신고가 = 252거래일 ≈ 달력 365일)이 첫날부터 제대로 서도록 넉넉히 둔다.
-# ★ 여기 한 곳이 정본이다 — 매일 판정(verdict_engine)·백테스트(backtest)·검증(verify_tree)이
+# ★ 여기 한 곳이 정본이다 — 매일 판정(web/verdict_view)·백테스트(trading/backtest)·검증(verify_tree)이
 #   모두 이 값을 가져다 쓴다. 과거엔 세 곳에 따로(500/400/500) 박혀 백테스트만 어긋났었다.
 WARMUP_DAYS = 500
 

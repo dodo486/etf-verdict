@@ -1,24 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""vectorbt 백테스트 '계산기'(구간④) — 돈·성적만 계산한다(판단은 머리=cond.py/tree 의 등급이 낸다).
+"""vectorbt 백테스트 '계산기'(구간③) — 돈·성적만 계산한다(판단은 판정기 Judge 의 등급이 낸다).
 
 무엇을 하나
-  체결 일정(한 진입 → 그 청산까지의 buys/sells)은 머리/shared 가 만든다(trading.trades.build_trades).
-  이 계산기는 그 체결 일정을 받아 vectorbt 로 굴려 포트폴리오 지표(자산곡선·MaxDD·샤프·총수익)를 낸다.
-  (규칙 평가·거래 경계·거래당 수익률은 trading.trades 에 있다 — 여기서 다시 정하지 않는다.)
-
-단방향(폭포수)
-  operations 는 아래(trading.trades 의 체결 일정·거래 요약)만 읽는다. shared/머리 는 operations 를
-  import 하지 않는다 — 역류 금지(verify_teams.py 강제).
-
-머리=판단 / 계산기=계산 분리
-  진입/청산 신호와 분할(tranche)·매도 규칙은 머리(tree)에서 나온다. trading.trades 가 그 규칙을 읽어
-  체결 일정을 만들고(build_trades), 이 계산기는 그 일정을 받아 vectorbt 로 돈을 굴린다.
+  체결 일정(한 진입 → 그 청산까지의 buys/sells)은 체결 워크(trading.trades.build_trades)가 만든다.
+  이 계산기는 그 체결 일정을 받아 vectorbt 로 굴려 포트폴리오 지표(자산곡선·MaxDD·샤프·총수익)를 낸다 —
+  모의 실행기(시작자본·수수료·세금으로 체결 일정을 돈으로 굴림)다. (규칙 평가·거래 경계·거래당 수익률은
+  trading.trades 에 있다 — 여기서 다시 정하지 않는다.)
   분할매수/부분매도는 from_signals 의 bool 로는 안 되므로(spike 권고), 체결 일정을 size 배열로 선계산해
   vbt.Portfolio.from_orders 에 넣는 '접착제'로 처리한다.
 
+실주문 실행기 자리(LiveExecutor — 범위 밖)
+  같은 체결 일정을 증권사(jhts) 실주문으로 내는 실행기가 들어올 자리다. 지금은 빈 자리표(아래 LiveExecutor)뿐 —
+  네트워크·주문 코드 없음.
+
 하드코딩 0
-  수수료·거래세·슬리피지·시작자본은 operations/market_config.json(시장별 US/KR)에서 읽는다.
+  수수료·거래세·슬리피지·시작자본은 trading/market_config.json(시장별 US/KR)에서 읽는다.
   코드에 시장 숫자 리터럴을 두지 않는다. 심볼의 시장은 md_feed.market_of 가 정한다.
 
 우리 체결 규약 유지
@@ -55,11 +52,11 @@ import logging
 import math
 import os
 
-from shared.paths import BASE, read_text
+from shared.paths import read_text
 from shared import md_feed
 from trading.trades import _parity_stats, _position_facts
 
-_CONFIG_PATH = os.path.join(BASE, "operations", "market_config.json")
+_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "market_config.json")
 _CONFIG = None
 _log = logging.getLogger(__name__)
 
@@ -207,3 +204,10 @@ def run_product(symbol, cal, closes, trade_list):
         "position_facts": _position_facts(trade_list, closes),
         "limits_unapplied": limits_unapplied,  # 적용 못 한 상하한가·호가단위(placeholder) — 없으면 []
     }
+
+
+class LiveExecutor:
+    """(빈 자리) 실주문 실행기 — 체결 일정(buys/sells)을 jhts 증권사 주문으로 낸다. 범위 밖이라 구현 없음."""
+
+    def __init__(self, *_a, **_k):
+        raise NotImplementedError("LiveExecutor — jhts 실주문 미구현(자리만 있음)")

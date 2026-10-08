@@ -7,7 +7,7 @@
 - 수집 어댑터: `shared/md_feed.py`
 - 평가기(원시함수): `checklist/cond.py`
 - 트리 해석: `checklist/grade.py`
-- 판정 엔진: `verdict/verdict_engine.py`
+- 판정: `trading/judge.py`(Judge) → 화면 JSON `web/verdict_view.py`
 - 원시함수 검사기: `checklist/verify_primitives.py`
 - 계약 메모: `MIGRATION_NOTES.md` (④ jhts 분봉 계약, ⑤ 후속)
 
@@ -183,16 +183,16 @@ B 는 신규 op 분기(cond.py 613행 이후 append)에만 손대도록 **영역
 
 ```
 tree.json(구간② 재생성)  →  md_feed(일봉 OK · 분봉 OHLCV OK, ~7일 보관)  →
-grade.ProductEval(등급/금액/분할/매도)  →  verdict_engine.render(JSON·알림)
+grade.ProductEval(등급/금액/분할/매도)  →  trading.judge.Judge → web.verdict_view.render(JSON·알림)
 ```
 
 - **1차 블로커 = tree.json 없음.** `books/moneycopy/`·`books/trend/` 에 `tree.json` 이 없다(후보만
   `tree_candidates/{a,b}.json`). `TreeGateway.load`(checklist/tree_gateway.py — 트리를 읽는 유일한 출입구)가 `None` 을 돌려주고
-  `verdict_engine.render`(252~254행)는 "조건 트리 없음" 에러로 끝난다 → **판정 자체가 안 돌아간다.**
+  `web.verdict_view.render` 는 "조건 트리 없음" 에러로 끝난다 → **판정 자체가 안 돌아간다.**
   (사용자 메모와 일치: tree.json 삭제·심판생성 전환, 재개 첫 일 = tree 재생성→파리티.)
 - **2차 블로커(완화됨) = jhts 분봉.** OHLCV+UTC 로 이미 온다(④-T). 남은 건 **보관기간(~7일)**·**과거/KR 미연결**.
 - **데이터 없음 → 조용한 실패 없음:** 시세 없는 심볼은 `md_feed` 가 수집요청을 남기고(`requested()`),
-  판정은 ❔(unknown)로 **정직하게** 떨어진다(verdict_engine 168~171·276행). 데이터 완전성 가드도 확정봉이
+  판정은 ❔(unknown)로 **정직하게** 떨어진다(web/verdict_view.product_verdict·render 의 missing). 데이터 완전성 가드도 확정봉이
   워밍업보다 적으면 ❔ 로 보류(checklist/grade.py ProductEval.incomplete) — '모르고 매매' 방지.
 
 ### 4.2 "사람 개입 0" 을 막는 수동 조건 목록 (tree_candidates 기준)

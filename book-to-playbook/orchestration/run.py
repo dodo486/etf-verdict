@@ -10,7 +10,7 @@ homebrew·python.org·Microsoft Store 어느 설치본이든 그대로 동작한
   python -m orchestration.run daily        # 판정(체크리스트 = 조건 트리) → 알림 → 백테스트 (장 마감 후). 화면은 라이브 서버가 맡는다.
   python -m orchestration.run watch [--every N]  # asof=지금 기준으로 N분(기본 5)마다 재판정(백테스트 제외).
                              #   장중 조건은 asof(관측 시점) 기준 분봉을 본다 — 분봉이 연결되면 그대로 살아난다.
-  python -m publish.serve    # 화면 보기 — 셸(책목록)+모든 책을 실시간 서빙(정적 스냅샷 폐지)
+  python -m web.serve        # 화면 보기 — 셸(책목록)+모든 책을 실시간 서빙(정적 스냅샷 폐지)
 
 옵션
   --quiet      콘솔 출력 최소화(로그 파일에는 그대로 남음)
@@ -23,7 +23,7 @@ homebrew·python.org·Microsoft Store 어느 설치본이든 그대로 동작한
 local.env 의 PYTHONPATH 로 준다(local.env.example 참고).
 
 팀 구조: 실행 대상은 전부 패키지 모듈(python -m <팀>.<모듈>)이다 — playbook(구간①)
-· checklist(구간②) · verdict(구간③) · operations(구간④ 계산기) · publish(발행층) · shared(공통).
+· checklist(구간②) · trading(구간③ 판정·백테스트·장중) · web(화면) · shared(공통).
 """
 import json
 import os
@@ -63,7 +63,7 @@ class Runner:
         """팀 패키지 모듈 하나 실행(python -m <팀>.<모듈>, cwd=BASE).
 
         capture_to 가 있으면 stdout 을 그 파일에 UTF-8로 저장한다
-        (bash의 `> latest-verdict.json` 리다이렉트 대체 — Windows 콘솔
+        (bash의 `> 파일` 리다이렉트 대체 — Windows 콘솔
         코드페이지를 타지 않도록 파이프에서 직접 디코드한다).
         """
         cmd = [PY, "-m", module] + list(args)
@@ -127,7 +127,8 @@ def main(argv):
     modes = [a for a in argv if not a.startswith("-")]
     mode = modes[0] if modes else "daily"
     if mode == "watch":
-        return watch(argv)
+        from trading.watch import watch                 # 장중 주기 재판정 루프(구간③) — 한 회차 = 이 러너의 verdict 모드
+        return watch(argv, lambda rest: main(["verdict"] + rest))
     if mode not in ("daily", "verdict"):
         print(__doc__)
         return 2
@@ -159,9 +160,9 @@ def main(argv):
             r.step(daily, [slug])                                              # 알림 포함 본 실행 — 화면은 라이브 서버가 맡는다
             # 책 페이지 '백테스트' 탭 데이터(1년·3년) — 장 마감 후(daily)만. 실패해도 막지 않는다.
             if mode == "daily":
-                r.step("operations.backtest", [slug, "--page"], required=False)
+                r.step("web.backtest_page", [slug], required=False)
 
-    # 정적 발행(GitHub Pages)은 폐지됐다 — 화면은 라이브 서버(publish.serve)가 매 요청 엔진을
+    # 정적 발행(GitHub Pages)은 폐지됐다 — 화면은 라이브 서버(web.serve)가 매 요청 엔진을
     # 새로 돌려 그린다(오래된 값이 '지금 값'처럼 안 보이게). 파일로 굽지도, 레포에 push 하지도 않는다.
 
     # ---- 검사 3종 — 판정·백테스트 뒤에 돈다.
@@ -212,27 +213,6 @@ def main(argv):
         return 1
     r.say("=== %s 완료" % mode)
     return 0
-
-
-def watch(argv):
-    """asof=지금 기준으로 주기적으로 재판정→발행(백테스트 제외)한다. 장중(tf="1m") 조건은 asof(관측 시점)
-    이하 마지막 분봉을 본다 — 분봉이 연결되면 그대로 자동으로 살아나고, 그 전엔 None→manual(🟡)로 떨어진다.
-
-    옛 watch 는 저자가 말한 '아침 고정 시각'까지 기다리는 용도였다 — asof 모델에선 그 고정 시점 개념이 없어
-    '지금 기준 주기 평가'로 바뀌었다. --every N 으로 간격(분, 기본 5)을, --cycles K 로 횟수(기본 무한)를 준다."""
-    import time
-    rest = [a for a in argv if a != "watch" and a not in ("--every", "--cycles")]
-    every = int(argv[argv.index("--every") + 1]) if "--every" in argv else 5
-    cycles = int(argv[argv.index("--cycles") + 1]) if "--cycles" in argv else None
-    code, n = 0, 0
-    while cycles is None or n < cycles:
-        n += 1
-        print("watch: asof=지금 %d회차 판정 — %s" % (n, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-        code = main(["verdict"] + rest) or code
-        if cycles is not None and n >= cycles:
-            break
-        time.sleep(max(1, every) * 60)
-    return code
 
 
 if __name__ == "__main__":
