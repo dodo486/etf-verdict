@@ -46,10 +46,9 @@ import 방향: `shared ← playbook · checklist(공개 DSL) ← trading ← web
 
 ## 🟡 키스톤 이후 (순서 있음 — 둘 다 cond.py 고쳐서 동시 금지)
 
-1. **#2(b) 신규 프리미티브** — `checklist/cond.py` 에 **ATR**(Wilder 권고, rsi와 일관)·**VWAP**(세션 리셋)·**세션리셋 당일 고/저** 추가. gap(갭)은 기존 `pct`/`lag`로 되어 불필요. 분봉은 **이미 흐름**(jhts `minute_bars` OHLCV, 블로커 아님). 각 프리미티브는 `checklist/verify_primitives.py` 에 pandas·손계산 기준값 테스트 동반. 상세 = `remaining-work-spec.md`.
+1. **계산기 부품** — 지표별 전용 연산(ATR·VWAP 등)은 만들지 않는다. 기본 부품 + 조합 예시, pandas 구현 — 트리 v3 와 함께(`docs/action-grammar-draft.md` 9절).
 2. **A 서버권위(적② 제거)** — 화면이 등급을 직접 재계산하는 중복(`web/ui/checklist-ui.js` 의 `ev/and3/or3/gradeKey/cautionOf`) 제거 — 끝나면 `orchestration/verify_code.py` 주인 표 '등급 사다리' 행의 TEMPORARY 허용 줄도 지운다. `cond.Ctx` 에 조건별 수동답 맵 추가 → `web.verdict_view.render(answers=)` → `web/serve.py` in-process → 마지막에 JS 평가기 삭제. **tree.json 재생성 뒤 파리티 검증(화면 등급==엔진 등급) 가능.** 상세 = `web-consolidation-plan.md` §4.
 
-> 둘 다 `checklist/cond.py` 의 `_series()` 영역을 건드린다 → **A(구조변경) 먼저, 프리미티브(op 추가) 나중** 권고(remaining-work-spec.md).
 
 ## 검증 명령 (venv = `book-to-playbook/.venv`)
 ```
