@@ -25,6 +25,8 @@
 **현재 폴더 구조(1폴더=1구간/층):**
 `playbook/`(①) · `checklist/`(②, 트리만) · `verdict/`(③) · `operations/`(④) · `shared/`(공용) · `publish/`(발행·화면) · `orchestration/`(실행·감사)
 실행: `python -m orchestration.run <daily|watch|publish>` · 검사 `python -m orchestration.verify_structure`
+트리(`tree.json`) 읽기 = `checklist/tree_gateway.py` 의 **TreeGateway 하나**(형식 검사·탐색). 나머지 코드는 원본 키를 직접 읽지 않는다
+(`verify_teams` 규칙 6) — 트리 형식(여섯 칸 → rules 목록) 교체 시 TreeGateway + 문법(`shared/cond.py`)만 고친다.
 
 ## 🔴 키스톤 — tree.json 재생성 (모든 게 이걸로 막힘)
 

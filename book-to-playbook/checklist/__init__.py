@@ -10,10 +10,12 @@
   · SCENARIO.md         사례 작성자 지침(원문만 보고 정답지)
   · JUDGE.md            심판 지침(비교 도구·판단·최종 트리와 review·채점 대응)
   · COND_DSL.md         트리 문법 — 트리를 쓰는 추출자·심판의 참고서(유효한 것과 그 뜻만)
+  · tree_gateway.py     TreeGateway — tree.json 을 읽는 유일한 출입구(형식 검사·탐색). 판정·백테스트·검사기가 여기에 묻는다
   · verify_tree.py      트리 검사 — 이중 추출 비교·원문 사례·발화 통계·비중 합 · 심판의 비교 도구(--dump)
 
 (화면 표시 JS 와 주입기 inject_ui 는 발행·서빙층 publish/ 로 옮겼다 — 구간②는 트리 생산만 한다.)
 
-팀 경계: 다른 팀(playbook·verdict) 코드를 import 하지 않는다. 공용은 shared/ 만(트리의 뜻 cond·tree_grade·
+팀 경계: 다른 팀(playbook·verdict) 코드를 import 하지 않는다. 거꾸로 이 팀 코드 중 tree_gateway.py 하나만은
+verdict·operations·orchestration·publish 가 import 해도 된다(verify_teams 의 명시 예외 — shared 는 안 됨). 공용은 shared/ 만(트리의 뜻 cond·tree_grade·
 trades 와 시세 창구 md_feed 는 shared/ — 구간③과 같은 코드). 경계는 verify_teams.py 가 기계로 강제한다.
 """

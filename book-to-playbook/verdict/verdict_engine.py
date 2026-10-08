@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 """판정 엔진 (책 무관) — 구간③. 체크리스트(= 조건 트리 books/<slug>/tree.json)를 오늘 시세에 대 판정한다.
 
-입력은 둘뿐이다: 트리(구간② 산출물)와 jhts 시세(수집 단계 tree_grade.history → md_feed.histories).
+입력은 둘뿐이다: 트리(구간② 산출물 — 읽기는 출입구 checklist/tree_gateway.TreeGateway 하나)와
+jhts 시세(수집 단계 tree_grade.history → md_feed.histories).
 트리의 뜻(등급·금액·분할·매도)은 shared/tree_grade 한 벌이고, 이 파일은 그 결과를 사람과 화면이 읽는
 모양으로 묶기만 한다 — 화면은 트리를 다시 해석하지 않고 이 출력만 그린다.
 
@@ -27,6 +28,7 @@ from datetime import datetime, timedelta, timezone
 from shared.paths import BASE, book_meta
 from verdict.notify import send_telegram, send_desktop
 from shared import cond, md_feed, tree_grade
+from checklist.tree_gateway import TreeGateway   # 트리를 읽는 유일한 출입구(verify_teams 의 명시 예외)
 
 SOURCE = "jhts 시세팀(일봉)"
 
@@ -49,37 +51,14 @@ def load_positions(slug):
 
 
 # ------------------------------------------------------------------ 공통 조건(defs)
-def _def_users(tree):
-    """{정의 이름: 그 정의를 참조하는 상품 집합} — 칸 안에서 {"def": 이름} 을 직접·간접으로 쓰는 상품."""
-    defs = tree.get("defs") or {}
-    users = {}
-
-    def walk(n, p, seen):
-        if isinstance(n, dict):
-            if "def" in n and n["def"] in defs and n["def"] not in seen:
-                users.setdefault(n["def"], set()).add(p)
-                walk(defs[n["def"]], p, seen | {n["def"]})
-            for k, x in n.items():
-                if k not in cond.META:
-                    walk(x, p, seen)
-        elif isinstance(n, list):
-            for x in n:
-                walk(x, p, seen)
-
-    for p, cfg in tree["products"].items():
-        for _z, _l, _r, node in cond.zone_nodes(cfg):
-            walk(node, p, set())
-    return users
-
-
-def common_items(tree, pe):
+def common_items(gw, pe):
     """라벨 달린 정의 중 상품 둘 이상이 같이 보는 것(상품마다 값이 다른 식 제외) — 공통 칸에서 조건마다 한 번만 펼친다.
 
     · 다른 공통 조건 안에 들어 있는 정의는 따로 나열하지 않는다(그 펼침에 보인다).
     · 단, 공통 칸 안에서 두 번 이상 펼쳐질 정의(모드 둘이 같이 쓰는 '반도체 과열', 한 조건 안에 두 번 쓰인 점수 등)는
       따로 한 번 나열하고, 그 밖의 자리에선 folded(한 줄 — 계산엔 그대로 쓰임)로 둔다. 가장 바깥 것부터 정한다."""
-    defs = tree.get("defs") or {}
-    users = _def_users(tree)
+    defs = gw.defs()
+    users = gw.def_users()
     i = len(pe.cal) - 1
     shared = [name for name, node in defs.items()
               if isinstance(node, dict) and node.get("label")
@@ -126,9 +105,9 @@ def common_items(tree, pe):
 
 
 # ------------------------------------------------------------------ 원문 소절별 반영 현황
-def ref_map(tree):
+def ref_map(gw):
     """{소절: {auto, manual, zones[], prods[]}} — 트리에 ref 로 달린 라벨 노드·규칙을 센다."""
-    defs = tree.get("defs") or {}
+    defs = gw.defs()
     out = {}
 
     def add(ref, zone, prod, manual):
@@ -141,19 +120,19 @@ def ref_map(tree):
         if prod not in r["prods"]:
             r["prods"].append(prod)
 
-    for p, cfg in tree["products"].items():
-        for z, label, ref, node in cond.zone_nodes(cfg):
+    for p in gw.products():
+        for z, label, ref, node in gw.expressions(p):
             if label:
                 add(ref, z, p, bool(cond.manual_leaves(node, defs)))
             for n in cond.labeled(node, defs):
                 add(n.get("ref"), z, p, bool(cond.manual_leaves(n, defs)))
-        sz = cfg.get("sizing") or {}
-        for t in sz.get("tranches") or []:
-            if "when" not in t:
-                add(t.get("ref"), "sizing", p, False)
-        if sz.get("weight") is None and sz.get("ref"):
-            add(sz["ref"], "sizing", p, False)
-    for u in tree.get("unexpressed") or []:
+        for t in gw.tranches(p):
+            if t.when is None:
+                add(t.ref, "sizing", p, False)
+        sz = gw.sizing(p)
+        if sz.weight is None and sz.ref:
+            add(sz.ref, "sizing", p, False)
+    for u in gw.unexpressed():
         if u.get("ref"):
             r = out.setdefault(u["ref"], {"auto": 0, "manual": 0, "zones": [], "prods": []})
             r.setdefault("unexpressed", []).append({"rule": u.get("rule"), "reason": u.get("reason")})
@@ -161,16 +140,15 @@ def ref_map(tree):
 
 
 # ------------------------------------------------------------------ 상품 하나
-def product_verdict(tree, p, hist, positions, asof=None):
-    cfg = tree["products"][p]
+def product_verdict(gw, p, hist, positions, asof=None):
     cs = hist.get(p) or []
-    base = {"prod": p, "index": cfg.get("index"), "note": cfg.get("note")}
+    base = {"prod": p, "index": gw.index(p), "note": gw.note(p)}
     if not cs:
         req = md_feed.requested().get(p, "-")
         return dict(base, key="unknown", grade=tree_grade.GRADES["unknown"],
                     reason="%s 시세 없음(수집 요청 %s)" % (p, req)), None
     cal = [c.date for c in cs]
-    pe = tree_grade.ProductEval(tree, p, hist, cal, asof=asof)
+    pe = tree_grade.ProductEval(gw, p, hist, cal, asof=asof)
     i = len(cal) - 1
     key, top = pe.grade_key(i), pe.top(i)
     reason = tree_grade.reason_of(key, top, pe.manual_items(i))
@@ -188,28 +166,27 @@ def product_verdict(tree, p, hist, positions, asof=None):
         if unknown:
             reason += " · 금액 축소 확인: " + " · ".join(unknown[:2])
     w, alt = pe.weight_of(i)
-    sz = cfg.get("sizing") or {}
+    sz, defs, index = gw.sizing(p), gw.defs(), gw.index(p)
     prev = cs[-2].close if len(cs) >= 2 else None
     v = dict(base, date=cal[i], close=cs[-1].close,
              chg=(cs[-1].close / prev - 1) * 100 if prev else None,
              key=key, grade=tree_grade.GRADES[key], reason=reason,
-             zones={sec: pe.view(cfg[sec], i) for sec in cond.SECTIONS},
+             zones={sec: pe.view(gw.section(p, sec), i) for sec in cond.SECTIONS},
              opt={sec: pe.opt[sec][i] for sec in cond.SECTIONS},
              pes={sec: pe.pes[sec][i] for sec in cond.SECTIONS},
-             caution=[dict(st, view=pe.view(r["when"], i), v=st["value"])
-                      for st, r in zip(pe.caution_state(i), cfg["caution"])],
+             caution=[dict(st, view=pe.view(r.when, i), v=st["value"])
+                      for st, r in zip(pe.caution_state(i), gw.cautions(p))],
              amount={"factor": f, "unspecified": unspec, "unknown": unknown},
-             sizing={"label": sz.get("label"), "ref": sz.get("ref"), "note": sz.get("note"),
-                     "weight": w, "weight_range": alt, "weight_set": sz.get("weight") is not None,
-                     "tranches": [dict({k: t[k] for k in ("label", "ref", "frac", "note") if k in t},
-                                       conditional="when" in t,
-                                       view=_static_view(t.get("when"), tree.get("defs") or {}, cfg.get("index")))
-                                  for t in sz.get("tranches") or []]},
-             exit=[{"label": r["label"], "ref": r.get("ref"), "sell": r["sell"], "note": r.get("note"),
-                    "view": _static_view(r["when"], tree.get("defs") or {}, cfg.get("index"))} for r in cfg["exit"]])
+             sizing={"label": sz.label, "ref": sz.ref, "note": sz.note,
+                     "weight": w, "weight_range": alt, "weight_set": sz.weight is not None,
+                     "tranches": [dict(t.shown("label", "ref", "frac", "note"), conditional=t.when is not None,
+                                       view=_static_view(t.when, defs, index))
+                                  for t in gw.tranches(p)]},
+             exit=[{"label": r.label, "ref": r.ref, "sell": r.sell, "note": r.note,
+                    "view": _static_view(r.when, defs, index)} for r in gw.exit_rules(p)])
     pos = []
     for x in positions.get(p, []):
-        st = tree_grade.position_state(tree, p, hist, cal, str(x["entry_date"]), float(x["entry_px"]),
+        st = tree_grade.position_state(gw, p, hist, cal, str(x["entry_date"]), float(x["entry_px"]),
                                        int(x.get("filled", 1)))
         pos.append(dict(st, entry_date=x["entry_date"], entry_px=x["entry_px"], filled=x.get("filled", 1)))
     if pos:
@@ -237,7 +214,7 @@ def _static_view(node, defs, index=None):
 # ------------------------------------------------------------------ 책 하나
 def render(slug, asof=None):
     """asof = 관측 시각(UTC datetime). None 이면 지금 — 장중(tf="1m") 조건을 이 시점 이하로 자른다."""
-    tree = tree_grade.load_tree(slug)
+    tree = TreeGateway.load(slug)
     now = datetime.now(timezone.utc).astimezone()
     top = {"slug": slug, "title": book_title(slug), "ts": now.isoformat(), "source": SOURCE,
            "verdicts": [], "common": [], "refs": {}, "missing": {}, "cash": None,
@@ -257,7 +234,7 @@ def render(slug, asof=None):
     positions = load_positions(slug)
     pe0 = None
     weights, all_known = [], True
-    for p in tree["products"]:
+    for p in tree.products():
         v, pe = product_verdict(tree, p, hist, positions, asof=asof)
         top["verdicts"].append(v)
         pe0 = pe0 or pe

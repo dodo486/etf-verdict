@@ -35,7 +35,7 @@
                                   │
         [② 추출자 a·b(서로 모름) · 원문 사례 → 심판이 최종 트리를 씀(비교 도구 사용) → 채점] ──▶ tree.json (체크리스트)
                                   │
-   [③ cond.symbols_of(tree) → md_feed.histories(jhts, 없으면 수집 요청) → tree_grade → verdict_engine]
+   [③ TreeGateway.symbols() → md_feed.histories(jhts, 없으면 수집 요청) → tree_grade → verdict_engine]
                                   │                                   └──▶ 알림 · latest-verdict-<slug>.json
                                   │
              [publish.assemble: 판정 + ui/*.js + 레일 + 원문 + 백테스트] ──▶ publish.serve(로컬 실시간)

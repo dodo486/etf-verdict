@@ -36,6 +36,7 @@ from datetime import datetime, timedelta, timezone
 
 from shared.paths import BASE, LOGS, ensure_dir, write_text, backtest_path
 from shared import trades as trades_mod, tree_grade
+from checklist.tree_gateway import TreeGateway
 from operations import portfolio, driver
 
 HORIZONS = (5, 10, 20)
@@ -94,7 +95,7 @@ def fetch_history(tree, days):
 def run(slug, days=365, hist=None, tree=None, unobserved=None):
     """hist 를 주면 시세를 다시 받지 않는다(여러 기간을 한 번에 돌릴 때).
     unobserved="exclude" = 분봉이 없어 관측 못 한 장중 조건(asof observe — 개장 전 선물 등)을 빼고 판단한다."""
-    tree = tree or tree_grade.load_tree(slug)
+    tree = tree or TreeGateway.load(slug)
     if tree is None:
         raise SystemExit("books/%s/tree.json 없음 — 조건 트리가 있어야 백테스트한다" % slug)
     today = datetime.now()
@@ -108,7 +109,7 @@ def run(slug, days=365, hist=None, tree=None, unobserved=None):
     sig = driver.run(tree, hist, start=start, unobserved=unobserved, axis="1d")
 
     rows, summary, manual, period, trade_res, incomplete = [], {}, {}, None, {}, {}
-    for p in tree["products"]:
+    for p in tree.products():
         cs = hist.get(p) or []
         cal = [c.date for c in cs]
         pe = sig["evals"][p]
@@ -136,7 +137,7 @@ def run(slug, days=365, hist=None, tree=None, unobserved=None):
         manual[p] = [{"section": s, "rule": l, "ref": r} for s, l, r in pe.manual_items()]
         if prow and period is None:
             period = [prow[0]["date"], prow[-1]["date"], len(prow)]
-    return {"slug": slug, "title": (tree.get("source") or {}).get("book", slug),
+    return {"slug": slug, "title": tree.book(slug),
             "period": period[:2] if period else None, "trading_days": period[2] if period else 0,
             "horizons": list(HORIZONS), "missing_symbols": missing, "incomplete_warmup": incomplete, "manual": manual,
             "summary": summary, "trades": trade_res, "daily": rows, "generated": today.isoformat(timespec="seconds")}
@@ -202,7 +203,7 @@ PAGE_PERIODS = (("1y", 365), ("3y", 1095))
 
 def page_data(slug):
     """책 페이지 '백테스트' 탭이 읽는 요약(일별 행 제외). 시세는 가장 긴 기간으로 한 번만 받는다."""
-    tree = tree_grade.load_tree(slug)
+    tree = TreeGateway.load(slug)
     if tree is None:
         raise SystemExit("books/%s/tree.json 없음" % slug)
     hist = fetch_history(tree, max(d for _, d in PAGE_PERIODS))
@@ -239,13 +240,13 @@ def run_vectorbt(slug, days=365, hist=None, tree=None, unobserved=None):
 
     거래 경계·체결가·체결일은 run()이 쓰는 규칙 평가 워크(shared.trades.build_trades)가 정한 그대로 재사용한다
     (머리의 규약·분할/매도 규칙을 계산기가 다시 정하지 않는다 — '머리=판단/계산기=계산' 분리)."""
-    tree = tree or tree_grade.load_tree(slug)
+    tree = tree or TreeGateway.load(slug)
     if tree is None:
         raise SystemExit("books/%s/tree.json 없음 — 조건 트리가 있어야 백테스트한다" % slug)
     hist = hist if hist is not None else fetch_history(tree, days)
     res = run(slug, days, hist=hist, tree=tree, unobserved=unobserved)
     vbt_products = {}
-    for p in tree["products"]:
+    for p in tree.products():
         cs = hist.get(p) or []
         cal = [c.date for c in cs]
         closes = [c.close for c in cs]
@@ -344,7 +345,7 @@ def run_intraday(slug, hist=None, tree=None, limit=None):
     operations.portfolio 가 낸다. 일봉 백테스트와 다른 것은 '축'(일봉 하루 → 분봉 한 틱)뿐이다.
 
     정직한 한계: 분봉은 jhts 분봉 범위(지수·선물 ~7거래일)만 — 짧은 구간 샤프/MaxDD 는 참고용(limit 표면화)."""
-    tree = tree or tree_grade.load_tree(slug)
+    tree = tree or TreeGateway.load(slug)
     if tree is None:
         raise SystemExit("books/%s/tree.json 없음 — 조건 트리가 있어야 백테스트한다" % slug)
     if hist is None:
@@ -367,7 +368,7 @@ def run_intraday(slug, hist=None, tree=None, limit=None):
         vbt_products[p] = portfolio.run_product(p, cal, closes, tl) if cal else None
         signal_summary[p] = {"points": len(rows), "buy_signals": len(starts),
                              "exit_source": src, "bars": len(cal)}
-    return {"slug": slug, "title": (tree.get("source") or {}).get("book", slug),
+    return {"slug": slug, "title": tree.book(slug),
             "engine": "vectorbt-intraday", "finest_tf": tf, "prods": prods,
             "sessions": sessions, "points": len(timeline), "signals": signal_summary,
             "vectorbt": vbt_products, "limit": driver.limit_note(tree, hist, tf, timeline, sessions),
@@ -427,7 +428,7 @@ def _cli():
     # --intraday : 장중(분봉) 백테스트 — finest_tf 가 분봉(5m/1m)인 트리를 분 단위로 밟아 계산기까지 돌린다.
     #   --engine vectorbt 라도 트리의 finest_tf 가 분봉이면 자동으로 이 경로로 보낸다(일봉 트리는 벡터 경로 유지).
     if "--intraday" in argv or ("--engine" in argv and argv[argv.index("--engine") + 1] == "vectorbt"
-                                and driver.finest_tf(tree_grade.load_tree(slug)) != "1d"):
+                                and driver.finest_tf(TreeGateway.load(slug)) != "1d"):
         ires = run_intraday(slug, limit=limit)
         if "--json" in argv:
             print(json.dumps(ires, ensure_ascii=False, indent=2, default=str))

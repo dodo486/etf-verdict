@@ -187,7 +187,7 @@ tree_grade.ProductEval(등급/금액/분할/매도)  →  verdict_engine.render(
 ```
 
 - **1차 블로커 = tree.json 없음.** `books/moneycopy/`·`books/trend/` 에 `tree.json` 이 없다(후보만
-  `tree_candidates/{a,b}.json`). `tree_grade.load_tree`(tree_grade.py 48~55행)가 `None` 을 돌려주고
+  `tree_candidates/{a,b}.json`). `TreeGateway.load`(checklist/tree_gateway.py — 트리를 읽는 유일한 출입구)가 `None` 을 돌려주고
   `verdict_engine.render`(252~254행)는 "조건 트리 없음" 에러로 끝난다 → **판정 자체가 안 돌아간다.**
   (사용자 메모와 일치: tree.json 삭제·심판생성 전환, 재개 첫 일 = tree 재생성→파리티.)
 - **2차 블로커(완화됨) = jhts 분봉.** OHLCV+UTC 로 이미 온다(④-T). 남은 건 **보관기간(~7일)**·**과거/KR 미연결**.

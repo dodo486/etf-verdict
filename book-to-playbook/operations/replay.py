@@ -14,8 +14,8 @@ trigger(장중)'를 그 분봉 간격으로 재생해 봐야 장중 신호가 �
 
 ## 단방향(폭포수)
 
-operations/(구간④)에 있고 driver(동일 구간)만 통해 verdict·shared 를 쓴다(downward). 상류는 이 파일을
-import 하지 않는다 — verify_teams 가 강제.
+operations/(구간④)에 있고 driver(동일 구간)만 통해 verdict·shared 를 쓴다(downward). 트리는 출입구
+TreeGateway(checklist/tree_gateway.py)로 읽는다. 상류는 이 파일을 import 하지 않는다 — verify_teams 가 강제.
 
 ## 사용
 
@@ -24,12 +24,11 @@ import 하지 않는다 — verify_teams 가 강제.
 """
 import sys
 
-from shared import tree_grade
+from checklist.tree_gateway import TreeGateway
 from operations import driver
 
 # 하위호환 재노출(기존 호출부·테스트가 operations.replay.finest_tf 등을 쓸 수 있게) — 정본은 driver.
 finest_tf = driver.finest_tf
-tree_tfs = driver.tree_tfs
 asof_timeline = driver.asof_timeline
 
 
@@ -41,7 +40,7 @@ def replay(slug, hist=None, tree=None, limit=None, prod=None):
 
     → {slug, title, finest_tf, prods, sessions, points, timeline:[UTC iso], series:{prod:[{asof, key, grade, close}]},
        limit:{reason, sessions, bars}}  (분봉 없으면 points=0, series 빈, 한계 표면화)."""
-    tree = tree or tree_grade.load_tree(slug)
+    tree = tree or TreeGateway.load(slug)
     if tree is None:
         raise SystemExit("books/%s/tree.json 없음 — 조건 트리가 있어야 재생한다" % slug)
     if hist is None:
@@ -51,7 +50,7 @@ def replay(slug, hist=None, tree=None, limit=None, prod=None):
     sig = driver.run(tree, hist, limit=limit, prods=([prod] if prod else None))
     tf, timeline, sessions, prods, series = (sig["tf"], sig["timeline"], sig["sessions"],
                                              sig["prods"], sig["series"])
-    return {"slug": slug, "title": (tree.get("source") or {}).get("book", slug),
+    return {"slug": slug, "title": tree.book(slug),
             "finest_tf": tf, "prods": prods, "sessions": sessions, "points": len(timeline),
             "timeline": [a.isoformat() for a in timeline], "series": series,
             "limit": driver.limit_note(tree, hist, tf, timeline, sessions)}

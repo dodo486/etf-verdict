@@ -40,34 +40,20 @@ operations.replay(장중 asof). 판정 머리(verdict_engine.product_verdict / t
 ## 단방향(폭포수)
 
 operations/(구간④)에 있고 verdict·shared 만 import 한다(downward). 상류(playbook·checklist·verdict·
-shared)는 이 파일을 import 하지 않는다 — verify_teams 가 강제.
+shared)는 이 파일을 import 하지 않는다 — verify_teams 가 강제. 트리는 TreeGateway(checklist/tree_gateway.py)로 받는다.
 """
 from datetime import datetime, timezone
 
-from shared import cond, tree_grade
+from shared import tree_grade
 from verdict import verdict_engine
 
 # tf 촘촘함 순서 — 초로 환산(작을수록 촘촘). cond.TIMEFRAMES 와 짝(그 밖 tf 는 문법이 막는다).
 TF_SECONDS = {"1m": 60, "5m": 300, "1d": 86400}
 
 
-def tree_tfs(tree):
-    """트리가 실제로 쓰는 tf 집합(모든 px 잎). defs 펼침. 늘 최소 {"1d"}(기본값)를 포함할 수 있다."""
-    defs = tree.get("defs") or {}
-    tfs = set()
-    nodes = list(defs.values())
-    for cfg in tree["products"].values():
-        nodes.extend(n for _z, _l, _r, n in cond.zone_nodes(cfg))
-    for node in nodes:
-        for n in cond.labeled_all(node, defs):
-            if isinstance(n, dict) and "px" in n:
-                tfs.add(n.get("tf", "1d"))
-    return tfs
-
-
 def finest_tf(tree):
-    """트리의 '가장 촘촘한 tf'(1m < 5m < 1d). px 잎이 없으면(순수 수동 트리) 기본 "1d"."""
-    tfs = tree_tfs(tree)
+    """트리(TreeGateway)의 '가장 촘촘한 tf'(1m < 5m < 1d). px 잎이 없으면(순수 수동 트리) 기본 "1d"."""
+    tfs = tree.timeframes()
     if not tfs:
         return "1d"
     return min(tfs, key=lambda tf: TF_SECONDS.get(tf, TF_SECONDS["1d"]))
@@ -100,7 +86,7 @@ def asof_timeline(tree, hist, limit=None):
     tf = finest_tf(tree)
     if tf == "1d":
         return []                               # 일봉 전용 트리 — 장중 재생할 분봉 축이 없다(빈 타임라인)
-    syms = cond.minute_symbols_of(tree)
+    syms = tree.minute_symbols()
     keys = _minute_keys(hist, syms)
     if not keys:
         return []                               # 분봉 데이터 없음 — 타임라인도 없음(가짜로 안 늘림)
@@ -190,7 +176,7 @@ def run(tree, hist, start=None, unobserved=None, limit=None, truncate=False, pro
     점(1d)   = {date, key, grade, close, incomplete}
     점(분봉) = {asof(UTC iso), key, grade, close}   (step 결과 그대로)."""
     tf = axis or finest_tf(tree)
-    prods = prods if prods is not None else list(tree["products"].keys())
+    prods = prods if prods is not None else tree.products()
     if tf == "1d":
         series, evals = {}, {}
         for p in prods:
@@ -229,7 +215,7 @@ def limit_note(tree, hist, tf, timeline, sessions):
                           "tf:5m/1m 조건이 있어야 장중 타임라인이 깔린다.",
                 "sessions": 0, "bars": 0}
     if not timeline:
-        syms = sorted(cond.minute_symbols_of(tree))
+        syms = sorted(tree.minute_symbols())
         return {"reason": "분봉 데이터 없음 — jhts 분봉(md_feed.minutes)에서 %s 분봉이 비어 있다"
                           "(미설치·네트워크·그 심볼 분봉 미보관). 없는 봉을 지어내 타임라인을 늘리지 않는다." % (", ".join(syms) or "대상 심볼"),
                 "sessions": 0, "bars": 0}

@@ -14,11 +14,13 @@
 
 판정은 봉이 끝난 직후(그날까지의 봉)로 낸다 — cond 연산이 전부 인과적이라 전체 이력을 한 번 계산해
 날짜로 꺼내도 미래를 보지 않는다(verify_primitives 가 강제).
+
+트리는 원본 dict 가 아니라 TreeGateway(checklist/tree_gateway.py — 트리를 읽는 유일한 출입구)로 받는다.
+공통층은 그 파일을 import 하지 않는다 — 호출자가 넘겨준 출입구 객체에 질문만 한다(의존성 주입).
 """
 import json
 import os
 
-from shared.paths import BASE
 from shared import cond, md_feed
 
 GRADES = {
@@ -41,33 +43,19 @@ GRADE_RULES = json.load(
 WARMUP_DAYS = 500
 
 
-def tree_path(slug, name="tree.json"):
-    return os.path.join(BASE, "books", slug, name)
-
-
-def load_tree(slug, name="tree.json"):
-    """트리 파일을 읽고 문법 검사까지 한다. 없으면 None, 문법 오류면 CondError."""
-    p = tree_path(slug, name)
-    if not os.path.exists(p):
-        return None
-    t = json.load(open(p, encoding="utf-8"))
-    cond.validate_tree(t)
-    return t
-
-
 class History(dict):
     """{심볼: 일봉} + minutes{심볼: 분봉}. 장중(tf="1m") 값은 asof 축에서 분봉을 잘라 읽는다(cond.minute_series)."""
     minutes = {}
 
 
 def history(trees, start):
-    """트리(들)가 쓰는 모든 심볼의 일봉(+ 장중(tf="1m") 값에 쓰는 심볼의 분봉) — 수집 단계(md_feed)
+    """트리(들 — TreeGateway)가 쓰는 모든 심볼의 일봉(+ 장중(tf="1m") 값에 쓰는 심볼의 분봉) — 수집 단계(md_feed)
     하나로 받는다. jhts 는 md_feed 에서만 만진다(팀 경계). 분봉이 연결되기 전에는 minutes 가 비어 있고
     장중 observe 조건은 None→manual 로 떨어진다(의도된 동작)."""
     syms, msyms = set(), set()
     for t in trees if isinstance(trees, list) else [trees]:
-        syms |= cond.symbols_of(t)
-        msyms |= cond.minute_symbols_of(t)
+        syms |= t.symbols()
+        msyms |= t.minute_symbols()
     h = History(md_feed.histories(syms, start))
     h.minutes = {s: md_feed.minutes(s) for s in sorted(msyms)}
     return h
@@ -101,15 +89,14 @@ def session_closes(symbols, cal, asof):
 class ProductEval:
     """한 상품의 여섯 칸을 전체 달력에 대해 한 번 계산해 둔다."""
 
-    def __init__(self, tree, prod, hist, cal, unobserved=None, asof=None):
-        """unobserved="exclude" = 관측값이 없는 장중 조건(observe)을 빼고 판단한다(백테스트 비교용).
+    def __init__(self, gw, prod, hist, cal, unobserved=None, asof=None):
+        """gw = TreeGateway. unobserved="exclude" = 관측값이 없는 장중 조건(observe)을 빼고 판단한다(백테스트 비교용).
         asof = 관측 시각(UTC datetime) — 장중(tf="1m"/"5m") 조건을 이 시점 이하로 자르고, 일봉은 asof 이하
         확정(settled) 봉만 본다(미확정 그날 일봉은 None). None 이면 실제 지금(일봉은 마지막 확정봉)."""
-        cfg = tree["products"][prod]
-        defs = tree.get("defs") or {}
-        self.tree, self.prod, self.cfg, self.defs, self.cal, self.hist = tree, prod, cfg, defs, list(cal), hist
-        sc = session_closes(cond.symbols_of(tree), list(cal), asof)
-        mk = lambda m: cond.Ctx(hist, cal, prod, cfg.get("index"), defs, manual_as=m, unobserved=unobserved,
+        defs, index = gw.defs(), gw.index(prod)
+        self.gw, self.prod, self.index, self.defs, self.cal, self.hist = gw, prod, index, defs, list(cal), hist
+        sc = session_closes(gw.symbols(), list(cal), asof)
+        mk = lambda m: cond.Ctx(hist, cal, prod, index, defs, manual_as=m, unobserved=unobserved,
                                 asof=asof, session_close=sc)
         self.ctx = {True: mk(True), False: mk(False), None: mk(None)}
         neutral = {"filter": True, "entry": True, "avoid": False}      # 칸 전체가 빠지면 그 칸은 제약 없음
@@ -119,16 +106,16 @@ class ProductEval:
             if sec is None:
                 return [None if x is cond.EXCLUDED else x for x in out]
             return [neutral[sec] if x is cond.EXCLUDED else x for x in out]
-        self.opt = {sec: s(cfg[sec], sec != "avoid", sec) for sec in cond.SECTIONS}
-        self.pes = {sec: s(cfg[sec], sec == "avoid", sec) for sec in cond.SECTIONS}
-        self.caution = [(r, [False if x is cond.EXCLUDED else x for x in cond.series(r["when"], self.ctx[None])])
-                        for r in cfg.get("caution") or []]
-        w = (cfg.get("sizing") or {}).get("weight")
+        self.opt = {sec: s(gw.section(prod, sec), sec != "avoid", sec) for sec in cond.SECTIONS}
+        self.pes = {sec: s(gw.section(prod, sec), sec == "avoid", sec) for sec in cond.SECTIONS}
+        self.caution = [(r, [False if x is cond.EXCLUDED else x for x in cond.series(r.when, self.ctx[None])])
+                        for r in gw.cautions(prod)]
+        w = gw.sizing(prod).weight
         self.weight = {m: (s(w, m) if w is not None else None) for m in (None, True, False)}
         # 데이터 완전성 가드 — 이 상품 등급이 실제로 쓰는 가장 긴 워밍업(트리에서 파생, 하드코딩 아님).
         #   그보다 '확정 봉'이 적은 초기 구간의 1d 신호는 창이 덜 차 조용히 None/틀릴 수 있어 신뢰불가다
         #   → grade_key 가 '불완전 데이터(❔ 보류)'로 표시한다(✅/🚫 확신 금지). WARMUP_DAYS(fetch 버퍼)와 무관.
-        self.warmup = cond.tree_warmup(tree, prod)
+        self.warmup = gw.warmup(prod)
         # 심볼 확정봉 지도 — asof 장중이면 오늘 미확정 봉을 뺀 '마지막 확정 index'(없으면 전부 확정 = 항등).
         #   여러 심볼을 보면 가장 적게 확정된 심볼(지연된 feed)이 기준이다 — 하나라도 모자라면 불완전.
         self._confirmed = self._confirmed_index_map()
@@ -138,9 +125,9 @@ class ProductEval:
         아직 확정 못 했으면(지연된 feed·asof 장중 미확정) 그 심볼 기준으로 낮춘다. 확정봉이 하나도 없으면 -1.
         캘린더가 없거나 asof 가 없으면(라이브 지금) settled_map 이 no-op(None) → 날짜 index 그대로(항등)."""
         ctx = self.ctx[None]
-        syms = sorted({ctx.bind(s) for s in cond.symbols_of(self.tree)
+        syms = sorted({ctx.bind(s) for s in self.gw.symbols()
                        if not s.startswith("$")} | {self.prod}
-                      | ({ctx.bind("$index")} if self.cfg.get("index") else set()))
+                      | ({ctx.bind("$index")} if self.index else set()))
         maps = [ctx.settled_map(s) for s in syms]
         out = []
         for i in range(len(self.cal)):
@@ -173,8 +160,8 @@ class ProductEval:
     # ---------------------------------------------------------------- 금액
     def caution_state(self, i):
         """[{label, ref, note, scale, value, manual}] — value 는 수동 = 모름으로 둔 평가."""
-        return [{"label": r["label"], "ref": r.get("ref"), "note": r.get("note"), "scale": r.get("scale"),
-                 "value": ser[i], "manual": [cond.manual_text(n) for n in cond.manual_leaves(r["when"], self.defs)]}
+        return [{"label": r.label, "ref": r.ref, "note": r.note, "scale": r.scale,
+                 "value": ser[i], "manual": [cond.manual_text(n) for n in cond.manual_leaves(r.when, self.defs)]}
                 for r, ser in self.caution]
 
     def weight_of(self, i):
@@ -206,7 +193,7 @@ class ProductEval:
         out = {}
         for sec in cond.SECTIONS:
             out[sec] = [(n.get("label"), n.get("ref"), cond.series(n, self.ctx[None])[i])
-                        for n in cond.labeled(self.cfg[sec], self.defs)]
+                        for n in cond.labeled(self.gw.section(self.prod, sec), self.defs)]
         return out
 
     def top(self, i):
@@ -215,7 +202,7 @@ class ProductEval:
         out = {}
         for sec in cond.SECTIONS:
             out[sec] = [(n.get("label"), n.get("ref"), cond.series(n, self.ctx[None])[i])
-                        for n in _top_labeled(self.cfg[sec], self.defs)]
+                        for n in _top_labeled(self.gw.section(self.prod, sec), self.defs)]
         return out
 
     def view(self, node, i):
@@ -225,7 +212,7 @@ class ProductEval:
     def manual_items(self, i=None):
         """사람 확인이 필요한 조건 [(칸, 라벨, ref)] — i 를 주면 그날 관측된 observe 조건은 뺀다."""
         out = []
-        for z, _l, _r, node in cond.zone_nodes(self.cfg):
+        for z, _l, _r, node in self.gw.expressions(self.prod):
             if z == "exit":
                 continue
             for n in cond.manual_leaves(node, self.defs):
@@ -557,22 +544,22 @@ def reason_of(key, ex, manual):
     return "데이터 부족으로 판정 불가"
 
 
-def position_state(tree, prod, hist, cal, entry_date, cost, filled=1):
-    """내 포지션(첫 매수일·평균 매입가·산 차수)의 오늘 매도·추가 매수 규칙 상태.
+def position_state(gw, prod, hist, cal, entry_date, cost, filled=1):
+    """내 포지션(첫 매수일·평균 매입가·산 차수)의 오늘 매도·추가 매수 규칙 상태(gw = TreeGateway).
     → {ret, days, exit:[{label, ref, sell, v, view}], next_tranche:{label, ref, frac, v, view}|None}"""
-    cfg, defs = tree["products"][prod], tree.get("defs") or {}
+    defs = gw.defs()
     later = [k for k, d in enumerate(cal) if d >= entry_date]
     if not later:
         return {"error": "첫 매수일 %s 이후 시세 없음" % entry_date}
-    ctx = cond.Ctx(hist, cal, prod, cfg.get("index"), defs, manual_as=None, pos=(later[0], cost))
+    ctx = cond.Ctx(hist, cal, prod, gw.index(prod), defs, manual_as=None, pos=(later[0], cost))
     i = len(cal) - 1
     out = {"ret": cond.series({"pos": "ret"}, ctx)[i], "days": cond.series({"pos": "days"}, ctx)[i],
-           "exit": [{"label": r["label"], "ref": r.get("ref"), "sell": r["sell"],
-                     "v": cond.series(r["when"], ctx)[i], "view": _view(r["when"], defs, ctx, i)}
-                    for r in cfg.get("exit") or []]}
-    trs = (cfg.get("sizing") or {}).get("tranches") or []
+           "exit": [{"label": r.label, "ref": r.ref, "sell": r.sell,
+                     "v": cond.series(r.when, ctx)[i], "view": _view(r.when, defs, ctx, i)}
+                    for r in gw.exit_rules(prod)]}
+    trs = gw.tranches(prod)
     nt = trs[filled] if 0 < filled < len(trs) else None
     out["next_tranche"] = None if nt is None else {
-        "label": nt["label"], "ref": nt.get("ref"), "frac": nt["frac"],
-        "v": cond.series(nt["when"], ctx)[i], "view": _view(nt["when"], defs, ctx, i)}
+        "label": nt.label, "ref": nt.ref, "frac": nt.frac,
+        "v": cond.series(nt.when, ctx)[i], "view": _view(nt.when, defs, ctx, i)}
     return out

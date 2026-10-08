@@ -28,6 +28,7 @@ import sys
 from shared import paths  # noqa: F401  (UTF-8 출력)
 from shared.paths import BASE, live_slugs, playbook_src, read_text
 from shared import cond
+from checklist.tree_gateway import TreeGateway
 
 CHECKS = ["orchestration.verify_teams", "playbook.verify_source_integrity"]
 PAGE_IDS = ('id="src"', 'id="verdict-data"', 'id="sheet-root"')
@@ -36,7 +37,6 @@ PAGE_IDS = ('id="src"', 'id="verdict-data"', 'id="sheet-root"')
 def book_contract(slug):
     """라이브 책 하나의 계약 위반 목록."""
     bad = []
-    bdir = os.path.join(BASE, "books", slug)
     try:
         idx = json.load(open(paths.source_index_path(slug), encoding="utf-8"))
         keys = set(idx.get("sections") or {})
@@ -46,21 +46,13 @@ def book_contract(slug):
         bad.append("source_index.json 없음/깨짐: %s" % e)
         keys = set()
     try:
-        tree = json.load(open(os.path.join(bdir, "tree.json"), encoding="utf-8"))
-        cond.validate_tree(tree)
+        tree = TreeGateway.open(TreeGateway.path(slug))
+        tree.validate()
     except (OSError, ValueError, cond.CondError) as e:
         bad.append("tree.json 문법: %s" % e)
         tree = None
     if tree is not None and keys:
-        defs = tree.get("defs") or {}
-        refs = set()
-        for node in list(defs.values()) + [n for cfg in tree["products"].values()
-                                           for _z, _l, r, n in cond.zone_nodes(cfg)]:
-            refs.update(x.get("ref") for x in cond.labeled_all(node, defs) if x.get("ref"))
-        for cfg in tree["products"].values():
-            refs.update(r.get("ref") for r in cfg["caution"] + cfg["exit"] if r.get("ref"))
-            sz = cfg["sizing"]
-            refs.update(t.get("ref") for t in sz["tranches"] + [sz] if t.get("ref"))
+        refs = tree.refs()
         # "2-1·2-3" 처럼 여러 소절을 함께 적은 ref 는 하나하나 본다
         parts = {p.strip() for r in refs for p in str(r).replace("·", ",").split(",") if p.strip()}
         missing = sorted(parts - keys)

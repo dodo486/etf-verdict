@@ -832,145 +832,20 @@ def _series(node, ctx, s_sym):
     raise CondError("모르는 연산 %r" % op)
 
 
-# ------------------------------------------------------------------ 트리 파일
+# ------------------------------------------------------------------ 칸의 뜻 · 파일 직렬화
 # 상품 한 개의 여섯 칸 (COND_DSL.md 1절). 조건 칸 셋은 등급을, 규칙 칸 셋은 금액·분할·매도를 낸다.
+# 트리 파일의 키 배치·형식 검사·탐색은 checklist/tree_gateway.py(TreeGateway) 하나가 맡는다 — 여기는 칸의 이름과 뜻만.
 SECTIONS = ("filter", "entry", "avoid")                 # 조건 칸(등급)
 ZONES = SECTIONS + ("caution", "sizing", "exit")        # 반드시 다 적는 여섯 칸
 # 여섯 칸의 한글 이름표 — 여기 한 곳이 정본이다. 화면(shared-ui.js ZW)은 복붙하지 않고
 # 판정 JSON(verdict_engine 이 VD.zones 로 실어보냄, ZONES 순서)을 받아 쓴다.
 ZONE_LABELS = {"filter": "필터", "avoid": "회피", "entry": "진입",
                "caution": "조심", "sizing": "비중·분할", "exit": "매도"}
-TREE_TOP = ("version", "defs", "products", "source", "note", "unexpressed", "review")
-# review = 심판의 판정 근거(구간② 검사기만 읽는다 — 판정·체결엔 안 쓴다): sections{"상품.칸": {winner a|b|custom, why, cases}},
-#   exits{상품: {winner, why}}, scenario_overrides{사례 이름: 사유}, fire_ack{경고문: 사유}. 최종 트리와 한 파일 — 심판만 쓴다.
-PRODUCT_KEYS = ("index", "note", "exit_note") + ZONES
-EXIT_KEYS = ("label", "ref", "note", "when", "sell")
-CAUTION_KEYS = ("label", "ref", "note", "when", "scale")
-SIZING_KEYS = ("label", "ref", "note", "weight", "tranches")
-TRANCHE_KEYS = ("label", "ref", "note", "frac", "when")
-EMPTY_ZONE = {"filter": {"all": []}, "entry": {"all": []}, "avoid": {"any": []},
-              "caution": [], "sizing": {"weight": None, "tranches": []}, "exit": []}
 
 
 def _uses_pos(node, defs):
+    """식이 포지션 값(pos)을 쓰나 — def 펼침."""
     return any("pos" in n for n in labeled_all(node, defs))
-
-
-def _rule_list(rules, keys, path, need):
-    """규칙 목록 형식 검사 — (경로, 규칙) 을 차례로 돌려준다."""
-    if not isinstance(rules, list):
-        raise CondError("%s: 목록이어야 한다" % path)
-    out = []
-    for k, r in enumerate(rules):
-        pp = "%s[%d]" % (path, k)
-        if not isinstance(r, dict):
-            raise CondError("%s: 객체여야 한다" % pp)
-        bad = set(r) - set(keys)
-        if bad:
-            raise CondError("%s: 모르는 키 %s" % (pp, sorted(bad)))
-        if any(x not in r or r[x] in (None, "") for x in need):
-            raise CondError("%s: %s 이 필요하다" % (pp, "·".join(need)))
-        out.append((pp, r))
-    return out
-
-
-def _frac_or_null(f):
-    """수량 자리(scale·frac·sell 비율) — 0 초과 1 이하의 수, 또는 null(저자 미명시)."""
-    return f is None or (isinstance(f, (int, float)) and not isinstance(f, bool) and 0 < f <= 1)
-
-
-def validate_exits(rules, defs, path):
-    """매도 규칙 목록: [{label, ref, when, sell}] — sell = "all" | {"initial": f} | {"remaining": f}.
-    f = 0<f<=1, 또는 null(줄일 비율 저자 미명시 — caution.scale·tranches.frac 과 같은 규칙)."""
-    for pp, r in _rule_list(rules, EXIT_KEYS, path, ("label", "when", "sell")):
-        validate(r["when"], defs, pp + ".when")
-        sell = r["sell"]
-        ok = sell == "all" or (isinstance(sell, dict) and len(sell) == 1
-                               and next(iter(sell)) in ("initial", "remaining")
-                               and _frac_or_null(next(iter(sell.values()))))
-        if not ok:
-            raise CondError("%s.sell: \"all\" 또는 {\"initial\"|\"remaining\": 0~1|null} 이어야 한다" % pp)
-
-
-def validate_caution(rules, defs, path):
-    """조심 규칙 목록: [{label, ref, when, scale}] — scale = 0<f<=1(그날 금액에 곱함) | null(저자 미명시)."""
-    for pp, r in _rule_list(rules, CAUTION_KEYS, path, ("label", "when")):
-        validate(r["when"], defs, pp + ".when")
-        if _uses_pos(r["when"], defs):
-            raise CondError("%s.when: pos 는 매도·분할 규칙 안에서만 쓴다" % pp)
-        if "scale" not in r:
-            raise CondError("%s: scale 을 명시한다(폭을 저자가 안 줬으면 null)" % pp)
-        sc = r["scale"]
-        if not _frac_or_null(sc):
-            raise CondError("%s.scale: 0 초과 1 이하의 수 또는 null" % pp)
-
-
-def validate_sizing(sz, defs, path):
-    """비중·분할: {weight: 숫자식|null, tranches: [{label, frac, when?}]} — 1차는 when 없음, frac 합 1."""
-    if not isinstance(sz, dict):
-        raise CondError("%s: 객체여야 한다" % path)
-    bad = set(sz) - set(SIZING_KEYS)
-    if bad:
-        raise CondError("%s: 모르는 키 %s" % (path, sorted(bad)))
-    if "weight" not in sz or "tranches" not in sz:
-        raise CondError("%s: weight·tranches 를 명시한다(저자가 안 줬으면 null·[])" % path)
-    if sz["weight"] is not None:
-        validate(sz["weight"], defs, path + ".weight")
-        if _uses_pos(sz["weight"], defs):
-            raise CondError("%s.weight: pos 를 쓸 수 없다" % path)
-    trs = _rule_list(sz["tranches"], TRANCHE_KEYS, path + ".tranches", ("label",))
-    if trs and len({t.get("frac") is None for _, t in trs}) > 1:
-        raise CondError("%s.tranches: frac 은 전부 숫자이거나 전부 null(저자 미명시)이어야 한다" % path)
-    for k, (pp, t) in enumerate(trs):
-        if "frac" not in t:
-            raise CondError("%s: frac 을 명시한다(저자가 비율을 안 줬으면 null)" % pp)
-        f = t["frac"]
-        if not _frac_or_null(f):
-            raise CondError("%s.frac: 0 초과 1 이하 또는 null" % pp)
-        if k == 0 and "when" in t:
-            raise CondError("%s: 1차는 when 없이 매수 신호 날 산다" % pp)
-        if k > 0:
-            if "when" not in t:
-                raise CondError("%s: 2차 이후는 when 이 필요하다" % pp)
-            validate(t["when"], defs, pp + ".when")
-    if trs and trs[0][1]["frac"] is not None and abs(sum(t["frac"] for _, t in trs) - 1) > 1e-6:
-        raise CondError("%s.tranches: frac 합이 1 이어야 한다(%g)" % (path, sum(t["frac"] for _, t in trs)))
-
-
-def validate_tree(tree):
-    """트리 파일 전체 검사. 상품마다 여섯 칸을 다 명시해야 한다
-    (빠진 칸을 조용히 기본값으로 채우지 않는다)."""
-    if not isinstance(tree, dict):
-        raise CondError("트리 파일은 객체여야 한다")
-    bad = set(tree) - set(TREE_TOP)
-    if bad:
-        raise CondError("모르는 최상위 키: %s" % sorted(bad))
-    defs = tree.get("defs") or {}
-    for name, d in defs.items():
-        validate(d, defs, "defs.%s" % name)
-        if _uses_pos(d, defs):
-            raise CondError("defs.%s: pos 는 정의에 쓰지 않는다(매도·분할 규칙 안에 직접)" % name)
-    prods = tree.get("products")
-    if not isinstance(prods, dict) or not prods:
-        raise CondError("products 가 비어 있다")
-    for p, cfg in prods.items():
-        if not isinstance(cfg, dict):
-            raise CondError("products.%s: 객체여야 한다" % p)
-        bad = set(cfg) - set(PRODUCT_KEYS)
-        if bad:
-            raise CondError("products.%s: 모르는 키 %s" % (p, sorted(bad)))
-        for z in ZONES:
-            if z not in cfg:
-                raise CondError("products.%s.%s: 칸이 없다(조건이 없으면 %s 로 명시)"
-                                % (p, z, json.dumps(EMPTY_ZONE[z], ensure_ascii=False)))
-        for sec in SECTIONS:
-            validate(cfg[sec], defs, "products.%s.%s" % (p, sec))
-            if _uses_pos(cfg[sec], defs):
-                raise CondError("products.%s.%s: pos 는 매도·분할 규칙 안에서만 쓴다" % (p, sec))
-        validate_caution(cfg["caution"], defs, "products.%s.caution" % p)
-        validate_sizing(cfg["sizing"], defs, "products.%s.sizing" % p)
-        validate_exits(cfg["exit"], defs, "products.%s.exit" % p)
-    return True
 
 
 def compact_json(obj, width=100):
@@ -1022,74 +897,6 @@ def is_compact(path):
     """파일이 compact_json 형식 그대로인가(검사기용)."""
     raw = open(path, encoding="utf-8").read()
     return raw == compact_json(json.loads(raw))
-
-
-def zone_nodes(cfg):
-    """상품 하나의 모든 식 [(칸, 라벨, ref, 식)] — 조건 칸은 칸 전체, 규칙 칸은 규칙마다."""
-    out = [(sec, None, None, cfg[sec]) for sec in SECTIONS if sec in cfg]
-    for r in cfg.get("caution") or []:
-        out.append(("caution", r.get("label"), r.get("ref"), r["when"]))
-    sz = cfg.get("sizing") or {}
-    if sz.get("weight") is not None:
-        out.append(("sizing", sz.get("label"), sz.get("ref"), sz["weight"]))
-    for t in sz.get("tranches") or []:
-        if "when" in t:
-            out.append(("sizing", t.get("label"), t.get("ref"), t["when"]))
-    for r in cfg.get("exit") or []:
-        out.append(("exit", r.get("label"), r.get("ref"), r["when"]))
-    return out
-
-
-def _minute_nodes(tree):
-    """장중 봉(tf="1m" 또는 "5m") 시세 노드 전부 — 장중 조건이 쓰는 장중 값. 5분봉도 원천은 1분봉이라(세션 안
-    집계) 같은 수집 대상이다."""
-    nodes = list((tree.get("defs") or {}).values())
-    for cfg in tree["products"].values():
-        nodes.extend(n for _z, _l, _r, n in zone_nodes(cfg))
-    return [n for node in nodes for n in labeled_all(node, tree.get("defs") or {})
-            if "px" in n and n.get("tf") in ("1m", "5m")]
-
-
-def minute_symbols_of(tree):
-    """장중 봉(tf="1m"/"5m") 값을 쓰는 심볼 — 수집 단계가 이 심볼들의 1분봉을 같이 받는다(5분봉은 세션 안 집계)."""
-    out = set()
-    for n in _minute_nodes(tree):
-        s = n.get("sym", "$self")
-        if s.startswith("$"):
-            out.update(cfg.get("index") if s == "$index" else p for p, cfg in tree["products"].items())
-        else:
-            out.add(s)
-    out.discard(None)
-    return out
-
-
-def symbols_of(tree):
-    """트리가 참조하는 실제 심볼 전부(상품·지수·defs·여섯 칸 전부). 수집 단계의 단일 입력."""
-    out = set()
-
-    def walk(n):
-        if isinstance(n, dict):
-            if "px" in n:
-                s = n.get("sym", "$self")
-                if not s.startswith("$"):
-                    out.add(s)
-            if "across" in n and isinstance(n["across"], dict):
-                out.update(n["across"].get("syms") or [])
-            for k, x in n.items():
-                if k not in META:
-                    walk(x)
-        elif isinstance(n, list):
-            for x in n:
-                walk(x)
-
-    walk(tree.get("defs") or {})
-    for p, cfg in tree["products"].items():
-        out.add(p)
-        if cfg.get("index"):
-            out.add(cfg["index"])
-        for _z, _l, _r, node in zone_nodes(cfg):
-            walk(node)
-    return out
 
 
 def labeled(node, defs=None, acc=None):
@@ -1217,20 +1024,6 @@ def warmup_of(node, defs=None, _seen=None):
         return w(node["observe"])
     # manual · pos — lookback 없음
     return 0
-
-
-def tree_warmup(tree, prod=None):
-    """상품 하나(prod)의 등급(조건 칸 filter/entry/avoid)이 요구하는 가장 긴 워밍업(거래일 수).
-    prod=None 이면 트리의 모든 상품에 걸친 최댓값. 규칙 칸(caution/sizing/exit)은 포지션이 있을 때만
-    보고 등급과 무관하므로 등급 워밍업에는 넣지 않는다(가드는 등급 신호의 신뢰성만 지킨다)."""
-    defs = tree.get("defs") or {}
-    prods = [prod] if prod is not None else list(tree["products"])
-    mx = 0
-    for p in prods:
-        cfg = tree["products"][p]
-        for sec in SECTIONS:
-            mx = max(mx, warmup_of(cfg[sec], defs))
-    return mx
 
 
 if __name__ == "__main__":

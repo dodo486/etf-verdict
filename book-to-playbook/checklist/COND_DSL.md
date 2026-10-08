@@ -8,6 +8,8 @@
 평가기는 `shared/cond.py`(문법 정본 = 그 파일 docstring), 등급·사유는 `shared/tree_grade.py`, 체결 규약은
 `shared/trades.py` — 만드는 쪽의 검사와 읽는 쪽의 판정이 **같은 코드**를 쓴다. 문법 밖의 키는 오류로 거부된다.
 트리를 만드는 곳은 구간② 하나, 읽는 곳은 구간③(판정 엔진·백테스트) 하나다. 화면은 ③의 판정 결과만 그린다.
+트리 파일의 키 배치를 아는 코드는 `checklist/tree_gateway.py`(TreeGateway — 파일 형식 검사·탐색) 하나다 — 판정·백테스트·
+검사기는 거기에 묻고 원본 키를 직접 읽지 않는다(`orchestration/verify_teams` 규칙 6).
 
 ## 1. 여섯 칸 — 상품마다
 
@@ -71,7 +73,7 @@
 - **심볼**: `$self` = 그 상품, `$index` = 상품의 기준 지수(상품의 `index` 필드), `$s` = across 안의 종목, 그 외는 jhts
   심볼 코드 그대로 — 미국은 야후 심볼(`^NDX` `^GSPC` `^VIX` `^TNX`(10년물 금리, 값 = %) `NQ=F` `KRW=X`, 종목·ETF
   티커), 국내는 6자리 종목코드. 지수는 거래량이 0/결측일 수 있다.
-- **수집**: 수집 요청서는 따로 없다 — 구간③이 `cond.symbols_of(tree)` 로 심볼을 뽑아 `shared/md_feed.histories()` 에서
+- **수집**: 수집 요청서는 따로 없다 — 구간③이 `TreeGateway.symbols()` 로 심볼을 뽑아 `shared/md_feed.histories()` 에서
   받는다. 시세가 없는 심볼은 jhts 수집 요청을 자동으로 남기고 그 판정은 ❔ "시세 없음(수집 요청 #id)"으로 드러난다.
 
 ## 4. 규칙 칸의 형식

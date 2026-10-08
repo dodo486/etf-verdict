@@ -16,6 +16,7 @@
   4. 인과성 — 미래 데이터를 잘라도 과거 날짜 값이 같아야 한다(미래 참조 금지)
   5. 문법 — 모르는 키·인자 수·빈 구역은 거부, 올바른 트리는 통과
   6. 표현력 회귀 — 이번에 발견된 버그 유형을 트리로 적어 원문 뜻대로 나오는지
+  7. 트리 출입구(TreeGateway) 계약 — 판정·백테스트·검사기가 트리에 묻는 질문의 답 모양
 
 사용: python -m verdict.verify_primitives   (실패 있으면 exit 1)
 """
@@ -29,6 +30,7 @@ import pandas as pd
 
 from shared import paths  # noqa: F401  (UTF-8 출력)
 from shared import cond
+from checklist.tree_gateway import TreeGateway, empty_product, synthetic   # 합성 트리는 출입구로 만든다(verify_teams 명시 예외)
 
 Candle = namedtuple("Candle", "date open high low close volume")
 FAILS = []
@@ -302,9 +304,9 @@ def t_pos(rng):
     check(got[0] is None and same(got[2], 10.0) and same(got[3], (120 / 105 - 1) * 100)
           and same(got[4], (90 / 105 - 1) * 100), "pos.ret 평균 매입가 목록 %r" % got)
     # pos 는 매수 구역에서 금지, 매도 규칙 형식 검사
-    bad = {"products": {"X": dict(cond.EMPTY_ZONE, entry={"gt": [{"pos": "ret"}, 0]})}}
+    bad = synthetic({"X": empty_product(entry={"gt": [{"pos": "ret"}, 0]})})
     try:
-        cond.validate_tree(bad)
+        TreeGateway.of(bad)
         FAILS.append("entry 에 pos 가 통과")
     except cond.CondError:
         pass
@@ -313,12 +315,13 @@ def t_pos(rng):
                [{"when": {"gt": [{"pos": "ret"}, 1]}, "sell": "all"}],
                [{"label": "x", "when": {"gt": [{"pos": "ret"}, 1]}, "sell": "all", "stop": 1}]):
         try:
-            cond.validate_exits(ex, {}, "exit")
+            TreeGateway.of(synthetic({"X": empty_product(exit=ex)}))
             FAILS.append("잘못된 매도 규칙 통과: %r" % ex)
         except cond.CondError:
             pass
     try:
-        cond.validate_exits([{"label": "축소", "when": {"gt": [{"pos": "ret"}, 1]}, "sell": {"remaining": None}}], {}, "exit")
+        TreeGateway.of(synthetic({"X": empty_product(
+            exit=[{"label": "축소", "when": {"gt": [{"pos": "ret"}, 1]}, "sell": {"remaining": None}}])}))
     except cond.CondError as e:
         FAILS.append("매도 비율 null(저자 미명시) 거부: %s" % e)
 
@@ -330,8 +333,13 @@ def t_trades():
     def mk(rows):
         cal = ["2021%04d" % i for i in range(len(rows))]
         hist = {"X": [Candle(d, o, max(o, c), min(o, c), c, 1000) for d, (o, c) in zip(cal, rows)]}
-        tree = {"products": {"X": dict(cond.EMPTY_ZONE)}}
+        tree = TreeGateway.of(synthetic({"X": empty_product()}))
         return tree, hist, cal
+
+    def bt(tree, hist, cal, starts, ex, trs=None):
+        """매도·분할 규칙 dict(트리 형식) → 출입구 Rule 로 감싸 build_trades 에."""
+        return trades_mod.build_trades(tree, "X", hist, cal, starts, TreeGateway.as_rules(ex),
+                                       None if trs is None else TreeGateway.as_rules(trs))
 
     R = {"pos": "ret"}
     # (1) 신호 0일 → 1일 시가 100 진입. 2일 종가 108(+8%) → 1차(처음 30%) 3일 시가 110 매도.
@@ -341,7 +349,7 @@ def t_trades():
     ex = [{"label": "1차", "when": {"ge": [R, 7]}, "sell": {"initial": 0.3}},
           {"label": "2차", "when": {"ge": [R, 15]}, "sell": {"initial": 0.3}},
           {"label": "잔량", "when": {"all": [{"ge": [{"pos": "maxret"}, 15]}, {"lt": [R, 0]}]}, "sell": "all"}]
-    t = trades_mod.build_trades(tree, "X", hist, cal, [0], ex)
+    t = bt(tree, hist, cal, [0], ex)
     check(len(t) == 1 and t[0]["closed"], "분할: 거래 1건 청산")
     if t:
         t = t[0]
@@ -356,7 +364,7 @@ def t_trades():
     tree, hist, cal = mk(rows)
     ex = [{"label": "a", "when": {"ge": [R, 5]}, "sell": {"initial": 0.5}},
           {"label": "b", "when": {"ge": [R, 5]}, "sell": {"remaining": 0.5}}]
-    t = trades_mod.build_trades(tree, "X", hist, cal, [0], ex)[0]
+    t = bt(tree, hist, cal, [0], ex)[0]
     check([round(x["qty"], 6) for x in t["sells"]] == [0.5, 0.25] and not t["closed"], "동시 발동 순서·미청산")
     exp = (0.5 * 120 + 0.25 * 120 + 0.25 * 125) / 100 * 100 - 100        # 남은 0.25 는 마지막 종가 125 로 평가
     check(same(t["ret"], exp, 1e-9), "미청산 평가 %r≠%r" % (t["ret"], exp))
@@ -364,35 +372,35 @@ def t_trades():
     rows = [(100, 100)] * 3 + [(100, 106), (106, 106)] + [(100, 100)] * 4
     tree, hist, cal = mk(rows)
     ex = [{"label": "익절", "when": {"ge": [R, 5]}, "sell": "all"}]
-    t = trades_mod.build_trades(tree, "X", hist, cal, [0, 1, 2, 5], ex)
+    t = bt(tree, hist, cal, [0, 1, 2, 5], ex)
     check([x["entry"] for x in t] == [cal[1], cal[6]], "보유 중 신호 건너뜀: %r" % [x["entry"] for x in t])
     check(t[0]["exit"] == cal[4] and t[0]["sells"][0]["px"] == 106, "청산일·가격")
     # (4) 같은 규칙은 한 번만 — 다시 조건이 참이 돼도 두 번 팔지 않는다
     rows = [(100, 100), (100, 108), (108, 100), (100, 109), (109, 109)]
     tree, hist, cal = mk(rows)
-    t = trades_mod.build_trades(tree, "X", hist, cal, [0], [{"label": "1차", "when": {"ge": [R, 7]}, "sell": {"initial": 0.3}}])[0]
+    t = bt(tree, hist, cal, [0], [{"label": "1차", "when": {"ge": [R, 7]}, "sell": {"initial": 0.3}}])[0]
     check(len(t["sells"]) == 1, "규칙 한 번만")
     # (5) 매도 비율 null(저자 미명시) — 걸려도 팔지 않고 문구로 드러낸다
     ex = [{"label": "축소", "when": {"ge": [R, 7]}, "sell": {"remaining": None}}]
-    t = trades_mod.build_trades(tree, "X", hist, cal, [0], ex)[0]
+    t = bt(tree, hist, cal, [0], ex)[0]
     check(t["sells"] == [] and not t["closed"], "비율 미명시 매도는 팔지 않음 %r" % t["sells"])
-    check("「축소」" in (trades_mod.unsized_note(tree, "X", ex) or ""), "비율 미명시 매도 문구")
+    check("「축소」" in (trades_mod.unsized_note(tree, "X", TreeGateway.as_rules(ex)) or ""), "비율 미명시 매도 문구")
     # (5) 마지막 날 신호 → 다음 날이 없어 체결 못 함(미청산), fixed20 은 20거래일 모자라면 None
     rows = [(100, 100), (100, 100), (100, 120)]
     tree, hist, cal = mk(rows)
-    t = trades_mod.build_trades(tree, "X", hist, cal, [0], [{"label": "x", "when": {"ge": [R, 5]}, "sell": "all"}])[0]
+    t = bt(tree, hist, cal, [0], [{"label": "x", "when": {"ge": [R, 5]}, "sell": "all"}])[0]
     check(not t["closed"] and t["sells"] == [] and t["fixed20"] is None, "마지막 날 신호는 체결 안 됨")
     # (6) fixed20 = 진입일 포함 20번째 거래일 종가
     rows = [(100, 100)] + [(100, 100 + i) for i in range(1, 30)]
     tree, hist, cal = mk(rows)
-    t = trades_mod.build_trades(tree, "X", hist, cal, [0], [])[0]
+    t = bt(tree, hist, cal, [0], [])[0]
     check(same(t["fixed20"], (rows[20][1] / 100 - 1) * 100, 1e-9), "fixed20 정의")
     # (7) manual 은 '매도가 안 나가는 쪽'으로 풀린다 — 확인 못 한 조건 때문에 팔지 않는다(not 아래도 마찬가지)
     rows = [(100, 100), (100, 100), (100, 100), (100, 100)]
     tree, hist, cal = mk(rows)
-    t = trades_mod.build_trades(tree, "X", hist, cal, [0], [{"label": "m", "when": {"manual": "실적"}, "sell": "all"}])[0]
+    t = bt(tree, hist, cal, [0], [{"label": "m", "when": {"manual": "실적"}, "sell": "all"}])[0]
     check(t["sells"] == [], "manual 매도는 안 걸림")
-    t = trades_mod.build_trades(tree, "X", hist, cal, [0], [{"label": "nm", "when": {"not": {"manual": "x"}}, "sell": "all"}])[0]
+    t = bt(tree, hist, cal, [0], [{"label": "nm", "when": {"not": {"manual": "x"}}, "sell": "all"}])[0]
     check(t["sells"] == [], "not 아래 manual 도 매도를 일으키지 않는다(안쪽을 참으로 풀어 not = 거짓)")
     # (8) 분할 매수 — 1차 25% 1일 시가 100. 2차(종가 ≥ +5%) 2일 종가 106 → 3일 시가 108 에 30%.
     #     평균 매입가 = (0.25·100 + 0.30·108)/0.55 = 104.36… 4일 종가 115(+10.2%) → 익절(산 물량 전부) 5일 시가 116.
@@ -400,7 +408,7 @@ def t_trades():
     tree, hist, cal = mk(rows)
     trs = [{"label": "1차", "frac": 0.25}, {"label": "2차", "frac": 0.30, "when": {"ge": [R, 5]}},
            {"label": "3차", "frac": 0.45, "when": {"ge": [R, 50]}}]
-    t = trades_mod.build_trades(tree, "X", hist, cal, [0],
+    t = bt(tree, hist, cal, [0],
                         [{"label": "익절", "when": {"ge": [R, 10]}, "sell": {"initial": 1.0}}], trs)[0]
     avg = (0.25 * 100 + 0.30 * 108) / 0.55
     check([(b["date"], b["px"], b["qty"]) for b in t["buys"]] == [(cal[1], 100, 0.25), (cal[3], 108, 0.30)],
@@ -411,15 +419,15 @@ def t_trades():
     # 같은 날 매도가 걸리면 그날은 추가 매수하지 않는다
     rows = [(100, 100), (100, 100), (100, 106), (106, 106), (106, 106)]
     tree, hist, cal = mk(rows)
-    t = trades_mod.build_trades(tree, "X", hist, cal, [0],
+    t = bt(tree, hist, cal, [0],
                         [{"label": "반", "when": {"ge": [R, 5]}, "sell": {"remaining": 0.5}}], trs)[0]
     check([b["date"] for b in t["buys"]] == [cal[1], cal[4]],      # 2일 매도 신호 → 3일 시가 매수 안 함, 3일 신호 → 4일 매수
           "매도가 걸린 날은 추가 매수 안 함 %r" % t["buys"])
     # 분할이 없으면 한 번에 전량(옛 규약과 같은 결과) · 비율이 저자 미명시(null)여도 전량(비율을 지어내지 않는다)
-    t = trades_mod.build_trades(tree, "X", hist, cal, [0], [], [])[0]
+    t = bt(tree, hist, cal, [0], [], [])[0]
     check([b["qty"] for b in t["buys"]] == [1.0], "분할 없음 = 전량")
     nul = [{"label": "1차", "frac": None}, {"label": "2차", "frac": None, "when": {"ge": [R, 5]}}]
-    t = trades_mod.build_trades(tree, "X", hist, cal, [0], [], nul)[0]
+    t = bt(tree, hist, cal, [0], [], nul)[0]
     check([b["qty"] for b in t["buys"]] == [1.0], "분할 비율 미명시 = 전량 한 번")
     # 주: 백테스트 수익률 정의(_fwd)는 구간④ 계산기(operations/backtest)로 옮겼다 — 이 검사기는 구간③(머리/공통층)
     #     원시함수만 본다. operations(계산기)를 import 하면 단방향(폭포수) 역류이므로 여기서 _fwd 는 검사하지 않는다
@@ -479,15 +487,15 @@ def t_syntax():
     except cond.CondError as e:
         FAILS.append("올바른 case·tf 가 거부: %s" % e)
     for z in cond.ZONES:
-        cfg = dict(cond.EMPTY_ZONE)
+        cfg = empty_product()
         cfg.pop(z)
         try:
-            cond.validate_tree({"products": {"X": cfg}})
+            TreeGateway.of(synthetic({"X": cfg}))
             FAILS.append("%s 칸 없는 트리가 통과" % z)
         except cond.CondError:
             pass
     try:
-        cond.validate_tree({"products": {"X": dict(cond.EMPTY_ZONE)}})
+        TreeGateway.of(synthetic({"X": empty_product()}))
     except cond.CondError as e:
         FAILS.append("빈 칸 여섯 개 트리가 거부: %s" % e)
     W = {"gt": [C, 1]}
@@ -506,18 +514,18 @@ def t_syntax():
     ]
     for b in bad_cfgs:
         try:
-            cond.validate_tree({"products": {"X": dict(cond.EMPTY_ZONE, **b)}})
+            TreeGateway.of(synthetic({"X": empty_product(**b)}))
             FAILS.append("잘못된 칸이 통과: %r" % b)
         except cond.CondError:
             pass
-    good = dict(cond.EMPTY_ZONE, caution=[{"label": "a", "when": W, "scale": None}],
-                sizing={"weight": {"case": [[W, 14]], "else": 34},
-                        "tranches": [{"label": "1", "frac": 0.25},
-                                     {"label": "2", "frac": 0.75, "when": {"ge": [{"pos": "ret"}, 3]}}]})
+    good = empty_product(caution=[{"label": "a", "when": W, "scale": None}],
+                         sizing={"weight": {"case": [[W, 14]], "else": 34},
+                                 "tranches": [{"label": "1", "frac": 0.25},
+                                              {"label": "2", "frac": 0.75, "when": {"ge": [{"pos": "ret"}, 3]}}]})
     try:
-        cond.validate_tree({"products": {"X": good}})
-        cond.validate_tree({"products": {"X": dict(cond.EMPTY_ZONE, sizing={"weight": None, "tranches": [
-            {"label": "1", "frac": None}, {"label": "2", "frac": None, "when": {"manual": "저자 미명시: x"}}]})}})
+        TreeGateway.of(synthetic({"X": good}))
+        TreeGateway.of(synthetic({"X": empty_product(sizing={"weight": None, "tranches": [
+            {"label": "1", "frac": None}, {"label": "2", "frac": None, "when": {"manual": "저자 미명시: x"}}]})}))
     except cond.CondError as e:
         FAILS.append("올바른 caution·sizing 이 거부: %s" % e)
 
@@ -710,15 +718,13 @@ def t_grade():
     cal = ["2022%04d" % i for i in range(len(xs))]
     hist = {"X": [Candle(d, c, c, c, c, 1000) for d, c in zip(cal, xs)]}
     jump = {"ge": [{"pct": [C, 1]}, 20]}
-    cfg = dict(cond.EMPTY_ZONE,
-               caution=[{"label": "급등 1/3", "when": jump, "scale": 0.3333},
-                        {"label": "급등 반", "when": jump, "scale": 0.5},
-                        {"label": "급등 폭 없음", "when": jump, "scale": None},
-                        {"label": "수동", "when": {"manual": "x"}, "scale": 0.5},
-                        {"label": "안 걸림", "when": {"not": jump}, "scale": 0.1}],
-               sizing={"weight": {"case": [[{"manual": "모드"}, 14]], "else": 34}, "tranches": []})
-    tree = {"products": {"X": cfg}}
-    cond.validate_tree(tree)
+    cfg = empty_product(caution=[{"label": "급등 1/3", "when": jump, "scale": 0.3333},
+                                 {"label": "급등 반", "when": jump, "scale": 0.5},
+                                 {"label": "급등 폭 없음", "when": jump, "scale": None},
+                                 {"label": "수동", "when": {"manual": "x"}, "scale": 0.5},
+                                 {"label": "안 걸림", "when": {"not": jump}, "scale": 0.1}],
+                        sizing={"weight": {"case": [[{"manual": "모드"}, 14]], "else": 34}, "tranches": []})
+    tree = TreeGateway.of(synthetic({"X": cfg}))
     pe = tree_grade.ProductEval(tree, "X", hist, cal)
     f, unspec, unknown = pe.amount_factor(len(xs) - 1)
     check(same(f, 0.3333 * 0.5) and unspec == ["급등 폭 없음"] and unknown == ["수동"],
@@ -748,7 +754,7 @@ def t_warmup_guard():
     """
     from shared import tree_grade
 
-    # 1) warmup_of / tree_warmup 산식 — 손으로 셀 수 있는 노드들로 전수 대조.
+    # 1) warmup_of / 출입구 warmup 산식 — 손으로 셀 수 있는 노드들로 전수 대조.
     D = {"ma20": {"ma": [C, 20]}, "hi60": {"highest": [C, 60]}}
     cases = [
         (C, 0), ({"px": "close"}, 0), ({"manual": "x"}, 0), (5, 0),
@@ -769,15 +775,14 @@ def t_warmup_guard():
         check(got == exp, "warmup_of %r → %d (기대 %d)" % (node, got, exp))
 
     # 트리 상품 워밍업 = 조건 칸(filter/entry/avoid) 전체의 최댓값. 규칙 칸(caution 등)은 안 센다.
-    cfg = dict(cond.EMPTY_ZONE, filter={"gt": [C, {"ma": [C, 50]}]},
-               entry={"gt": [C, {"highest": [C, 60]}]}, avoid={"lt": [C, {"ma": [C, 10]}]},
-               caution=[{"label": "c", "when": {"gt": [C, {"ma": [C, 200]}]}, "scale": 0.5}])
-    tree = {"products": {"P": cfg}}
-    cond.validate_tree(tree)
-    check(cond.tree_warmup(tree, "P") == 59, "tree_warmup = 조건 칸 최댓값(highest60 → 59), caution(ma200) 제외")
+    cfg = empty_product(filter={"gt": [C, {"ma": [C, 50]}]},
+                        entry={"gt": [C, {"highest": [C, 60]}]}, avoid={"lt": [C, {"ma": [C, 10]}]},
+                        caution=[{"label": "c", "when": {"gt": [C, {"ma": [C, 200]}]}, "scale": 0.5}])
+    tree = TreeGateway.of(synthetic({"P": cfg}))
+    check(tree.warmup("P") == 59, "warmup = 조건 칸 최댓값(highest60 → 59), caution(ma200) 제외")
 
     # 2) 워밍업 자르기 — 필요 워밍업 60(=highest60)짜리 트리. 충분한 봉 vs 모자란 봉.
-    W = cond.tree_warmup(tree, "P")                               # 59
+    W = tree.warmup("P")                                          # 59
     need = W + 1                                                  # 첫 완전 봉이 서려면 확정 봉이 이만큼
     rng = random.Random(7)
     xs = [x if x is not None else 100.0 for x in rand_series(rng, need + 40, miss=0)]
@@ -883,6 +888,73 @@ def t_no_excluded_live():
             check(not bad, "실전 문맥(manual_as=%r) %s 가 EXCLUDED 를 냄 %r" % (manual_as, list(node)[0], got))
 
 
+# ------------------------------------------------------------------ 7. 트리 출입구(TreeGateway) 계약
+def t_gateway():
+    """판정·백테스트·검사기가 트리에 묻는 질문의 답 모양 — 형식이 바뀌어도(여섯 칸 → rules) 이 답은 같아야 한다."""
+    W = {"gt": [C, {"ma": [C, 20]}]}
+    M = {"gt": [{"px": "close", "sym": "NQ=F", "tf": "1m"}, 0]}
+    D = {"공통": dict(W, label="20일선 위", ref="1-1"), "장중": dict(M, label="선물 양", ref="1-2"),
+         "지수": {"gt": [{"px": "close", "sym": "$index"}, 0], "label": "지수 양", "ref": "1-3"}}
+    EX = [{"label": "익절", "ref": "5-1", "when": {"ge": [{"pos": "ret"}, 9]}, "sell": "all", "note": "n"}]
+    PB = empty_product(filter={"def": "공통"})
+    data = {
+        "source": {"book": "샘플"}, "defs": D,
+        "products": {
+            "A": empty_product(index="^NDX", note="a 노트",
+                               filter={"def": "공통"}, entry={"all": [{"def": "장중"}, {"def": "지수"}]},
+                               avoid={"lt": [{"rsi": [C, 14]}, 30], "label": "과매도", "ref": "2-1"},
+                               caution=[{"label": "c1", "ref": "3-1", "when": {"def": "공통"}, "scale": 0.5}],
+                               sizing={"label": "비중", "ref": "4-1", "weight": 30,
+                                       "tranches": [{"label": "1차", "ref": "4-2", "frac": 0.5},
+                                                    {"label": "2차", "frac": 0.5, "when": {"ge": [{"pos": "ret"}, 3]}}]},
+                               exit=EX),
+            "B": PB},
+        "unexpressed": [{"rule": "r", "ref": "9-9", "reason": "데이터 없음: x"}],
+        "review": {"sections": {"A.entry": {"winner": "a", "why": "w"}}, "exits": {"A": {"winner": "b"}},
+                   "scenario_overrides": {"s": "x"}, "fire_ack": {"경고": "ok"}}}
+    g = TreeGateway.of(data)
+    check(g.products() == ["A", "B"] and g.has("A") and not g.has("Z"), "products/has")
+    check(g.index("A") == "^NDX" and g.index("B") is None and g.note("A") == "a 노트", "index/note")
+    check(g.book() == "샘플" and TreeGateway({"products": {}}).book("slug") == "slug", "book(source.book, 기본값)")
+    check(set(g.defs()) == {"공통", "장중", "지수"} and g.raw_defs() is D, "defs/raw_defs")
+    check(g.section("A", "filter") == {"def": "공통"}, "section")
+    ex = g.expressions("A")
+    check([(z, l) for z, l, _r, _n in ex] == [("filter", None), ("entry", None), ("avoid", None), ("caution", "c1"),
+                                              ("sizing", "비중"), ("sizing", "2차"), ("exit", "익절")], "expressions 순서 %r" % ex)
+    c = g.cautions("A")[0]
+    check((c.label, c.ref, c.scale, c.when, c.note) == ("c1", "3-1", 0.5, {"def": "공통"}, None), "cautions Rule")
+    sz = g.sizing("A")
+    check((sz.label, sz.ref, sz.weight) == ("비중", "4-1", 30) and g.sizing("B").weight is None, "sizing Rule")
+    trs = g.tranches("A")
+    check([(t.label, t.frac, t.when is None) for t in trs] == [("1차", 0.5, True), ("2차", 0.5, False)]
+          and trs[1].shown("label", "ref", "frac") == {"label": "2차", "frac": 0.5}, "tranches Rule·shown(적힌 키만)")
+    e = g.exit_rules("A")[0]
+    check((e.label, e.sell, e.note) == ("익절", "all", "n") and g.exit_rules("B") == [], "exit_rules")
+    check(e.with_when({"manual": "x"}).when == {"manual": "x"} and e.when != {"manual": "x"}, "with_when 사본")
+    std = TreeGateway.as_rules([{"label": "s", "when": W, "sell": {"initial": 0.5}}])
+    check(std[0].sell == {"initial": 0.5} and std[0].raw() == {"label": "s", "when": W, "sell": {"initial": 0.5}}, "as_rules")
+    check(g.symbols() == {"A", "B", "^NDX", "NQ=F"} and g.symbols(["B"]) == {"B", "NQ=F"}, "symbols %r" % g.symbols())
+    check(g.minute_symbols() == {"NQ=F"} and g.timeframes() == {"1d", "1m"}, "minute_symbols/timeframes")
+    check(g.warmup("A") == 19 and g.warmup("B") == 19 and g.warmup() == 19, "warmup")
+    check(g.refs() == {"1-1", "1-2", "1-3", "2-1", "3-1", "4-1", "4-2", "5-1"}, "refs %r" % g.refs())
+    check(g.def_users() == {"공통": {"A", "B"}, "장중": {"A"}, "지수": {"A"}}, "def_users %r" % g.def_users())
+    check(g.unexpressed()[0]["ref"] == "9-9", "unexpressed")
+    check(g.review_sections() == {"A.entry": {"winner": "a", "why": "w"}} and g.review_exits() == {"A": {"winner": "b"}}
+          and g.scenario_overrides() == {"s": "x"} and g.fire_ack() == {"경고": "ok"}, "review")
+    check(g.scenario_node("A", "filter") == {"def": "공통"} and g.scenario_node("A", "caution", "c1") == {"def": "공통"}
+          and g.scenario_node("A", "caution") == {"any": [{"def": "공통"}]} and g.scenario_node("A", "sizing") == 30
+          and g.scenario_node("A", "caution", "없음") is None and g.scenario_node("Z", "filter") is None, "scenario_node")
+    check(g.raw_zone("A", "exit") is EX and g.raw_product("B") is PB and g.whole() is data, "raw_* 는 원본 그대로")
+    check(not TreeGateway({}) and bool(g) and TreeGateway.load("__없는책__") is None, "빈·없는 트리는 거짓/None")
+    for broken in ({"products": {}}, {"products": {"X": empty_product()}, "zzz": 1},
+                   {"products": {"X": dict(empty_product(), extra=1)}}):
+        try:
+            TreeGateway.of(broken)
+            FAILS.append("형식이 틀린 트리가 통과: %r" % list(broken))
+        except cond.CondError:
+            pass
+
+
 def main():
     rng = random.Random(20261001)
     for name, fn in (("수치 연산", lambda: t_numeric(rng)), ("3값 논리", t_logic),
@@ -892,7 +964,7 @@ def main():
                      ("혼합 tf·확정봉·look-ahead 0", t_settled_mtf),
                      ("등급·금액", t_grade), ("데이터 완전성 가드(워밍업)", t_warmup_guard),
                      ("표현력 회귀", t_regress),
-                     ("EXCLUDED 실전 불변식", t_no_excluded_live)):
+                     ("EXCLUDED 실전 불변식", t_no_excluded_live), ("트리 출입구 계약", t_gateway)):
         before = len(FAILS)
         try:
             fn()
@@ -905,7 +977,7 @@ def main():
             print("    · " + f)
         print("원시함수 검사 실패 %d건 — 발행 정지" % len(FAILS))
         return 1
-    print("원시함수 검사 통과 — 수치·3값·시간·인과·문법·회귀")
+    print("원시함수 검사 통과 — 수치·3값·시간·인과·문법·회귀·출입구")
     return 0
 
 
