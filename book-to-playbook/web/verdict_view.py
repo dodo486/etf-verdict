@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 """판정 화면 데이터(웹 화면층, 책 무관) — 오늘 판정을 판정 JSON(#verdict-data)·알림 문장으로 빚는다.
 
-판정은 구간③ 판정기(trading/judge.Judge — 라이브 = 달력 마지막 봉)가 내고, 이 파일은 그 Decision 과 평가 문맥을
-사람과 화면이 읽는 모양으로 묶기만 한다 — 화면은 트리를 다시 해석하지 않고 이 출력만 그린다. 트리는 출입구
-(checklist/tree_gateway.TreeGateway), 시세는 수집 단계(checklist.tradeTool.Grade.history → md_feed.histories) 하나로 받는다.
-books.json 의 engine.daily 가 이 모듈이다(python -m web.verdict_view <slug> — 라이브 서버·러너가 부른다).
+판정(시세 조달 + Judge)은 구간③ 엔진(trading/engine.live_decisions)이 내고, 이 파일은 그 Decision 과 평가 문맥을
+사람과 화면이 읽는 모양으로 빚기만 한다 — 화면은 트리를 다시 해석하지 않고 이 출력만 그린다(판단/표시 분리:
+web 은 판정을 계산하지 않는다). books.json 의 engine.daily 가 이 모듈이다(python -m web.verdict_view <slug> —
+라이브 서버·러너가 부르는 '진입+표시+알림' 껍데기 · 계산은 trading.engine 이 한다).
 
 출력 계약(알림 · 화면 · /api/verdict 가 소비):
   top     : {slug, title, ts, date, source, cash, common[], verdicts[], refs{}, missing{}, positions_note}
@@ -23,16 +23,14 @@ view 는 노드 하나당 항목 하나 {v, op?, n?, kids?, label?, ref?, manual
 — 수동은 '모름'(사람이 답했으면 그 답 — render(answers=))으로 둔 그날 값. 화면은 다시 계산하지 않고 그대로 그린다.
 """
 import json
-import os
 import sys
 from datetime import datetime, timedelta, timezone
 
-from shared.paths import book_log, book_meta, positions_json, write_text
+from shared.paths import book_log, book_meta, write_text
 from shared import md_feed
 from checklist.tradeTool import Cond
 from checklist.tradeTool import Grade
-from checklist.tree_gateway import TreeGateway
-from trading.judge import Holding, Judge
+from trading import engine
 from trading.trades import NO_EXIT_NOTE, exit_policy, live_units, sell_text
 from trading.notify import send_telegram, send_desktop
 from web import condition_view as cv
@@ -44,17 +42,6 @@ def book_title(slug):
     """books.json 에서 이 책의 제목(알림/콘솔 헤더용). 없으면 slug.
     명단 읽기는 공용 함수(paths.book_meta) 한 곳을 쓴다 — 직접 파싱하지 않는다."""
     return book_meta(slug).get("title") or slug
-
-
-def load_positions(slug):
-    """books/<slug>/positions.json (커밋하지 않는 개인 파일) → {prod: [포지션]}."""
-    p = positions_json(slug)
-    if not os.path.exists(p):
-        return {}
-    out = {}
-    for x in (json.load(open(p, encoding="utf-8")).get("positions") or []):
-        out.setdefault(x["prod"], []).append(x)
-    return out
 
 
 # ------------------------------------------------------------------ 공통 조건(defs)
@@ -148,18 +135,14 @@ def ref_map(gw):
 
 
 # ------------------------------------------------------------------ 상품 하나
-def product_verdict(gw, p, hist, positions, asof=None, answers=None):
-    """상품 하나의 판정 JSON — 판정은 Judge(라이브 = 달력 마지막 봉)가 내고, 여기는 그 Decision 을 화면 모양으로 빚는다.
-    answers = 사람이 답한 수동(Judge 참고) — 등급·칸 값·금액이 그 답으로 풀린다."""
+def product_verdict(gw, p, d, xs):
+    """상품 하나의 판정 JSON — 판정(Decision d)은 엔진(trading.engine.live_decisions)이 내고, 여기는 그 사실을
+    화면 모양으로 빚는다. xs = 이 상품의 내 포지션(로컬 파일). d.eval 로 같은 평가 문맥에서 view 를 빚는다."""
     base = {"prod": p, "index": gw.index(p), "note": gw.note(p)}
-    j = Judge(gw, p, hist, asof=asof, answers=answers)
-    if not j.cs:
+    if not d.has_data:
         req = md_feed.requested().get(p, "-")
         return dict(base, key="unknown", grade=Grade.GRADES["unknown"],
                     reason="%s 시세 없음(수집 요청 %s)" % (p, req)), None
-    xs = positions.get(p, [])
-    d = j.decide(holdings=[Holding.at(j.cal, str(x["entry_date"]), float(x["entry_px"]), int(x.get("filled", 1)))
-                           for x in xs])
     i, ctx = d.i, d.eval.ctx[None]
     reason = cv.reason_of(d.key, d.top, d.manual)
     # 데이터 완전성 가드 — 지금 가진 확정 봉이 트리가 쓰는 가장 긴 창(필요 워밍업)보다 짧으면 등급은 ❔(불완전
@@ -235,7 +218,6 @@ def render(slug, asof=None, answers=None):
     """asof = 관측 시각(UTC datetime). None 이면 지금 — 장중(tf="1m") 조건을 이 시점 이하로 자른다.
     answers = 화면에서 사람이 답한 수동 {Cond.answer_key: 참/거짓} — 서버가 그 답으로 등급·칸 값·금액을 낸다
     (서버 권위 — 화면은 다시 계산하지 않는다). None 이면 답 없는 판정(옛 출력 그대로), 주면 top["answers"] 로 되돌려 준다."""
-    tree = TreeGateway.load(slug)
     now = datetime.now(timezone.utc).astimezone()
     top = {"slug": slug, "title": book_title(slug), "ts": now.isoformat(), "source": SOURCE,
            "verdicts": [], "common": [], "refs": {}, "missing": {}, "cash": None,
@@ -250,15 +232,14 @@ def render(slug, asof=None, answers=None):
                      for s in ("filter", "avoid", "entry", "caution", "sizing", "exit")},
            # 매도 정책 "none"(책에 매도 규칙 없음) 문구 — 정본 trading/trades.NO_EXIT_NOTE(화면이 받아 쓴다).
            "no_exit_note": NO_EXIT_NOTE}
+    tree, hist, positions, decisions = engine.live_decisions(slug, asof=asof, answers=answers)
     if tree is None:
         top["error"] = "조건 트리 없음 — books/%s/tree.json 이 있어야 판정한다" % slug
         return top
-    hist = Grade.history_back(tree)
-    positions = load_positions(slug)
     pe0 = None
     weights, all_known = [], True
-    for p in tree.products():
-        v, pe = product_verdict(tree, p, hist, positions, asof=asof, answers=answers)
+    for p, d, xs in decisions:
+        v, pe = product_verdict(tree, p, d, xs)
         top["verdicts"].append(v)
         pe0 = pe0 or pe
         sz = v.get("sizing") or {}
