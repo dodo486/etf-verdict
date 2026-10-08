@@ -23,8 +23,7 @@
           stdlib + shared + **자기 팀**만 import 한다. 다른 팀 금지.
           명시 예외: 구간②의 공개 DSL(checklist.tree_gateway·cond·grade)은 verdict·operations·trading·
           orchestration·publish·web 이 import 해도 된다(checklist 의 다른 모듈은 여전히 금지). shared 는 이것도
-          import 하지 않는다. 머리(playbook·checklist)와 shared 는 trading·web 을 import 하지 않는다
-          (명시 예외 하나: checklist/verify_tree → trading.trades — a·b 매도·분할 규칙을 같은 체결 워크로 비교).
+          import 하지 않는다. 머리(playbook·checklist)와 shared 는 trading·web 을 import 하지 않는다.
   규칙 2  `import jhts` 는 **shared/md_feed.py 하나**에서만 허용된다.
           파이프라인의 시세는 오롯이 jhts 시세수집팀 창구(md_feed)로만 들어온다.
   규칙 3  팀 폴더에서 네트워크 모듈(urllib.request·http.client·requests·socket
@@ -69,11 +68,9 @@ ALLOW = {
 #   읽는다 — 머리/공통이 계산기를 부르면 흐름이 거꾸로 선다(역류). operations 폴더는 이 금지의 대상이 아니다.
 UPSTREAM = set(TEAMS) | {"shared"}      # operations 를 import 해선 안 되는 '위쪽' 레이어
 OPERATIONS = "operations"
-# 구간③ 코드(trading)·화면층(web)도 머리(playbook·checklist)와 공통층이 import 하지 않는다. 명시 예외 하나:
-#   구간② 트리 검사(verify_tree)가 a·b 의 매도·분할 규칙을 같은 체결 워크로 굴려 비교한다(trading.trades 만).
+# 구간③ 코드(trading)·화면층(web)도 머리(playbook·checklist)와 공통층이 import 하지 않는다(예외 없음).
 DOWNSTREAM = ("trading", "web")
 HEADS = ("playbook", "checklist", "shared")
-CROSS_ALLOW = {("checklist", "verify_tree.py"): ("trading.trades",)}
 
 # 규칙 1 의 명시적 예외 — 구간②의 공개 DSL(트리 출입구·문법·등급의 뜻). 이 모듈들만, 이 레이어들만.
 PUBLIC_DSL = ("checklist.tree_gateway", "checklist.cond", "checklist.grade")
@@ -86,10 +83,6 @@ TREE_KEYS = {"products", "defs", "filter", "avoid", "entry", "caution", "sizing"
 # 규칙 6 의 오탐 예외 — 트리가 아닌 dict 가 같은 이름의 키를 쓰는 자리. (레이어/파일, 함수): (키, 사유). 여기 한 곳에만 적는다.
 KEY_ALLOW = {
     ("checklist/verify_tree.py", "compare"): ({"sizing"}, "칸별 비교 결과 dict(트리 아님)"),
-    ("checklist/verify_tree.py", "_trade_key"): ({"entry", "exit"}, "build_trades 거래 dict 의 진입·청산일"),
-    ("checklist/verify_tree.py", "compare_tranches"): ({"entry"}, "거래 dict 의 진입일"),
-    ("checklist/verify_tree.py", "compare_exits"): ({"entry"}, "거래 dict 의 진입일"),
-    ("checklist/verify_tree.py", "dump_exit_disagreements"): ({"entry", "exit"}, "거래 dict 의 진입·청산일"),
     ("checklist/verify_tree.py", "render_zone"): ({"weight", "tranches"}, "zone_diff 결과(심판 덤프) dict"),
     ("verdict/verdict_engine.py", "ref_map"): ({"unexpressed"}, "판정 JSON refs 항목을 만드는 자리"),
     ("verdict/verdict_engine.py", "render"): ({"sizing", "weight"}, "판정 JSON verdict.sizing 을 읽어 현금 % 계산"),
@@ -200,9 +193,7 @@ def check():
             if layer in UPSTREAM and OPERATIONS in mods:
                 bad.append((layer, fn, "%s 가 계산기(operations) import — 단방향(폭포수) 역류" % layer))
             if layer in HEADS:
-                ok = CROSS_ALLOW.get((layer, fn), ())
-                down = {m for m in names if m.split(".")[0] in DOWNSTREAM
-                        and not any(m == a or m.startswith(a + ".") for a in ok)}
+                down = {m for m in names if m.split(".")[0] in DOWNSTREAM}
                 if down:
                     bad.append((layer, fn, "%s 가 아래층(trading·web) import: %s — 역류" % (layer, ", ".join(sorted(down)))))
 

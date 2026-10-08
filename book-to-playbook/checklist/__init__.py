@@ -17,6 +17,6 @@
   · verify_tree.py      트리 검사 — 이중 추출 비교·원문 사례·발화 통계·비중 합 · 심판의 비교 도구(--dump)
   · verify_primitives.py 검사기 — 원시 연산·등급 계산을 기준값·손계산과 대조
 
-팀 경계: 이 팀은 shared/ 만 import 한다(명시 예외 하나 — verify_tree 가 a·b 의 매도·분할 규칙을 같은 체결 워크
-trading.trades 로 굴려 비교). 거꾸로 [공개 DSL] 세 모듈만 다른 층이 import 해도 된다. 경계는 verify_teams.py 가 강제한다.
+팀 경계: 이 팀은 shared/ 만 import 한다(a·b 비교는 규칙 식으로만 — 매매 시뮬레이션은 구간③ 몫).
+거꾸로 [공개 DSL] 세 모듈만 다른 층이 import 해도 된다. 경계는 verify_teams.py 가 강제한다.
 """

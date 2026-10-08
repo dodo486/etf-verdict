@@ -10,14 +10,15 @@
   대조했다. 그래서 '2'라는 글자만 있으면 2거래일 유지가 1일로 판정돼도 통과했고, 사전에 없는
   새 조건(RSI·볼린저…)은 '찾은 게 없으니 누락도 없음'으로 통과했다. 이 검사는 규칙을 실제 시세와
   원문 사례에 돌려 본다 — 조건 종류를 몰라도 같은 절차가 돈다. 트리의 뜻은 checklist/(cond·grade)
-  한 벌이고 체결은 trading/trades 하나라 여기서 본 동작이 곧 구간③ 판정 엔진의 동작이다. 트리 읽기도 판정 엔진과 같은 출입구(TreeGateway).
+  한 벌이라 여기서 본 동작이 곧 구간③ 판정 엔진의 동작이다. 트리 읽기도 판정 엔진과 같은 출입구(TreeGateway).
 
 무엇을 하나 (books/<slug>/ 아래)
   1. 최종 트리(tree.json, 심판이 씀) — 라이브 책은 반드시 있어야 하고, 문법 검사를 통과해야 한다.
   2. 이중 추출 일치 — 서로 독립인 두 추출(tree_candidates/a.json·b.json)을 칸마다 식(정규화)으로 대조하고, 실제 시세
-     수년치에서 날마다 평가해 비교한다(조건 칸 셋·조심 금액 배수·비중, 분할은 거래로). 식이 다르거나 하루라도 갈린 칸은
+     수년치에서 날마다 평가해 비교한다(조건 칸 셋·조심 금액 배수·비중 — 분할은 식으로만). 식이 다르거나 하루라도 갈린 칸은
      심판 기록(tree.json 의 review)이 있어야 하고, 최종 트리는 그 칸에서 심판이 고른 쪽과 **동작이 같아야** 한다.
-  3. 매도 규칙 이중 추출(후보 a·b 의 exit 칸) — 같은 진입 신호에 두 규칙으로 거래를 내 비교한다.
+  3. 매도 규칙 이중 추출(후보 a·b 의 exit 칸) — 식(정규화 지문)으로 비교한다(매매 시뮬레이션 비교는 하지 않는다 —
+     체결·돈은 구간③ 몫).
   4. 원문 사례 재현 — 원문만 보고 따로 쓴 시나리오(scenarios.json)를 합성 시세로 돌려 기대값과
      맞는지. 틀리면 실패 — 단 심판이 '시나리오가 틀렸다'고 사유를 남긴 것은 제외.
   5. 발화 통계 — 최종 트리의 라벨 노드를 실제 시세에서 날마다 평가해: 한 번도 안 뜸 · 거의 매일 ·
@@ -31,7 +32,6 @@
 사용:
   python -m checklist.verify_tree [slug ...] [--years 3]
   python -m checklist.verify_tree <slug> --dump N     심판의 비교 도구 — 판정이 갈린 날 N개씩을 logs/disagree-<slug>.json 으로(판단은 안 함)
-  python -m checklist.verify_tree <slug> --dump-exits N   심판의 비교 도구 — 매도 규칙 a/b 가 다르게 청산한 거래 N개씩
 """
 import json
 import os
@@ -43,7 +43,6 @@ from shared import paths  # noqa: F401  (UTF-8 출력)
 from shared.paths import BASE, LOGS, ensure_dir, live_slugs, write_text
 from checklist import cond, grade
 from shared import md_feed
-from trading import trades as trades_mod
 from checklist.tree_gateway import TreeGateway
 
 Candle = namedtuple("Candle", "date open high low close volume")
@@ -110,41 +109,10 @@ def compare(ta, tb, hist, years):
             diff = [i for i in idx if ea[sec][i] != eb[sec][i]]
             res[p][sec] = {"n": len(idx), "agree": 1 - len(diff) / max(1, len(idx)),
                            "days": [cal[i] for i in diff], "_ia": ea, "_ib": eb, "_cal": cal}
-        res[p]["sizing"]["tranche_diff"] = compare_tranches(ta, tb, p, hist, cal, years)
     for p in tb.products():
         if not ta.has(p):
             res[p] = {"missing_in_a": True}
     return res
-
-
-def _entry_starts(tree, prod, hist, cal, years):
-    pe = grade.ProductEval(tree, prod, hist, cal)
-    starts, prev = [], False
-    for i in _window(cal, years):
-        b = pe.grade_key(i) in ("buy", "confirm")
-        if b and not prev:
-            starts.append(i)
-        prev = b
-    return starts
-
-
-def _trade_key(t):
-    return (t["entry"], t["exit"], tuple((x["date"], round(x["qty"], 6)) for x in t.get("buys", [])),
-            tuple((x["date"], round(x["qty"], 6)) for x in t["sells"]))
-
-
-def compare_tranches(ta, tb, prod, hist, cal, years):
-    """분할 매수 비교 — a 의 진입 신호에 같은 매도 규칙(a 의 것)을 두고 두 분할로 거래를 내 갈린 거래."""
-    trs_a, trs_b = trades_mod.tranches_of(ta, prod), trades_mod.tranches_of(tb, prod)
-    if json.dumps(_inline([t.raw() for t in trs_a], ta.defs()), sort_keys=True) == \
-            json.dumps(_inline([t.raw() for t in trs_b], tb.defs()), sort_keys=True):
-        return []
-    starts = _entry_starts(ta, prod, hist, cal, years)
-    exits = _exit_rules(ta, prod) or ta.as_rules(trades_mod.STANDARD)   # a 의 def 를 펼쳐서(b 트리 문맥에서 a 의 def 를 찾지 않게) · 책 규칙 없으면 표준
-    xa = {t["entry"]: t for t in trades_mod.build_trades(ta, prod, hist, cal, starts, exits, trs_a)}
-    xb = {t["entry"]: t for t in trades_mod.build_trades(tb, prod, hist, cal, starts, exits, trs_b)}
-    return [(xa.get(k), xb.get(k)) for k in sorted(set(xa) | set(xb))
-            if not (xa.get(k) and xb.get(k) and _trade_key(xa[k]) == _trade_key(xb[k]))]
 
 
 # ------------------------------------------------------------------ 원문 사례
@@ -633,7 +601,7 @@ def dump_disagreements(slug, per, years):
             if not isinstance(r, dict) or sec == "grade":
                 continue
             sdiff = _section_key(ta, p, sec) != _section_key(tb, p, sec)
-            if not (r["days"] or r.get("tranche_diff") or sdiff):
+            if not (r["days"] or sdiff):
                 continue
             cal = r["_cal"]
             step = max(1, len(r["days"]) // per)
@@ -652,8 +620,6 @@ def dump_disagreements(slug, per, years):
                               "prices_last25[date,o,h,l,c,v]": prices})
             entry = {"agree": r["agree"], "diff_days": len(r["days"]), "expr_differs": sdiff,
                      "a_tree": ta.raw_zone(p, sec), "b_tree": tb.raw_zone(p, sec), "cases": cases}
-            if r.get("tranche_diff"):
-                entry["tranche_trades_diff"] = [{"a": a, "b": b} for a, b in r["tranche_diff"][:per]]
             out["%s.%s" % (p, sec)] = entry
     ensure_dir(LOGS)
     path = os.path.join(LOGS, "disagree-%s.json" % slug)
@@ -779,71 +745,16 @@ def name_conflicts(tree):
 
 
 # ------------------------------------------------------------------ 매도 규칙(exit 칸) 이중 추출 비교
-def _exit_rules(cand, prod):
-    """후보 트리의 상품 매도 규칙(exit 칸)을 def 를 펼쳐 돌려준다 — 그 상품이 없으면 []."""
-    defs = cand.defs()
-    rules = cand.exit_rules(prod) if cand.has(prod) else []
-    return [r.with_when(_inline(r.when, defs)) for r in rules]
-
-
-def compare_exits(tree, ea, eb, hist, years):
-    """같은 진입 신호에 두 매도 규칙을 돌려 진입일별로 짝지어 비교 → {prod: {n, diff:[(ta, tb)]}}."""
-    out = {}
-    for p in tree.products():
-        cal = [c.date for c in hist.get(p) or []]
-        starts = _entry_starts(tree, p, hist, cal, years)
-        ta = {t["entry"]: t for t in trades_mod.build_trades(tree, p, hist, cal, starts, _exit_rules(ea, p))}
-        tb = {t["entry"]: t for t in trades_mod.build_trades(tree, p, hist, cal, starts, _exit_rules(eb, p))}
-        keys = sorted(set(ta) | set(tb))
-        diff = [(ta.get(k), tb.get(k)) for k in keys
-                if not (ta.get(k) and tb.get(k) and _trade_key(ta[k]) == _trade_key(tb[k]))]
-        out[p] = {"n": len(keys), "diff": diff}
-    return out
-
-
-def dump_exit_disagreements(slug, per, years):
-    """매도 규칙이 갈린 거래 덤프(심판의 비교 도구). 진입 신호는 후보 a 의 것으로 맞춘다(같은 진입에 두 매도 규칙)."""
-    ea, eb = _load_tree(slug, "tree_candidates/a.json"), _load_tree(slug, "tree_candidates/b.json")
-    tree = ea
-    hist = _history([ea, eb], years)
-    cmp_ = compare_exits(tree, ea, eb, hist, years)
-    out = {}
-    for p, r in cmp_.items():
-        cs = hist.get(p) or []
-        idx = {c.date: i for i, c in enumerate(cs)}
-        step = max(1, len(r["diff"]) // per)
-        cases = []
-        for a, b in r["diff"][::step][:per]:
-            ent = (a or b)["entry"]
-            ends = [x for x in ((a or {}).get("exit"), (b or {}).get("exit")) if x]
-            i0 = idx[ent]
-            i1 = min(len(cs) - 1, max(idx[x] for x in ends) + 1) if ends else min(len(cs) - 1, i0 + 60)
-            cases.append({"entry": ent, "a": a, "b": b,
-                          "bars_from_entry[date,o,h,l,c]": [[c.date, c.open, c.high, c.low, c.close]
-                                                            for c in cs[i0:i1 + 1]]})
-        out[p] = {"trades": r["n"], "diff": len(r["diff"]),
-                  "a_rules": ea.raw_zone(p, "exit"), "b_rules": eb.raw_zone(p, "exit"),
-                  "cases": cases}
-    ensure_dir(LOGS)
-    path = os.path.join(LOGS, "exit-disagree-%s.json" % slug)
-    write_text(path, json.dumps({"defs_a": ea.raw_defs(), "defs_b": eb.raw_defs(), "products": out},
-                                ensure_ascii=False, indent=1, default=str))
-    for p, v in out.items():
-        print("  %s 거래 %d 중 %d 갈림" % (p, v["trades"], v["diff"]))
-    print("-> %s" % path)
-
-
-def check_exits(tree, ea, eb, hist, years):
-    """후보 a·b 의 exit 칸을 거래별로 비교 -> 갈린 상품은 심판 기록 필수 + 심판이 a/b 를 골랐으면 최종 트리의
-    규칙이 그쪽과 같은 거래를 내야 한다(custom 이면 최종 트리 자체가 심판의 답이라 대조할 상대가 없다)."""
+def check_exits(tree, ea, eb):
+    """후보 a·b 의 exit 칸을 식(정규화 지문)으로 비교 -> 다른 상품은 심판 기록 필수 + 심판이 a/b 를 골랐으면 최종 트리의
+    규칙 식이 그쪽과 같아야 한다(custom 이면 최종 트리 자체가 심판의 답이라 대조할 상대가 없다)."""
     stop = []
     decided = tree.review_exits()
-    for p, r in compare_exits(tree, ea, eb, hist, years).items():
+    for p in tree.products():
         sdiff = _section_key(ea, p, "exit") != _section_key(eb, p, "exit")
-        line = "  %s %-14s 거래 %d 중 %d 갈림%s" % ("✅" if not (r["diff"] or sdiff) else "≠", p + ".exit", r["n"],
-                                               len(r["diff"]), " · 식 다름" if sdiff else "")
+        line = "  %s %-14s%s" % ("≠" if sdiff else "✅", p + ".exit", " 식 다름" if sdiff else " 식 같음")
         d = decided.get(p)
-        if r["diff"] or sdiff:
+        if sdiff:
             if not d or d.get("winner") not in ("a", "b", "custom") or not d.get("why"):
                 stop.append("%s.exit 미심판 불일치" % p)
                 line += "  ❌ 심판 기록 없음"
@@ -853,7 +764,7 @@ def check_exits(tree, ea, eb, hist, years):
             if not d.get("why"):
                 stop.append("%s.exit 심판 사유 없음" % p)
             line += "  -> 심판: %s (두 추출이 같아도 원문 판단으로 바꿈)" % d["winner"]
-        # 최종 트리의 규칙은 승자(심판 기록이 없으면 a)와 같은 거래를 내야 한다
+        # 최종 트리의 규칙은 승자(심판 기록이 없으면 a)와 식이 같아야 한다
         win_name = (d or {}).get("winner", "a")
         if win_name == "custom":
             print(line)
@@ -877,12 +788,10 @@ def _check_pair(slug, tree, ta, tb, hist, years):
         for sec in COMPARED:
             r = secs[sec]
             key = "%s.%s" % (p, sec)
-            tdiff = r.get("tranche_diff") or []
             sdiff = _section_key(ta, p, sec) != _section_key(tb, p, sec)   # 수동·"?" 식 차이는 동작 비교로 안 보인다
-            differs = bool(r["days"] or tdiff or sdiff)
-            line = "  %s %-14s 일치 %5.1f%% (%d일 중 %d일 갈림%s%s)" % (
-                "≠" if differs else "✅", key, r["agree"] * 100, r["n"], len(r["days"]),
-                " · 분할 거래 %d건 갈림" % len(tdiff) if tdiff else "", " · 식 다름" if sdiff else "")
+            differs = bool(r["days"] or sdiff)
+            line = "  %s %-14s 일치 %5.1f%% (%d일 중 %d일 갈림%s)" % (
+                "≠" if differs else "✅", key, r["agree"] * 100, r["n"], len(r["days"]), " · 식 다름" if sdiff else "")
             if differs:
                 d = decided.get(key)
                 if not d or d.get("winner") not in ("a", "b", "custom") or not d.get("why"):
@@ -1032,7 +941,7 @@ def check_book(slug, years):
 
     # 3. 매도 규칙(exit 칸) 이중 추출
     if ta and tb:
-        stop.extend(check_exits(tree, ta, tb, hist, years))
+        stop.extend(check_exits(tree, ta, tb))
 
     # 4. 원문 사례
     scen = _load(slug, "scenarios.json")
@@ -1095,9 +1004,6 @@ def main():
     years = float(argv[argv.index("--years") + 1]) if "--years" in argv else 3
     if "--dump" in argv:
         dump_disagreements(argv[0], int(argv[argv.index("--dump") + 1]), years)
-        return 0
-    if "--dump-exits" in argv:
-        dump_exit_disagreements(argv[0], int(argv[argv.index("--dump-exits") + 1]), years)
         return 0
     slugs = [a for a in argv if not a.startswith("-") and not a.replace(".", "").isdigit()] or live_slugs()
     stop, warn = [], []

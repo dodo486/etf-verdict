@@ -22,7 +22,6 @@ exit/sizing 규칙을 읽어, 그 규칙을 봉마다 평가해 체결 일정·�
   · _position_facts: 지금 열려 있는(미청산) 마지막 거래의 사실(진입가·평단·현재수익률·보유일 등).
 
 트리는 호출자가 넘긴 TreeGateway(gw — checklist/tree_gateway.py)로 읽는다 — 규칙은 gw 가 건네는 Rule(label·when·sell·frac…)로만 다룬다.
-구간② 트리 검사(checklist/verify_tree)도 a·b 의 매도·분할 규칙을 이 워크로 굴려 비교한다(verify_teams 의 명시 예외).
 """
 import json
 import os

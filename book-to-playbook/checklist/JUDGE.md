@@ -34,7 +34,7 @@
   - `pairing`: 조건을 평평하게 — `common`(같은 식) · `only_a` · `only_b`, `same_behavior_as` = 3년간 판정이 한 번도
     안 갈린 상대(식은 달라도 같은 뜻일 수 있다는 근거. 수동은 기계가 값을 모르니 근거가 없다).
   - `sections`: 식이나 동작이 다른 칸 — 갈린 날의 양쪽 값·조건별 그날 값·최근 시세.
-- `python -m checklist.verify_tree <slug> --dump-exits 6` → `logs/exit-disagree-<slug>.json`: 매도 규칙이 다르게 청산한 거래.
+- 매도 규칙(exit)·분할(sizing.tranches)은 식으로만 비교한다 — `tree_diff` 의 그 칸을 본다(매매 시뮬레이션 비교 없음).
 - a·b 의 규칙 목록은 `source_text` 로 나란히 놓으면 같은 원문 문장을 각자 어떻게 옮겼는지 바로 보인다.
 
 ## 3. 판단 — 원문 기준
