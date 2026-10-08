@@ -9,9 +9,11 @@
   · backtest/portfolio.py 계산기(모의 실행) — 체결 일정 → vectorbt 돈·지표(market_config.json)
   · backtest/runner.py    백테스트 러너(신호 성적·거래 성적)
   · notify/telegram.py    텔레그램 송신(네트워크 urllib 예외는 이 한 파일) · notify/desktop.py 데스크톱 송신
+  ── ③ 트리거 (언제 다시 판정하나)
+  · feed.py               라이브 틱 피더 — in-process pub-sub(관찰자). 틱마다 구독한 소비자(SSE·watch·pricing) fan-out
   ── 공통·검사
   · commonTool.py         진입점 공통 '책 열기'(open_history — 로드+가드+시세, runner·탭·검사가 공유)
-  · watch.py              장중 주기 재판정 루프(orchestration.run watch)
+  · watch.py              장중 주기 재판정 루프(feed 구독 — orchestration.run watch)
   · verify_trading.py     검사기 — 거래 시뮬레이터·실전 경로 불변식 · --parity 신호 패리티(백테스트 == 실시간)
 
 트리의 뜻은 구간② 공개 DSL(checklist.tree_gateway·tradeTool)만 import 한다. 화면층(web)은 import 하지 않는다.
