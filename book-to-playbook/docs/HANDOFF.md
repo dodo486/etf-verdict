@@ -26,7 +26,7 @@
 `playbook/`(①) · `checklist/`(②, 트리만) · `verdict/`(③) · `operations/`(④) · `shared/`(공용) · `publish/`(발행·화면) · `orchestration/`(실행·감사)
 실행: `python -m orchestration.run <daily|watch|publish>` · 검사 `python -m orchestration.verify_structure`
 트리(`tree.json`) 읽기 = `checklist/tree_gateway.py` 의 **TreeGateway 하나**(형식 검사·탐색). 나머지 코드는 원본 키를 직접 읽지 않는다
-(`verify_teams` 규칙 6) — 트리 형식(여섯 칸 → rules 목록) 교체 시 TreeGateway + 문법(`shared/cond.py`)만 고친다.
+(`verify_teams` 규칙 6) — 트리 형식(여섯 칸 → rules 목록) 교체 시 TreeGateway + 문법(`checklist/cond.py`)만 고친다.
 
 ## 🔴 키스톤 — tree.json 재생성 (모든 게 이걸로 막힘)
 
@@ -41,15 +41,15 @@
 
 ## 🟡 키스톤 이후 (순서 있음 — 둘 다 cond.py 고쳐서 동시 금지)
 
-1. **#2(b) 신규 프리미티브** — `shared/cond.py` 에 **ATR**(Wilder 권고, rsi와 일관)·**VWAP**(세션 리셋)·**세션리셋 당일 고/저** 추가. gap(갭)은 기존 `pct`/`lag`로 되어 불필요. 분봉은 **이미 흐름**(jhts `minute_bars` OHLCV, 블로커 아님). 각 프리미티브는 `verdict/verify_primitives.py` 에 pandas·손계산 기준값 테스트 동반. 상세 = `remaining-work-spec.md`.
+1. **#2(b) 신규 프리미티브** — `checklist/cond.py` 에 **ATR**(Wilder 권고, rsi와 일관)·**VWAP**(세션 리셋)·**세션리셋 당일 고/저** 추가. gap(갭)은 기존 `pct`/`lag`로 되어 불필요. 분봉은 **이미 흐름**(jhts `minute_bars` OHLCV, 블로커 아님). 각 프리미티브는 `checklist/verify_primitives.py` 에 pandas·손계산 기준값 테스트 동반. 상세 = `remaining-work-spec.md`.
 2. **A 서버권위(적② 제거)** — 화면이 등급을 직접 재계산하는 중복(`publish/ui/checklist-ui.js` 의 `ev/and3/or3/gradeKey`) 제거. `cond.Ctx` 에 조건별 수동답 맵 추가 → `verdict_engine.render(answers=)` → `serve.py` in-process → 마지막에 JS 평가기 삭제. **tree.json 재생성 뒤 파리티 검증(화면 등급==엔진 등급) 가능.** 상세 = `web-consolidation-plan.md` §4.
 
-> 둘 다 `shared/cond.py` 의 `_series()` 영역을 건드린다 → **A(구조변경) 먼저, 프리미티브(op 추가) 나중** 권고(remaining-work-spec.md).
+> 둘 다 `checklist/cond.py` 의 `_series()` 영역을 건드린다 → **A(구조변경) 먼저, 프리미티브(op 추가) 나중** 권고(remaining-work-spec.md).
 
 ## 검증 명령 (venv = `book-to-playbook/.venv`)
 ```
 python -m orchestration.verify_teams          # 팀 경계
 python -m orchestration.verify_structure      # 구조·책계약(tree.json 있어야 통과)
-python -m verdict.verify_primitives           # 원시연산 계산 검사
+python -m checklist.verify_primitives           # 원시연산 계산 검사
 python -m checklist.verify_tree <slug>        # 트리 동작 검사
 ```

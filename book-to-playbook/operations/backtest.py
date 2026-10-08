@@ -35,7 +35,8 @@ import sys
 from datetime import datetime, timedelta, timezone
 
 from shared.paths import BASE, LOGS, ensure_dir, write_text, backtest_path
-from shared import trades as trades_mod, tree_grade
+from checklist import grade
+from trading import trades as trades_mod
 from checklist.tree_gateway import TreeGateway
 from operations import portfolio, driver
 
@@ -88,8 +89,8 @@ def _summarize(prod_rows, cs):
 
 # ------------------------------------------------------------------ 실행
 def fetch_history(tree, days):
-    """트리(여섯 칸 전부)가 쓰는 심볼의 일봉 — days + 워밍업만큼. 수집은 tree_grade.history 한 곳."""
-    return tree_grade.history(tree, (datetime.now() - timedelta(days=days + tree_grade.WARMUP_DAYS)).strftime("%Y%m%d"))
+    """트리(여섯 칸 전부)가 쓰는 심볼의 일봉 — days + 워밍업만큼. 수집은 grade.history 한 곳."""
+    return grade.history(tree, (datetime.now() - timedelta(days=days + grade.WARMUP_DAYS)).strftime("%Y%m%d"))
 
 
 def run(slug, days=365, hist=None, tree=None, unobserved=None):
@@ -157,7 +158,7 @@ def build_text(res):
     L.append("기간 %s ~ %s (%d거래일) · 진입=신호 다음날 시가 · 값=평균수익률 승률"
              % (res["period"][0], res["period"][1], res["trading_days"]))
     head = "  %-16s %5s %4s  " % ("등급", "일수", "신호") + "  ".join("%-13s" % ("%d일 후" % h) for h in HORIZONS)
-    order = list(tree_grade.GRADES.values()) + [BUY_OR_CONFIRM]
+    order = list(grade.GRADES.values()) + [BUY_OR_CONFIRM]
     for p, s in res["summary"].items():
         L.append("")
         L.append("■ %s  (기간 보유 %+.1f%%)" % (p, s["buy_hold"] or 0))
@@ -208,9 +209,9 @@ def page_data(slug):
         raise SystemExit("books/%s/tree.json 없음" % slug)
     hist = fetch_history(tree, max(d for _, d in PAGE_PERIODS))
     out = {"slug": slug, "generated": datetime.now().isoformat(timespec="seconds"),
-           "horizons": list(HORIZONS), "grades": list(tree_grade.GRADES.values()),
+           "horizons": list(HORIZONS), "grades": list(grade.GRADES.values()),
            "buy_or_confirm": BUY_OR_CONFIRM,
-           # 표준 매도 규칙의 짧은 표시(예 '+9%/−5%/10일') — shared/trades.STANDARD 에서 파생(단일 출처).
+           # 표준 매도 규칙의 짧은 표시(예 '+9%/−5%/10일') — trading/trades.STANDARD 에서 파생(단일 출처).
            #   화면(backtest-ui)은 이 값을 받아 쓰고 숫자를 복붙하지 않는다.
            "standard_exit_label": trades_mod.standard_label(), "periods": {}}
     for key, days in PAGE_PERIODS:
@@ -238,7 +239,7 @@ def run_vectorbt(slug, days=365, hist=None, tree=None, unobserved=None):
     """기존 run()으로 거래(머리가 낸 신호·분할·매도)를 얻고, 그 거래를 계산기(operations/portfolio)로
     다시 굴려 포트폴리오 지표(자산곡선·MaxDD·샤프·총수익)를 더한다. 기존 경로는 그대로 두고 옆에 나란히 둔다.
 
-    거래 경계·체결가·체결일은 run()이 쓰는 규칙 평가 워크(shared.trades.build_trades)가 정한 그대로 재사용한다
+    거래 경계·체결가·체결일은 run()이 쓰는 규칙 평가 워크(trading.trades.build_trades)가 정한 그대로 재사용한다
     (머리의 규약·분할/매도 규칙을 계산기가 다시 정하지 않는다 — '머리=판단/계산기=계산' 분리)."""
     tree = tree or TreeGateway.load(slug)
     if tree is None:
@@ -316,7 +317,7 @@ def _minute_axis(hist, prod, timeline):
             b = {"open": b, "high": b, "low": b, "close": b, "volume": 0.0}
         bars.append(_MinuteBar(k, b.get("open"), b.get("high"), b.get("low"), b.get("close"), b.get("volume")))
     cal = [b.date for b in bars]
-    mh = tree_grade.History({prod: bars})
+    mh = grade.History({prod: bars})
     mh.minutes = getattr(hist, "minutes", {})
     return cal, mh
 
@@ -341,7 +342,7 @@ def run_intraday(slug, hist=None, tree=None, limit=None):
     vectorbt 계산기(operations.portfolio)를 돌려 '장중 백테스트' 지표를 낸다(신호만 내던 재생에 계산기를 붙임).
 
     머리=판단/계산기=계산 분리는 그대로다: 신호(✅·🟡)는 driver.run(분봉이면 내부에서 step=product_verdict)이 각 asof 에서 내고,
-    체결 일정(분봉 다음봉 시가 진입 → 매도 규칙으로 청산)은 shared.trades.build_trades 가, 돈·지표는
+    체결 일정(분봉 다음봉 시가 진입 → 매도 규칙으로 청산)은 trading.trades.build_trades 가, 돈·지표는
     operations.portfolio 가 낸다. 일봉 백테스트와 다른 것은 '축'(일봉 하루 → 분봉 한 틱)뿐이다.
 
     정직한 한계: 분봉은 jhts 분봉 범위(지수·선물 ~7거래일)만 — 짧은 구간 샤프/MaxDD 는 참고용(limit 표면화)."""

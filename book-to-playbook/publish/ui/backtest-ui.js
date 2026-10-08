@@ -124,7 +124,7 @@
       var a = st.win, b = st.f20_win;
       h += '<h3>거래 성적 — 매도 규칙의 효과</h3><div class="tablewrap"><table><thead><tr>' +
            '<th>방식</th><th>거래</th><th>승률</th><th>평균 수익률</th><th>평균 보유</th><th>비고</th></tr></thead><tbody>';
-      // 표준 매도의 수치(+9%/−5%/10일)는 파이썬(shared/trades.STANDARD)에서 파생해 D.standard_exit_label 로 실려 온다 — 복붙 금지.
+      // 표준 매도의 수치(+9%/−5%/10일)는 파이썬(trading/trades.STANDARD)에서 파생해 D.standard_exit_label 로 실려 온다 — 복붙 금지.
       var stdLabel = '표준 매도(' + (D.standard_exit_label || '표준 기준') + ')';
       h += '<tr><td>' + (std ? stdLabel : '책 매도 규칙') + '</td><td>' + (st.trades || 0) + '</td>' +
            '<td class="' + (a != null && b != null && a > b ? 'bt-best' : '') + '">' + win(a) + '</td><td>' + pct(st.avg) + '</td>' +

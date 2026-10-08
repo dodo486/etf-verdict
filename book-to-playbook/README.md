@@ -18,14 +18,14 @@
 | 폴더 | 구간 | 하는 일 | 산출물(다음 팀의 입력) |
 |---|---|---|---|
 | `playbook/` | ① 책 원본 → 플레이북 | 원문 소절 인덱싱 · 플레이북 본문 무결 | `source_index.json` · `<slug>-playbook.html` 의 `#src` |
-| `checklist/` | ② 플레이북 → 체크리스트 | 조건 트리 추출·심판·검사 | **`books/<slug>/tree.json`** |
+| `checklist/` | ② 플레이북 → 체크리스트 | 조건 트리 추출·심판·검사 · 트리의 언어(출입구·문법·등급) | **`books/<slug>/tree.json`** |
 | `verdict/` | ③ 체크리스트 → 수집·판정 | 트리가 쓰는 심볼 수집(jhts) · 판정 | `latest-verdict-<slug>.json` |
 | `operations/` | ④ 확정 트리 → 돈·성적 계산기 | 백테스트·장중·웹뷰어가 소비하는 vectorbt 돈/지표 계산(단방향 폭포수: verdict 산출물·shared 규칙결과를 읽기만) | `backtest-<slug>.json` |
-| `shared/` | 공통층 | **트리의 뜻 한 벌**(cond 문법·tree_grade 판정·trades 체결) · **시세 창구 md_feed** · paths | — |
+| `shared/` | 공통층 | **시세 창구 md_feed** · paths | — |
 | `publish/` | 발행·서빙층 | 화면 UI(ui/*.js 주입) · 페이지 조립 · 로컬 실시간 서버 · 홈 | (serve 가 매 요청 그림) |
 | `orchestration/` | 조립·감사 | `run.py`(러너) · `verify_structure.py`(구조·책 계약) · `verify_teams.py`(경계) — 전 구간 실행·검사 | — |
 
-트리의 뜻(문법·등급·체결)을 shared/ 에 한 벌만 두는 이유: ②가 트리를 검사할 때 본 동작과 ③이 판정할 때의 동작이
+트리의 뜻(문법 cond·등급 grade)을 checklist/ 에 한 벌만 두고 ③이 그걸 import 하는 이유: ②가 트리를 검사할 때 본 동작과 ③이 판정할 때의 동작이
 **같은 코드**여야 둘이 갈라지지 않는다.
 
 ```
@@ -35,7 +35,7 @@
                                   │
         [② 추출자 a·b(서로 모름) · 원문 사례 → 심판이 최종 트리를 씀(비교 도구 사용) → 채점] ──▶ tree.json (체크리스트)
                                   │
-   [③ TreeGateway.symbols() → md_feed.histories(jhts, 없으면 수집 요청) → tree_grade → verdict_engine]
+   [③ TreeGateway.symbols() → md_feed.histories(jhts, 없으면 수집 요청) → checklist.grade → verdict_engine]
                                   │                                   └──▶ 알림 · latest-verdict-<slug>.json
                                   │
              [publish.assemble: 판정 + ui/*.js + 레일 + 원문 + 백테스트] ──▶ publish.serve(로컬 실시간)
@@ -64,7 +64,7 @@
 | # | 검사기 | 보는 것 |
 |---|---|---|
 | ① | `verify_structure` | 팀 경계 · 플레이북 본문 해시 · 책 계약(소절 인덱스·트리 문법·트리 ref 가 실제 소절·페이지 구획과 UI 사본) |
-| ② | `verdict.verify_primitives` | 원시 연산·체결·금액 판정을 pandas 기준값·손계산과 대조 · 3값 논리 전수 · 인과성 · 문법. 책이 늘어도 크기 고정 |
+| ② | `checklist.verify_primitives` | 원시 연산·체결·금액 판정을 pandas 기준값·손계산과 대조 · 3값 논리 전수 · 인과성 · 문법. 책이 늘어도 크기 고정 |
 | ③ | `checklist.verify_tree` | 체크리스트가 원문 뜻대로 **동작**하나 — 이중 추출을 실제 시세 3년으로 칸별 비교(갈린 칸은 심판 기록 필수) · 원문 사례 재현 · 발화 통계 · 비중 합 100% 초과 정지 · 수동 사유 분류 |
 
 글자 대조 검사(창작·커버리지·규칙↔명세·의미검사)는 의미를 판정하지 못해 없앴다 — 숫자 '2'만 있으면 '2거래일 유지'가
@@ -114,7 +114,7 @@ python -m publish.serve                                         # 로컬 실시�
 | `checklist/COND_DSL.md` | 트리 문법(트리를 쓰는 추출자·심판의 참고서) |
 | `checklist/verify_tree.py` | 트리 검사(트리를 만들지 않음) |
 | `publish/ui/*.js` · `publish/inject_ui.py` | 화면 JS(책 무관 공유) · 페이지 주입 |
-| `shared/cond.py` · `shared/tree_grade.py` · `shared/trades.py` | 트리 문법·평가기 · 판정(등급·금액·비중·포지션) · 체결(분할·매도) |
+| `checklist/cond.py` · `checklist/grade.py` · `trading/trades.py` | 트리 문법·평가기 · 판정(등급·금액·비중·포지션) · 체결(분할·매도) |
 | `shared/md_feed.py` | **jhts 시세 창구 — 유일한 수집 입구**(없으면 수집 요청) |
 | `verdict/verdict_engine.py` · `verdict/notify.py` | 오늘 판정 · 알림 송신(텔레그램·데스크톱, 구간③ 소유) |
 | `publish/publish_pages.py` · `publish/serve.py` · `publish/build_home.py` | 페이지 조립·발행 · 로컬 실시간 서버 · 홈 |

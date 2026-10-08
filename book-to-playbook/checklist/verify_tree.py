@@ -9,8 +9,8 @@
   옛 검증층(창작·커버리지·규칙↔명세·의미검사·자동가능)은 원문과 규칙의 **글자**(숫자·단어·어휘)를
   대조했다. 그래서 '2'라는 글자만 있으면 2거래일 유지가 1일로 판정돼도 통과했고, 사전에 없는
   새 조건(RSI·볼린저…)은 '찾은 게 없으니 누락도 없음'으로 통과했다. 이 검사는 규칙을 실제 시세와
-  원문 사례에 돌려 본다 — 조건 종류를 몰라도 같은 절차가 돈다. 트리의 뜻은 shared/(cond·tree_grade·
-  trades) 한 벌이라 여기서 본 동작이 곧 구간③ 판정 엔진의 동작이다. 트리 읽기도 판정 엔진과 같은 출입구(TreeGateway).
+  원문 사례에 돌려 본다 — 조건 종류를 몰라도 같은 절차가 돈다. 트리의 뜻은 checklist/(cond·grade)
+  한 벌이고 체결은 trading/trades 하나라 여기서 본 동작이 곧 구간③ 판정 엔진의 동작이다. 트리 읽기도 판정 엔진과 같은 출입구(TreeGateway).
 
 무엇을 하나 (books/<slug>/ 아래)
   1. 최종 트리(tree.json, 심판이 씀) — 라이브 책은 반드시 있어야 하고, 문법 검사를 통과해야 한다.
@@ -41,7 +41,9 @@ from datetime import datetime, timedelta
 
 from shared import paths  # noqa: F401  (UTF-8 출력)
 from shared.paths import BASE, LOGS, ensure_dir, live_slugs, write_text
-from shared import cond, md_feed, trades as trades_mod, tree_grade
+from checklist import cond, grade
+from shared import md_feed
+from trading import trades as trades_mod
 from checklist.tree_gateway import TreeGateway
 
 Candle = namedtuple("Candle", "date open high low close volume")
@@ -63,11 +65,11 @@ def _load_tree(slug, name):
 
 # ------------------------------------------------------------------ 실제 시세 평가
 def _start(years):
-    return (datetime.now() - timedelta(days=int(365 * years) + tree_grade.WARMUP_DAYS)).strftime("%Y%m%d")
+    return (datetime.now() - timedelta(days=int(365 * years) + grade.WARMUP_DAYS)).strftime("%Y%m%d")
 
 
 def _history(trees, years):
-    return tree_grade.history([t for t in trees if t], _start(years))
+    return grade.history([t for t in trees if t], _start(years))
 
 
 def _day_values(pe, i):
@@ -82,7 +84,7 @@ def _day_values(pe, i):
 
 
 def _eval(tree, prod, hist, cal):
-    pe = tree_grade.ProductEval(tree, prod, hist, cal)
+    pe = grade.ProductEval(tree, prod, hist, cal)
     days = [_day_values(pe, i) for i in range(len(cal))]
     return {k: [d[k] for d in days] for k in COMPARED + ("grade",)}, pe
 
@@ -116,7 +118,7 @@ def compare(ta, tb, hist, years):
 
 
 def _entry_starts(tree, prod, hist, cal, years):
-    pe = tree_grade.ProductEval(tree, prod, hist, cal)
+    pe = grade.ProductEval(tree, prod, hist, cal)
     starts, prev = [], False
     for i in _window(cal, years):
         b = pe.grade_key(i) in ("buy", "confirm")
@@ -264,7 +266,7 @@ def fire_stats(tree, hist, years, ack=None):
         idx = _window(cal, years)
         N = max(1, len(idx))
         nodes = []
-        top_avoid = {repr(n) for n in tree_grade._top_labeled(tree.section(p, "avoid"), defs)}
+        top_avoid = {repr(n) for n in grade._top_labeled(tree.section(p, "avoid"), defs)}
         for sec, n in _stat_nodes(tree, p, defs):
             if _has_manual(n, defs):
                 continue                         # 수동이 섞이면 '안 뜸/모름'이 정상이다
@@ -321,7 +323,7 @@ def weight_overflow(tree, hist, years):
         if tree.sizing(p).weight is None:
             continue
         cal = [c.date for c in hist.get(p) or []]
-        pe = tree_grade.ProductEval(tree, p, hist, cal)
+        pe = grade.ProductEval(tree, p, hist, cal)
         for i in _window(cal, years):
             w, alt = pe.weight_of(i)
             v = w if w is not None else (max(alt) if alt else None)
@@ -395,7 +397,7 @@ def pair_conditions(ta, tb, prod, hist, years):
     only_b = {k: v for k, v in cb.items() if k not in ca}
     cal = [c.date for c in hist.get(prod) or []]
     idx = _window(cal, years)
-    pa, pb = tree_grade.ProductEval(ta, prod, hist, cal), tree_grade.ProductEval(tb, prod, hist, cal)
+    pa, pb = grade.ProductEval(ta, prod, hist, cal), grade.ProductEval(tb, prod, hist, cal)
 
     def ser(pe, v):
         if cond.is_manual(v["expr"], {}):
@@ -636,8 +638,8 @@ def dump_disagreements(slug, per, years):
             cal = r["_cal"]
             step = max(1, len(r["days"]) // per)
             picks = r["days"][::step][:per]
-            pa = tree_grade.ProductEval(ta, p, hist, cal)
-            pb = tree_grade.ProductEval(tb, p, hist, cal)
+            pa = grade.ProductEval(ta, p, hist, cal)
+            pb = grade.ProductEval(tb, p, hist, cal)
             cases = []
             for d in picks:
                 i = cal.index(d)
@@ -971,7 +973,7 @@ def check_book(slug, years):
              and not cond.is_compact(os.path.join(BASE, "books", slug, n))]
     if loose:
         stop.append("%s 공통 직렬화 아님 %d개" % (slug, len(loose)))
-        print("  ❌ 공통 직렬화가 아닌 파일 %s — 쓴 사람이 python -m shared.cond fmt <파일> 로 다시 쓴다" % loose)
+        print("  ❌ 공통 직렬화가 아닌 파일 %s — 쓴 사람이 python -m checklist.cond fmt <파일> 로 다시 쓴다" % loose)
     # 0. 이름 없는 수동 조건 정지 — 체크리스트가 조용히 사라지거나 '수동 확인'으로만 뜨면 안 된다
     nameless = _nameless_manual(tree.whole())
     if nameless:

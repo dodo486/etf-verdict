@@ -14,7 +14,7 @@ raw ProductEval 끼리 비교하는 건 두 경로가 같은 클래스를 쓰니
   · 백테스트 경로 : `operations.backtest.run(slug, days=N)` 의 `daily` 행 → {date, prod, key, grade}.
                     (내부에서 ProductEval(tree, p, hist, cal).grade_key(i) 를 전체 달력에 돌린다.)
   · 실시간 경로   : 각 과거일 D 에 대해 `verdict.verdict_engine.product_verdict(tree, p, hist, {}, asof)`.
-                    라이브 드라이버(render)가 하는 그대로 — hist 는 tree_grade.history 로 받은 일봉,
+                    라이브 드라이버(render)가 하는 그대로 — hist 는 grade.history 로 받은 일봉,
                     asof 는 그날 마감 시점(UTC), index 는 트리의 기준 지수 — 로 호출한다. 다만 라이브는 늘
                     "마지막 봉(len(cal)-1)"을 판정하므로, 과거일 D 를 재생하려면 그 hist 를 **D 이하로
                     잘라** 마지막 봉이 D 가 되게 한다(라이브가 D 마감 직후 봤을 그 데이터 그대로).
@@ -46,7 +46,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 
 from shared.paths import live_slugs
-from shared import tree_grade
+from checklist import grade
 from checklist.tree_gateway import TreeGateway
 from operations import backtest, driver
 from verdict import verdict_engine
@@ -74,8 +74,8 @@ def compare(slug, window=WINDOW):
 
     # 라이브 드라이버(render)와 같은 방식으로 전체 일봉을 한 번 받는다(워밍업 포함).
     # window 만큼 + 워밍업을 넉넉히 — backtest.run 의 days 도 이 창을 덮게 준다.
-    full = tree_grade.history(
-        tree, (datetime.now() - timedelta(days=window * 2 + tree_grade.WARMUP_DAYS + 30)).strftime("%Y%m%d"))
+    full = grade.history(
+        tree, (datetime.now() - timedelta(days=window * 2 + grade.WARMUP_DAYS + 30)).strftime("%Y%m%d"))
 
     # 백테스트 경로: 실제 드라이버 진입점. daily 행에서 (prod, date) → (key, grade).
     bt = backtest.run(slug, days=window * 2 + 30, hist=full, tree=tree)

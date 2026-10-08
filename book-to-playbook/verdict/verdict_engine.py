@@ -3,8 +3,8 @@
 """판정 엔진 (책 무관) — 구간③. 체크리스트(= 조건 트리 books/<slug>/tree.json)를 오늘 시세에 대 판정한다.
 
 입력은 둘뿐이다: 트리(구간② 산출물 — 읽기는 출입구 checklist/tree_gateway.TreeGateway 하나)와
-jhts 시세(수집 단계 tree_grade.history → md_feed.histories).
-트리의 뜻(등급·금액·분할·매도)은 shared/tree_grade 한 벌이고, 이 파일은 그 결과를 사람과 화면이 읽는
+jhts 시세(수집 단계 grade.history → md_feed.histories).
+트리의 뜻(등급·금액·분할·매도)은 checklist/grade 한 벌이고, 이 파일은 그 결과를 사람과 화면이 읽는
 모양으로 묶기만 한다 — 화면은 트리를 다시 해석하지 않고 이 출력만 그린다.
 
 출력 계약(latest-verdict-<slug>.json · 알림 · 화면이 소비):
@@ -17,7 +17,7 @@ jhts 시세(수집 단계 tree_grade.history → md_feed.histories).
              exit[{label, ref, sell, note, view}], positions[...]}    positions = 내 포지션(로컬 파일)이 있을 때만
   refs    : {원문 소절: {auto, manual, zones[], prods[], unexpressed?[{rule, reason}]}}
             플레이북 소절별 체크리스트 반영 현황 + 트리로 못 옮긴 규칙과 그 사유
-view 는 노드 하나당 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, hidden?} (tree_grade._view)
+view 는 노드 하나당 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, hidden?} (grade._view)
 — 수동은 '모름'으로 둔 그날 값. 화면은 사람이 체크한 수동 조건으로 같은 3값 논리를 다시 계산한다.
 """
 import json
@@ -27,7 +27,9 @@ from datetime import datetime, timedelta, timezone
 
 from shared.paths import BASE, book_meta
 from verdict.notify import send_telegram, send_desktop
-from shared import cond, md_feed, tree_grade
+from checklist import cond, grade
+from shared import md_feed
+from web import condition_view as cv
 from checklist.tree_gateway import TreeGateway   # 트리를 읽는 유일한 출입구(verify_teams 의 명시 예외)
 
 SOURCE = "jhts 시세팀(일봉)"
@@ -62,7 +64,7 @@ def common_items(gw, pe):
     i = len(pe.cal) - 1
     shared = [name for name, node in defs.items()
               if isinstance(node, dict) and node.get("label")
-              and len(users.get(name, ())) >= 2 and not tree_grade.product_specific(node, defs)]
+              and len(users.get(name, ())) >= 2 and not cv.product_specific(node, defs)]
 
     def refs(n, stop, acc):
         """n 안의 정의 참조를 센다 — stop(따로 나열한 정의) 안으로는 들어가지 않는다."""
@@ -100,7 +102,7 @@ def common_items(gw, pe):
         node = defs[name]
         v = cond.series(node, pe.ctx[None])[i]
         out.append({"name": name, "label": node["label"], "ref": node.get("ref"), "v": v,
-                    "view": tree_grade._view(node, defs, pe.ctx[None], i, shared=True, fold=fold - {name})})
+                    "view": cv._view(node, defs, pe.ctx[None], i, shared=True, fold=fold - {name})})
     return out
 
 
@@ -145,13 +147,13 @@ def product_verdict(gw, p, hist, positions, asof=None):
     base = {"prod": p, "index": gw.index(p), "note": gw.note(p)}
     if not cs:
         req = md_feed.requested().get(p, "-")
-        return dict(base, key="unknown", grade=tree_grade.GRADES["unknown"],
+        return dict(base, key="unknown", grade=grade.GRADES["unknown"],
                     reason="%s 시세 없음(수집 요청 %s)" % (p, req)), None
     cal = [c.date for c in cs]
-    pe = tree_grade.ProductEval(gw, p, hist, cal, asof=asof)
+    pe = grade.ProductEval(gw, p, hist, cal, asof=asof)
     i = len(cal) - 1
     key, top = pe.grade_key(i), pe.top(i)
-    reason = tree_grade.reason_of(key, top, pe.manual_items(i))
+    reason = cv.reason_of(key, top, pe.manual_items(i))
     # 데이터 완전성 가드 — 지금 가진 확정 봉이 트리가 쓰는 가장 긴 창(필요 워밍업)보다 짧으면 등급은 ❔(불완전
     #   데이터, 판정 보류)로 떨어져 있다(grade_key). 사유를 '모르고 매매 금지'로 분명히 적는다(✅/🚫 확신 금지).
     if pe.incomplete(i):
@@ -170,11 +172,11 @@ def product_verdict(gw, p, hist, positions, asof=None):
     prev = cs[-2].close if len(cs) >= 2 else None
     v = dict(base, date=cal[i], close=cs[-1].close,
              chg=(cs[-1].close / prev - 1) * 100 if prev else None,
-             key=key, grade=tree_grade.GRADES[key], reason=reason,
-             zones={sec: pe.view(gw.section(p, sec), i) for sec in cond.SECTIONS},
+             key=key, grade=grade.GRADES[key], reason=reason,
+             zones={sec: cv._view(gw.section(p, sec), defs, pe.ctx[None], i) for sec in cond.SECTIONS},
              opt={sec: pe.opt[sec][i] for sec in cond.SECTIONS},
              pes={sec: pe.pes[sec][i] for sec in cond.SECTIONS},
-             caution=[dict(st, view=pe.view(r.when, i), v=st["value"])
+             caution=[dict(st, view=cv._view(r.when, defs, pe.ctx[None], i), v=st["value"])
                       for st, r in zip(pe.caution_state(i), gw.cautions(p))],
              amount={"factor": f, "unspecified": unspec, "unknown": unknown},
              sizing={"label": sz.label, "ref": sz.ref, "note": sz.note,
@@ -186,12 +188,33 @@ def product_verdict(gw, p, hist, positions, asof=None):
                     "view": _static_view(r.when, defs, index)} for r in gw.exit_rules(p)])
     pos = []
     for x in positions.get(p, []):
-        st = tree_grade.position_state(gw, p, hist, cal, str(x["entry_date"]), float(x["entry_px"]),
+        st = position_state(gw, p, hist, cal, str(x["entry_date"]), float(x["entry_px"]),
                                        int(x.get("filled", 1)))
         pos.append(dict(st, entry_date=x["entry_date"], entry_px=x["entry_px"], filled=x.get("filled", 1)))
     if pos:
         v["positions"] = pos
     return v, pe
+
+
+def position_state(gw, prod, hist, cal, entry_date, cost, filled=1):
+    """내 포지션(첫 매수일·평균 매입가·산 차수)의 오늘 매도·추가 매수 규칙 상태(gw = TreeGateway).
+    → {ret, days, exit:[{label, ref, sell, v, view}], next_tranche:{label, ref, frac, v, view}|None}"""
+    defs = gw.defs()
+    later = [k for k, d in enumerate(cal) if d >= entry_date]
+    if not later:
+        return {"error": "첫 매수일 %s 이후 시세 없음" % entry_date}
+    ctx = cond.Ctx(hist, cal, prod, gw.index(prod), defs, manual_as=None, pos=(later[0], cost))
+    i = len(cal) - 1
+    out = {"ret": cond.series({"pos": "ret"}, ctx)[i], "days": cond.series({"pos": "days"}, ctx)[i],
+           "exit": [{"label": r.label, "ref": r.ref, "sell": r.sell,
+                     "v": cond.series(r.when, ctx)[i], "view": cv._view(r.when, defs, ctx, i)}
+                    for r in gw.exit_rules(prod)]}
+    trs = gw.tranches(prod)
+    nt = trs[filled] if 0 < filled < len(trs) else None
+    out["next_tranche"] = None if nt is None else {
+        "label": nt.label, "ref": nt.ref, "frac": nt.frac,
+        "v": cond.series(nt.when, ctx)[i], "view": cv._view(nt.when, defs, ctx, i)}
+    return out
 
 
 def _static_view(node, defs, index=None):
@@ -206,7 +229,7 @@ def _static_view(node, defs, index=None):
         return it
     ctx = cond.Ctx({}, ["0"], "$none", index, defs, manual_as=None, pos=(0, 1.0))
     try:
-        return strip(tree_grade._view(node, defs, ctx, 0))
+        return strip(cv._view(node, defs, ctx, 0))
     except cond.CondError:
         return None
 
@@ -219,9 +242,9 @@ def render(slug, asof=None):
     top = {"slug": slug, "title": book_title(slug), "ts": now.isoformat(), "source": SOURCE,
            "verdicts": [], "common": [], "refs": {}, "missing": {}, "cash": None,
            # 등급 글자표(키→라벨)를 실어보낸다 — 화면이 따로 복붙하지 않고 이걸 받아 쓴다(단일 출처).
-           "grades": tree_grade.GRADES,
+           "grades": grade.GRADES,
            # 등급 판정 사다리(데이터) 도 같이 실어, 화면이 같은 표로 등급을 다시 낸다(복붙 금지).
-           "grade_rules": tree_grade.GRADE_RULES,
+           "grade_rules": grade.GRADE_RULES,
            # 여섯 칸 키→한글 이름표(화면 머리글용) — cond.ZONE_LABELS 가 정본이다. 화면(shared-ui ZW)이
            #   복붙하지 않고 이걸 받아 쓴다. 머리글 번호 순서대로(①필터 ②회피 ③진입 …) 실어보낸다.
            "zones": {s: cond.ZONE_LABELS[s]
@@ -229,8 +252,8 @@ def render(slug, asof=None):
     if tree is None:
         top["error"] = "조건 트리 없음 — books/%s/tree.json 이 있어야 판정한다" % slug
         return top
-    start = (datetime.now() - timedelta(days=tree_grade.WARMUP_DAYS)).strftime("%Y%m%d")
-    hist = tree_grade.history(tree, start)
+    start = (datetime.now() - timedelta(days=grade.WARMUP_DAYS)).strftime("%Y%m%d")
+    hist = grade.history(tree, start)
     positions = load_positions(slug)
     pe0 = None
     weights, all_known = [], True

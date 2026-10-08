@@ -10,19 +10,19 @@
 - **배경:** `observe` 는 옛 `at`(개장 전/개장 N분 스냅샷) 기계장치를 걷어낼 때, "개장 전 선물 방향" 같은
   장중 관측 조건을 담아 옮기던 **임시 포장재**였다. asof 전환 뒤엔 중복 — 이제 맨 `tf:"1m"` 식이
   데이터 없으면 자동으로 None(모름)을 내기 때문이다.
-- **현재 상태:** 지침·트리엔 observe 가 이미 0건. **엔진(`shared/cond.py`)에만 살아 있다.**
+- **현재 상태:** 지침·트리엔 observe 가 이미 0건. **엔진(`checklist/cond.py`)에만 살아 있다.**
   (제거 시도했으나, 아래 이유로 구간④ 재개 때로 보류함 — 2026-10-07.)
 - **그냥 못 지우는 이유:** run2 후보엔 observe 없는 **맨 장중 조건**(예: 개장 전 `ES=F` 선물 > 전일 종가)이
   있는데, 지금은 데이터가 없으면 🟡(사람 확인)가 아니라 ❔(보류)로 떨어지고 백테스트에서 EXCLUDED 도
   안 된다. **제대로 지우려면** 엔진이 "장중 데이터 없음 → None"을 observe 가 하던 대로
   **실전 🟡 / 백테스트 EXCLUDED 로 자동 처리**하는 트리거를 깔아야 한다. 이건:
-  - 백테스트 `EXCLUDED`(빼고 판단) 의미 + 등급 로직(`shared/tree_grade.py`)을 건드리는 **구간④ 기능 변경**
+  - 백테스트 `EXCLUDED`(빼고 판단) 의미 + 등급 로직(`checklist/grade.py`)을 건드리는 **구간④ 기능 변경**
   - **워밍업 None**(일봉 지표 준비 전)을 잘못 🟡/EXCLUDED 로 바꾸면 백테스트 오염 위험 → "장중축 데이터
     부재 None"만 콕 집는 표식 필요
   - `tree.json` 이 없어 **파리티(720/720)로 검증 불가** → 데이터 정직성상 지금 반쪽 변경은 안 함
 - **할 일(구간④ 재개 때):** 실데이터 + 트리 생기면 → 엔진에 "장중 데이터 부재 None → 🟡/EXCLUDED"
   자동 트리거 설치 → `observe` 래퍼 전부 제거 → `verify_primitives` 불변식 + 백테스트 파리티로 등가성 증명.
-- **영향 파일:** `shared/cond.py`, `shared/tree_grade.py`, `verdict/verify_primitives.py`,
+- **영향 파일:** `checklist/cond.py`, `checklist/grade.py`, `checklist/verify_primitives.py`,
   `checklist/verify_tree.py`, `operations/backtest.py`·`driver.py`, `publish/ui/checklist-ui.js`,
   `COND_DSL.md`·`MIGRATION_NOTES.md`.
 

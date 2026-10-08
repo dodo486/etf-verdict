@@ -1,14 +1,10 @@
 # -*- coding: utf-8 -*-
-"""공통층(shared) — 세 팀(playbook·checklist·verdict) 모두가 쓰는 유일한 공용 코드.
+"""공통층(shared) — 모든 팀이 쓰는 유일한 공용 코드. 뜻(규칙)은 두지 않는다 — 시세 창구와 경로뿐이다.
 
-팀 규칙: 팀 폴더끼리는 서로 import 하지 않는다. 두 팀 이상이 같은 코드가 필요하면
-그 코드는 여기로 온다. (경계는 verify_teams.py 가 기계로 강제한다.)
-
-조건 트리는 구간②가 만들고(checklist.verify_tree) 구간③이 읽는다(verdict). 트리의 **뜻**이
-두 곳에서 따로 구현되면 만든 쪽과 읽는 쪽의 판정이 갈라지므로, 뜻은 여기 한 벌만 둔다:
-  · cond.py        조건 트리 문법·평가기
-  · tree_grade.py  트리 → 날짜별 등급·사유
-  · trades.py      매수 신호 + 매도·분할 규칙 → 체결 일정·거래 요약(규칙 평가 워크 — 돈·수수료·지표 없음).
-                   돈·성적(자산곡선·MaxDD·샤프)은 구간④ 계산기(operations/portfolio)가 이 결과를 받아서 낸다.
   · md_feed.py     jhts 시세수집팀 창구 — 파이프라인의 유일한 시세 입구
+  · _dev_cache.py  개발용 시세 캐시(ETF_DEV_CACHE 일 때만)
+  · paths.py       경로·인코딩·책 레지스트리(books.json)
+
+트리의 뜻(문법 cond·등급 grade)은 구간② checklist/ 가, 체결 워크(trades)는 구간③ trading/ 이 가진다.
+공통층은 어느 팀도 import 하지 않는다(경계는 orchestration/verify_teams.py 가 기계로 강제한다).
 """

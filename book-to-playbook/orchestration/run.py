@@ -167,12 +167,14 @@ def main(argv):
     # ---- 검사 3종 — 판정·백테스트 뒤에 돈다.
     #
     #   ① verify_structure          형식·구조(팀 경계·플레이북 본문 해시·책 계약)
-    #   ② verdict.verify_primitives 조건 트리 원시 연산이 계산을 맞게 하나(실행 검사)
+    #   ② checklist.verify_primitives 조건 트리 원시 연산이 계산을 맞게 하나(실행 검사)
+    #      + trading.verify_trading   거래 시뮬레이터·실전 경로 불변식(구간③) · web.verify_view 화면 설명 구조
     #   ③ checklist.verify_tree     체크리스트가 원문 뜻대로 동작하나(이중 추출·원문 사례·발화 통계·비중 합)
     # 등급: 0 통과 · 1 정지 · 2 경고.
     checks = ["orchestration.verify_structure"]   # 발행물·구조 점검 — 트리와 무관, 항상 돈다
     if not no_verify_tree:
-        checks += ["verdict.verify_primitives", "checklist.verify_tree"]
+        checks += ["checklist.verify_primitives", "trading.verify_trading", "web.verify_view",
+                   "checklist.verify_tree"]
     else:
         r.say("--no-verify-tree: 트리 검수·원시함수 검사 생략(트리 생성 단계에서 이미 검수한 것으로 봄)")
     codes = {}
@@ -187,7 +189,9 @@ def main(argv):
 
     blocking = []
     labels = {"orchestration.verify_structure": "형식·구조 위반",
-              "verdict.verify_primitives": "원시함수 계산 오류",
+              "checklist.verify_primitives": "원시함수 계산 오류",
+              "trading.verify_trading": "거래 시뮬레이터·실전 경로 오류",
+              "web.verify_view": "화면 설명 구조 오류",
               "checklist.verify_tree": "규칙 동작 검사 실패(트리 없음·미심판 불일치·원문 사례 불일치 등)"}
     for script in checks:
         if codes[script] == 1:

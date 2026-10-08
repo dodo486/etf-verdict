@@ -1,21 +1,22 @@
 # -*- coding: utf-8 -*-
-"""구간② 팀 — 플레이북 → 체크리스트(조건 트리).
+"""구간② 팀 — 플레이북 → 체크리스트(조건 트리) + 그 트리의 언어(DSL).
 
 체크리스트 = books/<slug>/tree.json(조건 트리). 이 팀이 트리를 만드는 유일한 곳이다:
 서로 모르는 추출자 a·b 가 플레이북에서 후보를 쓰고, 원문만 보고 쓴 사례로 확인하고, 판정이 갈린 날을
-심판이 원문과 대조해 두 후보를 융합한 최종 트리를 직접 쓴다(코드는 트리를 만들지 않는다). 화면 표시 UI 는 발행·서빙층(publish/)으로 옮겼다 — 구간②는 트리만 만든다.
+심판이 원문과 대조해 두 후보를 융합한 최종 트리를 직접 쓴다(코드는 트리를 만들지 않는다).
+트리의 언어(출입구·문법·등급의 뜻)도 이 팀이 가진다 — 만드는 쪽의 검사와 읽는 쪽(구간③)의 판정이 같은 코드다.
 
   · README.md           구간② 진행 절차(진행자용 — 역할 ↔ 지침 문서·원칙·실패 시)
   · EXTRACTOR.md        추출자 a·b 지침(역할·목적·규칙 목록 → 트리·표준 식·자기 점검)
   · SCENARIO.md         사례 작성자 지침(원문만 보고 정답지)
   · JUDGE.md            심판 지침(비교 도구·판단·최종 트리와 review·채점 대응)
   · COND_DSL.md         트리 문법 — 트리를 쓰는 추출자·심판의 참고서(유효한 것과 그 뜻만)
-  · tree_gateway.py     TreeGateway — tree.json 을 읽는 유일한 출입구(형식 검사·탐색). 판정·백테스트·검사기가 여기에 묻는다
+  · tree_gateway.py     [공개 DSL] TreeGateway — tree.json 을 읽는 유일한 출입구(형식 검사·탐색)
+  · cond.py             [공개 DSL] 조건 트리 문법·평가기 (python -m checklist.cond fmt <파일> = 공통 직렬화)
+  · grade.py            [공개 DSL] 등급의 뜻 — 날짜별 등급·금액·비중·워밍업 가드 + grade_rules.json(등급 사다리)
   · verify_tree.py      트리 검사 — 이중 추출 비교·원문 사례·발화 통계·비중 합 · 심판의 비교 도구(--dump)
+  · verify_primitives.py 검사기 — 원시 연산·등급 계산을 기준값·손계산과 대조
 
-(화면 표시 JS 와 주입기 inject_ui 는 발행·서빙층 publish/ 로 옮겼다 — 구간②는 트리 생산만 한다.)
-
-팀 경계: 다른 팀(playbook·verdict) 코드를 import 하지 않는다. 거꾸로 이 팀 코드 중 tree_gateway.py 하나만은
-verdict·operations·orchestration·publish 가 import 해도 된다(verify_teams 의 명시 예외 — shared 는 안 됨). 공용은 shared/ 만(트리의 뜻 cond·tree_grade·
-trades 와 시세 창구 md_feed 는 shared/ — 구간③과 같은 코드). 경계는 verify_teams.py 가 기계로 강제한다.
+팀 경계: 이 팀은 shared/ 만 import 한다(명시 예외 하나 — verify_tree 가 a·b 의 매도·분할 규칙을 같은 체결 워크
+trading.trades 로 굴려 비교). 거꾸로 [공개 DSL] 세 모듈만 다른 층이 import 해도 된다. 경계는 verify_teams.py 가 강제한다.
 """

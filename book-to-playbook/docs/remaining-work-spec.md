@@ -5,10 +5,10 @@
 
 핵심 파일
 - 수집 어댑터: `shared/md_feed.py`
-- 평가기(원시함수): `shared/cond.py`
-- 트리 해석: `shared/tree_grade.py`
+- 평가기(원시함수): `checklist/cond.py`
+- 트리 해석: `checklist/grade.py`
 - 판정 엔진: `verdict/verdict_engine.py`
-- 원시함수 검사기: `verdict/verify_primitives.py`
+- 원시함수 검사기: `checklist/verify_primitives.py`
 - 계약 메모: `MIGRATION_NOTES.md` (④ jhts 분봉 계약, ⑤ 후속)
 
 ---
@@ -62,7 +62,7 @@
   끝 close·합 volume). 버킷 키 `YYYYMMDDHH + (분 5내림)` 이라 **세션/날 경계를 절대 안 넘는다**(403행).
 - `cond.Ctx.px(sym, field, tf)` (cond.py 312~329행): `tf="1d"` → 확정 일봉(settled, 장중 asof 면 오늘 미확정
   봉은 `_settled_dates` 로 가림), `tf="1m"` → `minute_series`, `tf="5m"` → `aggregate_5m` 후 `minute_series`.
-- 소비 입구(수집): `tree_grade.history(trees, start)` (tree_grade.py 63~73행) 가 `md_feed.histories` +
+- 소비 입구(수집): `grade.history(trees, start)` (checklist/grade.py) 가 `md_feed.histories` +
   `md_feed.minutes` 로 일봉·분봉을 모아 `History`(일봉 dict + `.minutes`)를 만든다.
 - `series()` 메모키 = `(repr(node), s_sym, ctx.manual_as)` (cond.py 529행) — 신규 프리미티브는 이 키에
   이미 들어간다(별도 작업 불필요).
@@ -154,7 +154,7 @@
 
 ## 3. 구현 순서와 충돌 지점 (둘 다 cond.py 를 고친다)
 
-**두 작업이 모두 `shared/cond.py` 를 고치므로 동시 진행 시 충돌한다.**
+**두 작업이 모두 `checklist/cond.py` 를 고치므로 동시 진행 시 충돌한다.**
 
 | 작업 | cond.py 건드리는 영역(함수) | 성격 |
 |---|---|---|
@@ -183,7 +183,7 @@ B 는 신규 op 분기(cond.py 613행 이후 append)에만 손대도록 **영역
 
 ```
 tree.json(구간② 재생성)  →  md_feed(일봉 OK · 분봉 OHLCV OK, ~7일 보관)  →
-tree_grade.ProductEval(등급/금액/분할/매도)  →  verdict_engine.render(JSON·알림)
+grade.ProductEval(등급/금액/분할/매도)  →  verdict_engine.render(JSON·알림)
 ```
 
 - **1차 블로커 = tree.json 없음.** `books/moneycopy/`·`books/trend/` 에 `tree.json` 이 없다(후보만
@@ -193,7 +193,7 @@ tree_grade.ProductEval(등급/금액/분할/매도)  →  verdict_engine.render(
 - **2차 블로커(완화됨) = jhts 분봉.** OHLCV+UTC 로 이미 온다(④-T). 남은 건 **보관기간(~7일)**·**과거/KR 미연결**.
 - **데이터 없음 → 조용한 실패 없음:** 시세 없는 심볼은 `md_feed` 가 수집요청을 남기고(`requested()`),
   판정은 ❔(unknown)로 **정직하게** 떨어진다(verdict_engine 168~171·276행). 데이터 완전성 가드도 확정봉이
-  워밍업보다 적으면 ❔ 로 보류(tree_grade 153~181행) — '모르고 매매' 방지.
+  워밍업보다 적으면 ❔ 로 보류(checklist/grade.py ProductEval.incomplete) — '모르고 매매' 방지.
 
 ### 4.2 "사람 개입 0" 을 막는 수동 조건 목록 (tree_candidates 기준)
 

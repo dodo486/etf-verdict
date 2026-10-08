@@ -5,7 +5,7 @@
 ## 왜 하나로 합쳤나
 
 옛날엔 "시간을 밟으며 asof 판정"하는 루프가 둘로 중복됐다: operations.backtest.run(일봉 하루씩)과
-operations.replay(장중 asof). 판정 머리(verdict_engine.product_verdict / tree_grade.ProductEval)는 이미
+operations.replay(장중 asof). 판정 머리(verdict_engine.product_verdict / grade.ProductEval)는 이미
 한 벌을 공유했지만(신호 파리티 720/720 로 증명), '시간을 밟는' 바깥 루프가 둘이었다. 이 모듈이 그
 스테핑을 하나로 모은다 — 뒤에 붙는 것만 용도별로 다르다(백테스트=계산기 / 재생=신호출력 / 라이브=단건).
 
@@ -44,7 +44,7 @@ shared)는 이 파일을 import 하지 않는다 — verify_teams 가 강제. �
 """
 from datetime import datetime, timezone
 
-from shared import tree_grade
+from checklist import grade
 from verdict import verdict_engine
 
 # tf 촘촘함 순서 — 초로 환산(작을수록 촘촘). cond.TIMEFRAMES 와 짝(그 밖 tf 는 문법이 막는다).
@@ -113,7 +113,7 @@ def _truncate(full, upto):
     """full(History) 을 날짜 upto(YYYYMMDD) 이하로 자른 새 History. 분봉(minutes)은 그대로 넘긴다.
     과거 세션을 재생할 때 '그 세션 마감 직후 라이브가 보유했을' 일봉(그날까지의 확정 일봉)을 재현한다 —
     verify_signal_parity._truncate 와 같은 규약(일봉 파리티를 증명한 바로 그 방식)."""
-    t = tree_grade.History({s: [c for c in (cs or []) if c.date <= upto] for s, cs in full.items()})
+    t = grade.History({s: [c for c in (cs or []) if c.date <= upto] for s, cs in full.items()})
     t.minutes = getattr(full, "minutes", {})
     return t
 
@@ -182,14 +182,14 @@ def run(tree, hist, start=None, unobserved=None, limit=None, truncate=False, pro
         for p in prods:
             cs = hist.get(p) or []
             cal = [c.date for c in cs]
-            pe = tree_grade.ProductEval(tree, p, hist, cal, unobserved)
+            pe = grade.ProductEval(tree, p, hist, cal, unobserved)
             pts = []
             for i, d in enumerate(cal):
                 if start is not None and d < start:
                     continue
                 inc = pe.incomplete(i)         # 워밍업 부족 — grade_key 가 ❔(불완전)로 내보낸다
                 k = pe.grade_key(i)
-                pts.append({"date": d, "key": k, "grade": tree_grade.GRADES[k],
+                pts.append({"date": d, "key": k, "grade": grade.GRADES[k],
                             "close": cs[i].close, "incomplete": inc})
             series[p], evals[p] = pts, pe
         return {"tf": tf, "prods": prods, "series": series, "evals": evals,
@@ -204,8 +204,8 @@ def run(tree, hist, start=None, unobserved=None, limit=None, truncate=False, pro
 def load_hist(tree):
     """장중 스테핑에 쓸 시세(일봉 + 분봉) 한 벌 — 재생·장중 백테스트가 같이 쓴다."""
     from datetime import timedelta
-    start = (datetime.now() - timedelta(days=tree_grade.WARMUP_DAYS)).strftime("%Y%m%d")
-    return tree_grade.history(tree, start)
+    start = (datetime.now() - timedelta(days=grade.WARMUP_DAYS)).strftime("%Y%m%d")
+    return grade.history(tree, start)
 
 
 def limit_note(tree, hist, tf, timeline, sessions):

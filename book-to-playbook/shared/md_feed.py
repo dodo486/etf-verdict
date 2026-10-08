@@ -3,7 +3,7 @@
 """jhts 시세수집팀(jhts.marketdata) 어댑터 — 파이프라인의 유일한 시세 창구(수집 단계).
 
 무엇을 받을지는 체크리스트(조건 트리)가 정한다: TreeGateway.symbols()(checklist/tree_gateway.py)가 여섯 칸
-전부·defs 에서 심볼을 뽑고, tree_grade.history 가 이 파일의 histories() 하나로 받는다. 판정 엔진·백테스트·트리 검사가
+전부·defs 에서 심볼을 뽑고, checklist.grade.history 가 이 파일의 histories() 하나로 받는다. 판정 엔진·백테스트·트리 검사가
 모두 같은 입구를 쓴다 — 수집 요청서(data_spec)를 따로 쓰지 않는다.
 
 시세가 없는 심볼은 지어내지 않고 jhts 수집 요청(collection_requests, requester "etf-verdict",

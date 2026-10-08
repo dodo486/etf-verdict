@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""매도·분할 규칙 리더 + 규칙 평가 워크(머리/shared) — 트리(books/<slug>/tree.json)의
+"""매도·분할 규칙 리더 + 규칙 평가 워크(구간③) — 트리(books/<slug>/tree.json)의
 exit/sizing 규칙을 읽어, 그 규칙을 봉마다 평가해 체결 일정·거래 요약을 만든다(책 무관, 돈·수수료·지표 없음).
 
 이 모듈은 '규칙'만 다룬다 — 돈·수수료·성적(자산곡선·MaxDD·샤프)은 계산기(operations/portfolio)가 낸다
@@ -11,9 +11,9 @@ exit/sizing 규칙을 읽어, 그 규칙을 봉마다 평가해 체결 일정·�
   · tranches_of : 분할 매수 차수. 저자가 비율을 안 줬으면(frac null) 전량 한 번(비율을 지어내지 않는다).
   · unsized_note: 분할 비율·매도 비율 '저자 미명시'를 백테스트가 어떻게 계산했는지 결과에 표시할 문구.
   · standard_label / STANDARD : 책에 매도 규칙이 없는 상품에 쓰는 '책 무관 기본값'(결과엔 '표준 기준(책 아님)').
-    표준 규칙의 숫자(+9%/−5%/10일)는 코드가 아니라 shared/exit_defaults.json 한 곳에 있다(하드코딩 0 — grade_rules 패턴).
+    표준 규칙의 숫자(+9%/−5%/10일)는 코드가 아니라 trading/exit_defaults.json 한 곳에 있다(하드코딩 0 — grade_rules 패턴).
 
-규칙 평가 워크(돈·수수료·지표 없음 — 머리/shared 관심사)
+규칙 평가 워크(돈·수수료·지표 없음)
   · build_trades   : 머리(tree)가 정한 진입 신호·분할·매도 규칙을 받아 '한 진입 → 그 청산까지'의
                      체결 일정(buys/sells)을 만든다. 포지션 사실(진입가·평단·ret·maxret·days)은 봉마다
                      여기서 계산하고, cond.py(순수 규칙 평가기)는 그 값을 pos 로 '읽어' exit/분할 규칙만
@@ -21,16 +21,16 @@ exit/sizing 규칙을 읽어, 그 규칙을 봉마다 평가해 체결 일정·�
   · _parity_stats  : 머리가 정한 거래 경계(한 진입→청산)로 집계한 거래 요약(거래수·승률·거래당 평균 등).
   · _position_facts: 지금 열려 있는(미청산) 마지막 거래의 사실(진입가·평단·현재수익률·보유일 등).
 
-트리는 호출자가 넘긴 TreeGateway(gw — checklist/tree_gateway.py)로 읽는다. 공통층은 그 파일을 import 하지 않는다 —
-규칙은 gw 가 건네는 Rule(label·when·sell·frac…)로만 다룬다.
+트리는 호출자가 넘긴 TreeGateway(gw — checklist/tree_gateway.py)로 읽는다 — 규칙은 gw 가 건네는 Rule(label·when·sell·frac…)로만 다룬다.
+구간② 트리 검사(checklist/verify_tree)도 a·b 의 매도·분할 규칙을 이 워크로 굴려 비교한다(verify_teams 의 명시 예외).
 """
 import json
 import os
 import statistics
 
-from shared import cond
+from checklist import cond
 
-# 표준 매도 규칙의 '정본'은 코드가 아니라 데이터(shared/exit_defaults.json)에 있다 — 숫자를 코드에 복붙하지 않는다.
+# 표준 매도 규칙의 '정본'은 코드가 아니라 데이터(trading/exit_defaults.json)에 있다 — 숫자를 코드에 복붙하지 않는다.
 STANDARD = json.load(
     open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "exit_defaults.json"),
          encoding="utf-8"))["standard"]

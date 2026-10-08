@@ -3,16 +3,16 @@
 """vectorbt 백테스트 '계산기'(구간④) — 돈·성적만 계산한다(판단은 머리=cond.py/tree 의 등급이 낸다).
 
 무엇을 하나
-  체결 일정(한 진입 → 그 청산까지의 buys/sells)은 머리/shared 가 만든다(shared.trades.build_trades).
+  체결 일정(한 진입 → 그 청산까지의 buys/sells)은 머리/shared 가 만든다(trading.trades.build_trades).
   이 계산기는 그 체결 일정을 받아 vectorbt 로 굴려 포트폴리오 지표(자산곡선·MaxDD·샤프·총수익)를 낸다.
-  (규칙 평가·거래 경계·거래당 수익률은 shared.trades 에 있다 — 여기서 다시 정하지 않는다.)
+  (규칙 평가·거래 경계·거래당 수익률은 trading.trades 에 있다 — 여기서 다시 정하지 않는다.)
 
 단방향(폭포수)
-  operations 는 아래(shared.trades 의 체결 일정·거래 요약)만 읽는다. shared/머리 는 operations 를
+  operations 는 아래(trading.trades 의 체결 일정·거래 요약)만 읽는다. shared/머리 는 operations 를
   import 하지 않는다 — 역류 금지(verify_teams.py 강제).
 
 머리=판단 / 계산기=계산 분리
-  진입/청산 신호와 분할(tranche)·매도 규칙은 머리(tree)에서 나온다. shared.trades 가 그 규칙을 읽어
+  진입/청산 신호와 분할(tranche)·매도 규칙은 머리(tree)에서 나온다. trading.trades 가 그 규칙을 읽어
   체결 일정을 만들고(build_trades), 이 계산기는 그 일정을 받아 vectorbt 로 돈을 굴린다.
   분할매수/부분매도는 from_signals 의 bool 로는 안 되므로(spike 권고), 체결 일정을 size 배열로 선계산해
   vbt.Portfolio.from_orders 에 넣는 '접착제'로 처리한다.
@@ -22,7 +22,7 @@
   코드에 시장 숫자 리터럴을 두지 않는다. 심볼의 시장은 md_feed.market_of 가 정한다.
 
 우리 체결 규약 유지
-  체결가·체결일은 shared.trades.build_trades 가 '신호 다음날 시가 진입'(미래누수 없음)으로 정한다 —
+  체결가·체결일은 trading.trades.build_trades 가 '신호 다음날 시가 진입'(미래누수 없음)으로 정한다 —
   계산기(vectorbt)가 체결 타이밍을 다시 정하지 않는다(규약을 존중).
 
 한국 거래세(매도측 비대칭)
@@ -36,10 +36,10 @@
   (_warn_unapplied_limits), 결과 dict 의 limits_unapplied 로도 돌려준다. null 이면 제한 없음(미국).
 
 parity(옛 계산기와 숫자 일치)
-  거래 경계는 머리가 정한다 — '한 진입 신호 → 그 청산까지'가 한 거래(shared.trades.build_trades 정의).
+  거래 경계는 머리가 정한다 — '한 진입 신호 → 그 청산까지'가 한 거래(trading.trades.build_trades 정의).
   vectorbt 의 pf.trades 는 부분매도를 FIFO 로트로 쪼개 세므로 '거래 수'가 다르게 보인다.
   그래서 parity 지표(거래수·승률·거래당 평균수익률)는 '머리가 정한 거래 경계'로 집계한다
-  (shared.trades._parity_stats). vectorbt 가 새로 더하는 것은 포트폴리오 지표뿐이다.
+  (trading.trades._parity_stats). vectorbt 가 새로 더하는 것은 포트폴리오 지표뿐이다.
 
 지표 정의(라이브러리마다 다르므로 못박는다)
   · total_return  = (마지막 자산 / 시작자본) − 1. vbt.Portfolio.total_return().
@@ -48,7 +48,7 @@ parity(옛 계산기와 숫자 일치)
   · sharpe        = vbt.Portfolio.sharpe_ratio(). 일별 수익률 기준, freq='1D' 로 연율화
                     (무위험수익률 0 가정). 거래가 없으면 NaN → None 으로 보고.
   · equity_curve  = vbt.Portfolio.value() — 매 거래일의 (현금 + 보유 평가액). 점 개수 = 거래일 수.
-  · win_rate/avg  = 머리가 정한 거래 경계로 집계(shared.trades._parity_stats).
+  · win_rate/avg  = 머리가 정한 거래 경계로 집계(trading.trades._parity_stats).
 """
 import json
 import logging
@@ -57,7 +57,7 @@ import os
 
 from shared.paths import BASE, read_text
 from shared import md_feed
-from shared.trades import _parity_stats, _position_facts
+from trading.trades import _parity_stats, _position_facts
 
 _CONFIG_PATH = os.path.join(BASE, "operations", "market_config.json")
 _CONFIG = None
@@ -96,7 +96,7 @@ def _warn_unapplied_limits(symbol, mp):
 
 # ------------------------------------------------------------------ 접착제: 머리의 체결 일정 → vbt 입력
 def _orders_from_trades(trade_list, cal):
-    """shared.trades.build_trades 가 낸 거래 목록(각 거래의 buys/sells)을 '거래일별 주문'으로 편다.
+    """trading.trades.build_trades 가 낸 거래 목록(각 거래의 buys/sells)을 '거래일별 주문'으로 편다.
     돌려주는 것: 날짜 인덱스 i → (signed_units, fill_price, is_sell_bar).
       signed_units > 0 매수, < 0 매도(한 봉에 매수·매도가 겹치면 합산; 세금은 매도가 있으면 가산).
     단위(units)는 규칙 평가 워크의 추상 물량(tranche frac 합=1.0) 그대로다 — 계산기가 물량을 다시 정하지 않는다."""
@@ -121,9 +121,9 @@ def _orders_from_trades(trade_list, cal):
 def run_product(symbol, cal, closes, trade_list):
     """한 상품의 성적을 vectorbt 로 계산해 dict 로 돌려준다.
       symbol     : 심볼(시장 파라미터를 고르는 데 씀)
-      cal        : 거래일 목록(YYYYMMDD, 오름차순) — tree_grade.history 의 달력 그대로
+      cal        : 거래일 목록(YYYYMMDD, 오름차순) — grade.history 의 달력 그대로
       closes     : cal 과 같은 길이의 종가 리스트(없는 날은 None 가능)
-      trade_list : 머리가 낸 신호·규칙을 shared.trades.build_trades 가 체결 일정으로 편 거래 목록(buys/sells 포함)
+      trade_list : 머리가 낸 신호·규칙을 trading.trades.build_trades 가 체결 일정으로 편 거래 목록(buys/sells 포함)
 
     출력: {market_params, total_return, max_drawdown, sharpe, equity_curve, win_rate,
            parity(거래수·승률·거래당평균 등 옛 정의), position_facts, limits_unapplied}

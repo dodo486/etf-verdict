@@ -119,7 +119,7 @@
 ### 3-2. 그대로 두는 것
 - 책 HTML의 센티넬 주석(`INJECT:*`)·데이터 id — **변경 없음**(주입기 경로만 바뀌지 마커 이름은 그대로).
 - `inject_nav.py`·`build_home.py` — 이미 publish, 무관.
-- `shared/cond.py`·`shared/tree_grade.py` — **읽기만**(이번 구조 이관에서 손 안 댐).
+- `checklist/cond.py`·`checklist/grade.py` — **읽기만**(이번 구조 이관에서 손 안 댐).
 
 ### 3-3. 왜 `verify_teams` 가 안 깨지나 (중요)
 - 규칙1은 `checklist`가 **다른 팀**을 import할 때만 위반. `inject_ui.py` 는 다른 팀을 import하지 않는다
@@ -152,28 +152,28 @@
 ### 4-1. 현재 (왜 화면이 다시 계산하나)
 - 서버는 `GET /api/verdict` 에서 엔진을 **subprocess**로 돌려 판정 JSON을 준다(~1초). 토글마다 이걸 치면 느리다.
 - 그래서 `checklist-ui.js` 가 `grade_rules`(데이터)와 **평가기(ev/and3/or3)를 JS로 복제**해, 체크박스 토글 즉시
-  등급을 다시 낸다. 이 평가기가 `shared/cond.py` 3값 평가기의 **복제**(사장님이 지적한 결합도의 핵심).
+  등급을 다시 낸다. 이 평가기가 `checklist/cond.py` 3값 평가기의 **복제**(사장님이 지적한 결합도의 핵심).
 - 단 **'사다리'(grade_rules.json)는 데이터**라 이미 VD로 실려와 복붙 아님. 복제는 **평가기 로직**뿐.
 
 ### 4-2. 목표: 서버가 '체크한 답까지 반영한 완성 판정'을 내려주고, 화면은 그리기만
 
 세 군데를 손댄다(순서 = 시스템 안 깨지게 **서버 먼저 → JS 삭제 마지막**):
 
-**(a) `shared/cond.Ctx` — 조건별 수동답 맵 추가 (기존 균일 `manual_as` 와 공존)**
+**(a) `checklist/cond.Ctx` — 조건별 수동답 맵 추가 (기존 균일 `manual_as` 와 공존)**
 - 지금 `manual_as` 는 수동 조건 전부를 True/False/None 하나로 균일 적용(opt/pes 두 벌).
 - 추가할 것: `manual_answers={수동키: True/False}` 같은 선택 인자. 평가 시 그 키에 답이 있으면 그 값을,
   없으면 기존 `manual_as` 를 쓴다. **극성(not 아래 뒤집힘) 규칙은 그대로** 태워야 화면 `ev` 와 일치.
 - 수동키는 화면 `mkey(it,path)` 와 **동일 규칙**이어야 한다: `(shared?'*':path.split('.')[0]) + '|' + (mkey||manual)`.
   → 엔진이 view를 낼 때 각 수동 노드에 이 키를 실어주거나(권장: `_view` 가 `mkey` 를 이미 낸다), 서버가
     같은 공식으로 재구성. **키 규칙 불일치 = 등급 갈라짐**이므로 여기가 가장 조심할 곳.
-- `shared/tree_grade.py` 는 **건드리지 않는다**(사장님 제약). `grade_key` 는 이미 `opt/pes`로 등급을 내므로,
+- `checklist/grade.py` 는 **건드리지 않는다**(사장님 제약). `grade_key` 는 이미 `opt/pes`로 등급을 내므로,
   답을 반영한 opt/pes를 만들 수 있으면 등급 해소는 기존 코드를 그대로 탄다.
   → 구현 위치는 `verdict_engine`(구간③)에서 Ctx에 답을 넣어 ProductEval을 다시 돌리는 얇은 경로.
 
 **(b) `verdict_engine.render(slug, asof=None, answers=None)` — 답으로 등급 해소**
 - `answers`(수동키→불리언)를 받아 ProductEval/Ctx에 흘려, 답 반영된 `key`(등급)·zones 표시값을 낸다.
 - `answers=None`(기본)이면 지금과 100% 동일 출력(하위호환). → 알림/CLI/첫 렌더 경로 안 깨짐.
-- grade_rules 데이터로 등급 해소(이미 그 구조). tree_grade는 호출만 하고 수정 안 함.
+- grade_rules 데이터로 등급 해소(이미 그 구조). grade는 호출만 하고 수정 안 함.
 
 **(c) `publish/serve.py` — in-process 평가 + 답 전달**
 - 지금 subprocess(~1초)를 토글 지연의 원인. 토글 응답용으로 **in-process** 경로를 추가:
@@ -235,6 +235,6 @@ ls book-to-playbook/books/*/tree.json   # 재생성 여부(§5 게이트)
 ```
 ./.venv/bin/python -m verify_teams
 ./.venv/bin/python -m verify_structure
-./.venv/bin/python -m verdict.verify_primitives
+./.venv/bin/python -m checklist.verify_primitives
 ./.venv/bin/python -m checklist.verify_tree   # tree.json 있을 때
 ```

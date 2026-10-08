@@ -21,9 +21,10 @@
 
   규칙 1  팀 폴더(playbook·checklist·verdict)의 모듈은
           stdlib + shared + **자기 팀**만 import 한다. 다른 팀 금지.
-          명시 예외 하나: 트리를 읽는 유일한 출입구 checklist/tree_gateway.py 는 verdict·operations·
-          orchestration·publish 가 import 해도 된다(checklist 의 다른 모듈은 여전히 금지). shared 는 이것도
-          import 하지 않는다 — 공통층이 맨 아래라 호출자가 출입구 객체를 인자로 넘긴다.
+          명시 예외: 구간②의 공개 DSL(checklist.tree_gateway·cond·grade)은 verdict·operations·trading·
+          orchestration·publish·web 이 import 해도 된다(checklist 의 다른 모듈은 여전히 금지). shared 는 이것도
+          import 하지 않는다. 머리(playbook·checklist)와 shared 는 trading·web 을 import 하지 않는다
+          (명시 예외 하나: checklist/verify_tree → trading.trades — a·b 매도·분할 규칙을 같은 체결 워크로 비교).
   규칙 2  `import jhts` 는 **shared/md_feed.py 하나**에서만 허용된다.
           파이프라인의 시세는 오롯이 jhts 시세수집팀 창구(md_feed)로만 들어온다.
   규칙 3  팀 폴더에서 네트워크 모듈(urllib.request·http.client·requests·socket
@@ -51,7 +52,7 @@ from shared import paths  # noqa: F401  (경로·UTF-8 출력 고정)
 from shared.paths import BASE
 
 TEAMS = ("playbook", "checklist", "verdict")
-LAYERS = TEAMS + ("shared", "publish", "operations", "orchestration")
+LAYERS = TEAMS + ("shared", "publish", "operations", "orchestration", "trading", "web")
 
 # 시세 자가수집에 쓰이는 모듈들 — 팀 폴더에서 보이면 그 자체로 위반.
 NET_MODULES = {"urllib", "http", "requests", "socket", "aiohttp", "httpx"}
@@ -68,10 +69,15 @@ ALLOW = {
 #   읽는다 — 머리/공통이 계산기를 부르면 흐름이 거꾸로 선다(역류). operations 폴더는 이 금지의 대상이 아니다.
 UPSTREAM = set(TEAMS) | {"shared"}      # operations 를 import 해선 안 되는 '위쪽' 레이어
 OPERATIONS = "operations"
+# 구간③ 코드(trading)·화면층(web)도 머리(playbook·checklist)와 공통층이 import 하지 않는다. 명시 예외 하나:
+#   구간② 트리 검사(verify_tree)가 a·b 의 매도·분할 규칙을 같은 체결 워크로 굴려 비교한다(trading.trades 만).
+DOWNSTREAM = ("trading", "web")
+HEADS = ("playbook", "checklist", "shared")
+CROSS_ALLOW = {("checklist", "verify_tree.py"): ("trading.trades",)}
 
-# 규칙 1 의 명시적 예외 — 트리를 읽는 유일한 출입구(구간② 소유). 이 모듈만, 이 레이어들만.
-TREE_GATEWAY = "checklist.tree_gateway"
-GATEWAY_USERS = ("verdict", "operations", "orchestration", "publish")
+# 규칙 1 의 명시적 예외 — 구간②의 공개 DSL(트리 출입구·문법·등급의 뜻). 이 모듈들만, 이 레이어들만.
+PUBLIC_DSL = ("checklist.tree_gateway", "checklist.cond", "checklist.grade")
+GATEWAY_USERS = ("verdict", "operations", "orchestration", "publish", "trading", "web")
 
 # 규칙 6 — 트리의 구조 키(COND_DSL 5절 파일 형식). 이 키로 원본을 읽는 코드는 출입구 파일 하나뿐이어야 한다.
 GATEWAY_FILE = ("checklist", "tree_gateway.py")
@@ -88,8 +94,8 @@ KEY_ALLOW = {
     ("verdict/verdict_engine.py", "ref_map"): ({"unexpressed"}, "판정 JSON refs 항목을 만드는 자리"),
     ("verdict/verdict_engine.py", "render"): ({"sizing", "weight"}, "판정 JSON verdict.sizing 을 읽어 현금 % 계산"),
     ("verdict/verdict_engine.py", "build_text"): ({"sizing", "weight", "exit"}, "판정 JSON 을 알림 문장으로"),
-    ("verdict/verify_primitives.py", "t_trades"): ({"entry", "exit"}, "거래 dict 검사"),
-    ("shared/tree_grade.py", "amount_factor"): ({"scale"}, "caution_state 결과(판정 JSON caution 항목)"),
+    ("trading/verify_trading.py", "t_trades"): ({"entry", "exit"}, "거래 dict 검사"),
+    ("checklist/grade.py", "amount_factor"): ({"scale"}, "caution_state 결과(판정 JSON caution 항목)"),
     ("operations/portfolio.py", "run_product"): ({"sell"}, "주문 dict 의 매도 표시"),
     ("operations/verify_signal_parity.py", "build_text"): ({"products"}, "파리티 보고 dict"),
 }
@@ -120,7 +126,7 @@ def _imports(tree):
 
 
 def _is_gateway(name):
-    return name == TREE_GATEWAY or name.startswith(TREE_GATEWAY + ".")
+    return any(name == m or name.startswith(m + ".") for m in PUBLIC_DSL)
 
 
 def _tree_key_reads(tree):
@@ -193,11 +199,17 @@ def check():
             #   operations 만 아래(shared 규칙 평가 결과·verdict 산출물)를 읽는다 — 위가 아래 계산기를 부르면 역류.
             if layer in UPSTREAM and OPERATIONS in mods:
                 bad.append((layer, fn, "%s 가 계산기(operations) import — 단방향(폭포수) 역류" % layer))
+            if layer in HEADS:
+                ok = CROSS_ALLOW.get((layer, fn), ())
+                down = {m for m in names if m.split(".")[0] in DOWNSTREAM
+                        and not any(m == a or m.startswith(a + ".") for a in ok)}
+                if down:
+                    bad.append((layer, fn, "%s 가 아래층(trading·web) import: %s — 역류" % (layer, ", ".join(sorted(down)))))
 
             # 규칙 1 예외의 경계 — 팀 밖 아래층(operations·orchestration·publish)도 checklist 는 출입구만
             if layer in GATEWAY_USERS and layer not in TEAMS and ck and not gate_only:
-                bad.append((layer, fn, "checklist import: %s — 트리는 출입구(%s)로만"
-                            % (", ".join(sorted(m for m in ck if not _is_gateway(m))), TREE_GATEWAY)))
+                bad.append((layer, fn, "checklist import: %s — 구간②는 공개 DSL(%s)로만"
+                            % (", ".join(sorted(m for m in ck if not _is_gateway(m))), ", ".join(PUBLIC_DSL))))
 
             # 규칙 6 — 트리 원본 키 직접 접근 금지(출입구 파일 하나만 예외, 오탐은 KEY_ALLOW)
             if (layer, fn) != GATEWAY_FILE:

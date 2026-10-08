@@ -17,8 +17,9 @@
   5. 문법 — 모르는 키·인자 수·빈 구역은 거부, 올바른 트리는 통과
   6. 표현력 회귀 — 이번에 발견된 버그 유형을 트리로 적어 원문 뜻대로 나오는지
   7. 트리 출입구(TreeGateway) 계약 — 판정·백테스트·검사기가 트리에 묻는 질문의 답 모양
+  (체결 워크·실전 경로는 trading/verify_trading.py, 화면 설명 구조는 web/verify_view.py 가 본다)
 
-사용: python -m verdict.verify_primitives   (실패 있으면 exit 1)
+사용: python -m checklist.verify_primitives   (실패 있으면 exit 1)
 """
 import itertools
 import math
@@ -29,7 +30,7 @@ from collections import namedtuple
 import pandas as pd
 
 from shared import paths  # noqa: F401  (UTF-8 출력)
-from shared import cond
+from checklist import cond
 from checklist.tree_gateway import TreeGateway, empty_product, synthetic   # 합성 트리는 출입구로 만든다(verify_teams 명시 예외)
 
 Candle = namedtuple("Candle", "date open high low close volume")
@@ -326,114 +327,6 @@ def t_pos(rng):
         FAILS.append("매도 비율 null(저자 미명시) 거부: %s" % e)
 
 
-def t_trades():
-    """체결 규칙 평가 워크(shared.trades.build_trades) — 손으로 답을 셀 수 있는 시세로 진입·분할 매도·동시 발동·미청산·보유 중 신호 건너뛰기."""
-    from shared import trades as trades_mod
-
-    def mk(rows):
-        cal = ["2021%04d" % i for i in range(len(rows))]
-        hist = {"X": [Candle(d, o, max(o, c), min(o, c), c, 1000) for d, (o, c) in zip(cal, rows)]}
-        tree = TreeGateway.of(synthetic({"X": empty_product()}))
-        return tree, hist, cal
-
-    def bt(tree, hist, cal, starts, ex, trs=None):
-        """매도·분할 규칙 dict(트리 형식) → 출입구 Rule 로 감싸 build_trades 에."""
-        return trades_mod.build_trades(tree, "X", hist, cal, starts, TreeGateway.as_rules(ex),
-                                       None if trs is None else TreeGateway.as_rules(trs))
-
-    R = {"pos": "ret"}
-    # (1) 신호 0일 → 1일 시가 100 진입. 2일 종가 108(+8%) → 1차(처음 30%) 3일 시가 110 매도.
-    #     4일 종가 116(+16%) → 2차(처음 30%) 5일 시가 117. 6일 종가 99(−1%) & maxret≥15 → 잔량 전량 7일 시가 98.
-    rows = [(100, 100), (100, 101), (105, 108), (110, 112), (114, 116), (117, 110), (105, 99), (98, 97), (97, 97)]
-    tree, hist, cal = mk(rows)
-    ex = [{"label": "1차", "when": {"ge": [R, 7]}, "sell": {"initial": 0.3}},
-          {"label": "2차", "when": {"ge": [R, 15]}, "sell": {"initial": 0.3}},
-          {"label": "잔량", "when": {"all": [{"ge": [{"pos": "maxret"}, 15]}, {"lt": [R, 0]}]}, "sell": "all"}]
-    t = bt(tree, hist, cal, [0], ex)
-    check(len(t) == 1 and t[0]["closed"], "분할: 거래 1건 청산")
-    if t:
-        t = t[0]
-        exp = (0.3 * 110 + 0.3 * 117 + 0.4 * 98) / 100 * 100 - 100
-        check([(x["date"], x["px"], round(x["qty"], 6), x["rule"]) for x in t["sells"]] ==
-              [(cal[3], 110, 0.3, "1차"), (cal[5], 117, 0.3, "2차"), (cal[7], 98, 0.4, "잔량")],
-              "분할: 매도 날짜·가격·수량 %r" % t["sells"])
-        check(same(t["ret"], exp, 1e-9), "분할: 수익률 %r≠%r" % (t["ret"], exp))
-        check(t["entry"] == cal[1] and t["entry_px"] == 100 and t["exit"] == cal[7] and t["days"] == 6, "분할: 진입·청산·보유일")
-    # (2) 같은 날 두 규칙(처음 50% + 남은 50%) — 적힌 순서: 0.5 팔고 남은 0.5의 절반 → 남은 0.25 는 미청산
-    rows = [(100, 100), (100, 100), (100, 110), (120, 120), (120, 125)]
-    tree, hist, cal = mk(rows)
-    ex = [{"label": "a", "when": {"ge": [R, 5]}, "sell": {"initial": 0.5}},
-          {"label": "b", "when": {"ge": [R, 5]}, "sell": {"remaining": 0.5}}]
-    t = bt(tree, hist, cal, [0], ex)[0]
-    check([round(x["qty"], 6) for x in t["sells"]] == [0.5, 0.25] and not t["closed"], "동시 발동 순서·미청산")
-    exp = (0.5 * 120 + 0.25 * 120 + 0.25 * 125) / 100 * 100 - 100        # 남은 0.25 는 마지막 종가 125 로 평가
-    check(same(t["ret"], exp, 1e-9), "미청산 평가 %r≠%r" % (t["ret"], exp))
-    # (3) 보유 중 신호 건너뛰기 · 청산 다음 날부터 다시 진입
-    rows = [(100, 100)] * 3 + [(100, 106), (106, 106)] + [(100, 100)] * 4
-    tree, hist, cal = mk(rows)
-    ex = [{"label": "익절", "when": {"ge": [R, 5]}, "sell": "all"}]
-    t = bt(tree, hist, cal, [0, 1, 2, 5], ex)
-    check([x["entry"] for x in t] == [cal[1], cal[6]], "보유 중 신호 건너뜀: %r" % [x["entry"] for x in t])
-    check(t[0]["exit"] == cal[4] and t[0]["sells"][0]["px"] == 106, "청산일·가격")
-    # (4) 같은 규칙은 한 번만 — 다시 조건이 참이 돼도 두 번 팔지 않는다
-    rows = [(100, 100), (100, 108), (108, 100), (100, 109), (109, 109)]
-    tree, hist, cal = mk(rows)
-    t = bt(tree, hist, cal, [0], [{"label": "1차", "when": {"ge": [R, 7]}, "sell": {"initial": 0.3}}])[0]
-    check(len(t["sells"]) == 1, "규칙 한 번만")
-    # (5) 매도 비율 null(저자 미명시) — 걸려도 팔지 않고 문구로 드러낸다
-    ex = [{"label": "축소", "when": {"ge": [R, 7]}, "sell": {"remaining": None}}]
-    t = bt(tree, hist, cal, [0], ex)[0]
-    check(t["sells"] == [] and not t["closed"], "비율 미명시 매도는 팔지 않음 %r" % t["sells"])
-    check("「축소」" in (trades_mod.unsized_note(tree, "X", TreeGateway.as_rules(ex)) or ""), "비율 미명시 매도 문구")
-    # (5) 마지막 날 신호 → 다음 날이 없어 체결 못 함(미청산), fixed20 은 20거래일 모자라면 None
-    rows = [(100, 100), (100, 100), (100, 120)]
-    tree, hist, cal = mk(rows)
-    t = bt(tree, hist, cal, [0], [{"label": "x", "when": {"ge": [R, 5]}, "sell": "all"}])[0]
-    check(not t["closed"] and t["sells"] == [] and t["fixed20"] is None, "마지막 날 신호는 체결 안 됨")
-    # (6) fixed20 = 진입일 포함 20번째 거래일 종가
-    rows = [(100, 100)] + [(100, 100 + i) for i in range(1, 30)]
-    tree, hist, cal = mk(rows)
-    t = bt(tree, hist, cal, [0], [])[0]
-    check(same(t["fixed20"], (rows[20][1] / 100 - 1) * 100, 1e-9), "fixed20 정의")
-    # (7) manual 은 '매도가 안 나가는 쪽'으로 풀린다 — 확인 못 한 조건 때문에 팔지 않는다(not 아래도 마찬가지)
-    rows = [(100, 100), (100, 100), (100, 100), (100, 100)]
-    tree, hist, cal = mk(rows)
-    t = bt(tree, hist, cal, [0], [{"label": "m", "when": {"manual": "실적"}, "sell": "all"}])[0]
-    check(t["sells"] == [], "manual 매도는 안 걸림")
-    t = bt(tree, hist, cal, [0], [{"label": "nm", "when": {"not": {"manual": "x"}}, "sell": "all"}])[0]
-    check(t["sells"] == [], "not 아래 manual 도 매도를 일으키지 않는다(안쪽을 참으로 풀어 not = 거짓)")
-    # (8) 분할 매수 — 1차 25% 1일 시가 100. 2차(종가 ≥ +5%) 2일 종가 106 → 3일 시가 108 에 30%.
-    #     평균 매입가 = (0.25·100 + 0.30·108)/0.55 = 104.36… 4일 종가 115(+10.2%) → 익절(산 물량 전부) 5일 시가 116.
-    rows = [(100, 100), (100, 101), (103, 106), (108, 109), (112, 115), (116, 117), (117, 117)]
-    tree, hist, cal = mk(rows)
-    trs = [{"label": "1차", "frac": 0.25}, {"label": "2차", "frac": 0.30, "when": {"ge": [R, 5]}},
-           {"label": "3차", "frac": 0.45, "when": {"ge": [R, 50]}}]
-    t = bt(tree, hist, cal, [0],
-                        [{"label": "익절", "when": {"ge": [R, 10]}, "sell": {"initial": 1.0}}], trs)[0]
-    avg = (0.25 * 100 + 0.30 * 108) / 0.55
-    check([(b["date"], b["px"], b["qty"]) for b in t["buys"]] == [(cal[1], 100, 0.25), (cal[3], 108, 0.30)],
-          "분할: 매수 날짜·가격·수량 %r" % t["buys"])
-    check(t["closed"] and [(x["date"], x["px"], round(x["qty"], 6)) for x in t["sells"]] == [(cal[5], 116, 0.55)],
-          "분할: 평균 매입가 기준 +10퍼센트 익절 %r" % t["sells"])
-    check(same(t["ret"], (116 / avg - 1) * 100, 1e-9), "분할: 수익률 = 판 금액 ÷ 산 금액")
-    # 같은 날 매도가 걸리면 그날은 추가 매수하지 않는다
-    rows = [(100, 100), (100, 100), (100, 106), (106, 106), (106, 106)]
-    tree, hist, cal = mk(rows)
-    t = bt(tree, hist, cal, [0],
-                        [{"label": "반", "when": {"ge": [R, 5]}, "sell": {"remaining": 0.5}}], trs)[0]
-    check([b["date"] for b in t["buys"]] == [cal[1], cal[4]],      # 2일 매도 신호 → 3일 시가 매수 안 함, 3일 신호 → 4일 매수
-          "매도가 걸린 날은 추가 매수 안 함 %r" % t["buys"])
-    # 분할이 없으면 한 번에 전량(옛 규약과 같은 결과) · 비율이 저자 미명시(null)여도 전량(비율을 지어내지 않는다)
-    t = bt(tree, hist, cal, [0], [], [])[0]
-    check([b["qty"] for b in t["buys"]] == [1.0], "분할 없음 = 전량")
-    nul = [{"label": "1차", "frac": None}, {"label": "2차", "frac": None, "when": {"ge": [R, 5]}}]
-    t = bt(tree, hist, cal, [0], [], nul)[0]
-    check([b["qty"] for b in t["buys"]] == [1.0], "분할 비율 미명시 = 전량 한 번")
-    # 주: 백테스트 수익률 정의(_fwd)는 구간④ 계산기(operations/backtest)로 옮겼다 — 이 검사기는 구간③(머리/공통층)
-    #     원시함수만 본다. operations(계산기)를 import 하면 단방향(폭포수) 역류이므로 여기서 _fwd 는 검사하지 않는다
-    #     (operations 자체 검증에서 다룬다).
-
-
 # ------------------------------------------------------------------ 4. 인과성
 CAUSAL_NODES = [
     {"ma": [C, 5]}, {"ema": [C, 5]}, {"rsi": [C, 5]}, {"stdev": [C, 5]},
@@ -712,8 +605,8 @@ def t_settled_mtf():
 
 
 def t_grade():
-    """tree_grade 금액 판정 — 걸린 caution 의 scale 곱, 폭 미명시·확인 필요 구분, 비중 범위, 화면 설명 구조."""
-    from shared import tree_grade
+    """등급 금액 판정 — 걸린 caution 의 scale 곱, 폭 미명시·확인 필요 구분, 비중 범위(화면 설명 구조는 web/verify_view.py)."""
+    from checklist import grade
     xs = [100.0] * 30 + [130.0]
     cal = ["2022%04d" % i for i in range(len(xs))]
     hist = {"X": [Candle(d, c, c, c, c, 1000) for d, c in zip(cal, xs)]}
@@ -725,23 +618,12 @@ def t_grade():
                                  {"label": "안 걸림", "when": {"not": jump}, "scale": 0.1}],
                         sizing={"weight": {"case": [[{"manual": "모드"}, 14]], "else": 34}, "tranches": []})
     tree = TreeGateway.of(synthetic({"X": cfg}))
-    pe = tree_grade.ProductEval(tree, "X", hist, cal)
+    pe = grade.ProductEval(tree, "X", hist, cal)
     f, unspec, unknown = pe.amount_factor(len(xs) - 1)
     check(same(f, 0.3333 * 0.5) and unspec == ["급등 폭 없음"] and unknown == ["수동"],
           "amount_factor %r %r %r" % (f, unspec, unknown))
     w, alt = pe.weight_of(len(xs) - 1)
     check(w is None and alt == [14.0, 34.0], "수동 모드 비중은 모름 + 범위 %r %r" % (w, alt))
-    node = {"all": [dict(jump, label="급등", ref="1"), {"not": {"label": "수동", "manual": "x"}}]}
-    v = pe.view(node, len(xs) - 1)
-    check(v["op"] == "all" and v["kids"][0]["v"] is True and v["kids"][0]["label"] == "급등"
-          and v["kids"][1]["op"] == "not" and v["kids"][1]["kids"][0]["manual"] == "x", "view 구조 %r" % v)
-    hid = pe.view({"atleast": 1, "of": [jump, {"manual": "y"}]}, len(xs) - 1)
-    check(hid["op"] == "atleast" and hid["n"] == 1 and hid["kids"][0].get("hidden") is True
-          and hid["kids"][0]["v"] is True, "라벨 없는 잎은 hidden 으로 값과 함께 %r" % hid)
-    # 창 길이·lag 가 "?"(저자 미명시)인 식도 근거 설명이 죽지 않는다 — "?일" 로 보인다
-    unk = {"label": "최근 ?일 급등", "ge": [{"pct": [C, "?"]}, {"lowest": [C, "?"]}]}
-    d = pe.view(unk, len(xs) - 1).get("detail") or []
-    check(d and d[0]["lhsd"] == "?일 전 대비 변화율" and d[0]["rhsd"] == "?일 최저", "\"?\" 창 설명 %r" % d)
 
 
 # ------------------------------------------------------------------ 데이터 완전성 가드(워밍업 부족 → 불완전)
@@ -756,7 +638,7 @@ def t_warmup_guard():
       2) 워밍업을 일부러 잘라낸(필요보다 적은 봉) 입력 → 그 초기 구간은 incomplete=True 이고 grade_key 가 ❔.
       3) 워밍업이 충분한 구간 → incomplete=False, 가드 끼기 전과 등급이 '그대로'(오탐 0).
     """
-    from shared import tree_grade
+    from checklist import grade
 
     # 1) warmup_of / 출입구 warmup 산식 — 손으로 셀 수 있는 노드들로 전수 대조.
     D = {"ma20": {"ma": [C, 20]}, "hi60": {"highest": [C, 60]}}
@@ -792,7 +674,7 @@ def t_warmup_guard():
     xs = [x if x is not None else 100.0 for x in rand_series(rng, need + 40, miss=0)]
     cal = ["2024%04d" % i for i in range(len(xs))]
     hist = {"P": [Candle(d, c, c, c, c, 1000) for d, c in zip(cal, xs)]}
-    pe = tree_grade.ProductEval(tree, "P", hist, cal)
+    pe = grade.ProductEval(tree, "P", hist, cal)
     # 초기 W 개 봉(index 0..W-1)은 확정 봉이 모자라 incomplete → grade_key 가 ❔(unknown).
     check(all(pe.incomplete(i) for i in range(W)), "워밍업 부족 구간(0..%d) 전부 incomplete" % (W - 1))
     check(all(pe.grade_key(i) == "unknown" for i in range(W)),
@@ -805,10 +687,10 @@ def t_warmup_guard():
     #    절대 건드리지 않는다는 뜻(파리티 오탐 0 의 단위테스트판).
     def raw_grade(pe_, i):
         views = {"opt": pe_.opt, "pes": pe_.pes}
-        for rule in tree_grade.GRADE_RULES["rules"]:
+        for rule in grade.GRADE_RULES["rules"]:
             if all(views[rule["view"]][sec][i] is want for sec, want in rule["when"].items()):
                 return rule["key"]
-        return tree_grade.GRADE_RULES["default"]
+        return grade.GRADE_RULES["default"]
     bad = [i for i in range(W, len(xs)) if pe.grade_key(i) != raw_grade(pe, i)]
     check(not bad, "워밍업 충분 구간 등급 == 가드 없는 원시 등급(오탐 0) @%r" % bad[:3])
 
@@ -816,7 +698,7 @@ def t_warmup_guard():
     # 짧게 잘린 쪽은 워밍업이 모자란 꼬리 봉을 ❔ 로 뺀다(바로 그 '251봉 vs 594봉' 버그를 잡는 경로).
     short = {"P": [Candle(d, c, c, c, c, 1000) for d, c in zip(cal, xs)][-30:]}   # 꼬리 30봉만(워밍업 없음)
     short_cal = [c.date for c in short["P"]]
-    pe_short = tree_grade.ProductEval(tree, "P", short, short_cal)
+    pe_short = grade.ProductEval(tree, "P", short, short_cal)
     check(all(pe_short.incomplete(i) for i in range(len(short_cal))),
           "짧게 잘린 이력(워밍업 없음)은 전 구간 불완전 — 긴 이력이면 신호 낼 꼬리까지 ❔ 로 뺀다")
     last = len(cal) - 1
@@ -861,17 +743,11 @@ def t_no_excluded_live():
     (checklist-ui ev/and3/or3)에는 그 개념이 없어 null 로 오해해 등급이 엔진과 갈라진다. 그 입력이 애초에
     실전 경로로 올 수 없음을 여기서 강제한다.
 
-    확인:
-      (1) verdict_engine(실전 판정)은 cond.Ctx 를 만들 때 unobserved="exclude" 를 쓰지 않는다 — 소스로 확인.
-      (2) 기본/실전 문맥에서는 관측값 없는 observe·수동·그 논리 묶음(전부 제외가 될 법한 묶음)조차 EXCLUDED 를
-          내지 않고 true/false/None 만 낸다 — 실행으로 확인.
+    여기서는 기본/실전 문맥에서 관측값 없는 observe·수동·그 논리 묶음(전부 제외가 될 법한 묶음)조차 EXCLUDED 를
+    내지 않고 true/false/None 만 냄을 실행으로 확인한다. 실전 판정 경로가 unobserved="exclude" 를 쓰지 않는지는
+    구간③ 검사(trading/verify_trading.py)가 소스로 확인한다.
     """
     import datetime as dt
-    import inspect
-    from verdict import verdict_engine
-    src = inspect.getsource(verdict_engine)
-    check('unobserved="exclude"' not in src and "unobserved='exclude'" not in src,
-          "verdict_engine 실전 경로가 unobserved=exclude 를 쓰지 않아야(백테스트 전용)")
     # 기본/낙관/비관 문맥 어디서도 EXCLUDED 가 안 나와야 한다 — 관측 없는 observe 와 그 논리 묶음까지.
     # (EXCLUDED 는 cond.py 에서 ctx.unobserved=="exclude" 일 때만 난다 — 실전은 그 모드가 아니다.)
     cal = ["20261001", "20261002"]
@@ -962,7 +838,7 @@ def t_gateway():
 def main():
     rng = random.Random(20261001)
     for name, fn in (("수치 연산", lambda: t_numeric(rng)), ("3값 논리", t_logic),
-                     ("시간 연산", lambda: t_time(rng)), ("하한", t_bounds), ("포지션", lambda: t_pos(rng)), ("거래 시뮬레이터", t_trades),
+                     ("시간 연산", lambda: t_time(rng)), ("하한", t_bounds), ("포지션", lambda: t_pos(rng)),
                      ("인과성", lambda: t_causal(rng)),
                      ("문법", t_syntax), ("관측 시점(asof)", t_asof),
                      ("혼합 tf·확정봉·look-ahead 0", t_settled_mtf),

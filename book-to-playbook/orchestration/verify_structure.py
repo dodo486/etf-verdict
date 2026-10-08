@@ -4,7 +4,7 @@
 
 검증층은 셋이다(글자 대조 검사는 의미를 판정하지 못해 이 셋으로 대체했다):
   ① verify_structure          — 이 파일. 형식이 맞나
-  ② verdict.verify_primitives — 계산이 맞나(원시 연산 실행 검사)
+  ② checklist.verify_primitives — 계산이 맞나(원시 연산 실행 검사)
   ③ checklist.verify_tree     — 체크리스트(조건 트리)가 원문 뜻대로 동작하나(이중 추출·원문 사례·발화 통계)
 
 여기 묶는 것과 등급:
@@ -27,7 +27,7 @@ import sys
 
 from shared import paths  # noqa: F401  (UTF-8 출력)
 from shared.paths import BASE, live_slugs, playbook_src, read_text
-from shared import cond
+from checklist import cond
 from checklist.tree_gateway import TreeGateway
 
 CHECKS = ["orchestration.verify_teams", "playbook.verify_source_integrity"]

@@ -5,19 +5,18 @@
 왜 있나
   트리의 키 배치(products·defs·여섯 칸·규칙의 sell/scale/frac…)를 아는 코드가 판정·백테스트·검사기 곳곳에
   흩어져 있었다. 형식이 바뀌면(여섯 칸 → rules 목록 하나) 그 전부를 고쳐야 했다. 이제 원본 키를 만지는 코드는
-  이 파일 하나다 — 나머지는 여기에 '질문'만 한다. 형식이 바뀌면 이 파일(+ 문법 shared/cond.py)만 고친다.
+  이 파일 하나다 — 나머지는 여기에 '질문'만 한다. 형식이 바뀌면 이 파일(+ 문법 checklist/cond.py)만 고친다.
   직접 접근은 orchestration/verify_teams 규칙 6 이 막는다.
 
 무엇을 하나 / 안 하나
   · 찾아서 건네주기(탐색·조회)와 파일 형식 검사(최상위·상품·규칙 목록의 모양)만 한다.
-  · 식의 뜻·평가·노드 문법은 shared/cond.py, 등급·금액은 shared/tree_grade.py, 체결은 shared/trades.py.
-  · shared 는 이 파일을 import 하지 않는다(공통층이 맨 아래) — 호출자가 TreeGateway 를 인자로 넘긴다.
+  · 식의 뜻·평가·노드 문법은 checklist/cond.py, 등급·금액은 checklist/grade.py, 체결은 trading/trades.py.
   · 규칙은 Rule(읽기 전용 값)로 건넨다 — 형식이 바뀌어도 같은 속성(label·ref·note·when·sell·scale·frac·weight)을 준다.
 """
 import json
 import os
 
-from shared import cond
+from checklist import cond
 from shared.paths import BASE
 
 TREE_TOP = ("version", "defs", "products", "source", "note", "unexpressed", "review")

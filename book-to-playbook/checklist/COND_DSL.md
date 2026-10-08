@@ -5,8 +5,8 @@
 트리를 쓰지 않는 사례 작성자는 이 문서를 읽지 않는다(`SCENARIO.md` 만).
 흔히 쓰는 식을 어떤 모양으로 조합하는가는 문법 사용법이라 맨 끝 6절에 조합 패턴 예시로 둔다.
 
-평가기는 `shared/cond.py`(문법 정본 = 그 파일 docstring), 등급·사유는 `shared/tree_grade.py`, 체결 규약은
-`shared/trades.py` — 만드는 쪽의 검사와 읽는 쪽의 판정이 **같은 코드**를 쓴다. 문법 밖의 키는 오류로 거부된다.
+평가기는 `checklist/cond.py`(문법 정본 = 그 파일 docstring), 등급·사유는 `checklist/grade.py`, 체결 규약은
+`trading/trades.py` — 만드는 쪽의 검사와 읽는 쪽의 판정이 **같은 코드**를 쓴다. 문법 밖의 키는 오류로 거부된다.
 트리를 만드는 곳은 구간② 하나, 읽는 곳은 구간③(판정 엔진·백테스트) 하나다. 화면은 ③의 판정 결과만 그린다.
 트리 파일의 키 배치를 아는 코드는 `checklist/tree_gateway.py`(TreeGateway — 파일 형식 검사·탐색) 하나다 — 판정·백테스트·
 검사기는 거기에 묻고 원본 키를 직접 읽지 않는다(`orchestration/verify_teams` 규칙 6).
@@ -115,7 +115,7 @@
 
 `review` 는 최종 트리에만 있다 — 심판의 판정 근거(형식은 `JUDGE.md`). 구간② 검사기만 읽고 판정·체결엔 쓰지 않는다.
 
-**직렬화**: 트리 파일을 쓴 뒤 반드시 `python -m shared.cond fmt <파일>` 로 공통 형식(`cond.compact_json` —
+**직렬화**: 트리 파일을 쓴 뒤 반드시 `python -m checklist.cond fmt <파일>` 로 공통 형식(`cond.compact_json` —
 한 줄에 들어가는 노드는 한 줄, 숫자 목록은 이어 붙임)으로 다시 쓴다. 줄 수를 부풀리는 들여쓰기를 쓰지 않는다 —
 형식이 다르면 `verify_tree` 가 정지한다.
 

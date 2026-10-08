@@ -882,7 +882,7 @@ def compact_json(obj, width=100):
 
 def fmt_files(paths):
     """JSON 파일을 compact_json 형식으로 다시 쓴다(내용 불변 — 다시 읽어 같은지 확인). 추출자·사례 작성자·심판이
-    파일을 쓴 뒤 부르는 공통 도구: python -m shared.cond fmt <파일...>"""
+    파일을 쓴 뒤 부르는 공통 도구: python -m checklist.cond fmt <파일...>"""
     for p in paths:
         obj = json.load(open(p, encoding="utf-8"))
         text = compact_json(obj)
@@ -962,7 +962,7 @@ def warmup_of(node, defs=None, _seen=None):
       3값 논리로 위에 전파돼 '모름'이 된다 — 데이터가 모자란 줄 모르고 ✅/🚫 확신을 내는 길목이다.
       시세가 rate-limit 로 잘려(워밍업 부족) 들어오면 바로 이 일이 난다(실제 발견된 버그).
       이 함수가 트리에서 '필요한 확정 봉 수'를 직접 뽑아, 그보다 짧은 구간의 1d 신호를 '불완전'으로
-      표면화하는 가드(tree_grade)의 임계값이 된다 — WARMUP_DAYS(fetch 버퍼)와 무관하다.
+      표면화하는 가드(checklist/grade)의 임계값이 된다 — WARMUP_DAYS(fetch 버퍼)와 무관하다.
 
     어떻게 세나 (연산마다 '그날 값이 서려면 그 앞에 몇 봉이 더 있어야 하나'를 더해 가장 깊은 사슬)
       · 창(ma/ema/stdev/highest/lowest/sum) n : n-1 + 안쪽
@@ -1031,4 +1031,4 @@ if __name__ == "__main__":
     if len(sys.argv) >= 3 and sys.argv[1] == "fmt":
         fmt_files(sys.argv[2:])
     else:
-        print("사용: python -m shared.cond fmt <json 파일...>   (구간② 파일 공통 직렬화)")
+        print("사용: python -m checklist.cond fmt <json 파일...>   (구간② 파일 공통 직렬화)")
