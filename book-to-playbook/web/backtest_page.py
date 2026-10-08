@@ -36,6 +36,8 @@ def page_data(slug):
         prods = {}
         for p in res["summary"]:
             d = dict(res["summary"][p], trades=res["trades"][p])
+            # 표준 매도를 썼나 — 화면(backtest-ui)은 trades 의 출처 글자와 비교하지 않고 이 플래그만 본다.
+            d["exit_standard"] = trades.uses_standard_exit(tree, p)
             # 계산기 지표(vectorbt) — 판정기가 낸 '그 거래'(res["trades"])를 portfolio 로 다시 굴려
             #   자산곡선·MaxDD·샤프·총수익을 옛 지표 옆에 나란히 둔다(중복 수집 없음 — 같은 hist·같은 거래).
             cs = hist.get(p) or []

@@ -104,7 +104,7 @@
 
     Object.keys(P.products).forEach(function (p) {
       var S = P.products[p], T = S.trades || {}, st = T.stats || {};
-      var std = T.exit_source && T.exit_source !== '책';
+      var std = !!S.exit_standard;   // 표준 매도를 썼나 — 엔진 플래그(web/backtest_page, trades.uses_standard_exit)
       h += '<div class="bt-prod"><h2>' + esc(p) + '<span class="bt-tag' + (std ? ' std' : '') + '">매도: ' + esc(T.exit_source || '-') + '</span></h2>';
       h += '<p class="bt-sub">기간 보유(처음~끝) ' + pct(S.buy_hold, 1) + '</p>';
       if (T.unsized_note) h += '<p class="bt-sub">⚠ ' + esc(T.unsized_note) + '</p>';

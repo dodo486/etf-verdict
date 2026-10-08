@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""검사기 ② — 조건 트리 원시함수 검사 (책 무관 · 크기 고정).
+"""조건 트리 원시함수 검사 (책 무관 · 크기 고정).
 
 왜 있나
   옛 검증층은 전부 '글자 대조'였다 — 라벨·원문·판정식의 숫자/단어가 서로 나오는지만 봤고,
@@ -31,7 +31,7 @@ import pandas as pd
 
 from shared import paths  # noqa: F401  (UTF-8 출력)
 from checklist import cond
-from checklist.tree_gateway import TreeGateway, empty_product, synthetic   # 합성 트리는 출입구로 만든다(verify_teams 명시 예외)
+from checklist.tree_gateway import TreeGateway, empty_product, synthetic   # 합성 트리는 출입구로 만든다(verify_code 명시 예외)
 
 Candle = namedtuple("Candle", "date open high low close volume")
 FAILS = []

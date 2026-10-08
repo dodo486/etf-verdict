@@ -131,7 +131,7 @@ def book_engine(slug, kind):
 
 # ---------------------------------------------------------------- 책 산출물 경로
 # 책마다의 산출물은 전부 BASE/books/<slug>/ 한 곳에 산다. 그 경로를 짓는 코드는 이 파일 하나다 —
-# 다른 파일이 BASE 에 "books"·slug 를 이어 붙이면 verify_teams 규칙 5 가 막는다.
+# 다른 파일이 BASE 에 "books"·slug 를 이어 붙이면 verify_code 주인 표('책 산출물 경로')가 막는다.
 #   tracked : playbook.html(플레이북 원본) · source.md(자작 원문) · source_index.json · tree.json · tree_candidates/ · scenarios.json
 #   runtime : backtest.json(백테스트 탭 데이터) · logs/(책별 실행 로그·심판 덤프) · positions.json(내 포지션 — 개인 파일)
 BOOKS = os.path.join(BASE, "books")

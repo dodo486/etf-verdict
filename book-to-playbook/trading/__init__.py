@@ -9,8 +9,7 @@
   · replay.py           장중 재생(신호만)
   · watch.py            장중 주기 재판정 루프(orchestration.run watch)
   · notify.py           알림 송신(텔레그램·데스크톱 — 네트워크 예외는 이 한 파일)
-  · verify_trading.py   검사기 — 거래 시뮬레이터·실전 경로 불변식
-  · verify_signal_parity.py 검사기 — 백테스트 신호 == 실시간 신호(일봉)
+  · verify_trading.py   검사기 — 거래 시뮬레이터·실전 경로 불변식 · --parity 신호 패리티(백테스트 == 실시간)
 
 트리의 뜻은 구간② 공개 DSL(checklist.tree_gateway·cond·grade)만 import 한다. 화면층(web)은 import 하지 않는다.
 """

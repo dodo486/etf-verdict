@@ -103,7 +103,7 @@ class Timeline:
     def truncate(full, upto):
         """full(History) 을 날짜 upto(YYYYMMDD) 이하로 자른 새 History. 분봉(minutes)은 그대로 넘긴다.
         과거 세션을 재생할 때 '그 세션 마감 직후 라이브가 보유했을' 일봉(그날까지의 확정 일봉)을 재현한다 —
-        신호 파리티(verify_signal_parity)가 쓰는 바로 그 규약."""
+        신호 파리티(verify_trading --parity)가 쓰는 바로 그 규약."""
         t = History({s: [c for c in (cs or []) if c.date <= upto] for s, cs in full.items()})
         t.minutes = getattr(full, "minutes", {})
         return t

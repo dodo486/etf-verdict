@@ -40,7 +40,7 @@
 `md_feed.minutes()` 가 하는 **모양 변환만**(66~95행): `dt`(ISO8601 UTC) → `YYYYMMDDHHMM`(UTC 그대로,
 변환 없음; 87행 슬라이싱 `dt[:4]+dt[5:7]+dt[8:10]+dt[11:13]+dt[14:16]`), `vol → volume`, OHLC 그대로.
 반환 계약: `{YYYYMMDDHHMM(UTC): {open,high,low,close,volume}}`. 네트워크 코드는 이 파일에 **없어야 하고**
-`import jhts` 는 파이프라인 전체에서 이 파일 하나만 허용(`verify_teams.py` 강제; md_feed.py 3~14행).
+`import jhts` 는 파이프라인 전체에서 이 파일 하나만 허용(`orchestration/verify_code.py` 강제; md_feed.py 3~14행).
 
 ### 1.2 "jhts 가 줘야 할 것 vs 지금 주는 것" 표
 

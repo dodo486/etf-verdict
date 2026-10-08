@@ -14,7 +14,7 @@
 
 import 방향은 한 방향이다 — `shared ← playbook · checklist(공개 DSL) ← trading ← web` (orchestration 은 조립만).
 구간②는 트리의 언어(공개 DSL: `tree_gateway`·`cond`·`grade`)를 내놓고, 구간③·화면은 그것만 import 한다.
-경계는 `orchestration/verify_teams.py` 가 기계로 강제한다.
+경계와 '결정 하나 = 주인 하나'(주인 표)는 `orchestration/verify_code.py` 가 기계로 강제한다.
 
 | 폴더 | 구간 | 하는 일 | 산출물 |
 |---|---|---|---|
@@ -23,7 +23,7 @@ import 방향은 한 방향이다 — `shared ← playbook · checklist(공개 D
 | `trading/` | ③ 판정·백테스트·장중 | Judge(한 시점 판정)·Timeline(시간 축)·체결 워크·vectorbt 계산기·재생·알림 | (판정은 web 이 화면으로) · `books/<slug>/logs/backtest.json` |
 | `web/` | 화면 | 판정 JSON·백테스트 탭 데이터 빚기 · 화면 JS 주입 · 페이지 조립 · 로컬 실시간 서버 · 홈 | (serve 가 매 요청 그림) · `books/<slug>/backtest.json` |
 | `shared/` | 공통층 | **시세 창구 md_feed** · paths | — |
-| `orchestration/` | 조립·감사 | `run.py`(러너) · `verify_structure.py`(구조·책 계약) · `verify_teams.py`(경계) — 전 구간 실행·검사 | — |
+| `orchestration/` | 조립·감사 | `run.py`(러너 · 검사 목록 CHECKS 한 곳) · `verify_code.py`(폴더 경계·주인 표) — 전 구간 실행·검사 | — |
 
 트리의 뜻(문법 cond·등급 grade)을 checklist/ 에 한 벌만 두고 ③이 그걸 import 하는 이유: ②가 트리를 검사할 때 본 동작과 ③이 판정할 때의 동작이
 **같은 코드**여야 둘이 갈라지지 않는다.
@@ -59,13 +59,21 @@ import 방향은 한 방향이다 — `shared ← playbook · checklist(공개 D
 
 봉 단위(`tf`: 1d·1m·5m)는 시세 노드의 속성이다 — 일봉·분봉을 따로 다루지 않는다. 데이터 연결 여부는 트리와 무관하다.
 
-## 검증층 — 검사기 3개 (발행 관문, `orchestration.run`)
+## 검증층 — 검사 목록 하나 (`orchestration/run.py` 의 CHECKS, `python -m orchestration.run check`)
 
-| # | 검사기 | 보는 것 |
+| 검사 | 태그 | 보는 것 |
 |---|---|---|
-| ① | `verify_structure` | 팀 경계 · 플레이북 본문 해시 · 책 계약(소절 인덱스·트리 문법·트리 ref 가 실제 소절·페이지 구획과 UI 사본) |
-| ② | `checklist.verify_primitives` | 원시 연산·체결·금액 판정을 pandas 기준값·손계산과 대조 · 3값 논리 전수 · 인과성 · 문법. 책이 늘어도 크기 고정 |
-| ③ | `checklist.verify_tree` | 체크리스트가 원문 뜻대로 **동작**하나 — 이중 추출을 실제 시세 3년으로 칸별 비교(갈린 칸은 심판 기록 필수) · 원문 사례 재현 · 발화 통계 · 비중 합 100% 초과 정지 · 수동 사유 분류 |
+| `orchestration.verify_code` | gate | 코드 규칙 — 폴더 경계(import 방향·jhts 단일 창구·자가수집 0) · **주인 표**(트리 원본 키·책 산출물 경로·표준 매도·매도 출처 이름표·칸/등급 이름표·등급 사다리 — 주인 밖에 보이면 정지) |
+| `playbook.verify_source_integrity` | gate | 플레이북 본문(`#src`) 해시 |
+| `checklist.verify_tree --contract` | gate | 책 계약 — 소절 인덱스 · 트리 문법(여섯 칸 전부) · 트리 ref 가 실제 소절 |
+| `web.verify_view --pages` | gate | 책 페이지 — `#src`·`#verdict-data`·`#sheet-root` · 공유 UI 구획 사본 == `web/ui/*.js` |
+| `checklist.verify_primitives` | tree | 원시 연산·등급·금액을 pandas 기준값·손계산과 대조 · 3값 논리 전수 · 인과성 · 문법 · 출입구 계약. 책이 늘어도 크기 고정 |
+| `trading.verify_trading` | tree | 거래 시뮬레이터(체결 워크) · 실전 경로 불변식. `--parity` = 신호 패리티(백테스트 == 실시간, 시세 필요 — 태그 opt) |
+| `web.verify_view` | tree | 화면 설명 구조(condition_view) |
+| `checklist.verify_tree` | tree | 체크리스트가 원문 뜻대로 **동작**하나 — 이중 추출을 실제 시세 3년으로 칸별 비교(갈린 칸은 심판 기록 필수) · 원문 사례 재현 · 발화 통계 · 비중 합 100% 초과 정지 · 수동 사유 분류 |
+
+태그: gate = 항상(daily·verdict 포함) · tree = `--no-verify-tree` 면 생략 · opt = `run check --parity` 일 때만.
+종료코드 0 통과 · 1 정지 · 2 경고(tree 태그만 — gate 는 2 도 정지).
 
 글자 대조 검사(창작·커버리지·규칙↔명세·의미검사)는 의미를 판정하지 못해 없앴다 — 숫자 '2'만 있으면 '2거래일 유지'가
 1일로 판정돼도 통과했다. 지금 검사는 전부 **실행**으로 본다.
@@ -80,7 +88,7 @@ import 방향은 한 방향이다 — `shared ← playbook · checklist(공개 D
    → 심판(`checklist/JUDGE.md`)이 비교 도구(`--dump`)로 다른 곳을 보고 원문과 대조해 최종 `tree.json`(`review` 포함)을 직접 쓴다
    → `python -m checklist.verify_tree <slug>` 통과.
 4. **페이지**: `books/trend/playbook.html` 을 베이스로 `#src` 와 머리말만 교체(시트 패널은 `#verdict-data` + `#sheet-root` 골격 그대로).
-5. **등록**: `books.json` 에 항목(slug/title/tickers/desc/live/engine). `python -m orchestration.verify_structure` 의 책 계약이 통과해야 한다.
+5. **등록**: `books.json` 에 항목(slug/title/tickers/desc/live/engine). `python -m orchestration.run check --no-verify-tree`(코드 규칙·본문 해시·책 계약·책 페이지)가 통과해야 한다.
 6. **배포**: `python -m orchestration.run daily`.
 
 수집 요청서는 없다 — 트리가 쓰는 심볼이 곧 수집 목록이고, jhts 에 없는 심볼은 수집 요청이 자동으로 남는다.
@@ -89,6 +97,7 @@ import 방향은 한 방향이다 — `shared ← playbook · checklist(공개 D
 
 ```
 python -m orchestration.run daily        # 판정 → 백테스트 탭 데이터 → 검사
+python -m orchestration.run check [--no-verify-tree] [--parity]   # 검사만 전부(CHECKS) — 요약 + 종료코드
 python -m orchestration.run watch [--every N] # asof=지금 기준 N분(기본 5)마다 재판정(백테스트 제외) — 장중 조건은 분봉이 연결되면 살아난다
 python -m web.verdict_view <slug> [--json] [--no-send]       # 오늘 판정(판정 JSON·알림)
 python -m trading.backtest <slug> [--days 365] [--engine vectorbt | --intraday]   # 백테스트(로그)
@@ -112,7 +121,7 @@ python -m web.serve                                           # 로컬 실시간
 | `books/<slug>/playbook.html` · `books/trend/source.md` | 플레이북 원본(책 페이지 HTML) · 데모 책 원문(자작) |
 | `books/<slug>/positions.json` | 내 포지션(커밋 안 함 — 로컬 화면에서만 매도·분할 판정, 형식은 `SETUP.md`) |
 | `books/<slug>/backtest.json` · `books/<slug>/logs/` | 런타임 산출물(커밋 안 함) — 백테스트 탭 데이터 · 책별 로그(판정 문장·백테스트·심판 덤프) |
-| `shared/paths.py` | 경로 한 곳 — 책 산출물 경로(`book_dir`·`book_file`·`playbook_html`…)를 짓는 유일한 코드(`verify_teams` 규칙 5) |
+| `shared/paths.py` | 경로 한 곳 — 책 산출물 경로(`book_dir`·`book_file`·`playbook_html`…)를 짓는 유일한 코드(`verify_code` 주인 표) |
 | `checklist/EXTRACTOR.md` · `SCENARIO.md` · `JUDGE.md` | 추출자 · 사례 작성자 · 심판 지침(역할마다 하나 — 서브에이전트 프롬프트 정본) |
 | `checklist/COND_DSL.md` | 트리 문법(트리를 쓰는 추출자·심판의 참고서) |
 | `checklist/verify_tree.py` | 트리 검사(트리를 만들지 않음) |

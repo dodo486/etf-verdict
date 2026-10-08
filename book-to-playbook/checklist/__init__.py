@@ -14,9 +14,9 @@
   · tree_gateway.py     [공개 DSL] TreeGateway — tree.json 을 읽는 유일한 출입구(형식 검사·탐색)
   · cond.py             [공개 DSL] 조건 트리 문법·평가기 (python -m checklist.cond fmt <파일> = 공통 직렬화)
   · grade.py            [공개 DSL] 등급의 뜻 — 날짜별 등급·금액·비중·워밍업 가드 + grade_rules.json(등급 사다리)
-  · verify_tree.py      트리 검사 — 이중 추출 비교·원문 사례·발화 통계·비중 합 · 심판의 비교 도구(--dump)
+  · verify_tree.py      트리 검사 — 이중 추출 비교·원문 사례·발화 통계·비중 합 · 심판의 비교 도구(--dump) · 책 계약(--contract)
   · verify_primitives.py 검사기 — 원시 연산·등급 계산을 기준값·손계산과 대조
 
 팀 경계: 이 팀은 shared/ 만 import 한다(a·b 비교는 규칙 식으로만 — 매매 시뮬레이션은 구간③ 몫).
-거꾸로 [공개 DSL] 세 모듈만 다른 층이 import 해도 된다. 경계는 verify_teams.py 가 강제한다.
+거꾸로 [공개 DSL] 세 모듈만 다른 층이 import 해도 된다. 경계는 orchestration/verify_code.py 가 강제한다.
 """

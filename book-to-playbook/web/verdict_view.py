@@ -233,7 +233,7 @@ def render(slug, asof=None):
            "grades": GRADES,
            # 등급 판정 사다리(데이터) 도 같이 실어, 화면이 같은 표로 등급을 다시 낸다(복붙 금지).
            "grade_rules": GRADE_RULES,
-           # 여섯 칸 키→한글 이름표(화면 머리글용) — cond.ZONE_LABELS 가 정본이다. 화면(shared-ui ZW)이
+           # 여섯 칸 키→한글 이름표(화면 머리글용) — cond.ZONE_LABELS 가 정본이다. 화면(shared-ui zw)이
            #   복붙하지 않고 이걸 받아 쓴다. 머리글 번호 순서대로(①필터 ②회피 ③진입 …) 실어보낸다.
            "zones": {s: cond.ZONE_LABELS[s]
                      for s in ("filter", "avoid", "entry", "caution", "sizing", "exit")}}
@@ -308,7 +308,7 @@ def build_text(top):
 
 
 # 알림 발신(send_telegram/send_desktop)은 구간③ trading/notify.py 가 맡는다 —
-# 네트워크 코드(urllib)는 그 한 파일에만 허용된다(verify_teams.py ALLOW 의 명시 예외).
+# 네트워크 코드(urllib)는 그 한 파일에만 허용된다(orchestration/verify_code.py ALLOW 의 명시 예외).
 def _cli():
     argv = sys.argv[1:]
     slug = next((a for a in argv if not a.startswith("-")), None)

@@ -10,7 +10,7 @@
   if(!btn) return;
 
   function refs(){ try { return JSON.parse(document.getElementById('verdict-data').textContent).refs || {}; } catch(e){ return {}; } }
-  // 칸 이름표는 엔진 값(VD.zones)을 먼저 읽는다 — 공용 부품(shared-ui.zw). ZW 리터럴은 오프라인 기본값.
+  // 칸 이름표는 엔진 값(VD.zones)을 먼저 읽는다 — 공용 부품(shared-ui.zw) — 없으면 키 그대로.
   function zones(r){ return (r.zones || []).map(function(z){ return window.BP.zw(z); }).join('·'); }
 
   /* ---- 분할 모드 토글 ---- */

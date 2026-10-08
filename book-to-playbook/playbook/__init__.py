@@ -9,5 +9,5 @@
 
 팀 경계: 다른 팀(checklist·verdict) 코드를 import 하지 않는다. 공용은 shared/ 만.
 다른 팀과의 인터페이스는 코드가 아니라 산출물 파일(books/<slug>/*.json)이다.
-경계는 verify_teams.py 가 기계로 강제한다.
+경계는 orchestration/verify_code.py 가 기계로 강제한다.
 """

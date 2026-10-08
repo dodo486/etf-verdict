@@ -231,8 +231,8 @@
     if(!v.zones){ return h; }
     const z = v.zones;
     // 칸 이름표(필터·회피·진입·조심·매도)는 엔진 값(VD.zones = checklist/cond.ZONE_LABELS)에서 꺼낸다 — 복붙 금지.
-    //   동그라미 번호는 화면 전용 머리글이라 그대로 두고, 이름표 글자만 ZW(=VD.zones 우선)에서 가져온다.
-    const ZL = window.BP.ZW, zl = k => (VD.zones && VD.zones[k]) || ZL[k] || k;
+    //   동그라미 번호는 화면 전용 머리글이라 그대로 두고, 이름표 글자만 VD.zones 에서 가져온다(없으면 키 그대로).
+    const zl = k => (VD.zones && VD.zones[k]) || k;
     // 조건 칸의 ●/○/? 는 실제 등급을 낸 시각(opt/pes)과 같은 fill 로 평가한다(M3) — 미응답 수동 조건에서
     //   등급은 정해졌는데 칸만 ? 로 뜨는 어긋남을 막는다. zoneHead 요약값도 같은 fill 로 맞춘다.
     const gv = gradeView(v, ans), fF = zoneFill(gv,'filter'), fA = zoneFill(gv,'avoid'), fE = zoneFill(gv,'entry');

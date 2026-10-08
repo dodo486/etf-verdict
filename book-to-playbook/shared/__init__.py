@@ -6,5 +6,5 @@
   · paths.py       경로·인코딩·책 레지스트리(books.json)
 
 트리의 뜻(문법 cond·등급 grade)은 구간② checklist/ 가, 체결 워크(trades)는 구간③ trading/ 이 가진다.
-공통층은 어느 팀도 import 하지 않는다(경계는 orchestration/verify_teams.py 가 기계로 강제한다).
+공통층은 어느 팀도 import 하지 않는다(경계는 orchestration/verify_code.py 가 기계로 강제한다).
 """

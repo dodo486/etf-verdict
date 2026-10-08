@@ -40,5 +40,5 @@
 
 ## 실행 환경 메모
 
-- 검증: `orchestration/verify_teams.py`·`verify_structure.py` 는 **조립·감사층**(`python -m orchestration.verify_teams` / `.verify_structure`). venv = `.venv`.
+- 검증: 검사 목록은 `orchestration/run.py` CHECKS 하나(`python -m orchestration.run check`). 코드 규칙은 `orchestration/verify_code.py`, 책 계약은 `python -m checklist.verify_tree --contract`. venv = `.venv`.
 - `scenarios.json` 은 옛 즉석본이라 신뢰 말 것 — 구간② 재실행 시 `SCENARIO.md`(② 단계)가 자동으로 새로 덮어쓴다.

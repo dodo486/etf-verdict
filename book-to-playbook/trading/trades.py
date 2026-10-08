@@ -8,6 +8,7 @@ build_trades 결과(체결 일정)를 받아서 낸다. '책에 매도 규칙이
 
 규칙 리더
   · exits_of    : 책에 매도 규칙이 있으면 그걸, 없으면 표준(STANDARD)을. (규칙 목록, 출처) 로 돌려준다.
+  · uses_standard_exit : 표준을 쓰나(불리언) — 화면은 출처 글자('책')와 비교하지 않고 이 플래그(exit_standard)를 본다.
   · tranches_of : 분할 매수 차수. 저자가 비율을 안 줬으면(frac null) 전량 한 번(비율을 지어내지 않는다).
   · unsized_note: 분할 비율·매도 비율 '저자 미명시'를 백테스트가 어떻게 계산했는지 결과에 표시할 문구.
   · standard_label / STANDARD : 책에 매도 규칙이 없는 상품에 쓰는 '책 무관 기본값'(결과엔 '표준 기준(책 아님)').
@@ -58,6 +59,11 @@ def exits_of(gw, prod):
     """(규칙 목록, 출처) — 책 규칙이 없으면 표준."""
     ex = gw.exit_rules(prod)
     return (ex, "책") if ex else (gw.as_rules(STANDARD), "표준 기준(책 아님)")
+
+
+def uses_standard_exit(gw, prod):
+    """책에 매도 규칙이 없어 표준을 쓰나 — exits_of 의 출처 글자 대신 화면이 보는 플래그(글자 비교 금지)."""
+    return not gw.exit_rules(prod)
 
 
 def tranches_of(gw, prod):

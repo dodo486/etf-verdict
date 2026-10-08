@@ -57,9 +57,10 @@ PYTHONPATH=C:\Users\<사용자>\jhts
 ```
 python -m orchestration.run daily        # 판정 → 백테스트 탭 데이터 → 검사 (장 마감 후)
 python -m orchestration.run watch [--every N]  # asof=지금 기준 N분(기본 5)마다 재판정(장중 포함)
+python -m orchestration.run check        # 검사만 전부(CHECKS 한 목록) — 요약 + 종료코드
 ```
 
-옵션: `--quiet`(콘솔 최소화) · `--no-verify-tree`(트리 검수 생략 — 트리 안정 후)
+옵션: `--quiet`(콘솔 최소화) · `--no-verify-tree`(tree 태그 검사 생략 — 트리 안정 후) · `--parity`(check 만 — 신호 패리티 추가)
 
 래퍼도 있다 — macOS/Linux는 `./run.sh`, Windows는 `run.cmd`.
 파이썬 경로를 고정하고 싶으면 `BOOK_TO_PLAYBOOK_PYTHON` 환경변수를 쓴다.

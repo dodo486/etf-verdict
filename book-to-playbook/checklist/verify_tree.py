@@ -28,9 +28,16 @@
   7. 수동 사유 분류 — manual 사유를 '저자 미명시 / 데이터 없음 / 연산 없음' 으로 세어 보고한다.
      사유 머리가 없으면 경고(어디로 보내야 할지 모르는 수동은 조용한 누락이 된다).
 
-종료코드: 0 통과 · 1 정지(트리 없음/문법/미심판 불일치/최종≠승자/사례 실패/비중 초과) · 2 경고만.
+책 계약(--contract) — 시세 없이 바로 갈리는 산출물 계약만(라이브 책마다, 실패 → 정지):
+  · books/<slug>/source_index.json — 원문이 소절 단위로 잘려 있다(소절 키 = 체크리스트 ref)
+  · books/<slug>/tree.json — 체크리스트가 문법을 통과한다(여섯 칸 전부 명시)
+  · 트리의 ref 가 전부 실제 소절 키다(없는 소절을 근거로 삼지 않는다)
+  (책 페이지 구획·UI 사본은 화면층 web.verify_view --pages 가 본다)
+
+종료코드: 0 통과 · 1 정지(트리 없음/문법/미심판 불일치/최종≠승자/사례 실패/비중 초과) · 2 경고만. --contract 는 0 · 1.
 사용:
   python -m checklist.verify_tree [slug ...] [--years 3]
+  python -m checklist.verify_tree --contract [slug ...]   책 계약만(빠름 — orchestration.run 이 항상 돌린다)
   python -m checklist.verify_tree <slug> --dump N     심판의 비교 도구 — 판정이 갈린 날 N개씩을 books/<slug>/logs/disagree.json 으로(판단은 안 함)
 """
 import json
@@ -40,7 +47,7 @@ from collections import namedtuple
 from datetime import datetime, timedelta
 
 from shared import paths  # noqa: F401  (UTF-8 출력)
-from shared.paths import book_file, book_log, live_slugs, write_text
+from shared.paths import book_file, book_log, live_slugs, source_index_json, write_text
 from checklist import cond, grade
 from shared import md_feed
 from checklist.tree_gateway import TreeGateway
@@ -997,8 +1004,52 @@ def check_book(slug, years):
     return stop, warn
 
 
+# ------------------------------------------------------------------ 책 계약(--contract)
+def contract(slug):
+    """라이브 책 하나의 산출물 계약 위반 목록 — 소절 인덱스 · 트리 문법 · 트리 ref 가 실제 소절."""
+    bad = []
+    try:
+        idx = json.load(open(source_index_json(slug), encoding="utf-8"))
+        keys = set(idx.get("sections") or {})
+        if not keys:
+            bad.append("source_index.json 에 소절이 없다")
+    except (OSError, ValueError) as e:
+        bad.append("source_index.json 없음/깨짐: %s" % e)
+        keys = set()
+    try:
+        tree = TreeGateway.open(TreeGateway.path(slug))
+        tree.validate()
+    except (OSError, ValueError, cond.CondError) as e:
+        bad.append("tree.json 문법: %s" % e)
+        tree = None
+    if tree is not None and keys:
+        refs = tree.refs()
+        # "2-1·2-3" 처럼 여러 소절을 함께 적은 ref 는 하나하나 본다
+        parts = {p.strip() for r in refs for p in str(r).replace("·", ",").split(",") if p.strip()}
+        missing = sorted(parts - keys)
+        if missing:
+            bad.append("tree.json 의 ref 가 없는 소절을 가리킴: %s" % ", ".join(missing))
+    return bad
+
+
+def contract_main(slugs):
+    stop = []
+    for slug in slugs:
+        bad = contract(slug)
+        print("  %s %-34s %s" % ("✅" if not bad else "❌", "책 계약 " + slug, "; ".join(bad)[:300] or "통과"))
+        if bad:
+            stop.append("책 계약 " + slug)
+    if stop:
+        print("책 계약 정지 — %s" % ", ".join(stop))
+        return 1
+    print("책 계약 통과")
+    return 0
+
+
 def main():
     argv = sys.argv[1:]
+    if "--contract" in argv:
+        return contract_main([a for a in argv if not a.startswith("-")] or live_slugs())
     years = float(argv[argv.index("--years") + 1]) if "--years" in argv else 3
     if "--dump" in argv:
         dump_disagreements(argv[0], int(argv[argv.index("--dump") + 1]), years)

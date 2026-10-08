@@ -11,7 +11,7 @@ dataset "candles")을 남긴다. 같은 요청은 jhts 가 하나로 합치고, 
 
 jhts.marketdata 미설치 시 AVAILABLE=False, 함수는 빈 값을 돌려준다(무크래시 — 판정은 ❔ 로 드러난다).
 이 파일에는 네트워크 코드가 **없어야 한다** — 수집은 전부 jhts 몫이다.
-(`import jhts` 가 허용되는 곳도 파이프라인 전체에서 이 파일 하나다. verify_teams.py 가 강제.)
+(`import jhts` 가 허용되는 곳도 파이프라인 전체에서 이 파일 하나다. orchestration/verify_code.py 가 강제.)
 """
 import sys
 

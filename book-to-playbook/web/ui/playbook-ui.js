@@ -10,7 +10,7 @@
   const esc = window.BP.esc;            // 공용 부품(shared-ui) — 고치는 곳은 거기 하나
   const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
   const REFS = (function(){ try { return JSON.parse(document.getElementById('verdict-data').textContent).refs || {}; } catch(e){ return {}; } })();
-  // 칸 이름표는 엔진 값(VD.zones)을 먼저 읽는다 — 공용 부품(shared-ui.zw). ZW 리터럴은 오프라인 기본값.
+  // 칸 이름표는 엔진 값(VD.zones)을 먼저 읽는다 — 공용 부품(shared-ui.zw) — 없으면 키 그대로.
   function refBadge(headText){
     const m = headText.match(window.BP.REF_RE); if(!m) return '';
     const r = REFS[m[1]];

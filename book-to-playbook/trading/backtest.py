@@ -317,7 +317,7 @@ def run_intraday(slug, hist=None, tree=None, limit=None):
     if hist is None:
         hist = load_hist(tree)
     # 신호 = Timeline 단일 입구(분봉 per-asof). truncate=True — 각 asof 를 그 세션일 이하로 자른 hist 로 판정한다
-    #   (verify_signal_parity 가 일봉 파리티를 증명한 바로 그 방식). 과거 세션도 '그 세션 자신의 일봉 regime +
+    #   (verify_trading --parity 가 일봉 파리티를 증명한 바로 그 방식). 과거 세션도 '그 세션 자신의 일봉 regime +
     #   그 시점 분봉'으로 충실히 재생된다(truncate 없이 full hist 면 latest 가 늘 오늘 봉을 판정해 과거
     #   세션 regime 이 틀린다 — 아키텍트 확인). 신호 뒤에 체결 일정·vectorbt 계산기만 백테스트가 붙인다.
     axis = Timeline(tree, hist)
