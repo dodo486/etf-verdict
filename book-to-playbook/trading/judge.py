@@ -5,7 +5,7 @@
   · Judge     트리(TreeGateway) + 시세 이력(+ 보유 Holding) → Decision. 상품마다 Grade.ProductEval(checklist/grade)을
               전체 달력에 한 번 세우고 시점(i)마다 꺼낸다(벡터 1회계산 — cond 연산이 인과적이라 미래를 보지 않는다).
               돈·잔고는 모른다(그건 계산기 portfolio 의 일). 등급은 grade(i) 하나 — 라이브는 latest()(달력 마지막 봉),
-              백테스트는 Timeline 이 모든 i 에 같은 grade(i) 를 부른다.
+              백테스트는 signal_series 가 모든 i 에 같은 grade(i) 를 부른다.
   · Amount    그 시점의 '얼마나' 사실(조심 배수·폭 미명시·확인 필요 조심·비중·비중 범위) — Judge.amount(i) 하나로 낸다.
               라이브 화면(Decision.amount)과 백테스트 매수 크기(trades.size_of 가 정책을 입혀 씀)가 같은 값을 쓴다.
               돈은 없다 — 모름(폭 미명시·확인 필요·비중 모름)을 금액에 어떻게 셀지는 정책 주인 trades.size_of 가 정한다.
@@ -151,3 +151,32 @@ class Judge:
         return HoldingState(ret=Cond.series({"pos": "ret"}, ctx)[i], days=Cond.series({"pos": "days"}, ctx)[i],
                             exits=[(r, Cond.series(r.when, ctx)[i]) for r in self.gw.exit_rules(self.prod)],
                             next_tranche=None if nt is None else (nt, Cond.series(nt.when, ctx)[i]), ctx=ctx)
+
+
+def signal_series(gw, hist, start=None, unobserved=None, prods=None):
+    """전 상품·전 시점 신호 — 상품마다 Judge 를 전체 달력에 한 번 세우고 grade(i)/incomplete(i) 를 뽑는다
+    (일봉 벡터 1회계산 — 라이브 latest() 와 같은 Judge.grade 경로). 백테스트가 이 신호 뒤에 집계·계산기를 붙인다.
+    트리 연산은 전부 인과적이라(그날까지의 값만 씀) 전체 이력을 한 번 계산해 날짜로 꺼낸다. start(YYYYMMDD)을
+    주면 그 이상 날만. → {prods, series:{prod:[{date,key,grade,close,incomplete}]}, judges:{prod:Judge}}."""
+    prods = prods if prods is not None else gw.products()
+    series, judges = {}, {}
+    for p in prods:
+        cs = hist.get(p) or []
+        cal = [c.date for c in cs]
+        j = Judge(gw, p, hist, cal, unobserved=unobserved)
+        pts = []
+        for i, d in enumerate(cal):
+            if start is not None and d < start:
+                continue
+            k = j.grade(i)                            # 워밍업 부족이면 grade 가 ❔(불완전)로 내보낸다(incomplete 로 함께 표시)
+            pts.append({"date": d, "key": k, "grade": Grade.GRADES[k], "close": cs[i].close, "incomplete": j.incomplete(i)})
+        series[p], judges[p] = pts, j
+    return {"prods": prods, "series": series, "judges": judges}
+
+
+def truncate(full, upto):
+    """full(Grade.History) 을 날짜 upto(YYYYMMDD) 이하로 자른 새 Grade.History (분봉 minutes 는 그대로 넘긴다).
+    과거 세션의 '그 세션 마감 직후 라이브가 보유했을' 확정 일봉을 재현한다 — 신호 파리티(verify_trading --parity)가 쓰는 규약."""
+    t = Grade.History({s: [c for c in (cs or []) if c.date <= upto] for s, cs in full.items()})
+    t.minutes = getattr(full, "minutes", {})
+    return t

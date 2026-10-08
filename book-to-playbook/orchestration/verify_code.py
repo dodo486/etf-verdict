@@ -8,7 +8,7 @@
 갈라지는" 사고로 돌아간다. 그래서 무엇을 import 해도 되는지를 층마다 한 줄로 정해 둔다(IMPORTS).
   · playbook/      구간① 책 원본 → 전사본(플레이북)
   · checklist/     구간② 전사본 → 조건 트리(tree.json) + 그 트리의 언어(DSL: 출입구·문법·등급의 뜻)
-  · trading/       구간③ 판정 · 백테스트 · 장중(Judge·Timeline·체결 워크·계산기·알림)
+  · trading/       구간③ 판정 · 백테스트 · 장중(Judge·signal_series·체결 워크·계산기·알림)
   · shared/        공통층 — 시세 창구(md_feed)·경로(paths)뿐
   · web/           화면층 — 판정·백테스트 결과를 화면 모양으로 빚고 서빙(판정을 다시 내지 않는다)
   · orchestration/ 조립·감사층(run 러너·이 검사 — 전 구간을 실행·검사만)

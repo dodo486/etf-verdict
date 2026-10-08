@@ -16,8 +16,8 @@
 인과적이고(미래를 안 봄) asof 확정봉 가리기(settled)가 일봉 마감과 맞아야 한다 — 그걸 실행으로 확인한다.
 
   · 백테스트 경로 : `trading.backtest.run(slug, days=N)` 의 `daily` 행 → {date, prod, key, grade}.
-                    (내부에서 Timeline 이 Judge(tree, p, hist, cal).grade(i) 를 전체 달력에 돌린다.)
-  · 실시간 경로   : 각 과거일 D 에 대해 hist 를 D 이하로 잘라(Timeline.truncate) `Judge(tree, p, hist, asof).latest()`
+                    (내부에서 judge.signal_series 가 Judge(tree, p, hist, cal).grade(i) 를 전체 달력에 돌린다.)
+  · 실시간 경로   : 각 과거일 D 에 대해 hist 를 D 이하로 잘라(judge.truncate) `Judge(tree, p, hist, asof).latest()`
                     — 라이브 판정(web.verdict_view.product_verdict)이 등급을 얻는 바로 그 호출이다.
                     asof 는 그날 마감 시점(UTC).
   전 상품 × 창(데이터 있는 최근 WINDOW 거래일) 전부에서 두 경로의 (key, grade) 가 **일치**하는지. 불일치가 하나라도
@@ -259,8 +259,7 @@ def compare(slug, window=WINDOW):
     """한 책의 두 경로를 실제로 돌려 (상품·날짜)별 (key, grade) 를 비교한다.
     → {total, match, mismatches:[{prod, date, bt_key, bt_grade, live_key, live_grade}], products, window}."""
     from trading import backtest               # 패리티만 쓰는 실제 드라이버 진입점(1·2 검사는 안 부른다)
-    from trading.judge import Judge
-    from trading.timeline import Timeline
+    from trading.judge import Judge, truncate
     # 라이브 판정(render)과 같은 방식으로 전체 일봉을 한 번 받는다(워밍업 포함).
     # window 만큼 + 워밍업을 넉넉히 — backtest.run 의 days 도 이 창을 덮게 준다.
     tree, full = open_history(slug, window * 2 + 30)
@@ -283,7 +282,7 @@ def compare(slug, window=WINDOW):
             if bt_row is None:
                 continue
             # 실시간 경로: 라이브가 D 마감 직후 봤을 입력(D 이하 이력·그날 마감 asof)으로 Judge.latest.
-            key, _close = Judge(tree, p, Timeline.truncate(full, d), asof=_asof_of(d)).latest()
+            key, _close = Judge(tree, p, truncate(full, d), asof=_asof_of(d)).latest()
             live_row = (key, Grade.GRADES[key])
             total += 1
             if live_row != bt_row:

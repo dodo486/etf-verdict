@@ -13,7 +13,7 @@
                │   공개 DSL: tree_gateway(출입구) · tradeTool(Cond=문법·계산 · Grade=등급의 뜻)
                ▼
           구간③ trading/    ─▶ Judge(판단) → Decision ─┬─ 오늘 판정
-                                                      ├─ 백테스트(Timeline × 계좌·체결 × 성적)
+                                                      ├─ 백테스트(signal_series × 계좌·체결 × 성적)
                                                       └─ 장중(watch — 주기 재판정)
                │
                ▼
@@ -28,7 +28,7 @@ books/<slug>/  책 하나의 산출물 전부(playbook.html · source · source_
 |---|---|---|
 | `playbook/` | 구간① 원문 → 전사본 | `PLAYBOOK.md`(지침) · `book_source.py` · `verify_source_integrity.py` |
 | `checklist/` | 구간② 전사본 → tree.json, **DSL 의 주인** | `tree_gateway.py` · `tradeTool.py`(Cond·Grade, +`grade_rules.json`) · `verify_tree.py` · `verify_primitives.py` · 지침 md(COND_DSL·EXTRACTOR·SCENARIO·JUDGE·README) |
-| `trading/` | 구간③ 판정 · 백테스트 · 장중 | `judge.py`(Judge·Decision·Holding) · `timeline.py` · `trades.py`(체결 규약·매도 정책) · `portfolio.py`(돈·수수료) · `backtest.py` · `commonTool.py` · `watch.py` · `notify.py` · `verify_trading.py` |
+| `trading/` | 구간③ 판정 · 백테스트 · 장중 | `judge.py`(Judge·Decision·Holding·signal_series·truncate) · `trades.py`(체결 규약·매도 정책) · `portfolio.py`(돈·수수료) · `backtest.py` · `commonTool.py` · `watch.py` · `notify.py` · `verify_trading.py` |
 | `web/` | 화면 | `verdict_view.py` · `condition_view.py` · `backtest_page.py` · `book_page.py` · `serve.py` · `ui/*.js` · `verify_view.py` |
 | `shared/` | 공통 | `md_feed.py` · `paths.py` · `_dev_cache.py`(개발용 시세 캐시) |
 | `orchestration/` | 실행·검사 | `run.py` · `verify_code.py` |

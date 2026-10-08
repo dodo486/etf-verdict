@@ -81,7 +81,7 @@ python -m web.serve                                           # 로컬 실시간
 | `checklist/verify_tree.py` | 트리 검사(트리를 만들지 않음) |
 | `web/ui/*.js` · `web/inject_ui.py` | 화면 JS(책 무관 공유) · 페이지 주입 |
 | `checklist/tree_gateway.py` · `tradeTool.py` | 구간② 공개 DSL — 트리 출입구 · Cond(문법·평가기) · Grade(등급의 뜻 — 등급·금액·비중·워밍업·시세 조달) |
-| `trading/judge.py` · `timeline.py` · `trades.py` · `portfolio.py` · `backtest.py` | 판정기(Judge·Decision·Holding) · 시간 축 · 체결 워크(분할·매도) · vectorbt 계산기 · 백테스트 |
+| `trading/judge.py` · `trades.py` · `portfolio.py` · `backtest.py` | 판정기(Judge·Decision·Holding·signal_series·truncate) · 체결 워크(분할·매도) · vectorbt 계산기 · 백테스트 |
 | `shared/md_feed.py` | **jhts 시세 창구 — 유일한 수집 입구**(없으면 수집 요청) |
 | `web/verdict_view.py` · `trading/notify.py` | 판정 JSON·알림 문장(books.json engine.daily) · 알림 송신(텔레그램·데스크톱) |
 | `web/book_page.py` · `web/serve.py` · `web/build_home.py` · `web/backtest_page.py` | 페이지 조립 · 로컬 실시간 서버 · 홈 · 백테스트 탭 데이터 |

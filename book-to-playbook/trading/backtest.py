@@ -3,7 +3,7 @@
 """신호 백테스트 (책 무관) — 과거 N일 동안 매일 '그날 장 마감 기준' 판정을 다시 내고,
 그 판정 뒤에 실제로 가격이 어떻게 갔는지 잰다.
 
-판정은 라이브와 같은 판정기(trading/judge.Judge — 같은 트리·같은 등급 코드)가 Timeline 위에서 낸다.
+판정은 라이브와 같은 판정기(trading/judge.Judge — 같은 트리·같은 등급 코드)가 judge.signal_series 로 낸다.
 트리 연산은 전부 인과적이라(그날까지의 값만 씀 — verify_primitives 가 강제) 전체 이력을 한 번
 계산해 날짜로 꺼낸다. 시세는 md_feed → jhts 시세팀에서 온다.
 
@@ -33,7 +33,7 @@ from datetime import datetime, timedelta
 
 from shared.paths import book_log, write_text
 from trading import trades
-from trading.timeline import Timeline
+from trading.judge import signal_series
 from trading.commonTool import open_history
 
 HORIZONS = (5, 10, 20)
@@ -92,10 +92,9 @@ def run(slug, days=365, hist=None, tree=None, unobserved=None):
     start = (today - timedelta(days=days)).strftime("%Y%m%d")
     missing = sorted(s for s, cs in hist.items() if not cs)
 
-    # 신호 = Timeline 단일 입구(일봉 벡터 1회계산 경로 — 라이브와 같은 Judge.grade). 백테스트는 그 신호 뒤에 집계·계산기를
-    #   붙인다(판단/계산 분리 — 여기선 판정기가 낸 신호를 '받아쓰기'만 한다). judges=Judge(워밍업·수동조건).
-    #   axis="1d" 강제 — 일봉 백테스트는 늘 일봉축이다(트리에 분봉 관측 잎이 섞여 finest_tf 가 "1m"이어도).
-    sig = Timeline(tree, hist).run(start=start, unobserved=unobserved, axis="1d")
+    # 신호 = judge.signal_series(일봉 벡터 1회계산 — 라이브 latest() 와 같은 Judge.grade). 백테스트는 그 신호 뒤에
+    #   집계·계산기를 붙인다(판단/계산 분리 — 여기선 판정기가 낸 신호를 '받아쓰기'만 한다). judges=Judge(워밍업·수동조건).
+    sig = signal_series(tree, hist, start=start, unobserved=unobserved)
 
     rows, summary, manual, period, trade_res, incomplete = [], {}, {}, None, {}, {}
     for p in tree.products():
