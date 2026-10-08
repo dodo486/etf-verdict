@@ -295,7 +295,7 @@ def weight_overflow(tree, hist, years):
     """상품 비중 합이 100% 를 넘는 날 [(날짜, 합)] — 비중을 아는 상품만 더한다(수동 범위는 최댓값)."""
     by_day = {}
     for p in tree.products():
-        if tree.sizing(p).weight is None:
+        if tree.sizing(p).qty.x is None:
             continue
         cal = [c.date for c in hist.get(p) or []]
         pe = grade.ProductEval(tree, p, hist, cal)
@@ -541,7 +541,7 @@ def zone_diff(ta, tb, prod, zone):
     if zone in ("caution", "exit"):
         return {"status": "same" if _ckey(xa) == _ckey(xb) else "diff", "rules": _rules_diff(xa, xb)}
     out = {"status": "same" if _ckey(xa) == _ckey(xb) else "diff"}            # sizing
-    wa, wb = _inline(ta.sizing(prod).weight, ta.defs()), _inline(tb.sizing(prod).weight, tb.defs())
+    wa, wb = _inline(ta.sizing(prod).qty.x, ta.defs()), _inline(tb.sizing(prod).qty.x, tb.defs())
     if _ckey(wa) != _ckey(wb):
         out["weight"] = tree_diff(wa, wb) if isinstance(wa, dict) and isinstance(wb, dict) else {"a": wa, "b": wb}
     ra = _inline([t.raw() for t in ta.tranches(prod)], ta.defs())

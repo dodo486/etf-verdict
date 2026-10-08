@@ -96,7 +96,8 @@ def _orders_from_trades(trade_list, cal):
     """trading.trades.build_trades 가 낸 거래 목록(각 거래의 buys/sells)을 '거래일별 주문'으로 편다.
     돌려주는 것: 날짜 인덱스 i → (signed_units, fill_price, is_sell_bar).
       signed_units > 0 매수, < 0 매도(한 봉에 매수·매도가 겹치면 합산; 세금은 매도가 있으면 가산).
-    단위(units)는 규칙 평가 워크의 추상 물량(tranche frac 합=1.0) 그대로다 — 계산기가 물량을 다시 정하지 않는다."""
+    단위(units)는 규칙 평가 워크의 물량(상품 예산 1.0 기준 — 분할 비율 × 비중 × 조심 배수, 금액 정책 trades.size_of)
+    그대로다 — 계산기가 물량을 다시 정하지 않는다."""
     di = {d: i for i, d in enumerate(cal)}
     orders = {}  # i -> {"units": float, "price": float, "sell": bool}
     for t in trade_list:
@@ -139,8 +140,8 @@ def run_product(symbol, cal, closes, trade_list):
     L = len(cal)
     orders = _orders_from_trades(trade_list, cal)
 
-    # 추상 물량(units, frac 합 1.0)을 '주수'로 바꾼다: 1.0 unit = 진입 시 자본을 가득(1.0배) 쓴 것.
-    #   → 1 unit 매수 = (init_cash / 체결가) 주. 부분매도는 같은 환산으로 음수 주수.
+    # 물량(units — 상품 예산 1.0 기준, 이미 비중·분할·조심 배수가 곱해져 있다)을 '주수'로 바꾼다:
+    #   1.0 unit = 시작자본 전액. → 1 unit 매수 = (init_cash / 체결가) 주. 부분매도는 같은 환산으로 음수 주수.
     #   (여러 진입이 시간상 겹치지 않으므로 — build_trades 의 free_from 가드 — 자본 초과가 없다.)
     size = np.full(L, np.nan)
     price = np.full(L, np.nan)

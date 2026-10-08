@@ -179,6 +179,59 @@ def t_no_exit():
             check(t["stats"]["trades"] == 1 and t["trades"][0]["closed"], "매도 규칙 있음 — 거래 시뮬레이션 %r" % t["stats"])
 
 
+def t_sizing():
+    """금액 정책(trades.size_of) — 매수 크기 = 분할 비율 × 비중(%)/100 × 조심 배수. 크기는 그날 판정의 Judge.amount
+    (라이브 화면과 같은 경로)에서 온다. 폭 미명시 조심·확인 필요 조심·비중 모름은 ×1 로 두고 횟수를 센다."""
+    from trading.judge import Judge
+    R = {"pos": "ret"}
+    ON = {"gt": [{"px": "close"}, 0]}                     # 늘 참
+    rows = [(100, 100), (100, 100), (100, 106), (106, 106), (106, 108), (108, 108)]
+    cal = ["2021%04d" % i for i in range(len(rows))]
+    hist = {"X": [Candle(d, o, max(o, c), min(o, c), c, 1000) for d, (o, c) in zip(cal, rows)]}
+    trs = [{"label": "1차", "frac": 0.25}, {"label": "2차", "frac": 0.75, "when": {"ge": [R, 5]}}]
+
+    def run(caution, weight):
+        tree = TreeGateway.of(synthetic({"X": empty_product(caution=caution, sizing={"weight": weight, "tranches": trs})}))
+        j = Judge(tree, "X", hist, cal)
+        tl = trades_mod.build_trades(tree, "X", hist, cal, [0], [], amount=j.amount)
+        return tl[0]["buys"], trades_mod._parity_stats(tl)["size_counts"]
+
+    # 조심 배수 ×0.5 · 비중 40% → 1차 0.25×0.4×0.5 · 2차(2일 +6% → 3일 시가) 0.75×0.4×0.5
+    b, sz = run([{"label": "반", "when": ON, "scale": 0.5}], 40)
+    check([round(x["qty"], 9) for x in b] == [0.05, 0.15] and [x["date"] for x in b] == [cal[1], cal[3]],
+          "비중·조심 배수·분할 비율 곱 %r" % b)
+    check(sz["buys"] == 2 and sz["cut"] == 2 and not trades_mod.size_notes(sz), "조심으로 줄인 횟수 %r" % sz)
+    # 폭 미명시 조심(scale null) → ×1(줄이지 않음) + 횟수 · 비중 저자 미명시 → 상품 예산 100%
+    b, sz = run([{"label": "폭", "when": ON, "scale": None}], None)
+    check([x["qty"] for x in b] == [0.25, 0.75], "폭 미명시 조심·비중 미명시는 ×1 %r" % b)
+    notes = trades_mod.size_notes(sz)
+    check(sz["unspecified"] == 2 and sz["weight_unset"] == 2 and sz["cut"] == 0
+          and any("폭 미명시 조심 2회" in n for n in notes) and any("비중 저자 미명시" in n for n in notes),
+          "폭 미명시·비중 미명시 횟수와 문구 %r %r" % (sz, notes))
+    # 확인 필요(수동) 조심 → ×1 + 횟수 · 비중 식은 있으나 값 모름("?") → 100% + 횟수
+    b, sz = run([{"label": "수동", "when": {"manual": "x"}, "scale": 0.5}], {"case": [[ON, "?"]], "else": "?"})
+    check([x["qty"] for x in b] == [0.25, 0.75] and sz["unknown"] == 2 and sz["weight_unknown"] == 2,
+          "확인 필요 조심·비중 모름은 ×1 %r %r" % (b, sz))
+    # 수량 변환 하나(to_units) — 다섯 basis · 모름(None)은 None
+    Qty, Led, tu = TreeGateway.as_rules([{"frac": 1}])[0].qty.__class__, trades_mod.Ledger, trades_mod.to_units
+    led = Led(budget=0.4, order=0.5, bought=0.6, held=0.3)
+    got = [tu(Qty(of, x), led) for of, x in (("cash", 30), ("budget", 0.25), ("order", 0.5), ("bought", 0.3),
+                                              ("held", 0.5))]
+    check(all(same(g, w) for g, w in zip(got, (0.3, 0.05, 0.5, 0.18, 0.15))) and tu(Qty("held", None), led) is None,
+          "to_units 다섯 basis %r" % got)
+    # 매수(분할 차수)와 매도(산/남은 물량 비율)가 같은 변환 하나를 지난다
+    seen, orig = [], trades_mod.to_units
+    trades_mod.to_units = lambda q, ld: seen.append(q.of) or orig(q, ld)
+    try:
+        tree = TreeGateway.of(synthetic({"X": empty_product(sizing={"weight": 40, "tranches": trs})}))
+        ex = TreeGateway.as_rules([{"label": "반", "when": {"ge": [R, 5]}, "sell": {"initial": 0.5}},
+                                   {"label": "끝", "when": {"ge": [R, 5]}, "sell": "all"}])
+        trades_mod.build_trades(tree, "X", hist, cal, [0], ex, amount=Judge(tree, "X", hist, cal).amount)
+    finally:
+        trades_mod.to_units = orig
+    check({"budget", "cash", "order", "bought", "held"} <= set(seen), "매수·매도·비중·조심이 to_units 하나로 %r" % seen)
+
+
 def t_live_path():
     """실전 판정 경로가 cond.Ctx 를 unobserved="exclude" 로 만들지 않는다 — EXCLUDED 가 화면(#verdict-data)에 실리면
     화면 3값 엔진(checklist-ui)엔 그 개념이 없어 등급이 갈라진다(checklist.verify_primitives 의 실행 불변식과 짝)."""
@@ -284,7 +337,7 @@ def parity_main(argv):
 def main(argv):
     if "--parity" in argv:
         return parity_main(argv)
-    for name, fn in (("거래 시뮬레이터", t_trades), ("매도 정책(규칙 없음)", t_no_exit),
+    for name, fn in (("거래 시뮬레이터", t_trades), ("매도 정책(규칙 없음)", t_no_exit), ("금액 정책", t_sizing),
                      ("실전 경로 unobserved", t_live_path)):
         before = len(FAILS)
         try:

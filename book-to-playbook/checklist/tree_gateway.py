@@ -11,10 +11,13 @@
 무엇을 하나 / 안 하나
   · 찾아서 건네주기(탐색·조회)와 파일 형식 검사(최상위·상품·규칙 목록의 모양)만 한다.
   · 식의 뜻·평가·노드 문법은 checklist/cond.py, 등급·금액은 checklist/grade.py, 체결은 trading/trades.py.
-  · 규칙은 Rule(읽기 전용 값)로 건넨다 — 형식이 바뀌어도 같은 속성(label·ref·note·when·sell·scale·frac·weight)을 준다.
+  · 규칙은 Rule(읽기 전용 값)로 건넨다 — 형식이 바뀌어도 같은 속성(label·ref·note·when·qty)을 준다.
+  · '얼마나'(조심 scale · 비중 weight · 분할 frac · 매도 sell)는 정규화된 Qty(of, x) 하나로만 건넨다 — 원본 키 이름은
+    여기 밖에서 모른다. 트리 v3 의 qty {of, x} 로 바뀌면 이 파일(Rule.qty)만 고친다.
 """
 import json
 import os
+from collections import namedtuple
 
 from checklist import cond
 from shared.paths import book_file
@@ -41,14 +44,40 @@ def synthetic(products, **top):
     return dict(top, products=products)
 
 
+class Qty(namedtuple("Qty", "of x")):
+    """'얼마나' — 정규화된 수량 하나(트리 v3 의 qty {of, x} 와 같은 모양). x = 수 · 식(비중) · None(저자 미명시).
+      of = "cash"   총 투자금의 x %          (비중 — x 는 날마다 값이 바뀌는 식일 수 있다)
+           "budget" 이 상품 배정 금액의 x     (분할 차수)
+           "order"  그날 사려던 양의 x 배      (조심 — 스스로 사지 않고 다른 규칙의 양을 바꾼다)
+           "bought" 지금까지 산 물량의 x      (매도 {"initial": x})
+           "held"   지금 남은 물량의 x(1=전량) (매도 "all" · {"remaining": x})"""
+    __slots__ = ()
+
+
+def _qty(raw):
+    """원본 규칙의 수량 자리(sell·scale·frac·weight) → Qty. 수량 자리가 없는 규칙이면 None."""
+    if "sell" in raw:
+        sell = raw["sell"]
+        if sell == "all":
+            return Qty("held", 1.0)
+        (k, x), = sell.items()
+        return Qty("bought" if k == "initial" else "held", x)
+    for k, of in (("scale", "order"), ("frac", "budget"), ("weight", "cash")):
+        if k in raw:
+            return Qty(of, raw[k])
+    return None
+
+
 class Rule:
-    """규칙 하나(조심 · 비중 · 분할 차수 · 매도)의 읽기 전용 값. 없는 필드는 None — when None = 조건 없음(1차 분할)."""
-    __slots__ = ("label", "ref", "note", "when", "sell", "scale", "frac", "weight", "_raw")
+    """규칙 하나(조심 · 비중 · 분할 차수 · 매도)의 읽기 전용 값. 없는 필드는 None — when None = 조건 없음(1차 분할).
+    qty = 얼마나(Qty) — 원본의 scale·weight·frac·sell 을 정규화한 것(밖은 이것만 본다)."""
+    __slots__ = ("label", "ref", "note", "when", "qty", "_raw")
 
     def __init__(self, raw):
         self._raw = raw
-        for k in self.__slots__[:-1]:
+        for k in ("label", "ref", "note", "when"):
             setattr(self, k, raw.get(k))
+        self.qty = _qty(raw)
 
     def shown(self, *keys):
         """원본에 적힌 필드만 {키: 값} — 적지 않은 키는 빠진다(판정 JSON 모양 그대로)."""
@@ -181,19 +210,19 @@ class TreeGateway:
         return self._p(prod)[sec]
 
     def cautions(self, prod):
-        """조심 규칙 [Rule(label, ref, note, when, scale)]."""
+        """조심 규칙 [Rule(label, ref, note, when, qty=Qty("order", 배수|None))]."""
         return [Rule(r) for r in self._p(prod).get("caution") or []]
 
     def sizing(self, prod):
-        """비중 Rule(label, ref, note, weight) — weight None = 저자 미명시."""
+        """비중 Rule(label, ref, note, qty=Qty("cash", 식|None)) — x None = 저자 미명시."""
         return Rule(self._p(prod).get("sizing") or {})
 
     def tranches(self, prod):
-        """분할 차수 [Rule(label, ref, note, frac, when)] — 1차는 when None."""
+        """분할 차수 [Rule(label, ref, note, when, qty=Qty("budget", 비율|None))] — 1차는 when None."""
         return [Rule(t) for t in (self._p(prod).get("sizing") or {}).get("tranches") or []]
 
     def exit_rules(self, prod):
-        """책의 매도 규칙 [Rule(label, ref, note, when, sell)] — 없으면 [](그때의 정책은 trades.exit_policy — 대체 규칙을 붙이지 않는다)."""
+        """책의 매도 규칙 [Rule(label, ref, note, when, qty=Qty("bought"|"held", 비율|None))] — 없으면 [](그때의 정책은 trades.exit_policy — 대체 규칙을 붙이지 않는다)."""
         return [Rule(r) for r in self._p(prod).get("exit") or []]
 
     def expressions(self, prod):

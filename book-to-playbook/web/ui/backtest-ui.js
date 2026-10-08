@@ -109,6 +109,10 @@
       h += '<div class="bt-prod"><h2>' + esc(p) + (none ? '<span class="bt-tag none">' + esc(D.no_exit_note) + '</span>' : '') + '</h2>';
       h += '<p class="bt-sub">기간 보유(처음~끝) ' + pct(S.buy_hold, 1) + '</p>';
       if (T.unsized_note) h += '<p class="bt-sub">⚠ ' + esc(T.unsized_note) + '</p>';
+      // 금액(얼마나) — 엔진이 낸 횟수(stats.size_counts)와 문구(size_notes, 정본 trading/trades.size_of 정책)를 그대로
+      var SC = st.size_counts;
+      if (SC && SC.buys) h += '<p class="bt-sub">금액 = 비중 × 분할 비율 × 조심 배수 · 매수 ' + SC.buys + '회 중 조심으로 줄인 매수 ' + SC.cut + '회</p>';
+      if ((T.size_notes || []).length) h += '<p class="bt-sub">⚠ ' + T.size_notes.map(esc).join(' · ') + '</p>';
 
       // 포트폴리오 지표(vectorbt 계산기) — 총수익·MDD·샤프 + 자산곡선. 수수료·세금 반영(단순 가격차보다 보수적).
       var V = S.vectorbt;

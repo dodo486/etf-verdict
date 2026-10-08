@@ -63,7 +63,7 @@ import 방향은 한 방향이다 — `shared ← playbook · checklist(공개 D
 
 | 검사 | 태그 | 보는 것 |
 |---|---|---|
-| `orchestration.verify_code` | gate | 코드 규칙 — 폴더 경계(import 방향·jhts 단일 창구·자가수집 0) · **주인 표**(트리 원본 키·책 산출물 경로·매도 정책·칸/등급 이름표·등급 사다리 — 주인 밖에 보이면 정지) |
+| `orchestration.verify_code` | gate | 코드 규칙 — 폴더 경계(import 방향·jhts 단일 창구·자가수집 0) · **주인 표**(트리 원본 키·책 산출물 경로·매도 정책·금액 정책·수량 변환·칸/등급 이름표·등급 사다리 — 주인 밖에 보이면 정지) |
 | `playbook.verify_source_integrity` | gate | 플레이북 본문(`#src`) 해시 |
 | `checklist.verify_tree --contract` | gate | 책 계약 — 소절 인덱스 · 트리 문법(여섯 칸 전부) · 트리 ref 가 실제 소절 |
 | `web.verify_view --pages` | gate | 책 페이지 — `#src`·`#verdict-data`·`#sheet-root` · 공유 UI 구획 사본 == `web/ui/*.js` |

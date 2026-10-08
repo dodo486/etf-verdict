@@ -141,9 +141,11 @@ def run(slug, days=365, hist=None, tree=None, unobserved=None):
             trade_res[p] = {"exit_policy": pol}
         else:
             exits = tree.exit_rules(p)
-            tl = trades.build_trades(tree, p, hist, cal, starts, exits)
+            # 매수 크기 = 그날 판정의 '얼마나'(j.amount — 라이브 화면과 같은 Judge 경로)에 금액 정책(trades.size_of)
+            tl = trades.build_trades(tree, p, hist, cal, starts, exits, amount=j.amount)
+            st = trades._parity_stats(tl)
             trade_res[p] = {"exit_policy": pol, "unsized_note": trades.unsized_note(tree, p, exits),
-                            "stats": trades._parity_stats(tl), "trades": tl}
+                            "size_notes": trades.size_notes(st["size_counts"]), "stats": st, "trades": tl}
         manual[p] = [{"section": s, "rule": l, "ref": r} for s, l, r in j.manual_items()]
         if prow and period is None:
             period = [prow[0]["date"], prow[-1]["date"], len(prow)]
@@ -194,6 +196,9 @@ def build_text(res):
                                                    "%.1f" % st["days"] if "days" in st else "-", b))
         if st["rule_hits"]:
             L.append("        매도 발동: " + " · ".join("%s %d" % kv for kv in st["rule_hits"].items()))
+        sz = st["size_counts"]
+        L.append("        금액: 매수 %d회 중 조심으로 줄임 %d회%s" % (sz["buys"], sz["cut"],
+                                                       "".join(" · " + n for n in t["size_notes"])))
     man = [(p, m) for p, ms in res["manual"].items() for m in ms]
     if man:
         L.append("")
@@ -317,6 +322,17 @@ def _starts_from_series(rows, cal):
     return starts
 
 
+def _amounts_on_axis(rows, cal):
+    """장중 신호 시계열(step(amounts=True) 결과)의 asof 별 Amount → {분봉 축 인덱스: Amount}."""
+    pos_of = {d: i for i, d in enumerate(cal)}
+    out = {}
+    for r in rows:
+        k = r["asof"].replace("-", "").replace(":", "").replace("T", "")[:12]
+        if k in pos_of:
+            out[pos_of[k]] = r.get("amount")
+    return out
+
+
 def run_intraday(slug, hist=None, tree=None, limit=None):
     """장중(분봉) 백테스트 — 신호 생성 단일 입구(Timeline.run)로 분 단위 신호를 얻고, 그 분봉 종가 시리즈로
     vectorbt 계산기(portfolio)를 돌려 '장중 백테스트' 지표를 낸다(신호만 내던 재생에 계산기를 붙임).
@@ -336,7 +352,7 @@ def run_intraday(slug, hist=None, tree=None, limit=None):
     #   그 시점 분봉'으로 충실히 재생된다(truncate 없이 full hist 면 latest 가 늘 오늘 봉을 판정해 과거
     #   세션 regime 이 틀린다 — 아키텍트 확인). 신호 뒤에 체결 일정·vectorbt 계산기만 백테스트가 붙인다.
     axis = Timeline(tree, hist)
-    sig = axis.run(limit=limit, truncate=True)
+    sig = axis.run(limit=limit, truncate=True, amounts=True)
     tf, timeline, sessions, prods, series = (sig["tf"], sig["timeline"], sig["sessions"],
                                              sig["prods"], sig["series"])
     vbt_products, signal_summary = {}, {}
@@ -345,9 +361,11 @@ def run_intraday(slug, hist=None, tree=None, limit=None):
         cal, mh = _minute_axis(hist, p, timeline)
         closes = [c.close for c in mh.get(p)]
         starts = _starts_from_series(rows, cal)
+        amt = _amounts_on_axis(rows, cal)          # 분봉 축 인덱스 → 그 asof 판정의 Amount(같은 Judge 경로)
         pol = trades.exit_policy(tree, p)
         if pol == "book" and cal:
-            tl = trades.build_trades(tree, p, mh, cal, starts, tree.exit_rules(p))   # 분봉 축 체결 일정(다음봉 시가 진입)
+            tl = trades.build_trades(tree, p, mh, cal, starts, tree.exit_rules(p),   # 분봉 축 체결 일정(다음봉 시가 진입)
+                                     amount=amt.get)
             vbt_products[p] = portfolio.run_product(p, cal, closes, tl)
         else:
             vbt_products[p] = None          # 분봉 없음 · 또는 책에 매도 규칙 없음(거래를 지어내지 않는다)

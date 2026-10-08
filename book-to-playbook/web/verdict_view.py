@@ -12,9 +12,10 @@ books.json 의 engine.daily 가 이 모듈이다(python -m web.verdict_view <slu
   common  : [{name, label, ref, v, view}]           상품 여럿이 같이 보는 판단(defs) — 화면 맨 위 한 번
   verdict : {prod, index, note, date, close, chg, key, grade, reason,
              zones{filter,avoid,entry: view[]}, opt{..}, pes{..},     조건 칸 셋의 중첩 설명 + 낙관·비관 값
-             caution[{label, ref, scale, v, manual, view}], amount{factor, unspecified, unknown},
-             sizing{label, ref, weight, weight_range, tranches[{label, ref, frac, note, view?}]},
-             exit[{label, ref, sell, note, view}], exit_policy("book"|"none" — trades.exit_policy),
+             caution[{label, ref, scale, v, manual, view}], amount{factor, unspecified, unknown},   (judge.Amount)
+             sizing{label, ref, weight, weight_range, units, tranches[{label, ref, frac, note, units, view?}]},
+                                                     units = 오늘 물량(시작자본 1.0 기준 — trades.to_units, 비중 모르면 None)
+             exit[{label, ref, sell(문장 — trades.sell_text), note, view}], exit_policy("book"|"none" — trades.exit_policy),
              positions[...]}                                         positions = 내 포지션(로컬 파일)이 있을 때만
   refs    : {원문 소절: {auto, manual, zones[], prods[], unexpressed?[{rule, reason}]}}
             플레이북 소절별 체크리스트 반영 현황 + 트리로 못 옮긴 규칙과 그 사유
@@ -32,7 +33,7 @@ from checklist import cond
 from checklist.grade import GRADES, GRADE_RULES, WARMUP_DAYS, history
 from checklist.tree_gateway import TreeGateway
 from trading.judge import Holding, Judge
-from trading.trades import NO_EXIT_NOTE, exit_policy
+from trading.trades import NO_EXIT_NOTE, exit_policy, live_units, sell_text
 from trading.notify import send_telegram, send_desktop
 from web import condition_view as cv
 
@@ -136,7 +137,7 @@ def ref_map(gw):
             if t.when is None:
                 add(t.ref, "sizing", p, False)
         sz = gw.sizing(p)
-        if sz.weight is None and sz.ref:
+        if sz.qty.x is None and sz.ref:
             add(sz.ref, "sizing", p, False)
     for u in gw.unexpressed():
         if u.get("ref"):
@@ -163,7 +164,8 @@ def product_verdict(gw, p, hist, positions, asof=None):
     #   데이터, 판정 보류)로 떨어져 있다(grade_key). 사유를 '모르고 매매 금지'로 분명히 적는다(✅/🚫 확신 금지).
     if d.incomplete:
         reason = "불완전 데이터(판정 보류) — 확정 봉 %d개 < 필요 워밍업 %d개, 창이 덜 차 신뢰불가" % (d.confirmed, d.warmup)
-    f, unspec, unknown = d.amount
+    a = d.amount
+    f, unspec, unknown = a.factor, a.unspecified, a.unknown
     if d.key in ("buy", "confirm"):
         if f < 1:
             reason += " · 금액 ×%.2f" % f
@@ -171,7 +173,6 @@ def product_verdict(gw, p, hist, positions, asof=None):
             reason += " · 금액 축소(폭 저자 미명시): " + " · ".join(unspec[:2])
         if unknown:
             reason += " · 금액 축소 확인: " + " · ".join(unknown[:2])
-    w, alt = d.weight
     sz, defs, index = gw.sizing(p), gw.defs(), gw.index(p)
     v = dict(base, date=d.date, close=d.close,
              chg=(d.close / d.prev_close - 1) * 100 if d.prev_close else None,
@@ -181,11 +182,13 @@ def product_verdict(gw, p, hist, positions, asof=None):
              caution=[dict(st, view=cv._view(r.when, defs, ctx, i), v=st["value"]) for st, r in d.caution],
              amount={"factor": f, "unspecified": unspec, "unknown": unknown},
              sizing={"label": sz.label, "ref": sz.ref, "note": sz.note,
-                     "weight": w, "weight_range": alt, "weight_set": sz.weight is not None,
-                     "tranches": [dict(t.shown("label", "ref", "frac", "note"), conditional=t.when is not None,
+                     "weight": a.weight, "weight_range": a.weight_range, "weight_set": a.weight_set,
+                     "units": live_units(a),            # 오늘 물량(시작자본 1.0 기준, 화면이 × 총 투자금)
+                     "tranches": [dict(t.shown("label", "ref"), frac=t.qty.x, **t.shown("note"),
+                                       units=live_units(a, t.qty), conditional=t.when is not None,
                                        view=_static_view(t.when, defs, index))
                                   for t in gw.tranches(p)]},
-             exit=[{"label": r.label, "ref": r.ref, "sell": r.sell, "note": r.note,
+             exit=[{"label": r.label, "ref": r.ref, "sell": sell_text(r.qty), "note": r.note,
                     "view": _static_view(r.when, defs, index)} for r in gw.exit_rules(p)],
              exit_policy=exit_policy(gw, p))
     pos = [dict(_holding_view(hs, defs, i), entry_date=x["entry_date"], entry_px=x["entry_px"], filled=x.get("filled", 1))
@@ -200,11 +203,11 @@ def _holding_view(hs, defs, i):
     if hs.error:
         return {"error": hs.error}
     out = {"ret": hs.ret, "days": hs.days,
-           "exit": [{"label": r.label, "ref": r.ref, "sell": r.sell, "v": v, "view": cv._view(r.when, defs, hs.ctx, i)}
+           "exit": [{"label": r.label, "ref": r.ref, "sell": sell_text(r.qty), "v": v, "view": cv._view(r.when, defs, hs.ctx, i)}
                     for r, v in hs.exits]}
     nt = hs.next_tranche
     out["next_tranche"] = None if nt is None else {
-        "label": nt[0].label, "ref": nt[0].ref, "frac": nt[0].frac, "v": nt[1], "view": cv._view(nt[0].when, defs, hs.ctx, i)}
+        "label": nt[0].label, "ref": nt[0].ref, "frac": nt[0].qty.x, "v": nt[1], "view": cv._view(nt[0].when, defs, hs.ctx, i)}
     return out
 
 

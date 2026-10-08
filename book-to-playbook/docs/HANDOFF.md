@@ -40,6 +40,15 @@ import 방향: `shared ← playbook · checklist(공개 DSL) ← trading ← web
   5·10·20거래일 보유 수익률만 — 백테스트 summary 의 ✅+🟡 줄). 화면은 `exit_policy` 필드 + `no_exit_note` 문구
   ("책에 매도 규칙 없음 — 매수 신호만 평가")만 본다(백테스트 탭·판정 화면 ⑥칸). `verify_code` 주인 표 '매도 정책' 행이
   폐지된 표준 매도 이름·문구를 주인 포함 어디서도 막는다(`everywhere`).
+- **백테스트가 '얼마나'를 반영** — 매수 크기 = 분할 비율 × 비중(%)/100 × 조심 배수. 사실은 라이브 화면과 같은
+  `Judge.amount(i)`(→ `judge.Amount`), 정책은 `trades.size_of` 하나(주인 표 '금액 정책'). 모름은 지어내지 않는다:
+  폭 미명시 조심·확인 필요(수동·데이터 없음) 조심 → ×1, 비중 미명시·그날 값 모름 → 상품 예산 100% — 횟수를
+  `stats.size_counts` + `size_notes` 로 결과·백테스트 탭에 드러낸다('manual → 매매가 안 나가는 쪽'은 매매 발생 규칙이라
+  금액엔 적용하지 않음). 수량은 출입구 `Rule.qty = Qty(of, x)`(cash·budget·order·bought·held — 트리 v3 qty 모양) 하나로만
+  읽고(원본 scale·weight·frac·sell 은 TreeGateway 안에서만), 물량으로 바꾸는 곳은 `trades.to_units(Qty, Ledger)` 하나 —
+  매수(분할 차수)·매도(산/남은 물량 비율)·비중·조심이 전부 지난다(주인 표 '수량 변환'). 라이브 화면 금액도 엔진이 낸
+  `units`(`trades.live_units`)·매도 문장(`sell_text`)만 그린다. moneycopy 후보 a.json 은 scale 전부 null·비중 "?" 라
+  숫자가 그대로다(지어내지 않음 — 횟수만 표시).
 
 ## 🔴 키스톤 — tree.json 재생성 (모든 게 이걸로 막힘)
 

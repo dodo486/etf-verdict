@@ -1472,8 +1472,6 @@ UPRO는 시장의 폭을 산다. S&P500에는 기술주 외에 금융·헬스케
     const ok = val === null ? '' : (val === want ? ' ok' : ' bad');
     return '<div class="grouplabel ck-zone'+ok+'">'+title+' <span class="ck-zv">'+(val===true?'참':val===false?'거짓':'확인 필요')+'</span></div>';
   }
-  function sellText(s){ if(s==='all') return '남은 전량'; const ini = s.initial!==undefined, f = ini ? s.initial : s.remaining;
-    return (ini ? '산 물량의 ' : '남은 물량의 ')+(f==null ? '? (비율 저자 미명시)' : Math.round(f*100)+'%'); }
   function cautionOf(v, ans){
     let f = 1; const unspec = [], unk = [];
     (v.caution||[]).forEach((c,i)=>{
@@ -1518,7 +1516,7 @@ UPRO는 시장의 폭을 산다. S&P500에는 기술주 외에 금융·헬스케
       v.exit.forEach((r,i)=>{
         const live = pos.map(ps => (ps.exit||[])[i]).filter(Boolean);
         const st = live.length ? live.map(e=>MARK(e.v)).join('') : '<span class="ck-m n">—</span>';
-        h += '<div class="ck-row auto" '+(r.ref?'data-ref="'+esc(r.ref)+'"':'')+'><div class="ck-line">'+st+'<span class="ck-t">'+esc(r.label)+' <span class="ck-opl">'+esc(sellText(r.sell))+'</span>'+refChip(r.ref)+'</span></div>'+(r.note?'<div class="ck-why">'+esc(r.note)+'</div>':'')+'</div>';
+        h += '<div class="ck-row auto" '+(r.ref?'data-ref="'+esc(r.ref)+'"':'')+'><div class="ck-line">'+st+'<span class="ck-t">'+esc(r.label)+' <span class="ck-opl">'+esc(r.sell)+'</span>'+refChip(r.ref)+'</span></div>'+(r.note?'<div class="ck-why">'+esc(r.note)+'</div>':'')+'</div>';
       });
       if(pos.length){
         pos.forEach(ps=>{
@@ -1547,16 +1545,17 @@ UPRO는 시장의 폭을 산다. S&P500에는 기술주 외에 금융·헬스케
           + '<div class="tablewrap" style="margin-top:6px"><table><thead><tr><th>상품</th><th>오늘 비중</th><th>오늘 금액</th><th>분할</th></tr></thead><tbody>';
     let sum = 0, known = true;
     vs.forEach(v=>{
-      const s = v.sizing, c = cautionOf(v, answers());
+      // 금액 = 총 투자금 × 엔진이 낸 오늘 물량(units — trading/trades.to_units: 비중 × 분할 비율 × 조심 배수, 비중 모르면 null)
+      const s = v.sizing, am = v.amount || {}, f = am.factor == null ? 1 : am.factor, unspec = am.unspecified || [];
       let w = s.weight, wtxt;
       if(!s.weight_set){ wtxt = '<span class="manual-tag">저자 미명시</span>'; w = null; }
       else if(w == null){ known = false; wtxt = '<span class="manual-tag">✋ 확인 필요 '+(s.weight_range||[]).map(x=>x.toFixed(0)+'%').join(' / ')+'</span>'; }
       else { sum += w; wtxt = w.toFixed(1)+'%'; }
-      const amt = w == null ? null : cap * w / 100 * c.f;
-      const trs = (s.tranches||[]).map(t=>esc(t.label)+(t.frac==null ? ' <span class="manual-tag">비율 저자 미명시</span>' : ' '+Math.round(t.frac*100)+'%'+(amt!=null?' = '+Math.round(amt*t.frac).toLocaleString('ko-KR')+'만':''))+(t.conditional?' <span class="subtle">(조건부)</span>':'')).join('<br>') || '한 번에 전량';
+      const amt = s.units == null ? null : cap * s.units;
+      const trs = (s.tranches||[]).map(t=>esc(t.label)+(t.frac==null ? ' <span class="manual-tag">비율 저자 미명시</span>' : ' '+Math.round(t.frac*100)+'%'+(t.units!=null?' = '+Math.round(cap*t.units).toLocaleString('ko-KR')+'만':''))+(t.conditional?' <span class="subtle">(조건부)</span>':'')).join('<br>') || '한 번에 전량';
       h += '<tr><td style="color:var(--'+esc(v.prod.toLowerCase())+',var(--head))"><b>'+esc(v.prod)+'</b>'+refChip(s.ref)+'</td><td>'+wtxt+'</td><td>'
-         + (amt!=null ? Math.round(amt).toLocaleString('ko-KR')+'만'+(c.f<1?' <span class="subtle">(조심 ×'+c.f.toFixed(2)+')</span>':'') : '—')
-         + (c.unspec.length ? '<br><span class="manual-tag">줄일 폭 저자 미명시: '+esc(c.unspec.join(' · '))+'</span>' : '') + '</td><td>'+trs+'</td></tr>';
+         + (amt!=null ? Math.round(amt).toLocaleString('ko-KR')+'만'+(f<1?' <span class="subtle">(조심 ×'+f.toFixed(2)+')</span>':'') : '—')
+         + (unspec.length ? '<br><span class="manual-tag">줄일 폭 저자 미명시: '+esc(unspec.join(' · '))+'</span>' : '') + '</td><td>'+trs+'</td></tr>';
     });
     h += '</tbody></table></div>';
     // 현금 비중은 엔진이 실어보낸 VD.cash(파이썬에서 max(0, 100-합)으로 0 이상 클램프)를 그대로 쓴다 —

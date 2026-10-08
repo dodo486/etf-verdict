@@ -112,7 +112,7 @@ class ProductEval:
         self.pes = {sec: s(gw.section(prod, sec), sec == "avoid", sec) for sec in cond.SECTIONS}
         self.caution = [(r, [False if x is cond.EXCLUDED else x for x in cond.series(r.when, self.ctx[None])])
                         for r in gw.cautions(prod)]
-        w = gw.sizing(prod).weight
+        w = gw.sizing(prod).qty.x                # 비중 식(Qty "cash") — None = 저자 미명시
         self.weight = {m: (s(w, m) if w is not None else None) for m in (None, True, False)}
         # 데이터 완전성 가드 — 이 상품 등급이 실제로 쓰는 가장 긴 워밍업(트리에서 파생, 하드코딩 아님).
         #   그보다 '확정 봉'이 적은 초기 구간의 1d 신호는 창이 덜 차 조용히 None/틀릴 수 있어 신뢰불가다
@@ -162,7 +162,7 @@ class ProductEval:
     # ---------------------------------------------------------------- 금액
     def caution_state(self, i):
         """[{label, ref, note, scale, value, manual}] — value 는 수동 = 모름으로 둔 평가."""
-        return [{"label": r.label, "ref": r.ref, "note": r.note, "scale": r.scale,
+        return [{"label": r.label, "ref": r.ref, "note": r.note, "scale": r.qty.x,
                  "value": ser[i], "manual": [cond.manual_text(n) for n in cond.manual_leaves(r.when, self.defs)]}
                 for r, ser in self.caution]
 

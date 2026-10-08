@@ -802,17 +802,19 @@ def t_gateway():
     check([(z, l) for z, l, _r, _n in ex] == [("filter", None), ("entry", None), ("avoid", None), ("caution", "c1"),
                                               ("sizing", "비중"), ("sizing", "2차"), ("exit", "익절")], "expressions 순서 %r" % ex)
     c = g.cautions("A")[0]
-    check((c.label, c.ref, c.scale, c.when, c.note) == ("c1", "3-1", 0.5, {"def": "공통"}, None), "cautions Rule")
+    check((c.label, c.ref, c.qty, c.when, c.note) == ("c1", "3-1", ("order", 0.5), {"def": "공통"}, None), "cautions Rule")
     sz = g.sizing("A")
-    check((sz.label, sz.ref, sz.weight) == ("비중", "4-1", 30) and g.sizing("B").weight is None, "sizing Rule")
+    check((sz.label, sz.ref, sz.qty) == ("비중", "4-1", ("cash", 30)) and g.sizing("B").qty == ("cash", None), "sizing Rule")
     trs = g.tranches("A")
-    check([(t.label, t.frac, t.when is None) for t in trs] == [("1차", 0.5, True), ("2차", 0.5, False)]
-          and trs[1].shown("label", "ref", "frac") == {"label": "2차", "frac": 0.5}, "tranches Rule·shown(적힌 키만)")
+    check([(t.label, t.qty, t.when is None) for t in trs] == [("1차", ("budget", 0.5), True), ("2차", ("budget", 0.5), False)]
+          and trs[1].shown("label", "ref") == {"label": "2차"}, "tranches Rule·shown(적힌 키만)")
     e = g.exit_rules("A")[0]
-    check((e.label, e.sell, e.note) == ("익절", "all", "n") and g.exit_rules("B") == [], "exit_rules")
+    check((e.label, e.qty, e.note) == ("익절", ("held", 1.0), "n") and g.exit_rules("B") == [], "exit_rules")
     check(e.with_when({"manual": "x"}).when == {"manual": "x"} and e.when != {"manual": "x"}, "with_when 사본")
-    std = TreeGateway.as_rules([{"label": "s", "when": W, "sell": {"initial": 0.5}}])
-    check(std[0].sell == {"initial": 0.5} and std[0].raw() == {"label": "s", "when": W, "sell": {"initial": 0.5}}, "as_rules")
+    std = TreeGateway.as_rules([{"label": "s", "when": W, "sell": {"initial": 0.5}},
+                                {"label": "r", "when": W, "sell": {"remaining": None}}])
+    check(std[0].qty == ("bought", 0.5) and std[1].qty == ("held", None)
+          and std[0].raw() == {"label": "s", "when": W, "sell": {"initial": 0.5}}, "as_rules·qty(매도 비율)")
     check(g.symbols() == {"A", "B", "^NDX", "NQ=F"} and g.symbols(["B"]) == {"B", "NQ=F"}, "symbols %r" % g.symbols())
     check(g.minute_symbols() == {"NQ=F"} and g.timeframes() == {"1d", "1m"}, "minute_symbols/timeframes")
     check(g.warmup("A") == 19 and g.warmup("B") == 19 and g.warmup() == 19, "warmup")

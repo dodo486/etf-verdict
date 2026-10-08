@@ -261,6 +261,48 @@ def m_std_exit_gone(src):
             + [(ln, None, t) for ln, v in src.lits for t in STD_GONE_TEXT if t in v])
 
 
+# 금액 정책 — 그날의 '얼마나' 사실(Judge.amount)을 매수 크기로 바꾸는 규칙(모름을 어떻게 세나). 정본 trades.size_of.
+#   사실을 꺼내는 grade 의 amount_factor·weight_of 는 Judge.amount 한 경로로만 읽는다(라이브·백테스트 같은 값).
+AMOUNT_FACTS = {"amount_factor", "weight_of"}
+
+
+def m_amount_policy(src):
+    """구간③·화면(매수 크기를 다루는 층)만 본다 — 구간②(checklist)는 트리의 뜻을 검사하려고 사실을 직접 읽는다."""
+    if not src.rel.startswith(("trading/", "web/")):
+        return []
+    if src.kind == "py":
+        return ([(ln, f, x) for ln, f, x in _py_names(src) if x in AMOUNT_FACTS]
+                + [(n.lineno, n.name, n.name) for n, _ in _py_nodes(src.tree)
+                   if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == "size_of"])
+    return [(ln, None, x) for ln, x in _js_hits(src, r"\bfunction\s+size_?[oO]f\s*\(")]
+
+
+# 수량 변환 — 정규화된 '얼마나'(출입구 Qty(of, x))를 물량으로 바꾸는 곳은 trades.to_units 하나(매수·매도·비중·조심 모두).
+#   밖에서 basis(of)를 가르거나 수량(qty.x)으로 셈을 하면 종류별 해석이 다시 흩어진다.
+QTY_BASES = ("bought", "held", "budget")
+QTY_JS = (r"\.of\b|\b(?:frac|scale|weight)\b\s*\*(?!\s*100\b)"
+          r"|\*\s*(?:[\w$]+\.)*(?:frac|scale|weight)\b")
+
+
+def _is_qty_x(n):
+    return isinstance(n, ast.Attribute) and n.attr == "x" and isinstance(n.value, ast.Attribute) and n.value.attr == "qty"
+
+
+def m_qty_convert(src):
+    if src.kind == "py":
+        out = []
+        for n, fn in _py_nodes(src.tree):
+            if isinstance(n, ast.Attribute) and n.attr == "of" and isinstance(n.value, ast.Attribute)                     and n.value.attr == "qty":
+                out.append((n.lineno, fn, "qty.of"))
+            elif isinstance(n, ast.BinOp) and (_is_qty_x(n.left) or _is_qty_x(n.right)):
+                out.append((n.lineno, fn, "qty.x 셈"))
+            elif isinstance(n, ast.Compare) and any(isinstance(c, ast.Constant) and c.value in QTY_BASES
+                                                     for c in [n.left] + n.comparators):
+                out.append((n.lineno, fn, "basis 비교"))
+        return out
+    return [(ln, None, x) for ln, x in _js_hits(src, QTY_JS)]
+
+
 def _labels():
     """칸·등급 이름표 글자 — 정본(cond.ZONE_LABELS · grade.GRADES)에서 읽는다(여기 다시 적지 않는다)."""
     from checklist import cond, grade
@@ -311,6 +353,16 @@ OWNERS = [
          why="책에 매도 규칙이 없을 때의 정책은 trades.exit_policy 하나(\"none\" = 대체 규칙 없이 매수 신호만 평가) — "
              "폐지된 표준 매도(대체 규칙·숫자 파일·출처 글자·플래그)는 주인 포함 어디서도 되살리지 않는다",
          hint="trades.exit_policy · 화면은 exit_policy 필드와 no_exit_note 문구로", allow={}),
+    dict(concept="금액 정책", owners=("trading/trades.py",), match=m_amount_policy,
+         why="매수 크기(비중 × 분할 × 조심 배수)와 모름(폭 미명시·확인 필요·비중 모름)을 어떻게 셀지는 trades.size_of 하나 — "
+             "그 사실은 Judge.amount 한 경로로만(라이브 화면 = 백테스트)",
+         hint="Judge.amount 로 사실을, trades.size_of 로 크기를",
+         allow={("trading/judge.py", "amount"): (AMOUNT_FACTS, "Judge.amount — 그날 사실(Amount)을 꺼내는 한 경로")}),
+    dict(concept="수량 변환", owners=("trading/trades.py",), match=m_qty_convert,
+         why="'얼마나'(Qty: cash·budget·order·bought·held)를 물량으로 바꾸는 곳은 trades.to_units 하나 — 매수(분할)·매도·"
+             "비중·조심이 같은 변환을 지난다. 밖은 Qty 를 건네기만 하고 basis 를 가르거나 셈하지 않는다",
+         hint="trades.to_units(Qty, Ledger) · 화면은 엔진이 낸 units·sell 문장으로",
+         allow={("checklist/tree_gateway.py", "_qty"): (None, "원본 키(sell·scale·frac·weight) → Qty 정규화(변환 아님)")}),
     dict(concept="칸·등급 이름표", owners=("checklist/cond.py", "checklist/grade.py"), match=m_labels,
          why="cond.ZONE_LABELS · grade.GRADES · grade_rules.json 이 정본 — 화면은 판정 JSON(zones·grades·grade_rules)으로 받는다",
          hint="판정 JSON 의 zones·grades·grade_rules 로", allow={}),

@@ -108,7 +108,7 @@ class Timeline:
         t.minutes = getattr(full, "minutes", {})
         return t
 
-    def step(self, timeline, prods, truncate=False):
+    def step(self, timeline, prods, truncate=False, amounts=False):
         """각 asof 에서 Judge(tree, p, hist, asof).latest() — 라이브가 보는 그대로 — 로 (asof, key, grade, close) 를 모은다.
         평가 규칙을 새로 만들지 않고, asof 를 분봉 간격으로 깔아 '같은 판정기'를 여러 시점에 돌릴 뿐이다.
 
@@ -117,7 +117,9 @@ class Timeline:
         truncate=True(장중 백테스트) = 각 asof 마다 일봉 hist 를 그 asof 세션일 이하로 잘라 그 세션 자신의 일봉 regime 을
         그날 분봉 스냅샷과 묶는다(look-ahead 0 — 일봉 잎은 그 세션 마감 전엔 미확정, 마감 후 확정).
 
-        → {prod: [{asof(UTC iso), key, grade, close}, ...]}  (timeline 순서대로)."""
+        amounts=True 면 점마다 그 판정의 '얼마나'(amount = Judge.amount — judge.Amount)를 함께 담는다(장중 백테스트 매수 크기).
+
+        → {prod: [{asof(UTC iso), key, grade, close, amount?}, ...]}  (timeline 순서대로)."""
         series = {p: [] for p in prods}
         cache = {}
         for asof in timeline:
@@ -128,11 +130,15 @@ class Timeline:
                     cache[day] = self.truncate(self.hist, day)
                 h = cache[day]
             for p in prods:
-                key, close = Judge(self.tree, p, h, asof=asof).latest()
-                series[p].append({"asof": asof.isoformat(), "key": key, "grade": GRADES[key], "close": close})
+                j = Judge(self.tree, p, h, asof=asof)
+                key, close = j.latest()
+                pt = {"asof": asof.isoformat(), "key": key, "grade": GRADES[key], "close": close}
+                if amounts and j.cs:
+                    pt["amount"] = j.amount(len(j.cal) - 1)
+                series[p].append(pt)
         return series
 
-    def run(self, start=None, unobserved=None, limit=None, truncate=False, prods=None, axis=None):
+    def run(self, start=None, unobserved=None, limit=None, truncate=False, prods=None, axis=None, amounts=False):
         """책 무관 **단일 신호 생성 입구** — finest_tf 로 내부 경로를 고른다(로직이 아니라 '속도·축'만 다르다).
 
         axis 로 축을 강제할 수 있다(None 이면 finest_tf 자동). **일봉 백테스트는 의미상 늘 일봉축**이므로
@@ -141,7 +147,7 @@ class Timeline:
 
         · 1d   : 상품마다 Judge 를 한 번 만들고 전체 달력의 grade(i)/incomplete(i) 를 뽑는다. start(YYYYMMDD)을
           주면 그 이상 날만.
-        · 5m/1m: asofs(분봉 범위)를 깔고 step 으로 각 asof 에서 판정한다. truncate 는 step 참고, limit 은 꼬리 개수.
+        · 5m/1m: asofs(분봉 범위)를 깔고 step 으로 각 asof 에서 판정한다. truncate·amounts 는 step 참고, limit 은 꼬리 개수.
 
         prods 를 주면 그 상품만(없으면 트리의 전 상품). 반환:
           {tf, prods, series:{prod:[점]},
@@ -169,7 +175,7 @@ class Timeline:
             return {"tf": tf, "prods": prods, "series": series, "judges": judges,
                     "timeline": [], "sessions": []}       # 일봉 트리 — 분봉 축 없음(asofs 와 같은 빈 리스트)
         timeline = self.asofs(limit=limit)
-        series = self.step(timeline, prods, truncate=truncate)
+        series = self.step(timeline, prods, truncate=truncate, amounts=amounts)
         sessions = sorted({a.strftime("%Y%m%d") for a in timeline})
         return {"tf": tf, "prods": prods, "series": series, "judges": None,
                 "timeline": timeline, "sessions": sessions}
