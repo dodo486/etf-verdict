@@ -175,7 +175,6 @@ def t_no_exit():
             check(set(t) == {"exit_policy"}, "매도 규칙 없음 — 거래를 만들지 않는다 %r" % sorted(t))
             b = res["summary"]["X"]["grades"][backtest.BUY_OR_CONFIRM]
             check(b["signals"] == 1 and b["fwd"][5]["n"] == 1, "매도 규칙 없음 — 매수 신호 뒤 N일 보유만 %r" % b)
-            check(trades_mod.NO_EXIT_NOTE in backtest.build_text(res), "매도 규칙 없음 문구")
         else:
             check(t["stats"]["trades"] == 1 and t["trades"][0]["closed"], "매도 규칙 있음 — 거래 시뮬레이션 %r" % t["stats"])
 

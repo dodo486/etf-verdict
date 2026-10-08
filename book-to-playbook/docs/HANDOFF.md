@@ -60,8 +60,9 @@
 - **백테스트 계산기 버그** — `portfolio` 가 1 unit = 시작자본 고정이라 손실 뒤 다음 진입이 남은 현금보다 클 수 있다
   (옛 표준 매도 사본에서 SOXL −162% 관측). 잔고 기준 사이징으로.
 - **판정 JSON 의 `grade_rules` 빼기** — 서버 권위 뒤 화면이 안 쓴다(다음 출력 변경 때).
-- **웹 백테스트 탭 지표 채우기**(총수익·MDD·샤프·자산곡선 — 표시 코드는 있음) · **장중 손익 백테스트**(분봉이 길게 쌓이면
-  `replay → portfolio.run_product`, 지금은 분봉 ~7일이라 보류) · tree 재생성 뒤 `python -m trading.verify_trading --parity` 실측.
+- **웹 백테스트 탭 지표 채우기**(총수익·MDD·샤프·자산곡선 — 표시 코드는 있음) · **장중 손익 백테스트**(분봉 ~7일뿐이라 보류 —
+  옛 CLI `replay`·`backtest.run_intraday` 는 `work/trading-cleanup` 정리에서 삭제했다. 되살릴 땐 통일 신호 경로 위에
+  재구현한다) · tree 재생성 뒤 `python -m trading.verify_trading --parity` 실측.
 - **무인 판정을 막는 수동 조건** — (가) 연산으로 풀 것 = v3 기본 부품 조합 · (나) 데이터가 없는 것 = 실적 캘린더 · 뉴스 시각 ·
   지수 구성종목 등락(breadth) · 개인 매매 기록 — 외부 소스 생기기 전엔 서버 권위 수동 답으로 '1회 답'까지 · (다) 정성 판단 = 수동 답.
 - **jhts 실데이터 교체 + yfinance 임시 흔적 삭제**(`MIGRATION_NOTES.md` 체크리스트).

@@ -10,10 +10,6 @@
   분할매수/부분매도는 from_signals 의 bool 로는 안 되므로(spike 권고), 체결 일정을 size 배열로 선계산해
   vbt.Portfolio.from_orders 에 넣는 '접착제'로 처리한다.
 
-실주문 실행기 자리(LiveExecutor — 범위 밖)
-  같은 체결 일정을 증권사(jhts) 실주문으로 내는 실행기가 들어올 자리다. 지금은 빈 자리표(아래 LiveExecutor)뿐 —
-  네트워크·주문 코드 없음.
-
 하드코딩 0
   수수료·거래세·슬리피지·시작자본은 trading/market_config.json(시장별 US/KR)에서 읽는다.
   코드에 시장 숫자 리터럴을 두지 않는다. 심볼의 시장은 md_feed.market_of 가 정한다.
@@ -205,10 +201,3 @@ def run_product(symbol, cal, closes, trade_list):
         "position_facts": _position_facts(trade_list, closes),
         "limits_unapplied": limits_unapplied,  # 적용 못 한 상하한가·호가단위(placeholder) — 없으면 []
     }
-
-
-class LiveExecutor:
-    """(빈 자리) 실주문 실행기 — 체결 일정(buys/sells)을 jhts 증권사 주문으로 낸다. 범위 밖이라 구현 없음."""
-
-    def __init__(self, *_a, **_k):
-        raise NotImplementedError("LiveExecutor — jhts 실주문 미구현(자리만 있음)")

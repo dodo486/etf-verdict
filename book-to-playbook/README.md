@@ -54,7 +54,7 @@ python -m orchestration.run daily        # 판정 → 백테스트 탭 데이터
 python -m orchestration.run check [--no-verify-tree] [--parity]   # 검사만 전부(CHECKS) — 요약 + 종료코드
 python -m orchestration.run watch [--every N] # asof=지금 기준 N분(기본 5)마다 재판정(백테스트 제외) — 장중 조건은 분봉이 연결되면 살아난다
 python -m web.verdict_view <slug> [--json] [--no-send]       # 오늘 판정(판정 JSON·알림)
-python -m trading.backtest <slug> [--days 365] [--engine vectorbt | --intraday]   # 백테스트(로그)
+python -m trading.backtest <slug> [--days 365]   # 백테스트(로그·JSON)
 python -m web.backtest_page <slug>                            # 책 페이지 '백테스트' 탭 데이터
 python -m web.serve                                           # 로컬 실시간 서버(RUN.md)
 ```
