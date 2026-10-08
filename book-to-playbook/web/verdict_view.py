@@ -4,7 +4,7 @@
 
 판정은 구간③ 판정기(trading/judge.Judge — 라이브 = 달력 마지막 봉)가 내고, 이 파일은 그 Decision 과 평가 문맥을
 사람과 화면이 읽는 모양으로 묶기만 한다 — 화면은 트리를 다시 해석하지 않고 이 출력만 그린다. 트리는 출입구
-(checklist/tree_gateway.TreeGateway), 시세는 수집 단계(checklist.grade.history → md_feed.histories) 하나로 받는다.
+(checklist/tree_gateway.TreeGateway), 시세는 수집 단계(checklist.tradeTool.Grade.history → md_feed.histories) 하나로 받는다.
 books.json 의 engine.daily 가 이 모듈이다(python -m web.verdict_view <slug> — 라이브 서버·러너가 부른다).
 
 출력 계약(알림 · 화면 · /api/verdict 가 소비):
@@ -29,8 +29,8 @@ from datetime import datetime, timedelta, timezone
 
 from shared.paths import book_log, book_meta, positions_json, write_text
 from shared import md_feed
-from checklist import cond
-from checklist.grade import GRADES, GRADE_RULES, WARMUP_DAYS, history
+from checklist.tradeTool import Cond
+from checklist.tradeTool import Grade
 from checklist.tree_gateway import TreeGateway
 from trading.judge import Holding, Judge
 from trading.trades import NO_EXIT_NOTE, exit_policy, live_units, sell_text
@@ -70,7 +70,7 @@ def common_items(gw, pe):
     ctx = pe.ctx[None].shared()            # 공통 칸 = 상품마다 같은 판단 — 사람의 답 열쇠 "*"(답이 없으면 그대로)
     shared = [name for name, node in defs.items()
               if isinstance(node, dict) and node.get("label")
-              and len(users.get(name, ())) >= 2 and not cond.product_specific(node, defs)]
+              and len(users.get(name, ())) >= 2 and not Cond.product_specific(node, defs)]
 
     def refs(n, stop, acc):
         """n 안의 정의 참조를 센다 — stop(따로 나열한 정의) 안으로는 들어가지 않는다."""
@@ -81,7 +81,7 @@ def common_items(gw, pe):
                 if x not in stop:
                     refs(defs[x], stop, acc)
             for k, y in n.items():
-                if k not in cond.META and k != "def":
+                if k not in Cond.META and k != "def":
                     refs(y, stop, acc)
         elif isinstance(n, list):
             for y in n:
@@ -106,7 +106,7 @@ def common_items(gw, pe):
     out = []
     for name in listed:
         node = defs[name]
-        v = cond.series(node, ctx)[i]
+        v = Cond.series(node, ctx)[i]
         out.append({"name": name, "label": node["label"], "ref": node.get("ref"), "v": v,
                     "view": cv._view(node, defs, ctx, i, shared=True, fold=fold - {name})})
     return out
@@ -131,9 +131,9 @@ def ref_map(gw):
     for p in gw.products():
         for z, label, ref, node in gw.expressions(p):
             if label:
-                add(ref, z, p, bool(cond.manual_leaves(node, defs)))
-            for n in cond.labeled(node, defs):
-                add(n.get("ref"), z, p, bool(cond.manual_leaves(n, defs)))
+                add(ref, z, p, bool(Cond.manual_leaves(node, defs)))
+            for n in Cond.labeled(node, defs):
+                add(n.get("ref"), z, p, bool(Cond.manual_leaves(n, defs)))
         for t in gw.tranches(p):
             if t.when is None:
                 add(t.ref, "sizing", p, False)
@@ -155,7 +155,7 @@ def product_verdict(gw, p, hist, positions, asof=None, answers=None):
     j = Judge(gw, p, hist, asof=asof, answers=answers)
     if not j.cs:
         req = md_feed.requested().get(p, "-")
-        return dict(base, key="unknown", grade=GRADES["unknown"],
+        return dict(base, key="unknown", grade=Grade.GRADES["unknown"],
                     reason="%s 시세 없음(수집 요청 %s)" % (p, req)), None
     xs = positions.get(p, [])
     d = j.decide(holdings=[Holding.at(j.cal, str(x["entry_date"]), float(x["entry_px"]), int(x.get("filled", 1)))
@@ -179,7 +179,7 @@ def product_verdict(gw, p, hist, positions, asof=None, answers=None):
     v = dict(base, date=d.date, close=d.close,
              chg=(d.close / d.prev_close - 1) * 100 if d.prev_close else None,
              key=d.key, grade=d.grade, reason=reason,
-             zones={sec: cv._view(gw.section(p, sec), defs, ctx, i) for sec in cond.SECTIONS},
+             zones={sec: cv._view(gw.section(p, sec), defs, ctx, i) for sec in Cond.SECTIONS},
              opt=d.opt, pes=d.pes,
              caution=[dict(st, view=cv._view(r.when, defs, ctx, i), v=st["value"]) for st, r in d.caution],
              amount={"factor": f, "unspecified": unspec, "unknown": unknown},
@@ -223,38 +223,37 @@ def _static_view(node, defs, index=None):
         if "kids" in it:
             it["kids"] = [strip(k) for k in it["kids"]]
         return it
-    ctx = cond.Ctx({}, ["0"], "$none", index, defs, manual_as=None, pos=(0, 1.0))
+    ctx = Cond.Ctx({}, ["0"], "$none", index, defs, manual_as=None, pos=(0, 1.0))
     try:
         return strip(cv._view(node, defs, ctx, 0))
-    except cond.CondError:
+    except Cond.CondError:
         return None
 
 
 # ------------------------------------------------------------------ 책 하나
 def render(slug, asof=None, answers=None):
     """asof = 관측 시각(UTC datetime). None 이면 지금 — 장중(tf="1m") 조건을 이 시점 이하로 자른다.
-    answers = 화면에서 사람이 답한 수동 {cond.answer_key: 참/거짓} — 서버가 그 답으로 등급·칸 값·금액을 낸다
+    answers = 화면에서 사람이 답한 수동 {Cond.answer_key: 참/거짓} — 서버가 그 답으로 등급·칸 값·금액을 낸다
     (서버 권위 — 화면은 다시 계산하지 않는다). None 이면 답 없는 판정(옛 출력 그대로), 주면 top["answers"] 로 되돌려 준다."""
     tree = TreeGateway.load(slug)
     now = datetime.now(timezone.utc).astimezone()
     top = {"slug": slug, "title": book_title(slug), "ts": now.isoformat(), "source": SOURCE,
            "verdicts": [], "common": [], "refs": {}, "missing": {}, "cash": None,
            # 등급 글자표(키→라벨)를 실어보낸다 — 화면이 따로 복붙하지 않고 이걸 받아 쓴다(단일 출처).
-           "grades": GRADES,
+           "grades": Grade.GRADES,
            # 등급 판정 사다리(데이터) — 화면은 더 이상 등급을 다시 내지 않는다(서버 권위: answers 로 서버가 낸다).
            #   판정 JSON 모양을 그대로 두려고(서버 권위 전환 때 무답 출력 바이트 동일) 남겼다 — 다음 출력 변경 때 뺀다.
-           "grade_rules": GRADE_RULES,
-           # 여섯 칸 키→한글 이름표(화면 머리글용) — cond.ZONE_LABELS 가 정본이다. 화면(shared-ui zw)이
+           "grade_rules": Grade.GRADE_RULES,
+           # 여섯 칸 키→한글 이름표(화면 머리글용) — Cond.ZONE_LABELS 가 정본이다. 화면(shared-ui zw)이
            #   복붙하지 않고 이걸 받아 쓴다. 머리글 번호 순서대로(①필터 ②회피 ③진입 …) 실어보낸다.
-           "zones": {s: cond.ZONE_LABELS[s]
+           "zones": {s: Cond.ZONE_LABELS[s]
                      for s in ("filter", "avoid", "entry", "caution", "sizing", "exit")},
            # 매도 정책 "none"(책에 매도 규칙 없음) 문구 — 정본 trading/trades.NO_EXIT_NOTE(화면이 받아 쓴다).
            "no_exit_note": NO_EXIT_NOTE}
     if tree is None:
         top["error"] = "조건 트리 없음 — books/%s/tree.json 이 있어야 판정한다" % slug
         return top
-    start = (datetime.now() - timedelta(days=WARMUP_DAYS)).strftime("%Y%m%d")
-    hist = history(tree, start)
+    hist = Grade.history_back(tree)
     positions = load_positions(slug)
     pe0 = None
     weights, all_known = [], True

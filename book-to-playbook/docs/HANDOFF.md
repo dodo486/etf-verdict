@@ -54,7 +54,7 @@
 - 끝나면 `main` 에 합치기(사용자 승인).
 
 ### 그 뒤
-- **`observe` 레거시 제거** — 엔진(`checklist/cond.py`)에만 남은 옛 포장재. 제대로 지우려면 "장중 데이터 없음 None →
+- **`observe` 레거시 제거** — 엔진(`checklist/tradeTool.py`)에만 남은 옛 포장재. 제대로 지우려면 "장중 데이터 없음 None →
   실전 🟡 / 백테스트 EXCLUDED" 자동 처리를 먼저 깔아야 한다(워밍업 None 과 구별하는 표식 필요). tree 생긴 뒤 파리티로 증명.
   영향: `cond`·`grade`·`verify_primitives`·`verify_tree`·`trading/backtest`·`timeline`·`COND_DSL`.
 - **백테스트 계산기 버그** — `portfolio` 가 1 unit = 시작자본 고정이라 손실 뒤 다음 진입이 남은 현금보다 클 수 있다

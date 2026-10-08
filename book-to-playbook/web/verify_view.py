@@ -17,7 +17,7 @@ from collections import namedtuple
 
 from shared import paths  # noqa: F401  (UTF-8 출력)
 from shared.paths import live_slugs, playbook_html, read_text
-from checklist import grade
+from checklist.tradeTool import Grade
 from checklist.tree_gateway import TreeGateway, empty_product, synthetic
 from web import condition_view as cv
 
@@ -38,7 +38,7 @@ def t_view():
     hist = {"X": [Candle(d, c, c, c, c, 1000) for d, c in zip(cal, xs)]}
     jump = {"ge": [{"pct": [C, 1]}, 20]}
     tree = TreeGateway.of(synthetic({"X": empty_product()}))
-    pe = grade.ProductEval(tree, "X", hist, cal)
+    pe = Grade.ProductEval(tree, "X", hist, cal)
     node = {"all": [dict(jump, label="급등", ref="1"), {"not": {"label": "수동", "manual": "x"}}]}
     v = cv._view(node, pe.defs, pe.ctx[None], len(xs) - 1)
     check(v["op"] == "all" and v["kids"][0]["v"] is True and v["kids"][0]["label"] == "급등"

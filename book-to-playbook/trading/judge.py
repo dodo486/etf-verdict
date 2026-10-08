@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """판정기(구간③) — 한 상품의 한 시점 판정. 라이브 판정·백테스트·장중 재생·신호 파리티가 전부 여기를 지난다.
 
-  · Judge     트리(TreeGateway) + 시세 이력(+ 보유 Holding) → Decision. 상품마다 ProductEval(checklist/grade)을
+  · Judge     트리(TreeGateway) + 시세 이력(+ 보유 Holding) → Decision. 상품마다 Grade.ProductEval(checklist/grade)을
               전체 달력에 한 번 세우고 시점(i)마다 꺼낸다(벡터 1회계산 — cond 연산이 인과적이라 미래를 보지 않는다).
               돈·잔고는 모른다(그건 계산기 portfolio 의 일). 등급은 grade(i) 하나 — 라이브는 latest()(달력 마지막 봉),
               백테스트는 Timeline 이 모든 i 에 같은 grade(i) 를 부른다.
@@ -16,8 +16,8 @@
 """
 from dataclasses import dataclass, field
 
-from checklist import cond
-from checklist.grade import GRADES, ProductEval
+from checklist.tradeTool import Cond
+from checklist.tradeTool import Grade
 
 
 class Holding:
@@ -34,7 +34,7 @@ class Holding:
 
     def ctx(self, gw, prod, hist, cal, manual_as=None):
         """이 보유를 pos 로 주입한 평가 문맥 — cond 는 그 값을 '읽어' ret·days·maxret·minret 로 exit·분할 규칙만 평가한다."""
-        return cond.Ctx(hist, cal, prod, gw.index(prod), gw.defs(), manual_as=manual_as, pos=(self.entry_i, self.cost))
+        return Cond.Ctx(hist, cal, prod, gw.index(prod), gw.defs(), manual_as=manual_as, pos=(self.entry_i, self.cost))
 
 
 @dataclass
@@ -81,23 +81,23 @@ class Decision:
     opt: dict = None
     pes: dict = None
     holdings: list = None            # [HoldingState]
-    eval: object = None              # ProductEval — 화면층이 같은 문맥으로 view 를 빚는다
+    eval: object = None              # Grade.ProductEval — 화면층이 같은 문맥으로 view 를 빚는다
 
     @property
     def grade(self):
-        return GRADES[self.key]
+        return Grade.GRADES[self.key]
 
 
 class Judge:
-    """한 상품 판정기 — 생성 때 ProductEval 을 전체 달력에 한 번 세운다.
+    """한 상품 판정기 — 생성 때 Grade.ProductEval 을 전체 달력에 한 번 세운다.
     asof = 관측 시각(UTC datetime, None 이면 지금) · unobserved 가 "exclude" 면 관측 못 한 장중 조건을 빼고 판단(백테스트 전용)
-    · answers = 사람이 답한 수동 {cond.answer_key: 참/거짓}(라이브 화면의 수동 체크 — 서버가 그 답으로 등급을 낸다)."""
+    · answers = 사람이 답한 수동 {Cond.answer_key: 참/거짓}(라이브 화면의 수동 체크 — 서버가 그 답으로 등급을 낸다)."""
 
     def __init__(self, gw, prod, hist, cal=None, asof=None, unobserved=None, answers=None):
         self.gw, self.prod, self.hist = gw, prod, hist
         self.cs = hist.get(prod) or []
         self.cal = [c.date for c in self.cs] if cal is None else cal
-        self.pe = ProductEval(gw, prod, hist, self.cal, unobserved, asof, answers)
+        self.pe = Grade.ProductEval(gw, prod, hist, self.cal, unobserved, asof, answers)
 
     @property
     def warmup(self):
@@ -137,7 +137,7 @@ class Judge:
             incomplete=pe.incomplete(i), confirmed=pe._confirmed[i] + 1, warmup=pe.warmup,
             top=pe.top(i), manual=pe.manual_items(i), amount=self.amount(i),
             caution=list(zip(pe.caution_state(i), self.gw.cautions(self.prod))),
-            opt={sec: pe.opt[sec][i] for sec in cond.SECTIONS}, pes={sec: pe.pes[sec][i] for sec in cond.SECTIONS},
+            opt={sec: pe.opt[sec][i] for sec in Cond.SECTIONS}, pes={sec: pe.pes[sec][i] for sec in Cond.SECTIONS},
             holdings=[self.hold(h, i) for h in holdings], eval=pe)
 
     def hold(self, h, i=None):
@@ -148,6 +148,6 @@ class Judge:
         ctx = h.ctx(self.gw, self.prod, self.hist, self.cal)
         trs = self.gw.tranches(self.prod)
         nt = trs[h.filled] if 0 < h.filled < len(trs) else None
-        return HoldingState(ret=cond.series({"pos": "ret"}, ctx)[i], days=cond.series({"pos": "days"}, ctx)[i],
-                            exits=[(r, cond.series(r.when, ctx)[i]) for r in self.gw.exit_rules(self.prod)],
-                            next_tranche=None if nt is None else (nt, cond.series(nt.when, ctx)[i]), ctx=ctx)
+        return HoldingState(ret=Cond.series({"pos": "ret"}, ctx)[i], days=Cond.series({"pos": "days"}, ctx)[i],
+                            exits=[(r, Cond.series(r.when, ctx)[i]) for r in self.gw.exit_rules(self.prod)],
+                            next_tranche=None if nt is None else (nt, Cond.series(nt.when, ctx)[i]), ctx=ctx)

@@ -12,11 +12,10 @@
   · JUDGE.md            심판 지침(비교 도구·판단·최종 트리와 review·채점 대응)
   · COND_DSL.md         트리 문법 — 트리를 쓰는 추출자·심판의 참고서(유효한 것과 그 뜻만)
   · tree_gateway.py     [공개 DSL] TreeGateway — tree.json 을 읽는 유일한 출입구(형식 검사·탐색)
-  · cond.py             [공개 DSL] 조건 트리 문법·평가기 (python -m checklist.cond fmt <파일> = 공통 직렬화)
-  · grade.py            [공개 DSL] 등급의 뜻 — 날짜별 등급·금액·비중·워밍업 가드 + grade_rules.json(등급 사다리)
+  · tradeTool.py        [공개 DSL] Cond(조건 트리 문법·평가기) · Grade(날짜별 등급·금액·비중·워밍업 가드·시세 조달) + grade_rules.json(등급 사다리) · python -m checklist.tradeTool fmt <파일> = 공통 직렬화
   · verify_tree.py      트리 검사 — 이중 추출 비교·원문 사례·발화 통계·비중 합 · 심판의 비교 도구(--dump) · 책 계약(--contract)
   · verify_primitives.py 검사기 — 원시 연산·등급 계산을 기준값·손계산과 대조
 
 팀 경계: 이 팀은 shared/ 만 import 한다(a·b 비교는 규칙 식으로만 — 매매 시뮬레이션은 구간③ 몫).
-거꾸로 [공개 DSL] 세 모듈만 다른 층이 import 해도 된다. 경계는 orchestration/verify_code.py 가 강제한다.
+거꾸로 [공개 DSL] 두 모듈(tree_gateway·tradeTool)만 다른 층이 import 해도 된다. 경계는 orchestration/verify_code.py 가 강제한다.
 """

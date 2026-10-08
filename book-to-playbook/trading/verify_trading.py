@@ -36,9 +36,10 @@ from collections import namedtuple
 from datetime import datetime, timedelta, timezone
 
 from shared.paths import BASE, live_slugs, read_text  # (UTF-8 출력 고정 포함)
-from checklist.grade import GRADES, WARMUP_DAYS, history
+from checklist.tradeTool import Grade
 from checklist.tree_gateway import TreeGateway, empty_product, synthetic
 from trading import trades as trades_mod
+from trading.commonTool import open_history
 
 Candle = namedtuple("Candle", "date open high low close volume")
 FAILS = []
@@ -261,13 +262,9 @@ def compare(slug, window=WINDOW):
     from trading import backtest               # 패리티만 쓰는 실제 드라이버 진입점(1·2 검사는 안 부른다)
     from trading.judge import Judge
     from trading.timeline import Timeline
-    tree = TreeGateway.load(slug)
-    if tree is None:
-        raise SystemExit("books/%s/tree.json 없음" % slug)
-
     # 라이브 판정(render)과 같은 방식으로 전체 일봉을 한 번 받는다(워밍업 포함).
     # window 만큼 + 워밍업을 넉넉히 — backtest.run 의 days 도 이 창을 덮게 준다.
-    full = history(tree, (datetime.now() - timedelta(days=window * 2 + WARMUP_DAYS + 30)).strftime("%Y%m%d"))
+    tree, full = open_history(slug, window * 2 + 30)
 
     # 백테스트 경로: 실제 드라이버 진입점. daily 행에서 (prod, date) → (key, grade).
     bt = backtest.run(slug, days=window * 2 + 30, hist=full, tree=tree)
@@ -288,7 +285,7 @@ def compare(slug, window=WINDOW):
                 continue
             # 실시간 경로: 라이브가 D 마감 직후 봤을 입력(D 이하 이력·그날 마감 asof)으로 Judge.latest.
             key, _close = Judge(tree, p, Timeline.truncate(full, d), asof=_asof_of(d)).latest()
-            live_row = (key, GRADES[key])
+            live_row = (key, Grade.GRADES[key])
             total += 1
             if live_row != bt_row:
                 mismatches.append({"prod": p, "date": d, "bt_key": bt_row[0], "bt_grade": bt_row[1],

@@ -53,7 +53,7 @@ description: 트레이딩 책을 읽어 실전 매매 플레이북 + 기계가 �
 | verify_tree --contract · verify_view --pages | 소절 인덱스·트리 문법·ref · 페이지 구획·UI 사본 | 해당 산출물을 만든 단계를 다시(UI 사본은 `python -m web.inject_ui <페이지>`) |
 | verify_code | 폴더 경계·주인 표 위반 | 위반 줄을 주인 파일의 공개 함수로(검사·표를 느슨하게 하지 않는다) |
 | verify_source_integrity | 플레이북 본문이 바뀜 | 의도한 원문 대조 수정이면 `--accept --why`, 아니면 되돌린다 |
-| verify_primitives · verify_trading | 원시 연산·체결 계산 오류 | `checklist/cond.py`·`trading/trades.py`(책 쪽이 아니다) |
+| verify_primitives · verify_trading | 원시 연산·체결 계산 오류 | `checklist/tradeTool.py`·`trading/trades.py`(책 쪽이 아니다) |
 
 ## 입력
 - 정제된 텍스트(.md) 있음 → 바로 1)

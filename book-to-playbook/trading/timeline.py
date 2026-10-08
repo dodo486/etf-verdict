@@ -27,7 +27,7 @@
 """
 from datetime import datetime, timedelta, timezone
 
-from checklist.grade import GRADES, WARMUP_DAYS, History, history
+from checklist.tradeTool import Grade
 from trading.judge import Judge
 
 # tf 촘촘함 순서 — 초로 환산(작을수록 촘촘). cond.TIMEFRAMES 와 짝(그 밖 tf 는 문법이 막는다).
@@ -40,11 +40,6 @@ def finest_tf(tree):
     if not tfs:
         return "1d"
     return min(tfs, key=lambda tf: TF_SECONDS.get(tf, TF_SECONDS["1d"]))
-
-
-def load_hist(tree):
-    """장중 스테핑에 쓸 시세(일봉 + 분봉) 한 벌 — 재생·장중 백테스트가 같이 쓴다."""
-    return history(tree, (datetime.now() - timedelta(days=WARMUP_DAYS)).strftime("%Y%m%d"))
 
 
 def _minute_keys(hist, syms):
@@ -101,10 +96,10 @@ class Timeline:
 
     @staticmethod
     def truncate(full, upto):
-        """full(History) 을 날짜 upto(YYYYMMDD) 이하로 자른 새 History. 분봉(minutes)은 그대로 넘긴다.
+        """full(Grade.History) 을 날짜 upto(YYYYMMDD) 이하로 자른 새 Grade.History. 분봉(minutes)은 그대로 넘긴다.
         과거 세션을 재생할 때 '그 세션 마감 직후 라이브가 보유했을' 일봉(그날까지의 확정 일봉)을 재현한다 —
         신호 파리티(verify_trading --parity)가 쓰는 바로 그 규약."""
-        t = History({s: [c for c in (cs or []) if c.date <= upto] for s, cs in full.items()})
+        t = Grade.History({s: [c for c in (cs or []) if c.date <= upto] for s, cs in full.items()})
         t.minutes = getattr(full, "minutes", {})
         return t
 
@@ -132,7 +127,7 @@ class Timeline:
             for p in prods:
                 j = Judge(self.tree, p, h, asof=asof)
                 key, close = j.latest()
-                pt = {"asof": asof.isoformat(), "key": key, "grade": GRADES[key], "close": close}
+                pt = {"asof": asof.isoformat(), "key": key, "grade": Grade.GRADES[key], "close": close}
                 if amounts and j.cs:
                     pt["amount"] = j.amount(len(j.cal) - 1)
                 series[p].append(pt)
@@ -170,7 +165,7 @@ class Timeline:
                         continue
                     inc = j.incomplete(i)          # 워밍업 부족 — grade 가 ❔(불완전)로 내보낸다
                     k = j.grade(i)
-                    pts.append({"date": d, "key": k, "grade": GRADES[k], "close": cs[i].close, "incomplete": inc})
+                    pts.append({"date": d, "key": k, "grade": Grade.GRADES[k], "close": cs[i].close, "incomplete": inc})
                 series[p], judges[p] = pts, j
             return {"tf": tf, "prods": prods, "series": series, "judges": judges,
                     "timeline": [], "sessions": []}       # 일봉 트리 — 분봉 축 없음(asofs 와 같은 빈 리스트)

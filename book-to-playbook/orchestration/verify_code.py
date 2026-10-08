@@ -64,7 +64,7 @@ IMPORTS = {
     "orchestration": set(LAYERS),
 }
 # 구간②의 공개 DSL — 다른 층이 import 해도 되는 checklist 모듈은 이 목록뿐(한 곳).
-PUBLIC_DSL = ("checklist.tree_gateway", "checklist.cond", "checklist.grade")
+PUBLIC_DSL = ("checklist.tree_gateway", "checklist.tradeTool")
 
 # 시세 자가수집에 쓰이는 모듈들 — 보이면 그 자체로 위반.
 NET_MODULES = {"urllib", "http", "requests", "socket", "aiohttp", "httpx"}
@@ -304,9 +304,9 @@ def m_qty_convert(src):
 
 
 def _labels():
-    """칸·등급 이름표 글자 — 정본(cond.ZONE_LABELS · grade.GRADES)에서 읽는다(여기 다시 적지 않는다)."""
-    from checklist import cond, grade
-    return set(cond.ZONE_LABELS.values()) | set(grade.GRADES.values())
+    """칸·등급 이름표 글자 — 정본(Cond.ZONE_LABELS · Grade.GRADES)에서 읽는다(여기 다시 적지 않는다)."""
+    from checklist.tradeTool import Cond, Grade
+    return set(Cond.ZONE_LABELS.values()) | set(Grade.GRADES.values())
 
 
 def m_labels(src):
@@ -338,7 +338,7 @@ OWNERS = [
          allow={   # 같은 이름 키를 쓰는 '트리 아닌' dict
              ("checklist/verify_tree.py", "compare"): ({"sizing"}, "칸별 비교 결과 dict(트리 아님)"),
              ("checklist/verify_tree.py", "render_zone"): ({"weight", "tranches"}, "zone_diff 결과(심판 덤프) dict"),
-             ("checklist/grade.py", "amount_factor"): ({"scale"}, "caution_state 결과(판정 JSON caution 항목)"),
+             ("checklist/tradeTool.py", "amount_factor"): ({"scale"}, "caution_state 결과(판정 JSON caution 항목)"),
              ("trading/verify_trading.py", "t_trades"): ({"entry", "exit"}, "거래 dict 검사"),
              ("trading/verify_trading.py", "parity_text"): ({"products"}, "파리티 보고 dict"),
              ("trading/portfolio.py", "run_product"): ({"sell"}, "주문 dict 의 매도 표시"),
@@ -363,12 +363,12 @@ OWNERS = [
              "비중·조심이 같은 변환을 지난다. 밖은 Qty 를 건네기만 하고 basis 를 가르거나 셈하지 않는다",
          hint="trades.to_units(Qty, Ledger) · 화면은 엔진이 낸 units·sell 문장으로",
          allow={("checklist/tree_gateway.py", "_qty"): (None, "원본 키(sell·scale·frac·weight) → Qty 정규화(변환 아님)")}),
-    dict(concept="칸·등급 이름표", owners=("checklist/cond.py", "checklist/grade.py"), match=m_labels,
-         why="cond.ZONE_LABELS · grade.GRADES · grade_rules.json 이 정본 — 화면은 판정 JSON(zones·grades·grade_rules)으로 받는다",
+    dict(concept="칸·등급 이름표", owners=("checklist/tradeTool.py",), match=m_labels,
+         why="Cond.ZONE_LABELS · Grade.GRADES · grade_rules.json 이 정본 — 화면은 판정 JSON(zones·grades·grade_rules)으로 받는다",
          hint="판정 JSON 의 zones·grades·grade_rules 로", allow={}),
-    dict(concept="등급 사다리", owners=("checklist/grade.py",), match=m_grade_ladder,
-         why="날짜별 등급·금액 배수를 내는 곳은 grade 하나 — 두 벌이면 엔진과 화면 등급이 갈라진다",
-         hint="판정 JSON 의 key 를 그대로(수동 답은 POST /api/verdict — 서버가 cond.Ctx answers 로 낸다)", allow={}),
+    dict(concept="등급 사다리", owners=("checklist/tradeTool.py",), match=m_grade_ladder,
+         why="날짜별 등급·금액 배수를 내는 곳은 Grade 하나 — 두 벌이면 엔진과 화면 등급이 갈라진다",
+         hint="판정 JSON 의 key 를 그대로(수동 답은 POST /api/verdict — 서버가 Cond.Ctx answers 로 낸다)", allow={}),
 ]
 SELF = "orchestration/verify_code.py"      # 표 자신(금지 표식 목록을 들고 있다) — 표식 검사에서 뺀다
 

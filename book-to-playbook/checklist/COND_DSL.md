@@ -115,7 +115,7 @@
 
 `review` 는 최종 트리에만 있다 — 심판의 판정 근거(형식은 `JUDGE.md`). 구간② 검사기만 읽고 판정·체결엔 쓰지 않는다.
 
-**직렬화**: 트리 파일을 쓴 뒤 반드시 `python -m checklist.cond fmt <파일>` 로 공통 형식(`cond.compact_json` —
+**직렬화**: 트리 파일을 쓴 뒤 반드시 `python -m checklist.tradeTool fmt <파일>` 로 공통 형식(`cond.compact_json` —
 한 줄에 들어가는 노드는 한 줄, 숫자 목록은 이어 붙임)으로 다시 쓴다. 줄 수를 부풀리는 들여쓰기를 쓰지 않는다 —
 형식이 다르면 `verify_tree` 가 정지한다.
 

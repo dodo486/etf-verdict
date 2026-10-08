@@ -10,7 +10,7 @@
                │ 산출물 파일
                ▼
           구간② checklist/  ─▶ books/<slug>/tree.json (체크리스트 = DSL)
-               │   공개 DSL: tree_gateway(출입구) · cond(문법·계산) · grade(등급의 뜻)
+               │   공개 DSL: tree_gateway(출입구) · tradeTool(Cond=문법·계산 · Grade=등급의 뜻)
                ▼
           구간③ trading/    ─▶ Judge(판단) → Decision ─┬─ 오늘 판정
                                                       ├─ 백테스트(Timeline × 계좌·체결 × 성적)
@@ -27,7 +27,7 @@ books/<slug>/  책 하나의 산출물 전부(playbook.html · source · source_
 | 폴더 | 하는 일 | 주요 파일 |
 |---|---|---|
 | `playbook/` | 구간① 원문 → 전사본 | `PLAYBOOK.md`(지침) · `book_source.py` · `verify_source_integrity.py` |
-| `checklist/` | 구간② 전사본 → tree.json, **DSL 의 주인** | `tree_gateway.py` · `cond.py` · `grade.py`(+`grade_rules.json`) · `verify_tree.py` · `verify_primitives.py` · 지침 md(COND_DSL·EXTRACTOR·SCENARIO·JUDGE·README) |
+| `checklist/` | 구간② 전사본 → tree.json, **DSL 의 주인** | `tree_gateway.py` · `tradeTool.py`(Cond·Grade, +`grade_rules.json`) · `verify_tree.py` · `verify_primitives.py` · 지침 md(COND_DSL·EXTRACTOR·SCENARIO·JUDGE·README) |
 | `trading/` | 구간③ 판정 · 백테스트 · 장중 | `judge.py`(Judge·Decision·Holding) · `timeline.py` · `trades.py`(체결 규약·매도 정책) · `portfolio.py`(돈·수수료) · `backtest.py` · `replay.py` · `watch.py` · `notify.py` · `verify_trading.py` |
 | `web/` | 화면 | `verdict_view.py` · `condition_view.py` · `backtest_page.py` · `book_page.py` · `serve.py` · `ui/*.js` · `verify_view.py` |
 | `shared/` | 공통 | `md_feed.py` · `paths.py` · `_dev_cache.py`(개발용 시세 캐시) |
@@ -57,7 +57,7 @@ books/<slug>/  책 하나의 산출물 전부(playbook.html · source · source_
 - **동작 변경은 따로 커밋**하고 전후 수치를 보고한다.
 - **쓸모없어진 것(죽은 코드·옛 문서·옛 산출물)은 같은 작업에서 지운다.** 호환용 별칭을 남기지 않는다.
 - **책 데이터(후보·tree.json)는 손으로 고치지 않는다** — 공통 로직을 고친 뒤 다시 뽑는다. 심판 몫은 심판이.
-- 트리 JSON 은 `python -m checklist.cond fmt <파일>` 압축 형식.
+- 트리 JSON 은 `python -m checklist.tradeTool fmt <파일>` 압축 형식.
 
 ## 4. 주인 표 (`orchestration/verify_code.py` OWNERS — 주인 밖에 보이면 정지)
 
@@ -68,8 +68,8 @@ books/<slug>/  책 하나의 산출물 전부(playbook.html · source · source_
 | 매도 정책(책에 매도 규칙이 없을 때 = 매수 신호만 평가) | `trading/trades.py` `exit_policy` |
 | 금액 정책(비중 × 분할 × 조심 배수, 모름 처리) | `trading/trades.py` `size_of` (사실은 `Judge.amount` 한 경로) |
 | 수량 변환('얼마나' → 물량, 매수·매도 공통) | `trading/trades.py` `to_units` |
-| 칸·등급 이름표 | `checklist/cond.py` · `checklist/grade.py` · `grade_rules.json` |
-| 등급 사다리(등급·금액 배수 계산) | `checklist/grade.py` — 화면은 다시 계산하지 않음(수동 답은 `POST /api/verdict`) |
+| 칸·등급 이름표 | `checklist/tradeTool.py`(Cond·Grade) · `grade_rules.json` |
+| 등급 사다리(등급·금액 배수 계산) | `checklist/tradeTool.py`(Grade) — 화면은 다시 계산하지 않음(수동 답은 `POST /api/verdict`) |
 | 할 일 목록 | `docs/HANDOFF.md` (다른 곳에 TODO 파일 금지) |
 
 새로 '한 곳에서만 정할 것'이 생기면 여기와 OWNERS 에 한 줄씩.

@@ -11,22 +11,19 @@ import sys
 from datetime import datetime
 
 from shared.paths import backtest_json, write_text
-from checklist.grade import GRADES
-from checklist.tree_gateway import TreeGateway
+from checklist.tradeTool import Grade
+from trading.commonTool import open_history
 from trading import portfolio, trades
-from trading.backtest import BUY_OR_CONFIRM, HORIZONS, fetch_history, run
+from trading.backtest import BUY_OR_CONFIRM, HORIZONS, run
 
 PAGE_PERIODS = (("1y", 365), ("3y", 1095))
 
 
 def page_data(slug):
     """책 페이지 '백테스트' 탭이 읽는 요약(일별 행 제외). 시세는 가장 긴 기간으로 한 번만 받는다."""
-    tree = TreeGateway.load(slug)
-    if tree is None:
-        raise SystemExit("books/%s/tree.json 없음" % slug)
-    hist = fetch_history(tree, max(d for _, d in PAGE_PERIODS))
+    tree, hist = open_history(slug, max(d for _, d in PAGE_PERIODS))
     out = {"slug": slug, "generated": datetime.now().isoformat(timespec="seconds"),
-           "horizons": list(HORIZONS), "grades": list(GRADES.values()),
+           "horizons": list(HORIZONS), "grades": list(Grade.GRADES.values()),
            "buy_or_confirm": BUY_OR_CONFIRM,
            # 매도 정책 "none"(책에 매도 규칙 없음)일 때 화면이 그대로 쓰는 문구 — 정본 trading/trades.NO_EXIT_NOTE.
            "no_exit_note": trades.NO_EXIT_NOTE, "periods": {}}

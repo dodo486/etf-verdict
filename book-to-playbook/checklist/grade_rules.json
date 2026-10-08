@@ -1,5 +1,5 @@
 {
-  "_doc": "등급 판정 사다리 — 정본(한 곳). 위에서 아래로 보며, 모든 when 조건이 맞는 첫 규칙이 이긴다(없으면 default). view 는 opt(낙관)·pes(비관) 중 어느 평가를 볼지. when 의 값은 3값(참/거짓/모름) — 정확히 같아야 맞는다(모름은 참·거짓 어느 쪽에도 안 맞는다). 이 표를 읽어 등급을 내는 곳은 checklist/grade.grade_key 하나다(화면은 판정 JSON 의 등급을 그대로 그린다 — 서버 권위).",
+  "_doc": "등급 판정 사다리 — 정본(한 곳). 위에서 아래로 보며, 모든 when 조건이 맞는 첫 규칙이 이긴다(없으면 default). view 는 opt(낙관)·pes(비관) 중 어느 평가를 볼지. when 의 값은 3값(참/거짓/모름) — 정확히 같아야 맞는다(모름은 참·거짓 어느 쪽에도 안 맞는다). 이 표를 읽어 등급을 내는 곳은 checklist/tradeTool.py 의 Grade.ProductEval.grade_key 하나다(화면은 판정 JSON 의 등급을 그대로 그린다 — 서버 권위).",
   "rules": [
     {"key": "buy",      "view": "pes", "when": {"filter": true,  "avoid": false, "entry": true}},
     {"key": "confirm",  "view": "opt", "when": {"filter": true,  "avoid": false, "entry": true}},

@@ -27,7 +27,7 @@ entry(살 자리) · caution(줄여 살까) · sizing(얼마나·나눠서) · e
 - 산출물 두 개(`books/<slug>/tree_candidates/`):
   1. **규칙 목록** `<a|b>.rules.json` — 행동 → 판정 → 부품의 상하위 구조와 원문 근거(2.2절). 먼저 쓴다.
   2. **트리** `<a|b>.json` — 규칙 목록을 COND_DSL 문법으로 옮긴 것(2.3절). 규칙 목록과 1:1.
-- 둘 다 쓴 뒤 `python -m checklist.cond fmt <파일>`(COND_DSL 5절).
+- 둘 다 쓴 뒤 `python -m checklist.tradeTool fmt <파일>`(COND_DSL 5절).
 
 ### 2.2 규칙 목록 형식 (`<a|b>.rules.json`)
 

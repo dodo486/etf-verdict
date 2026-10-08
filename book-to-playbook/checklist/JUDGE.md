@@ -19,7 +19,7 @@
 
 - 입력: **원문**(책 소스) · 플레이북 · 후보 `tree_candidates/<a|b>.json` · 규칙 목록 `tree_candidates/<a|b>.rules.json`
   (행동 → 판정 → 부품 구조와 `source_text`·`interpretation`) · `scenarios.json`(채점용 정답지) · `COND_DSL.md` · 이 문서.
-- 산출물: `books/<slug>/tree.json` 하나(트리 + `review`) → `python -m checklist.cond fmt <파일>`.
+- 산출물: `books/<slug>/tree.json` 하나(트리 + `review`) → `python -m checklist.tradeTool fmt <파일>`.
 - a·b·사례·코드·문서는 고치지 않는다. git 기록은 보지 않는다.
 
 ## 2. 비교 도구 — 무엇이 다른지 본다(도구는 계산만, 판단은 너)
@@ -78,7 +78,7 @@ COND_DSL 5절 형식에 `source: {"book": "<slug>", "extractor": "심판"}`, 그
 
 | 정지 | 뜻 | 고칠 곳 |
 |---|---|---|
-| 공통 직렬화 아님 | `fmt` 를 안 거침 | `python -m checklist.cond fmt <파일>` |
+| 공통 직렬화 아님 | `fmt` 를 안 거침 | `python -m checklist.tradeTool fmt <파일>` |
 | 미심판 불일치 | 식이나 판정이 다른 칸(수동 차이 포함)에 `review` 기록 없음 | `review.sections`/`exits` 에 원문 근거로 결정 |
 | 최종≠승자 | a/b 를 골랐는데 그 칸 식이 고른 쪽과 다름 | 트리나 기록을 고쳐 맞춘다(섞었으면 custom) |
 | 같은 로직 다른 이름 | 한 상품 안에서 같은 식이 이름 둘 | a·b 이름 중 하나로 통일, def 하나 |

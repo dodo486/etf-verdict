@@ -7,9 +7,10 @@
   · portfolio.py        계산기(모의 실행) — 체결 일정 → vectorbt 돈·지표(market_config.json) · LiveExecutor 빈 자리
   · backtest.py         백테스트 러너(신호 성적·거래 성적·vectorbt·장중)
   · replay.py           장중 재생(신호만)
+  · commonTool.py       진입점 공통 '책 열기'(open_history — 로드+가드+시세, backtest·replay·탭·검사가 공유)
   · watch.py            장중 주기 재판정 루프(orchestration.run watch)
   · notify.py           알림 송신(텔레그램·데스크톱 — 네트워크 예외는 이 한 파일)
   · verify_trading.py   검사기 — 거래 시뮬레이터·실전 경로 불변식 · --parity 신호 패리티(백테스트 == 실시간)
 
-트리의 뜻은 구간② 공개 DSL(checklist.tree_gateway·cond·grade)만 import 한다. 화면층(web)은 import 하지 않는다.
+트리의 뜻은 구간② 공개 DSL(checklist.tree_gateway·tradeTool)만 import 한다. 화면층(web)은 import 하지 않는다.
 """

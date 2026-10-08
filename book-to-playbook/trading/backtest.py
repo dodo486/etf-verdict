@@ -38,11 +38,12 @@ import sys
 from datetime import datetime, timedelta, timezone
 
 from shared.paths import book_log, write_text
-from checklist.grade import GRADES, WARMUP_DAYS, History, history
+from checklist.tradeTool import Grade
 from checklist.tree_gateway import TreeGateway
 from trading import trades
 from trading import portfolio
-from trading.timeline import Timeline, finest_tf, load_hist
+from trading.timeline import Timeline, finest_tf
+from trading.commonTool import open_history
 
 HORIZONS = (5, 10, 20)
 BUY_OR_CONFIRM = "✅+🟡 (수동 확인 가정)"
@@ -92,20 +93,12 @@ def _summarize(prod_rows, cs):
 
 
 # ------------------------------------------------------------------ 실행
-def fetch_history(tree, days):
-    """트리(여섯 칸 전부)가 쓰는 심볼의 일봉 — days + 워밍업만큼. 수집은 checklist.grade.history 한 곳."""
-    return history(tree, (datetime.now() - timedelta(days=days + WARMUP_DAYS)).strftime("%Y%m%d"))
-
-
 def run(slug, days=365, hist=None, tree=None, unobserved=None):
     """hist 를 주면 시세를 다시 받지 않는다(여러 기간을 한 번에 돌릴 때).
     unobserved="exclude" = 분봉이 없어 관측 못 한 장중 조건(asof observe — 개장 전 선물 등)을 빼고 판단한다."""
-    tree = tree or TreeGateway.load(slug)
-    if tree is None:
-        raise SystemExit("books/%s/tree.json 없음 — 조건 트리가 있어야 백테스트한다" % slug)
+    tree, hist = open_history(slug, days, tree, hist)
     today = datetime.now()
     start = (today - timedelta(days=days)).strftime("%Y%m%d")
-    hist = hist if hist is not None else fetch_history(tree, days)
     missing = sorted(s for s, cs in hist.items() if not cs)
 
     # 신호 = Timeline 단일 입구(일봉 벡터 1회계산 경로 — 라이브와 같은 Judge.grade). 백테스트는 그 신호 뒤에 집계·계산기를
@@ -169,7 +162,7 @@ def build_text(res):
     L.append("기간 %s ~ %s (%d거래일) · 진입=신호 다음날 시가 · 값=평균수익률 승률"
              % (res["period"][0], res["period"][1], res["trading_days"]))
     head = "  %-16s %5s %4s  " % ("등급", "일수", "신호") + "  ".join("%-13s" % ("%d일 후" % h) for h in HORIZONS)
-    order = list(GRADES.values()) + [BUY_OR_CONFIRM]
+    order = list(Grade.GRADES.values()) + [BUY_OR_CONFIRM]
     for p, s in res["summary"].items():
         L.append("")
         L.append("■ %s  (기간 보유 %+.1f%%)" % (p, s["buy_hold"] or 0))
@@ -222,10 +215,7 @@ def run_vectorbt(slug, days=365, hist=None, tree=None, unobserved=None):
 
     거래 경계·체결가·체결일은 run()이 쓰는 체결 워크(trades.build_trades)가 정한 그대로 재사용한다
     (머리의 규약·분할/매도 규칙을 계산기가 다시 정하지 않는다 — '머리=판단/계산기=계산' 분리)."""
-    tree = tree or TreeGateway.load(slug)
-    if tree is None:
-        raise SystemExit("books/%s/tree.json 없음 — 조건 트리가 있어야 백테스트한다" % slug)
-    hist = hist if hist is not None else fetch_history(tree, days)
+    tree, hist = open_history(slug, days, tree, hist)
     res = run(slug, days, hist=hist, tree=tree, unobserved=unobserved)
     vbt_products = {}
     for p in tree.products():
@@ -289,7 +279,7 @@ def _minute_axis(hist, prod, timeline):
     """장중 백테스트용 분봉 축을 만든다 — asof 타임라인을 '달력'으로, 각 asof 의 그 상품 분봉을 '봉'으로.
 
     cal   = asof 키(YYYYMMDDHHMM, UTC) 오름차순 — 분봉 간격의 '거래 시점' 축(일봉 하루 대신 분 한 틱).
-    mhist = 그 축의 History(그 상품 분봉 OHLCV 를 봉으로) — build_trades 가 '다음 봉 시가 진입'을 분봉에 적용한다.
+    mhist = 그 축의 Grade.History(그 상품 분봉 OHLCV 를 봉으로) — build_trades 가 '다음 봉 시가 진입'을 분봉에 적용한다.
     분봉 데이터가 그 asof 에 없으면 그 봉은 빠진다(가짜로 채우지 않는다 — 정직한 한계)."""
     mins = (getattr(hist, "minutes", {}) or {}).get(prod) or {}
     bars = []
@@ -302,7 +292,7 @@ def _minute_axis(hist, prod, timeline):
             b = {"open": b, "high": b, "low": b, "close": b, "volume": 0.0}
         bars.append(_MinuteBar(k, b.get("open"), b.get("high"), b.get("low"), b.get("close"), b.get("volume")))
     cal = [b.date for b in bars]
-    mh = History({prod: bars})
+    mh = Grade.History({prod: bars})
     mh.minutes = getattr(hist, "minutes", {})
     return cal, mh
 
@@ -342,11 +332,7 @@ def run_intraday(slug, hist=None, tree=None, limit=None):
     portfolio 가 낸다. 일봉 백테스트와 다른 것은 '축'(일봉 하루 → 분봉 한 틱)뿐이다.
 
     정직한 한계: 분봉은 jhts 분봉 범위(지수·선물 ~7거래일)만 — 짧은 구간 샤프/MaxDD 는 참고용(limit 표면화)."""
-    tree = tree or TreeGateway.load(slug)
-    if tree is None:
-        raise SystemExit("books/%s/tree.json 없음 — 조건 트리가 있어야 백테스트한다" % slug)
-    if hist is None:
-        hist = load_hist(tree)
+    tree, hist = open_history(slug, tree=tree, hist=hist)
     # 신호 = Timeline 단일 입구(분봉 per-asof). truncate=True — 각 asof 를 그 세션일 이하로 자른 hist 로 판정한다
     #   (verify_trading --parity 가 일봉 파리티를 증명한 바로 그 방식). 과거 세션도 '그 세션 자신의 일봉 regime +
     #   그 시점 분봉'으로 충실히 재생된다(truncate 없이 full hist 면 latest 가 늘 오늘 봉을 판정해 과거

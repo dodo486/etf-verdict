@@ -13,8 +13,8 @@
 """
 import sys
 
-from checklist.tree_gateway import TreeGateway
-from trading.timeline import Timeline, load_hist
+from trading.commonTool import open_history
+from trading.timeline import Timeline
 
 
 def replay(slug, hist=None, tree=None, limit=None, prod=None):
@@ -25,11 +25,7 @@ def replay(slug, hist=None, tree=None, limit=None, prod=None):
 
     → {slug, title, finest_tf, prods, sessions, points, timeline:[UTC iso], series:{prod:[{asof, key, grade, close}]},
        limit:{reason, sessions, bars}}  (분봉 없으면 points=0, series 빈, 한계 표면화)."""
-    tree = tree or TreeGateway.load(slug)
-    if tree is None:
-        raise SystemExit("books/%s/tree.json 없음 — 조건 트리가 있어야 재생한다" % slug)
-    if hist is None:
-        hist = load_hist(tree)
+    tree, hist = open_history(slug, tree=tree, hist=hist)
     # 신호 = Timeline 단일 입구(분봉 per-asof). truncate=False(기본) — 재생 기존 동작 그대로(지금 상품 상태 스냅샷).
     #   prod 를 주면 그 상품만 돌린다. 이 함수는 그 신호 시계열을 '재생 출력' 계약으로 묶기만 한다(신호만).
     tl = Timeline(tree, hist)

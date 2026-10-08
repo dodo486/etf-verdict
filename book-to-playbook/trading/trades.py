@@ -45,7 +45,7 @@ build_trades 결과(체결 일정)를 받아서 낸다. 매도 정책(책에 매
 import statistics
 from collections import namedtuple
 
-from checklist import cond
+from checklist.tradeTool import Cond
 from checklist.tree_gateway import Qty
 from trading.judge import Holding
 
@@ -206,8 +206,8 @@ def build_trades(gw, prod, hist, cal, starts, exits, tranches=None, amount=None)
             for k in range(frm, L):
                 cost[k] = avg
             ctx = Holding(e, list(cost)).ctx(gw, prod, hist, cal, manual_as=False)
-            return ([cond.series(r.when, ctx) for r in exits],
-                    [cond.series(t.when, ctx) if t.when is not None else None for t in tranches])
+            return ([Cond.series(r.when, ctx) for r in exits],
+                    [Cond.series(t.when, ctx) if t.when is not None else None for t in tranches])
 
         whens, twhens = rebuild(e)
         nxt, sells, fired, last = 1, [], set(), None
