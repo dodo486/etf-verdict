@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""책 페이지 조립 — <slug>-playbook.html 에 판정(verdict-data)·공유 UI·레일·원문·백테스트를 얹어
+"""책 페이지 조립 — books/<slug>/playbook.html 에 판정(verdict-data)·공유 UI·레일·원문·백테스트를 얹어
 한 장의 HTML 을 만든다. 라이브 서버(web.serve)가 매 요청 이 assemble 로 페이지를 그린다.
 
 정적 발행(파일로 굽기)은 폐지됐다 — 하루 지난 스냅샷이 매매를 오도하지 않게. assemble 은 파일을
@@ -8,22 +8,22 @@
 """
 import os, re
 import json
-from shared.paths import (BASE, playbook_src, read_text, backtest_path, source_index_path)
+from shared.paths import BASE, backtest_json, book_file, playbook_html, read_text, source_index_json
 
 VERDICT_RE = re.compile(
     r'(<script type="application/json" id="verdict-data">)(.*?)(</script>)', re.S)
 
 
 def _source_sections(slug):
-    """books/<slug>/source_index.json 의 source_file(책 원문)을 소절(ref)로 분해 → {ref: 원문}.
+    """books/<slug>/source_index.json 의 source_file(책 폴더 안 원문 — 예 books/trend/source.md)을 소절(ref)로 분해 → {ref: 원문}.
     원문 파일이 repo 에 없으면(실제 책 미커밋 등) 빈 {} — 프런트가 '원문 미제공'으로 처리한다.
     자작/공개 원문이 있는 책만 소절 원문이 노출된다(없는 책은 아무것도 새로 드러나지 않음)."""
     try:
-        idx = json.loads(read_text(source_index_path(slug)))
+        idx = json.loads(read_text(source_index_json(slug)))
     except Exception:
         return {}
     sf = idx.get("source_file", "")
-    p = sf if os.path.isabs(sf) else os.path.join(BASE, sf)
+    p = sf if os.path.isabs(sf) else book_file(slug, sf)     # 원문 파일 이름은 책 폴더 기준
     if not sf or not os.path.exists(p):
         return {}
     secs, key, buf = {}, None, []
@@ -57,11 +57,11 @@ BACKTEST_BEGIN, BACKTEST_END = "<!-- INJECT:backtest -->", "<!-- /INJECT:backtes
 
 
 def _inject_backtest(html, slug):
-    """백테스트 탭(책 무관): backtest-<slug>.json(web.backtest_page) + web/ui/backtest-ui.js 를
+    """백테스트 탭(책 무관): books/<slug>/backtest.json(web.backtest_page) + web/ui/backtest-ui.js 를
     checklist-ui 바로 앞에 심는다 — checklist-ui 가 로드 때 .tab 을 묶기 전에 탭이 생겨야 기존 탭 전환에 묶인다.
     데이터가 없는 책은 탭을 만들지 않는다(빈 탭을 보이지 않는다). 다시 발행하면 이전 주입분을 갈아끼운다."""
     html = re.sub(re.escape(BACKTEST_BEGIN) + r".*?" + re.escape(BACKTEST_END) + r"\n?", "", html, flags=re.S)
-    data_p = backtest_path(slug)
+    data_p = backtest_json(slug)
     ui_p = os.path.join(BASE, "web", "ui", "backtest-ui.js")
     if not (os.path.exists(data_p) and os.path.exists(ui_p)):
         return html
@@ -78,7 +78,7 @@ def assemble(slug, data):
     """책 페이지 한 장을 조립한다 — 로컬 실시간 서버(serve)가 쓰는 단일 경로.
     판정(#verdict-data) · 공유 UI(ui/*.js) · 책 레일 · 소절 원문 · 백테스트 탭을 얹는다.
     (로컬 전용이라 내 포지션을 그대로 싣는다 — 정적 발행이 폐지돼 '공개 페이지' 분기는 없다.)"""
-    html = read_text(playbook_src(slug))
+    html = read_text(playbook_html(slug))
     if data is not None:
         if not VERDICT_RE.search(html):
             raise ValueError("verdict-data 블록을 찾지 못함(%s)" % slug)

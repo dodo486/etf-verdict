@@ -54,7 +54,7 @@ def _run_verdict(slug):
     """엔진(books.json engine.daily) --json 을 한 프로세스로 돌려 판정 dict 를 받는다 — 매번 새 시세로.
 
     로직을 복제하지 않고 **같은 엔진 모듈의 --json 경로를 재사용**한다. 텔레그램/데스크톱 알림은
-    --no-send 로 끈다. 라이브 전용이라 정적 스냅샷 파일(latest-verdict)은 읽지도 쓰지도 않는다."""
+    --no-send 로 끈다. 라이브 전용이라 판정을 파일로 저장하지 않는다(정적 스냅샷 폐지)."""
     daily = book_engine(slug, "daily")
     if not daily:
         raise RuntimeError("%s 책에 시세 엔진(engine.daily)이 없습니다 — books.json 확인" % slug)

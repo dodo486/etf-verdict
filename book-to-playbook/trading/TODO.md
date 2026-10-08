@@ -29,7 +29,7 @@
 ## 🟡 기능 (구간② tree.json 재생성 후)
 
 - **웹뷰어 지표 통합:** 백테스트 탭에 vectorbt 지표(총수익·MaxDD·샤프·자산곡선·장중 결과)를
-  `backtest-<slug>.json` + 탭에 채우기 (표시 코드는 이미 있음, 결과 JSON이 구버전 포맷이라 비어 있음).
+  `books/<slug>/backtest.json` + 탭에 채우기 (표시 코드는 이미 있음, 결과 JSON이 구버전 포맷이라 비어 있음).
 - **신호 파리티 재검증:** 심판이 트리 재생성한 뒤 `python -m trading.verify_signal_parity`(venv)로
   새 `cond.py` 위 신호 파리티 실측.
 - **장중 P&L 백테스트:** 분봉이 길게 들어오면 `replay.series → portfolio.run_product` 재사용

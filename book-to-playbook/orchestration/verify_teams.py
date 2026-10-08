@@ -33,6 +33,9 @@
   규칙 4  트리 원본 키 직접 접근 금지 — tree.json 의 키 배치(products·defs·여섯 칸·sell/scale/frac…)를 아는
           코드는 checklist/tree_gateway.py 하나다. 다른 파일에서 그 키로 첨자([..])·.get/.pop/.setdefault 를
           읽으면 위반(정적 AST 검사). 같은 이름 키를 쓰는 '트리 아닌' dict(거래·판정 JSON 등)는 KEY_ALLOW 한 곳에 사유와 함께.
+  규칙 5  책 산출물 경로는 shared/paths.py 한 곳에서만 짓는다(books/<slug>/ 아래 playbook.html·backtest.json·logs/…).
+          다른 파일이 os.path.join 에 "books" 를 넣거나, 옛 루트 산출물 이름("-playbook.html"·"latest-verdict"·
+          "backtest-%s"·"disagree-%s")을 문자열로 지으면 위반(정적 AST 검사 — docstring 제외).
 
 ## 사용
 
@@ -86,6 +89,28 @@ KEY_ALLOW = {
     ("web/verdict_view.py", "render"): ({"sizing", "weight"}, "판정 JSON verdict.sizing 을 읽어 현금 % 계산"),
     ("web/verdict_view.py", "build_text"): ({"sizing", "weight", "exit"}, "판정 JSON 을 알림 문장으로"),
 }
+
+
+# 규칙 5 — 책 산출물 경로를 짓는 유일한 파일과, 옛 루트 산출물 이름 조각.
+PATHS_FILE = ("shared", "paths.py")
+OLD_ARTIFACTS = ("-playbook.html", "latest-verdict", "backtest-%s", "disagree-%s")
+
+
+def _path_builds(tree):
+    """책 산출물 경로를 손으로 짓는 자리 [(줄, 사유)] — os.path.join(…, "books", …) 와 옛 루트 산출물 이름 문자열."""
+    docs = {id(n.body[0].value) for n in ast.walk(tree)
+            if isinstance(n, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and n.body
+            and isinstance(n.body[0], ast.Expr) and isinstance(n.body[0].value, ast.Constant)}
+    out = []
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "join"                 and any(isinstance(a, ast.Constant) and isinstance(a.value, str)
+                        and (a.value == "books" or a.value.startswith("books/")) for a in n.args):
+            out.append((n.lineno, 'os.path.join 에 "books"'))
+        elif isinstance(n, ast.Constant) and isinstance(n.value, str) and id(n) not in docs:
+            hit = [x for x in OLD_ARTIFACTS if x in n.value]
+            if hit:
+                out.append((n.lineno, "옛 산출물 이름 %r" % hit[0]))
+    return out
 
 
 def _parse(path):
@@ -186,6 +211,10 @@ def check():
                     if key not in keys:
                         bad.append((layer, fn, "%d행 %s() 가 트리 키 %r 를 직접 읽음 — TreeGateway 에 물어볼 것"
                                     % (line, func or "<모듈>", key)))
+            # 규칙 5 — 책 산출물 경로는 shared/paths.py 하나만 짓는다
+            if (layer, fn) not in (PATHS_FILE, ("orchestration", "verify_teams.py")):   # 이 파일은 금지 이름 목록을 들고 있다
+                for line, why in _path_builds(tree):
+                    bad.append((layer, fn, "%d행 %s — 책 산출물 경로는 shared/paths.py(book_dir·book_file…)로" % (line, why)))
     return bad
 
 
@@ -198,7 +227,7 @@ def main():
         print("\n흐름은 한 방향이다: shared ← playbook · checklist(공개 DSL) ← trading ← web (orchestration 은 조립만).")
         return 1
     print("팀 경계 통과 — 층 import 방향 위반 0 · checklist 는 공개 DSL 로만 · jhts 창구 단일 · 자가수집 네트워크 코드 0"
-          " · 트리 원본 직접 접근 0(출입구 하나).")
+          " · 트리 원본 직접 접근 0(출입구 하나) · 책 산출물 경로는 paths 하나.")
     return 0
 
 

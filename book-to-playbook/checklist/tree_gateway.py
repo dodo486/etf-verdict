@@ -17,7 +17,7 @@ import json
 import os
 
 from checklist import cond
-from shared.paths import BASE
+from shared.paths import book_file
 
 TREE_TOP = ("version", "defs", "products", "source", "note", "unexpressed", "review")
 # review = 심판의 판정 근거(구간② 검사기만 읽는다 — 판정·체결엔 안 쓴다): sections{"상품.칸": {winner a|b|custom, why, cases}},
@@ -75,7 +75,7 @@ class TreeGateway:
     # ---------------------------------------------------------------- 읽기
     @staticmethod
     def path(slug, name="tree.json"):
-        return os.path.join(BASE, "books", slug, name)
+        return book_file(slug, name)
 
     @classmethod
     def open(cls, path):

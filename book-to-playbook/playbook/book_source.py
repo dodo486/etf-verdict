@@ -10,7 +10,7 @@
 
 원문은 여기 있다(저작권물이라 리포로 복사하지 않는다).
 
-    ./trend-source.md  (slug: trend)
+    books/trend/source.md  (slug: trend — 자작 데모라 리포에 둔다)
 
 경로는 `book_sources.json` 이 들고 있고 환경변수로 덮어쓴다. 리포에 남는 건
 `books/<slug>/source_index.json` — **소절 키·제목·줄범위·글자수·해시**뿐,
@@ -63,7 +63,6 @@ def norm(t):
 
 # 원문 위치 설정은 이 팀(①)만 쓰므로 팀 폴더 안에 산다.
 CONFIG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "book_sources.json")
-BOOKS_DIR = os.path.join(BASE, "books")
 
 MARK_CHAPTER = re.compile(r"^\s*(?:Chapter\s+(\d+)|(\d+)\s*장)\.")
 MARK_SECTION = re.compile(r"^\s*(\d+-\d+)\.")
@@ -331,7 +330,7 @@ def build_index(slug):
 
 
 def index_path(slug):
-    return paths.source_index_path(slug)
+    return paths.source_index_json(slug)
 
 
 def write_index(slug):
@@ -346,7 +345,7 @@ PB_HEAD = re.compile(r"^#{2,3}\s*(\d+-\d+|프롤로그|에필로그)\s*[.\s—-]
 
 
 def playbook_path(slug):
-    p = os.path.join(BASE, "%s-playbook.html" % slug)
+    p = paths.playbook_html(slug)
     return p if os.path.exists(p) else None
 
 

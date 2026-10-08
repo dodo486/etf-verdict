@@ -49,7 +49,7 @@
 - `inject(html)`(모든 구획 갱신) / `check(html)`(사본==파일 대조, 드리프트 검출) / `extract` 제공.
 - 하위호환 꼬리: `inject(html, js)` 로 js 를 주면 `review-ui` 구획에만 쓴다(옛 시그니처).
 
-### 1-3. HTML 주입 마커·앵커 (책 페이지 = `trend-playbook.html`, `moneycopy-playbook.html` 두 장)
+### 1-3. HTML 주입 마커·앵커 (책 페이지 = `trend-playbook.html`, `moneycopy-playbook.html` 두 장 — 지금은 `books/<slug>/playbook.html`)
 
 - **데이터 블록**: `id="verdict-data"`(판정 JSON), `id="sheet-root"`(체크리스트 렌더 대상), `id="src"`(원문 md),
   `id="source-data"`(소절 원문, publish가 주입), `id="backtest-data"`(백테스트, publish가 주입).

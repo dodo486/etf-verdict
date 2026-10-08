@@ -27,6 +27,7 @@
 `trading/`(③ 판정·백테스트·장중: `judge`(Judge·Decision·Holding)·`timeline`·`trades`·`portfolio`·`backtest`·`replay`·`watch`·`notify`) ·
 `web/`(화면: `verdict_view`·`condition_view`·`backtest_page`·`book_page`·`serve`·`ui/`) · `shared/`(시세 창구 `md_feed`·`paths`) · `orchestration/`(실행·감사)
 import 방향: `shared ← playbook · checklist(공개 DSL) ← trading ← web` (`verify_teams` 규칙 1).
+책 산출물은 전부 `books/<slug>/`(커밋: `playbook.html`·`source.md`·`source_index.json`·`tree.json`·`tree_candidates/`·`scenarios.json` / 런타임: `backtest.json`·`logs/`·`positions.json`) — 경로는 `shared/paths.py` 하나(`verify_teams` 규칙 5).
 실행: `python -m orchestration.run <daily|verdict|watch>` · 검사 `python -m orchestration.verify_structure`
 트리(`tree.json`) 읽기 = `checklist/tree_gateway.py` 의 **TreeGateway 하나**(형식 검사·탐색). 나머지 코드는 원본 키를 직접 읽지 않는다
 (`verify_teams` 규칙 4) — 트리 형식(여섯 칸 → rules 목록) 교체 시 TreeGateway + 문법(`checklist/cond.py`)만 고친다.
@@ -41,7 +42,7 @@ import 방향: `shared ← playbook · checklist(공개 DSL) ← trading ← web
 - 절차 정본: `checklist/README.md`. 역할별 지침 = `playbook/PLAYBOOK.md`(전사) · `checklist/EXTRACTOR.md`(추출 a·b, 서로 모름) · `checklist/SCENARIO.md`(사례) · `checklist/JUDGE.md`(심판).
 - **독립성이 검증 근거** — 추출 a·b는 서로/최종/사례 안 봄, 사례 작성자는 트리 안 봄. 각자 다른 서브에이전트.
 - 게이트: `python -m checklist.verify_tree <slug>` exit 0.
-- 원문 위치: `playbook/book_sources.json` (trend=`trend-source.md`, moneycopy=`~/jhts/hypotheses/sources/미국-돈복사-ETF-투자방법.md`).
+- 원문 위치: `playbook/book_sources.json` (trend=`books/trend/source.md`, moneycopy=`~/jhts/hypotheses/sources/미국-돈복사-ETF-투자방법.md`).
 
 ## 🟡 키스톤 이후 (순서 있음 — 둘 다 cond.py 고쳐서 동시 금지)
 

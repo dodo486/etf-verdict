@@ -19,7 +19,7 @@
 '✅+🟡' 줄은 수동 조건이 전부 확인됐다고 가정한 낙관치다.
 
 사용:
-    python -m trading.backtest <slug> [--days 365] [--json]   → logs/backtest-<slug>.json
+    python -m trading.backtest <slug> [--days 365] [--json]   → books/<slug>/logs/backtest.json
     python -m trading.backtest <slug> --engine vectorbt       → 계산기(trading/portfolio)로 자산곡선·MaxDD·샤프 (추가 경로)
     python -m trading.backtest <slug> --intraday [--limit N]  → 장중(분봉) 백테스트
 (책 페이지 '백테스트' 탭 데이터는 웹 화면층 web/backtest_page.py 가 이 run() 결과로 빚는다.)
@@ -30,12 +30,11 @@
 """
 import collections
 import json
-import os
 import statistics
 import sys
 from datetime import datetime, timedelta, timezone
 
-from shared.paths import LOGS, ensure_dir, write_text
+from shared.paths import book_log, write_text
 from checklist.grade import GRADES, WARMUP_DAYS, History, history
 from checklist.tree_gateway import TreeGateway
 from trading import trades
@@ -408,8 +407,7 @@ def _cli():
     # --exclude-unobserved : 분봉이 없어 관측 못 한 장중 조건(asof observe — 개장 전 선물 등)을 빼고 판단(나머지 조건으로 진입)
     res = run(slug, days, unobserved=unobserved)
     res["unobserved"] = "제외하고 판단" if "--exclude-unobserved" in argv else "수동(🟡)으로 둠"
-    ensure_dir(LOGS)
-    write_text(os.path.join(LOGS, "backtest-%s.json" % slug),
+    write_text(book_log(slug, "backtest.json"),
                json.dumps(res, ensure_ascii=False, indent=1))
     if "--json" in argv:
         print(json.dumps({k: v for k, v in res.items() if k != "daily"}, ensure_ascii=False, indent=2))

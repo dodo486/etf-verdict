@@ -1,6 +1,6 @@
 {
   "slug": "trend",
-  "source_file": "trend-source.md",
+  "source_file": "source.md",
   "source_sha256": "42b19b200c9e4cd745eca01abb3becefff00608ebe20b90c70c3f335cdb4633c",
   "source_line_count": 117,
   "wrapped_layout": false,

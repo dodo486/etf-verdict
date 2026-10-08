@@ -26,7 +26,7 @@
 
 실행 환경: `book-to-playbook` 폴더에서 `PYTHONIOENCODING=utf-8`, `PYTHONPATH="<jhts 경로>;."`(없으면 시세가 빈다).
 
-- `python -m checklist.verify_tree <slug> --dump 6` → `logs/disagree-<slug>.json`
+- `python -m checklist.verify_tree <slug> --dump 6` → `books/<slug>/logs/disagree.json`
   - `tree_diff` (**먼저 본다**): 상품·칸마다 a·b 를 트리 모양 그대로 맞춘 것. 노드마다 `same` · `diff` · `only_a` · `only_b`.
     같은 종류 묶음(all/any/atleast/not)은 자식끼리 다시 맞춘다 — 뼈대가 같고 잎 하나만 다르면 그 잎만 `diff`.
     같은지는 정규화한 식으로만 판정한다(이름·문장 무관). 짝 맞춤(이름·심볼 뺀 모양·안쪽 겹침)은 힌트일 뿐이다.

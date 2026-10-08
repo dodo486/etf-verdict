@@ -26,7 +26,7 @@ import subprocess
 import sys
 
 from shared import paths  # noqa: F401  (UTF-8 출력)
-from shared.paths import BASE, live_slugs, playbook_src, read_text
+from shared.paths import BASE, live_slugs, playbook_html, read_text, source_index_json
 from checklist import cond
 from checklist.tree_gateway import TreeGateway
 
@@ -38,7 +38,7 @@ def book_contract(slug):
     """라이브 책 하나의 계약 위반 목록."""
     bad = []
     try:
-        idx = json.load(open(paths.source_index_path(slug), encoding="utf-8"))
+        idx = json.load(open(source_index_json(slug), encoding="utf-8"))
         keys = set(idx.get("sections") or {})
         if not keys:
             bad.append("source_index.json 에 소절이 없다")
@@ -59,7 +59,7 @@ def book_contract(slug):
         if missing:
             bad.append("tree.json 의 ref 가 없는 소절을 가리킴: %s" % ", ".join(missing))
     try:
-        html = read_text(playbook_src(slug))
+        html = read_text(playbook_html(slug))
         for pid in PAGE_IDS:
             if pid not in html:
                 bad.append("책 페이지에 %s 가 없다" % pid)

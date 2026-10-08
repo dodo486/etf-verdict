@@ -23,7 +23,7 @@ entry(살 자리) · caution(줄여 살까) · sizing(얼마나·나눠서) · e
 ### 2.1 입력과 산출물
 
 - 입력: 플레이북 `#src`(**충실 전사본** — 저자 문장 그대로, 소절마다 `### x-y.` 제목) · `books/<slug>/source_index.json`(ref 키) · `COND_DSL.md` · 이 문서.
-  상대 추출자의 결과·최종 트리·사례·`logs/`·git 기록·원문은 보지 않는다.
+  상대 추출자의 결과·최종 트리·사례·`logs/`·`books/<slug>/logs/`·git 기록·원문은 보지 않는다.
 - 산출물 두 개(`books/<slug>/tree_candidates/`):
   1. **규칙 목록** `<a|b>.rules.json` — 행동 → 판정 → 부품의 상하위 구조와 원문 근거(2.2절). 먼저 쓴다.
   2. **트리** `<a|b>.json` — 규칙 목록을 COND_DSL 문법으로 옮긴 것(2.3절). 규칙 목록과 1:1.

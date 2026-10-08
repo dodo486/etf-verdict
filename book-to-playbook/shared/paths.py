@@ -83,7 +83,7 @@ def load_env_file(p):
 
 # ---------------------------------------------------------------- 책 레지스트리
 # 배포·서빙·엔진호출이 특정 책에 안 박히도록, "어느 책?"은 books.json 에서 온다.
-# 파일 규칙(책-무관): 플레이북 원본 = BASE/<slug>-playbook.html.
+# 책마다의 산출물은 전부 books/<slug>/ 한 곳에 산다(아래 '책 산출물 경로').
 import json as _json
 
 
@@ -129,28 +129,47 @@ def book_engine(slug, kind):
     return (book_meta(slug).get("engine") or {}).get(kind)
 
 
-def playbook_src(slug):
-    """플레이북 원본 HTML 경로(BASE/<slug>-playbook.html)."""
-    return os.path.join(BASE, "%s-playbook.html" % slug)
+# ---------------------------------------------------------------- 책 산출물 경로
+# 책마다의 산출물은 전부 BASE/books/<slug>/ 한 곳에 산다. 그 경로를 짓는 코드는 이 파일 하나다 —
+# 다른 파일이 BASE 에 "books"·slug 를 이어 붙이면 verify_teams 규칙 5 가 막는다.
+#   tracked : playbook.html(플레이북 원본) · source.md(자작 원문) · source_index.json · tree.json · tree_candidates/ · scenarios.json
+#   runtime : backtest.json(백테스트 탭 데이터) · logs/(책별 실행 로그·심판 덤프) · positions.json(내 포지션 — 개인 파일)
+BOOKS = os.path.join(BASE, "books")
 
 
-# ---------------------------------------------------------------- 산출물(아티팩트) 경로
-# 파이프라인이 주고받는 파일 이름을 여기 한 곳에서만 짓는다 — 예전엔 run.py·발행·backtest·
-# verify_structure 가 "latest-verdict-<slug>.json" 식 이름을 각자 손으로 적어, 규칙을 바꾸면
-# 여러 파일을 동시에 고쳐야 했다.
-def latest_verdict_path(slug):
-    """오늘 판정 결과 JSON(BASE/latest-verdict-<slug>.json) — 엔진이 쓰고 발행이 읽는다."""
-    return os.path.join(BASE, "latest-verdict-%s.json" % slug)
+def book_dir(slug):
+    """책 하나의 산출물 폴더(BASE/books/<slug>)."""
+    return os.path.join(BOOKS, slug)
 
 
-def backtest_path(slug):
-    """책 페이지 '백테스트' 탭 데이터(BASE/backtest-<slug>.json)."""
-    return os.path.join(BASE, "backtest-%s.json" % slug)
+def book_file(slug, name):
+    """책 폴더 안의 파일(name 은 'tree_candidates/a.json' 처럼 하위 경로여도 된다)."""
+    return os.path.join(book_dir(slug), name)
 
 
-def source_index_path(slug):
-    """원문 소절 인덱스(BASE/books/<slug>/source_index.json)."""
-    return os.path.join(BASE, "books", slug, "source_index.json")
+def playbook_html(slug):
+    """플레이북 원본 HTML(books/<slug>/playbook.html)."""
+    return book_file(slug, "playbook.html")
+
+
+def source_index_json(slug):
+    """원문 소절 인덱스(books/<slug>/source_index.json)."""
+    return book_file(slug, "source_index.json")
+
+
+def backtest_json(slug):
+    """책 페이지 '백테스트' 탭 데이터(books/<slug>/backtest.json) — web.backtest_page 가 쓰고 book_page 가 읽는다."""
+    return book_file(slug, "backtest.json")
+
+
+def positions_json(slug):
+    """내 포지션(books/<slug>/positions.json — 커밋하지 않는 개인 파일)."""
+    return book_file(slug, "positions.json")
+
+
+def book_log(slug, name):
+    """책별 실행 로그·덤프(books/<slug>/logs/<name>). 책과 무관한 러너 로그는 LOGS."""
+    return book_file(slug, os.path.join("logs", name))
 
 
 if __name__ == "__main__":

@@ -4,13 +4,13 @@
 결과를 화면이 읽는 요약(일별 행 제외, 1년·3년)으로 빚는다. 백테스트를 다시 정의하지 않는다.
 
 사용:
-    python -m web.backtest_page <slug>   → backtest-<slug>.json (책 페이지 조립 web/book_page 가 탭으로 심는다)
+    python -m web.backtest_page <slug>   → books/<slug>/backtest.json (책 페이지 조립 web/book_page 가 탭으로 심는다)
 """
 import json
 import sys
 from datetime import datetime
 
-from shared.paths import backtest_path, write_text
+from shared.paths import backtest_json, write_text
 from checklist.grade import GRADES
 from checklist.tree_gateway import TreeGateway
 from trading import portfolio, trades
@@ -56,7 +56,7 @@ def _cli():
     if not slug:
         print("사용법: python -m web.backtest_page <slug>", file=sys.stderr)
         sys.exit(2)
-    path = backtest_path(slug)
+    path = backtest_json(slug)
     write_text(path, json.dumps(page_data(slug), ensure_ascii=False, separators=(",", ":"), default=str))
     print("웹페이지용 백테스트 → %s" % path)
 

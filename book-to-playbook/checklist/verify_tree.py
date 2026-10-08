@@ -31,7 +31,7 @@
 종료코드: 0 통과 · 1 정지(트리 없음/문법/미심판 불일치/최종≠승자/사례 실패/비중 초과) · 2 경고만.
 사용:
   python -m checklist.verify_tree [slug ...] [--years 3]
-  python -m checklist.verify_tree <slug> --dump N     심판의 비교 도구 — 판정이 갈린 날 N개씩을 logs/disagree-<slug>.json 으로(판단은 안 함)
+  python -m checklist.verify_tree <slug> --dump N     심판의 비교 도구 — 판정이 갈린 날 N개씩을 books/<slug>/logs/disagree.json 으로(판단은 안 함)
 """
 import json
 import os
@@ -40,7 +40,7 @@ from collections import namedtuple
 from datetime import datetime, timedelta
 
 from shared import paths  # noqa: F401  (UTF-8 출력)
-from shared.paths import BASE, LOGS, ensure_dir, live_slugs, write_text
+from shared.paths import book_file, book_log, live_slugs, write_text
 from checklist import cond, grade
 from shared import md_feed
 from checklist.tree_gateway import TreeGateway
@@ -52,7 +52,7 @@ MANUAL_HEADS = ("저자 미명시", "데이터 없음", "연산 없음")
 
 def _load(slug, name):
     """산출물 JSON(원문 사례 scenarios.json 등 — 트리 아님) — 없으면 None."""
-    p = os.path.join(BASE, "books", slug, name)
+    p = book_file(slug, name)
     return json.load(open(p, encoding="utf-8")) if os.path.exists(p) else None
 
 
@@ -621,8 +621,7 @@ def dump_disagreements(slug, per, years):
             entry = {"agree": r["agree"], "diff_days": len(r["days"]), "expr_differs": sdiff,
                      "a_tree": ta.raw_zone(p, sec), "b_tree": tb.raw_zone(p, sec), "cases": cases}
             out["%s.%s" % (p, sec)] = entry
-    ensure_dir(LOGS)
-    path = os.path.join(LOGS, "disagree-%s.json" % slug)
+    path = book_log(slug, "disagree.json")
     pairing = {p: pair_conditions(ta, tb, p, hist, years) for p in ta.products() if tb.has(p)}
     shape = {p: {z: zone_diff(ta, tb, p, z) for z in cond.ZONES} for p in ta.products() if tb.has(p)}
     write_text(path, json.dumps({"defs_a": ta.raw_defs(), "defs_b": tb.raw_defs(), "tree_diff": shape, "pairing": pairing,
@@ -878,8 +877,7 @@ def check_book(slug, years):
     # 00. 직렬화 형식 정지 — 구간② 파일은 공통 직렬화(cond.compact_json)로만 쓴다(줄 수를 부풀리지 않게)
     loose = [n for n in ("tree.json", "tree_candidates/a.json", "tree_candidates/b.json", "tree_candidates/a.rules.json",
                          "tree_candidates/b.rules.json", "scenarios.json")
-             if os.path.exists(os.path.join(BASE, "books", slug, n))
-             and not cond.is_compact(os.path.join(BASE, "books", slug, n))]
+             if os.path.exists(book_file(slug, n)) and not cond.is_compact(book_file(slug, n))]
     if loose:
         stop.append("%s 공통 직렬화 아님 %d개" % (slug, len(loose)))
         print("  ❌ 공통 직렬화가 아닌 파일 %s — 쓴 사람이 python -m checklist.cond fmt <파일> 로 다시 쓴다" % loose)

@@ -25,7 +25,7 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 
-from shared.paths import BASE, book_meta
+from shared.paths import book_log, book_meta, positions_json, write_text
 from shared import md_feed
 from checklist import cond
 from checklist.grade import GRADES, GRADE_RULES, WARMUP_DAYS, history
@@ -45,7 +45,7 @@ def book_title(slug):
 
 def load_positions(slug):
     """books/<slug>/positions.json (커밋하지 않는 개인 파일) → {prod: [포지션]}."""
-    p = os.path.join(BASE, "books", slug, "positions.json")
+    p = positions_json(slug)
     if not os.path.exists(p):
         return {}
     out = {}
@@ -325,10 +325,8 @@ def _cli():
         if not send_telegram(text):
             send_desktop(text)
     try:
-        from shared.paths import LOGS as _LOGS, ensure_dir as _ensure, write_text as _write
-        _ensure(_LOGS)
         now = datetime.fromisoformat(top["ts"])
-        _write(os.path.join(_LOGS, "%s-%s.txt" % (slug, now.strftime("%Y%m%d"))), text)
+        write_text(book_log(slug, "verdict-%s.txt" % now.strftime("%Y%m%d")), text)
     except Exception:  # noqa: BLE001
         pass
 

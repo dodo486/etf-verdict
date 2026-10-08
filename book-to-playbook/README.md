@@ -18,10 +18,10 @@ import 방향은 한 방향이다 — `shared ← playbook · checklist(공개 D
 
 | 폴더 | 구간 | 하는 일 | 산출물 |
 |---|---|---|---|
-| `playbook/` | ① 책 원본 → 전사본 | 원문 소절 인덱싱 · 플레이북 본문 무결 | `source_index.json` · `<slug>-playbook.html` 의 `#src` |
+| `playbook/` | ① 책 원본 → 전사본 | 원문 소절 인덱싱 · 플레이북 본문 무결 | `books/<slug>/source_index.json` · `books/<slug>/playbook.html` 의 `#src` |
 | `checklist/` | ② 전사본 → 체크리스트 | 조건 트리 추출·심판·검사 · 트리의 언어(출입구·문법·등급) | **`books/<slug>/tree.json`** |
-| `trading/` | ③ 판정·백테스트·장중 | Judge(한 시점 판정)·Timeline(시간 축)·체결 워크·vectorbt 계산기·재생·알림 | (판정은 web 이 화면으로) · `backtest-<slug>.json` 재료 |
-| `web/` | 화면 | 판정 JSON·백테스트 탭 데이터 빚기 · 화면 JS 주입 · 페이지 조립 · 로컬 실시간 서버 · 홈 | (serve 가 매 요청 그림) · `backtest-<slug>.json` |
+| `trading/` | ③ 판정·백테스트·장중 | Judge(한 시점 판정)·Timeline(시간 축)·체결 워크·vectorbt 계산기·재생·알림 | (판정은 web 이 화면으로) · `books/<slug>/logs/backtest.json` |
+| `web/` | 화면 | 판정 JSON·백테스트 탭 데이터 빚기 · 화면 JS 주입 · 페이지 조립 · 로컬 실시간 서버 · 홈 | (serve 가 매 요청 그림) · `books/<slug>/backtest.json` |
 | `shared/` | 공통층 | **시세 창구 md_feed** · paths | — |
 | `orchestration/` | 조립·감사 | `run.py`(러너) · `verify_structure.py`(구조·책 계약) · `verify_teams.py`(경계) — 전 구간 실행·검사 | — |
 
@@ -31,7 +31,7 @@ import 방향은 한 방향이다 — `shared ← playbook · checklist(공개 D
 ```
 책 원문 ──[① book_source]──▶ source_index.json (소절 키 = 체크리스트 ref 의 기준)
    │
-   └─[① 플레이북 작성·원문 대조 감사]──▶ <slug>-playbook.html #src
+   └─[① 플레이북 작성·원문 대조 감사]──▶ books/<slug>/playbook.html #src
                                   │
         [② 추출자 a·b(서로 모름) · 원문 사례 → 심판이 최종 트리를 씀(비교 도구 사용) → 채점] ──▶ tree.json (체크리스트)
                                   │
@@ -79,7 +79,7 @@ import 방향은 한 방향이다 — `shared ← playbook · checklist(공개 D
    규칙 목록 `<a|b>.rules.json` → 트리 `<a|b>.json` → 사례 작성자(`checklist/SCENARIO.md`)가 원문만 보고 `scenarios.json`
    → 심판(`checklist/JUDGE.md`)이 비교 도구(`--dump`)로 다른 곳을 보고 원문과 대조해 최종 `tree.json`(`review` 포함)을 직접 쓴다
    → `python -m checklist.verify_tree <slug>` 통과.
-4. **페이지**: `trend-playbook.html` 을 베이스로 `#src` 와 머리말만 교체(시트 패널은 `#verdict-data` + `#sheet-root` 골격 그대로).
+4. **페이지**: `books/trend/playbook.html` 을 베이스로 `#src` 와 머리말만 교체(시트 패널은 `#verdict-data` + `#sheet-root` 골격 그대로).
 5. **등록**: `books.json` 에 항목(slug/title/tickers/desc/live/engine). `python -m orchestration.verify_structure` 의 책 계약이 통과해야 한다.
 6. **배포**: `python -m orchestration.run daily`.
 
@@ -109,7 +109,10 @@ python -m web.serve                                           # 로컬 실시간
 | `books/<slug>/tree.json` | **체크리스트(조건 트리)** — 심판이 쓴 최종본 |
 | `books/<slug>/tree_candidates/` · `scenarios.json` | 이중 추출 — 규칙 목록 `<a|b>.rules.json`·트리 `<a|b>.json` · 원문 사례 |
 | `books/<slug>/source_index.json` | 원문 소절 인덱스(본문 없음 — 키·제목·줄범위·해시) |
+| `books/<slug>/playbook.html` · `books/trend/source.md` | 플레이북 원본(책 페이지 HTML) · 데모 책 원문(자작) |
 | `books/<slug>/positions.json` | 내 포지션(커밋 안 함 — 로컬 화면에서만 매도·분할 판정, 형식은 `SETUP.md`) |
+| `books/<slug>/backtest.json` · `books/<slug>/logs/` | 런타임 산출물(커밋 안 함) — 백테스트 탭 데이터 · 책별 로그(판정 문장·백테스트·심판 덤프) |
+| `shared/paths.py` | 경로 한 곳 — 책 산출물 경로(`book_dir`·`book_file`·`playbook_html`…)를 짓는 유일한 코드(`verify_teams` 규칙 5) |
 | `checklist/EXTRACTOR.md` · `SCENARIO.md` · `JUDGE.md` | 추출자 · 사례 작성자 · 심판 지침(역할마다 하나 — 서브에이전트 프롬프트 정본) |
 | `checklist/COND_DSL.md` | 트리 문법(트리를 쓰는 추출자·심판의 참고서) |
 | `checklist/verify_tree.py` | 트리 검사(트리를 만들지 않음) |

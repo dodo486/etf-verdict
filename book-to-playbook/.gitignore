@@ -4,11 +4,10 @@ telegram.env
 !*.env.example
 
 # ==== 런타임 생성물 (매 실행마다 갱신) ====
-latest-verdict.json
-latest-verdict-*.json
-intraday-verdict.json
-backtest-*.json
-
+# 책 산출물은 books/<slug>/ 한 곳 — playbook.html·source.md·source_index.json·tree.json·tree_candidates/·scenarios.json 은 커밋,
+# 아래(백테스트 탭 데이터·책별 로그)는 실행마다 다시 만든다.
+books/*/backtest.json
+books/*/logs/
 logs/
 
 # ==== 배포 아티팩트 (public/은 별도 배포 레포) ====
