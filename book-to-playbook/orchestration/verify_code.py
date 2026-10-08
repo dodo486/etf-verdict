@@ -476,9 +476,24 @@ def _sources():
     return srcs, bad
 
 
+TODO_OWNER = "docs/HANDOFF.md"
+
+
+def todo_hits():
+    """주인 표 '할 일 목록'(문서 — 파일 이름으로 본다): 할 일은 docs/HANDOFF.md 한 곳. 다른 TODO 파일이 생기면 정지."""
+    bad = []
+    for root, dirs, files in os.walk(BASE):
+        dirs[:] = [d for d in dirs if d not in (".venv", "__pycache__", "books", "logs", ".git")]
+        for fn in files:
+            if "todo" in fn.lower():
+                rel = os.path.relpath(os.path.join(root, fn), BASE).replace(os.sep, "/")
+                bad.append((rel, "[할 일 목록] 주인은 %s — 할 일은 거기 한 곳에" % TODO_OWNER))
+    return bad
+
+
 def check():
     srcs, bad = _sources()
-    return bad + boundary_hits(srcs) + owner_hits(srcs)
+    return bad + boundary_hits(srcs) + owner_hits(srcs) + todo_hits()
 
 
 def main():
@@ -491,7 +506,7 @@ def main():
               " 결정 하나 = 주인 하나(주인 표 OWNERS).")
         return 1
     print("코드 규칙 통과 — 층 import 방향 위반 0 · checklist 는 공개 DSL 로만 · jhts 창구 단일 · 자가수집 네트워크 코드 0"
-          " · 주인 표 %d행 위반 0(%s)." % (len(OWNERS), " · ".join(r["concept"] for r in OWNERS)))
+          " · 주인 표 %d행 위반 0(%s) · 할 일은 %s 한 곳." % (len(OWNERS), " · ".join(r["concept"] for r in OWNERS), TODO_OWNER))
     return 0
 
 

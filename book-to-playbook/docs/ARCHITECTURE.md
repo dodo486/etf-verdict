@@ -59,15 +59,35 @@ books/<slug>/  책 하나의 산출물 전부(playbook.html · source · source_
 - **책 데이터(후보·tree.json)는 손으로 고치지 않는다** — 공통 로직을 고친 뒤 다시 뽑는다. 심판 몫은 심판이.
 - 트리 JSON 은 `python -m checklist.cond fmt <파일>` 압축 형식.
 
-## 4. 검사
+## 4. 주인 표 (`orchestration/verify_code.py` OWNERS — 주인 밖에 보이면 정지)
+
+| 결정 | 주인 |
+|---|---|
+| tree.json 원본 키 | `checklist/tree_gateway.py` |
+| 책 산출물 경로 | `shared/paths.py` |
+| 매도 정책(책에 매도 규칙이 없을 때 = 매수 신호만 평가) | `trading/trades.py` `exit_policy` |
+| 금액 정책(비중 × 분할 × 조심 배수, 모름 처리) | `trading/trades.py` `size_of` (사실은 `Judge.amount` 한 경로) |
+| 수량 변환('얼마나' → 물량, 매수·매도 공통) | `trading/trades.py` `to_units` |
+| 칸·등급 이름표 | `checklist/cond.py` · `checklist/grade.py` · `grade_rules.json` |
+| 등급 사다리(등급·금액 배수 계산) | `checklist/grade.py` — 화면은 다시 계산하지 않음(수동 답은 `POST /api/verdict`) |
+| 할 일 목록 | `docs/HANDOFF.md` (다른 곳에 TODO 파일 금지) |
+
+새로 '한 곳에서만 정할 것'이 생기면 여기와 OWNERS 에 한 줄씩.
+
+## 5. 검사
 
 `python -m orchestration.run check` 하나로 전부. 목록은 `orchestration/run.py` 의 `CHECKS` 한 곳.
+태그: gate = 항상(daily·verdict 포함) · tree = `--no-verify-tree` 면 생략 · opt = `run check --parity` 일 때만.
 
-| 검사 | 무엇 |
-|---|---|
-| `orchestration.verify_code` | 코드 규칙: 폴더 경계 + 주인 표 |
-| `playbook.verify_source_integrity` | 구간① 전사본 무결(해시) |
-| `checklist.verify_tree` (`--contract`) | 구간② 트리 동작(a·b 비교·사례·심판) · 책 계약(소절·문법·ref) |
-| `checklist.verify_primitives` | DSL 계산기 |
-| `trading.verify_trading` (`--parity`) | 체결·실전 경로 · 판정=백테스트 일치 |
-| `web.verify_view` (`--pages`) | 화면 설명 구조 · 책 페이지 |
+| 검사 | 태그 | 보는 것 |
+|---|---|---|
+| `orchestration.verify_code` | gate | 폴더 경계(import 방향·jhts 단일 창구·자가수집 0) + 주인 표 |
+| `playbook.verify_source_integrity` | gate | 플레이북 본문(`#src`) 해시 |
+| `checklist.verify_tree --contract` | gate | 책 계약 — 소절 인덱스 · 트리 문법 · ref 가 실제 소절 |
+| `web.verify_view --pages` | gate | 책 페이지 구획 · UI 사본 == `web/ui/*.js` |
+| `checklist.verify_primitives` | tree | 원시 연산·등급·금액·수동 답(pandas 기준값·손계산) · 3값 논리 · 인과성 · 문법 · 출입구 계약 |
+| `trading.verify_trading` | tree | 체결 워크·수량 변환·금액·매도 정책 · 실전 경로. `--parity` = 판정 == 백테스트(opt) |
+| `web.verify_view` | tree | 화면 설명 구조 |
+| `checklist.verify_tree` | tree | 체크리스트가 원문 뜻대로 동작하나 — a·b 비교(식) · 원문 사례 · 심판 기록 · 발화 통계 |
+
+검사는 전부 **실행**으로 본다(글자 대조 검사는 의미를 판정하지 못해 없앴다).
