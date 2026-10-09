@@ -20,7 +20,7 @@ import os
 from shared.paths import positions_json
 from dsl.tradeTool import Grade
 from dsl.tree_gateway import TreeGateway
-from signal.judge import Holding, Judge
+from signals.judge import Holding, Judge
 
 
 def load_positions(slug):

@@ -12,7 +12,7 @@ from datetime import datetime
 
 from shared.paths import backtest_json, write_text
 from dsl.tradeTool import Grade
-from signal.commonTool import open_history
+from signals.commonTool import open_history
 from consumers.backtest import portfolio, trades
 from consumers.backtest.runner import BUY_OR_CONFIRM, HORIZONS, run
 

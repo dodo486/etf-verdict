@@ -39,7 +39,7 @@ from shared.paths import BASE, live_slugs, read_text  # (UTF-8 출력 고정 포
 from dsl.tradeTool import Grade
 from dsl.tree_gateway import TreeGateway, empty_product, synthetic
 from consumers.backtest import trades as trades_mod
-from signal.commonTool import open_history
+from signals.commonTool import open_history
 
 Candle = namedtuple("Candle", "date open high low close volume")
 FAILS = []
@@ -182,7 +182,7 @@ def t_no_exit():
 def t_sizing():
     """금액 정책(trades.size_of) — 매수 크기 = 분할 비율 × 비중(%)/100 × 조심 배수. 크기는 그날 판정의 Judge.amount
     (라이브 화면과 같은 경로)에서 온다. 폭 미명시 조심·확인 필요 조심·비중 모름은 ×1 로 두고 횟수를 센다."""
-    from signal.judge import Judge
+    from signals.judge import Judge
     R = {"pos": "ret"}
     ON = {"gt": [{"px": "close"}, 0]}                     # 늘 참
     rows = [(100, 100), (100, 100), (100, 106), (106, 106), (106, 108), (108, 108)]
@@ -235,10 +235,10 @@ def t_sizing():
 def t_live_path():
     """실전 판정 경로가 cond.Ctx 를 unobserved="exclude"(관측 못 한 조건 빼기 — 백테스트 전용)로 만들지 않는다 —
     라이브 판정·화면(#verdict-data)이 백테스트 규칙으로 판정하지 않게(verify.verify_primitives 의 실행 불변식과 짝)."""
-    from signal import judge
-    # 실전 경로 = 판정기(signal/judge) + 그 Decision 을 판정 JSON 으로 빚는 web/verdict_view(구간③은 web 을 import
-    #   하지 않으므로 소스 글자로 읽는다).
-    for name, src in (("signal/judge.py", inspect.getsource(judge)),
+    from signals import judge
+    # 실전 경로 = 판정기(signals/judge) + 그 Decision 을 판정 JSON 으로 빚는 consumers/display/verdict_view
+    #   (소스 글자로 읽는다 — unobserved=exclude 가 실전 경로에 없어야 한다).
+    for name, src in (("signals/judge.py", inspect.getsource(judge)),
                       ("consumers/display/verdict_view.py", read_text(os.path.join(BASE, "consumers", "display", "verdict_view.py")))):
         check('unobserved="exclude"' not in src and "unobserved='exclude'" not in src,
               "%s 실전 경로가 unobserved=exclude 를 쓰지 않아야(백테스트 전용)" % name)
@@ -259,7 +259,7 @@ def compare(slug, window=WINDOW):
     """한 책의 두 경로를 실제로 돌려 (상품·날짜)별 (key, grade) 를 비교한다.
     → {total, match, mismatches:[{prod, date, bt_key, bt_grade, live_key, live_grade}], products, window}."""
     from consumers.backtest import runner               # 패리티만 쓰는 실제 드라이버 진입점(1·2 검사는 안 부른다)
-    from signal.judge import Judge, truncate
+    from signals.judge import Judge, truncate
     # 라이브 판정(render)과 같은 방식으로 전체 일봉을 한 번 받는다(워밍업 포함).
     # window 만큼 + 워밍업을 넉넉히 — backtest.run 의 days 도 이 창을 덮게 준다.
     tree, full = open_history(slug, window * 2 + 30)

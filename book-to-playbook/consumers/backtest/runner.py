@@ -3,7 +3,7 @@
 """신호 백테스트 (책 무관) — 과거 N일 동안 매일 '그날 장 마감 기준' 판정을 다시 내고,
 그 판정 뒤에 실제로 가격이 어떻게 갔는지 잰다.
 
-판정은 라이브와 같은 판정기(signal/judge.Judge — 같은 트리·같은 등급 코드)가 judge.signal_series 로 낸다.
+판정은 라이브와 같은 판정기(signals/judge.Judge — 같은 트리·같은 등급 코드)가 judge.signal_series 로 낸다.
 트리 연산은 전부 인과적이라(그날까지의 값만 씀 — verify_primitives 가 강제) 전체 이력을 한 번
 계산해 날짜로 꺼낸다. 시세는 md_feed → jhts 시세팀에서 온다.
 
@@ -33,8 +33,8 @@ from datetime import datetime, timedelta
 
 from shared.paths import book_log, write_text
 from consumers.backtest import trades
-from signal.judge import signal_series
-from signal.commonTool import open_history
+from signals.judge import signal_series
+from signals.commonTool import open_history
 
 HORIZONS = (5, 10, 20)
 BUY_OR_CONFIRM = "✅+🟡 (수동 확인 가정)"

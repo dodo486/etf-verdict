@@ -13,7 +13,7 @@
                ▼
           dsl/          조건 트리의 언어 — tree_gateway(출입구) · tradeTool(Cond=문법·계산 · Grade=등급의 뜻)
                ▼
-          signal/       tree + 시세 → Judge(판단) → Decision  (돈·잔고 모름)
+          signals/       tree + 시세 → Judge(판단) → Decision  (돈·잔고 모름)
                │
                ├─▶ consumers/backtest   signal_series × 계좌·체결 × 성적(돈)
                ├─▶ consumers/notify      텔레그램·데스크톱 알림

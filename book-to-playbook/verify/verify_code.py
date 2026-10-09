@@ -9,7 +9,7 @@
   · shared/      경로(paths)·인코딩·책 레지스트리 — 뜻은 두지 않는다
   · market/      시세 창구(md_feed)·개발 캐시 — jhts 는 여기서만
   · dsl/         조건 트리(tree.json)의 언어 — 출입구(tree_gateway)·문법/등급(tradeTool)
-  · signal/      tree+시세 → 판정 데이터(Judge·라이브 엔진·공통 책열기)
+  · signals/      tree+시세 → 판정 데이터(Judge·라이브 엔진·공통 책열기)
   · feed/        라이브 틱 피더(in-process pub-sub 트리거)
   · consumers/   신호를 받아 쓰는 소비자 — backtest(체결·돈·러너)·notify(알림)·display(화면 모양·UI JS)
   · entry/       진입점 — run(스케줄 러너)·serve(로컬 서버)·watch(장중 루프)
@@ -56,16 +56,16 @@ import sys
 from shared import paths  # noqa: F401  (경로·UTF-8 출력 고정)
 from shared.paths import BASE
 
-LAYERS = ("shared", "market", "dsl", "signal", "feed", "consumers", "entry", "verify", "authoring")
+LAYERS = ("shared", "market", "dsl", "signals", "feed", "consumers", "entry", "verify", "authoring")
 
 # 규칙 1 — 층마다 import 해도 되는 층. 흐름은 아래→위 한 방향, 소비·진입·검사만 위에서 아래를 부른다.
 IMPORTS = {
     "shared": {"shared"},
     "market": {"market", "shared"},
     "dsl": {"dsl", "shared", "market"},
-    "signal": {"signal", "shared", "market", "dsl"},
+    "signals": {"signals", "shared", "market", "dsl"},
     "feed": {"feed", "shared"},
-    "consumers": {"consumers", "shared", "market", "dsl", "signal", "feed"},
+    "consumers": {"consumers", "shared", "market", "dsl", "signals", "feed"},
     "entry": set(LAYERS),
     "verify": set(LAYERS),
     "authoring": {"authoring", "shared", "market", "dsl"},
@@ -272,8 +272,8 @@ AMOUNT_FACTS = {"amount_factor", "weight_of"}
 
 
 def m_amount_policy(src):
-    """매수 크기를 다루는 층(signal·consumers·entry)만 본다 — dsl 은 트리의 뜻을 검사하려고 사실을 직접 읽는다."""
-    if not src.rel.startswith(("signal/", "consumers/", "entry/")):
+    """매수 크기를 다루는 층(signals·consumers·entry)만 본다 — dsl 은 트리의 뜻을 검사하려고 사실을 직접 읽는다."""
+    if not src.rel.startswith(("signals/", "consumers/", "entry/")):
         return []
     if src.kind == "py":
         return ([(ln, f, x) for ln, f, x in _py_names(src) if x in AMOUNT_FACTS]
@@ -362,7 +362,7 @@ OWNERS = [
          why="매수 크기(비중 × 분할 × 조심 배수)와 모름(폭 미명시·확인 필요·비중 모름)을 어떻게 셀지는 trades.size_of 하나 — "
              "그 사실은 Judge.amount 한 경로로만(라이브 화면 = 백테스트)",
          hint="Judge.amount 로 사실을, trades.size_of 로 크기를",
-         allow={("signal/judge.py", "amount"): (AMOUNT_FACTS, "Judge.amount — 그날 사실(Amount)을 꺼내는 한 경로")}),
+         allow={("signals/judge.py", "amount"): (AMOUNT_FACTS, "Judge.amount — 그날 사실(Amount)을 꺼내는 한 경로")}),
     dict(concept="수량 변환", owners=("consumers/backtest/trades.py",), match=m_qty_convert,
          why="'얼마나'(Qty: cash·budget·order·bought·held)를 물량으로 바꾸는 곳은 trades.to_units 하나 — 매수(분할)·매도·"
              "비중·조심이 같은 변환을 지난다. 밖은 Qty 를 건네기만 하고 basis 를 가르거나 셈하지 않는다",

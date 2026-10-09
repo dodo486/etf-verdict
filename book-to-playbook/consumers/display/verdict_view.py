@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """판정 화면 데이터(웹 화면층, 책 무관) — 오늘 판정을 판정 JSON(#verdict-data)·알림 문장으로 빚는다.
 
-판정(시세 조달 + Judge)은 구간③ 엔진(signal/engine.live_decisions)이 내고, 이 파일은 그 Decision 과 평가 문맥을
+판정(시세 조달 + Judge)은 구간③ 엔진(signals/engine.live_decisions)이 내고, 이 파일은 그 Decision 과 평가 문맥을
 사람과 화면이 읽는 모양으로 빚기만 한다 — 화면은 트리를 다시 해석하지 않고 이 출력만 그린다(판단/표시 분리:
 web 은 판정을 계산하지 않는다). books.json 의 engine.daily 가 이 모듈이다(python -m consumers.display.verdict_view <slug> —
 라이브 서버·러너가 부르는 '진입+표시+알림' 껍데기 · 계산은 trading.engine 이 한다).
@@ -30,7 +30,7 @@ from shared.paths import book_log, book_meta, write_text
 from market import md_feed
 from dsl.tradeTool import Cond
 from dsl.tradeTool import Grade
-from signal import engine
+from signals import engine
 from consumers.backtest.trades import NO_EXIT_NOTE, exit_policy, live_units, sell_text
 from consumers.notify.telegram import send_telegram
 from consumers.notify.desktop import send_desktop
