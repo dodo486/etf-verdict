@@ -39,12 +39,13 @@ SSE_TICK = float(os.environ.get("PLAYBOOK_TICK", "15"))  # 초 — SSE tick 주�
 # 어느 책을 라이브로 띄울지는 books.json 에서 온다(코드에 특정 책을 박지 않는다).
 # BOOK_SLUG 로 덮어쓸 수 있고, 기본은 첫 live 책.
 from shared.paths import BASE, default_slug, book_engine, live_slugs, load_manifest   # noqa: E402
-from feed.feed import Feed   # 라이브 틱 피더(in-process pub-sub) — SSE·watch 공통 트리거 코어
+from entry.live import LiveHub   # 라이브 2단 pub-sub 조립(price_bus→신호→verdict_bus→화면)
 DEFAULT_SLUG = os.environ.get("BOOK_SLUG") or (live_slugs() or [default_slug()])[0]
 
-# 라이브 틱 피더 하나 — 백그라운드 _ticker 가 SSE_TICK 초마다 틱을 올리면, 열린 SSE 연결들이 '구독'으로
-# 한꺼번에 깨어난다(연결마다 따로 sleep 하지 않는다 — watch 루프와 같은 Feed 코어). 소비자 추가 = 구독 추가.
-_feed = Feed()
+# 라이브 2단 pub-sub 허브 하나 — Poller 가 SSE_TICK 초마다 price_bus 에 틱을 올리면, 책마다 신호 핸들러가
+# 판정을 계산해 그 책 verdict_bus 에 올린다(1단→2단). 열린 SSE 연결은 그 책 verdict_bus 를 '구독'해 판정이
+# 갱신될 때만 깨어난다(연결마다 따로 sleep 않는다 — 진짜 push). GET /api/verdict 는 허브 캐시(latest)를 읽는다.
+_hub = LiveHub()
 
 
 def _slugs():
@@ -77,7 +78,17 @@ def _run_verdict(slug):
 
 
 def compute_verdict(slug, force=False):
-    """책 slug 의 판정 — TTL 캐시가 살아 있으면 캐시를, 아니면 새로 계산해 (data, from_cache) 반환."""
+    """책 slug 의 판정 — 2단 pub-sub 허브가 이미 빚어 둔 최신 top(verdict_bus 소비자 캐시)이 있으면 그걸,
+    없으면(허브 틱 전) TTL 캐시/엔진 서브프로세스로 한 번 계산해 (data, from_cache) 반환.
+
+    허브 top 은 render(slug) 와 내용이 같다(engine.live_decisions → _format, 서브프로세스 --json 과 동일 경로).
+    서브프로세스 경로는 러너·콜드 스타트용으로 남겨 둔다(books.json engine.daily — 배치 러너가 그대로 쓴다)."""
+    if not force:
+        top = _hub.latest(slug)
+        if top is not None:
+            data = dict(top)
+            data["live"] = True
+            return data, True
     now = time.time()
     with _cache_lock:
         c = _cache.get(slug)
@@ -238,10 +249,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.wfile.flush()
         except Exception:
             return
-        # 이 연결은 공용 _feed 를 '구독'한다 — _ticker 가 올리는 틱마다 evt 가 서고, 그때만 다시 그린다
-        #   (연결마다 sleep 루프를 따로 돌리지 않는다 — 트리거는 Feed 하나). 틱이 없으면 keepalive ping.
+        # 이 연결은 그 책의 verdict_bus(2단)를 '구독'한다 — 신호 핸들러가 판정을 갱신해 올릴 때만 evt 가
+        #   서고, 그때 그 top 의 ts 를 그대로 push 한다(진짜 push — 연결이 직접 재계산하지 않는다). 틱이 없으면
+        #   keepalive ping. 책이 아직 허브에 없으면(막 추가) 다음 틱의 _sync 로 버스가 생길 때까지 ping 만.
         evt = threading.Event()
-        unsub = _feed.subscribe(lambda _e: evt.set())
+        box = {"top": None}
+
+        def _on_verdict(ev):
+            box["top"] = ev
+            evt.set()
+        vbus = _hub.verdict_bus.get(slug)
+        unsub = vbus.subscribe(_on_verdict) if vbus else (lambda: None)
         try:
             while True:
                 if not evt.wait(timeout=SSE_TICK * 3):     # 틱 누락 대비 안전 keepalive
@@ -253,8 +271,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     continue
                 evt.clear()
                 try:
-                    data, _ = compute_verdict(slug)
-                    payload = json.dumps({"ts": data.get("ts")}, ensure_ascii=False)
+                    top = _hub.latest(slug)
+                    payload = json.dumps({"ts": top.get("ts") if top else None}, ensure_ascii=False)
                     self.wfile.write(("data: %s\n\n" % payload).encode("utf-8"))
                     self.wfile.flush()
                 except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
@@ -278,8 +296,9 @@ def _warm():
 
 
 def _ticker():
-    """라이브 틱 — SSE_TICK 초마다 Feed 에 틱을 올려 구독한 SSE 연결들을 한꺼번에 깨운다(무한 루프, 데몬)."""
-    _feed.run(SSE_TICK, now=time.time)
+    """라이브 틱 — 허브 Poller 가 SSE_TICK 초마다 price_bus 에 틱을 올린다(책마다 신호 핸들러 → verdict_bus →
+    화면 소비자 캐시). start 가 스레드를 띄우므로 join 해 메인 스레드와 수명을 맞춘다(무한 루프, 데몬)."""
+    _hub.start(SSE_TICK, now=time.time).join()
 
 
 if __name__ == "__main__":
