@@ -1,53 +1,82 @@
 # 아키텍처 — 구조의 정본
 
 > 구조·원칙 설명은 이 파일 한 곳. README·HANDOFF 는 여기를 가리킨다. 할 일은 `docs/HANDOFF.md` 한 곳.
-> 2026-10-08 리팩터(TreeGateway → 폴더 재편 → 검사 정리), 2026-10-09 리팩터(팀 폴더 → layer-first 재배치)에서 사용자와 정한 원칙.
+> 2026-10-08 리팩터(TreeGateway → 폴더 재편 → 검사 정리), 2026-10-09 리팩터(팀 폴더 → layer-first 재배치 → 2단 pub-sub)에서 사용자와 정한 원칙.
 
-## 1. 구조 한눈에
+## 1. 구조 한눈에 — 폴더 이름이 곧 파이프라인
 
-폴더 = 층(layer). 흐름은 아래에서 위로 한 방향 — 아래는 위를 import 하지 않는다. 소비·진입·검사만 위에서 아래를 부른다.
+폴더 = 층(layer). 흐름은 **아래에서 위로 한 방향** — 아래는 위를 import 하지 않는다(소비·진입·검사만 위에서 아래를 부른다).
+**제작(authoring)이 왼쪽에서 tree.json 을 만들고, 런타임이 그 tree 를 오른쪽으로 흘린다. 검사(verify)는 전 층을 가로지르는 게이트.**
 
 ```
-책 원문 ─▶ authoring/   ─▶ books/<slug>/playbook.html · tree.json  (만드는 쪽: 전사·추출·심판)
-               │ 산출물 파일(books/<slug>/*.json)
-               ▼
-          dsl/          조건 트리의 언어 — tree_gateway(출입구) · tradeTool(Cond=문법·계산 · Grade=등급의 뜻)
-               ▼
-          signals/       tree + 시세 → Judge(판단) → Decision  (돈·잔고 모름)
-               │
-               ├─▶ consumers/backtest   signal_series × 계좌·체결 × 성적(돈)
-               ├─▶ consumers/notify      텔레그램·데스크톱 알림
-               └─▶ consumers/display     결과 JSON 을 화면 모양으로(판단 안 함) · ui/*.js
-                        ▲
-          feed/   라이브 틱 피더(트리거) ──┘ 틱마다 소비자 fan-out(SSE·watch·pricing)
+          books(설정·책마다 tree.json) · dsl(언어)
+                 │
+  제작 ───────────┤─────────────── 런타임 파이프라인: 시세 → 신호 → 소비 ───────────────
+                 │
+authoring/   books/<slug>/tree.json 을 만든다(전사·추출 a·b·심판) — 런타임과 분리, 명령으로만 돈다
+  │ 산출물 books/<slug>/*.json
+  ▼
+dsl/         조건 트리의 언어(공개 토대) — tree_gateway(읽는 유일 출입구) · tradeTool(Cond=문법/계산 · Grade·ProductEval=등급 수학, tf중립·asof)
+  ▼
+market/      시세 조달 — md_feed(jhts 어댑터, 유일한 시세 창구) · _dev_cache
+  ▼
+feed/        라이브 틱 피더(pub-sub) — ① price_bus(시세 틱) · ② verdict_bus(판정) 두 단 버스. 시세를 '모름'(가격 아님, 트리거)
+  ▼                               틱마다 전 책 심볼 합집합을 market 에서 '한 번' 조회해 fan-out(공유 시세·중복 조회 0)
+signals/     ① 신호층 — tree+공유시세 → Judge(판단) → Decision  (돈·잔고·화면 모름)
+  │
+  ├─▶ consumers/backtest   signal_series × 계좌·체결 × 성적(돈·vectorbt)
+  ├─▶ consumers/notify     텔레그램·데스크톱 알림
+  └─▶ consumers/display    Decision → 화면 JSON·사유·view (판단 안 함 — 서버 권위) · ui/*.js
 
-market/   시세 창구(md_feed) · 개발 캐시 — jhts 는 여기서만
 shared/   경로(paths)·인코딩·책 레지스트리(books.json) — 뜻은 두지 않는다
-entry/    진입점 — run(스케줄 러너) · serve(로컬 서버) · watch(장중 루프)
+entry/    진입점 — serve(로컬 서버: 피더 구동 + SSE) · run(스케줄 daily·check) · live(2단 pub-sub 조립 뿌리)
 verify/   검사만 — 코드 규칙·트리·원시함수·거래·화면·본문 해시
 books/<slug>/  책 하나의 산출물 전부(playbook.html · source · source_index · tree.json · 후보 · 사례 · 결과 · 로그)
 ```
 
 | 폴더(층) | 하는 일 | 주요 파일 |
 |---|---|---|
-| `shared/` | 경로·인코딩·책 레지스트리 | `paths.py`(book_dir·book_file·books.json 레지스트리) |
-| `market/` | 시세 창구 — jhts 는 여기서만 | `md_feed.py` · `_dev_cache.py`(개발용 시세 캐시) |
-| `dsl/` | 조건 트리(tree.json)의 언어 — **DSL 의 주인** | `tree_gateway.py`(출입구) · `tradeTool.py`(Cond·Grade, +`grade_rules.json`) |
-| `signal/` | tree+시세 → 판정 데이터 | `judge.py`(Judge·Decision·Holding·signal_series·truncate) · `engine.py`(라이브 판정 엔진) · `commonTool.py`(공통 책 열기) |
-| `feed/` | 라이브 틱 피더(트리거) | `__init__.py`(Feed — in-process pub-sub, SSE·watch 공통) |
-| `consumers/` | 신호를 받아 쓰는 소비자 | **backtest** `{trades,portfolio,runner}.py`(체결 규약·매도 정책 · 돈·수수료 · 러너, +`market_config.json`) · **notify** `{telegram,desktop}.py` · **display** `verdict_view.py` · `condition_view.py` · `backtest_page.py` · `book_page.py` · `build_home.py` · `inject_*.py` · `ui/*.js` |
-| `entry/` | 진입점 | `run.py`(스케줄 러너·CHECKS) · `serve.py`(로컬 서버) · `watch.py`(장중 루프) |
+| `shared/` | 경로·인코딩·책 레지스트리 | `paths.py`(book_dir·book_file·books.json 레지스트리·live_slugs) |
+| `market/` | 시세 조달 — jhts 는 여기서만 | `md_feed.py`(histories·minutes·sessions) · `_dev_cache.py` |
+| `dsl/` | 조건 트리(tree.json)의 언어 — **DSL 의 주인** | `tree_gateway.py`(출입구) · `tradeTool.py`(Cond·Grade·ProductEval·History, +`grade_rules.json`) |
+| `feed/` | 라이브 틱 피더(pub-sub 버스) — 시세 모름 | `bus.py`(`Bus` 구독/발행 · `Poller` 틱 구동) · `feed.py`(`Feed`=Bus+run · `watch` 장중 루프) |
+| `signals/` | tree+시세 → 판정 데이터 (돈·화면 모름) | `judge.py`(Judge·Decision·Holding·signal_series·truncate) · `engine.py`(라이브 판정 엔진 live_decisions · open_history) |
+| `consumers/` | 신호를 받아 쓰는 소비자(서브폴더로 구분) | **backtest** `{trades,portfolio,runner}.py`(체결·매도 정책 · 돈·수수료 · 러너, +`market_config.json`) · **notify** `{telegram,desktop}.py` · **display** `verdict_view.py`(판정→화면 JSON) · `condition_view.py` · `backtest_page.py` · `book_page.py` · `build_home.py` · `inject_*.py` · `ui/*.js` |
+| `entry/` | 진입점 | `serve.py`(로컬 서버·SSE) · `run.py`(스케줄 러너·CHECKS) · `live.py`(`LiveHub` — 2단 버스 조립) |
 | `verify/` | 검사만 | `verify_code.py` · `verify_tree.py` · `verify_primitives.py` · `verify_trading.py` · `verify_view.py` · `verify_source_integrity.py` |
-| `authoring/` | 책 → 플레이북 → 트리를 **만드는** 쪽 | **playbook** `book_source.py` · `pages.py` · `PLAYBOOK.md`(지침) · `book_sources.json` · `source_baseline.json` · **checklist** 지침 md(COND_DSL·EXTRACTOR·SCENARIO·JUDGE·README) |
+| `authoring/` | 책 → 플레이북 → 트리를 **만드는** 쪽(런타임과 분리) | **playbook** `book_source.py` · `pages.py` · `PLAYBOOK.md` · `book_sources.json` · `source_baseline.json` · **checklist** 지침 md(COND_DSL·EXTRACTOR·SCENARIO·JUDGE·README) |
+
+### 1-1. 라이브 2단 pub-sub — 책 N개가 시세 하나를 나눠 쓴다
+
+```
+market (jhts, pull)
+   ▲ 틱마다 전 live 책 심볼 '합집합'을 한 번만 조회 (md_feed.histories 1회 — 공유 심볼 중복 0)
+   │
+feed.price_bus (1개) ──틱 {ts, trees, hist}── fan-out ─┬──────────────┬──────────────┐
+                                                      ▼              ▼              ▼
+                                           signal(책A)     signal(책B)     signal(책N…)   (pricing 미래)
+                                           = 구독+발행      = 구독+발행      = 구독+발행
+                                                │ 판정 사실       │              │
+                                                ▼ publish         ▼              ▼
+                                           feed.verdict_bus[책] (책마다 1개)
+                                                ├──▶ display(화면 SSE push)
+                                                └──▶ notify(알림) · (주문 미래)
+```
+
+- **책 추가 = `books.json` 한 줄 + `books/<slug>/tree.json`.** `entry/live.LiveHub._sync()` 가 live 책을 `price_bus` 구독자로 자동 등록한다(서버 재시작 불필요) — "책 등록 = 구독". signal 은 **코드 하나, 인스턴스 N개**(책마다 파일 안 만듦 — 원칙 12).
+- **시세는 한 번**: 피더가 틱마다 전 책 트리의 심볼 합집합을 `Grade.history_back([트리들])` 로 1회 조회해 틱에 싣는다. 각 책 Judge 는 그 공유 hist 에서 자기 심볼만 읽어(ProductEval) 혼자 받던 때와 **같은 판정**을 낸다(중복 조회 제거 — `verify`/A·B 로 동작 불변 증명).
+- **feed 는 가격을 모른다**(다른 층 import 0) — '언제 다시 판정하나'(트리거)만. '무엇을 계산할지'는 구독자(signals·consumers)가 정한다. 그래서 백테스트(과거 배치)는 feed 를 안 거치고 같은 signal 코드를 직접 돌린다(구독 밖).
+- **의존성 주입**: signals·consumers 는 feed 를 import 하지 않는다. 둘을 엮는 유일한 자리는 `entry/live.py`(조립 뿌리, entry 는 전 층 import 허용).
+- **오늘 판정 = asof=now 한 점 · 백테스트 = 전 날짜 signal_series** — 같은 Judge 를 쓰임만 달리(원칙 5).
 
 ## 2. 원칙
 
 | # | 원칙 | 지키는 장치 |
 |---|---|---|
-| 1 | **단방향 파이프라인** — shared ← market ← dsl ← signal·feed ← consumers (entry·verify 는 전부, authoring 은 dsl 까지). 층 사이 약속은 코드가 아니라 **산출물 파일**. 아래는 위를 import 하지 않는다 | `verify_code` 폴더 경계 |
+| 1 | **단방향 파이프라인** — shared ← market ← dsl ← signals·feed ← consumers (entry·verify 는 전부, authoring 은 dsl 까지). 층 사이 약속은 코드가 아니라 **산출물 파일**. 아래는 위를 import 하지 않는다 | `verify_code` 폴더 경계 |
 | 2 | **산출물을 만든 쪽이 읽는 창구도 책임** — tree.json 키는 `TreeGateway` 만 안다. 소비자는 질문만 | 주인 표: 트리 원본 키 |
 | 3 | **결정 하나 = 주인 하나** — 같은 결정을 두 곳에 두지 않는다. 새로 '한 곳에서만 정할 것'이 생기면 주인 표에 한 줄 | 주인 표(`verify_code.OWNERS`) |
-| 4 | **뜻 / 판단 / 실행 / 표시 분리** — 뜻 = `dsl` · 판단 = `signal`(`Judge`, 돈·잔고 모름) · 실행 = `consumers/backtest`(계좌·체결, 갈아끼울 수 있음) · 표시 = `consumers/display`(판단 안 함) | 폴더 경계 + 주인 표 |
+| 4 | **뜻 / 판단 / 실행 / 표시 분리** — 뜻 = `dsl` · 판단 = `signals`(`Judge`, 돈·잔고 모름) · 실행 = `consumers/backtest`(계좌·체결, 갈아끼울 수 있음) · 표시 = `consumers/display`(판단 안 함) · 트리거 = `feed`(언제, 가격 모름) | 폴더 경계 + 주인 표 |
 | 5 | **판단 엔진은 하나, 쓰임은 조합만 다름** — 오늘 판정 = 백테스트의 마지막 하루. 실전 주문도 같은 `Judge` | `Judge` 단일 경로 · `verify_trading --parity` |
 | 6 | **서버 권위** — 화면은 엔진 결과를 그리기만. 다시 계산하지 않는다 | 주인 표: 등급 사다리 |
 | 7 | **특수 기능보다 일반 부품 + 조합** — 사례마다 칸·지표를 덧대지 않는다. 조합으로 안 되면 **부품을 넓힌다**. `연산 없음`이 쌓이면 확장 신호 | 최소 문법 + 주인 표 |
