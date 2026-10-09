@@ -4,13 +4,13 @@ book-to-playbook 판정 페이지는 **로컬 실시간 서버**로 본다(정�
 
 | 여는 법 | 동작 |
 |---------|------|
-| `python3 -m web.serve` 로 띄운 서버 | 매 요청 엔진을 새로 돌려 그리고, 15초마다 `/api/verdict` 폴링(또는 `/events` SSE)으로 값이 살아 움직인다 (`🟢 실시간 · jhts(marketdata) · 갱신 HH:MM:SS`). |
+| `python3 -m entry.serve` 로 띄운 서버 | 매 요청 엔진을 새로 돌려 그리고, 15초마다 `/api/verdict` 폴링(또는 `/events` SSE)으로 값이 살아 움직인다 (`🟢 실시간 · jhts(marketdata) · 갱신 HH:MM:SS`). |
 
 ## 1. 서버 켜기
 
 ```bash
 cd ~/claude-projects/etf-verdict/book-to-playbook
-python3 -m web.serve
+python3 -m entry.serve
 ```
 
 콘솔에 뜨는 주소:
@@ -21,7 +21,7 @@ python3 -m web.serve
 포트를 바꾸려면:
 
 ```bash
-PLAYBOOK_PORT=9000 python3 -m web.serve
+PLAYBOOK_PORT=9000 python3 -m entry.serve
 ```
 
 환경변수(선택):
@@ -38,7 +38,7 @@ PLAYBOOK_PORT=9000 python3 -m web.serve
 | 경로 | 내용 |
 |------|------|
 | `GET /` `GET /index.html` | 최신 판정을 구워 넣은 플레이북 페이지(루트로 바로 열림, 이후 스스로 갱신) |
-| `GET /api/verdict` | 판정 JSON(라이브). `web.display.verdict_view`(books.json engine.daily) 로 계산, 8초 TTL 캐시, CORS 허용 |
+| `GET /api/verdict` | 판정 JSON(라이브). `consumers.display.verdict_view`(books.json engine.daily) 로 계산, 8초 TTL 캐시, CORS 허용 |
 | `GET /events` | SSE — 15초마다 tick. 브라우저가 받으면 `/api/verdict` 를 한 번 더 당겨 다시 그림 |
 | 기타 | `BASE` 디렉터리 정적 파일 서빙 |
 
@@ -54,7 +54,7 @@ PLAYBOOK_PORT=9000 python3 -m web.serve
    tailscale up
    ```
 2. **폰** 에 Tailscale 앱 설치 → 같은 계정으로 로그인.
-3. 데스크톱에서 서버를 켠다: `python3 -m web.serve` (0.0.0.0 바인딩이라 이미 LAN/테일스케일에서 접속 가능).
+3. 데스크톱에서 서버를 켠다: `python3 -m entry.serve` (0.0.0.0 바인딩이라 이미 LAN/테일스케일에서 접속 가능).
 4. 데스크톱의 Tailscale 주소를 확인:
    ```bash
    tailscale ip -4          # 예: 100.x.y.z

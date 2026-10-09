@@ -6,7 +6,7 @@ description: 트레이딩 책을 읽어 실전 매매 플레이북 + 기계가 �
 # Book → Playbook + 체크리스트(조건 트리) — 진행자 지침
 
 이 문서는 전체를 돌리는 **진행자**의 지침이다(전 구간 공통만). 구간별 세부는 그 구간의 문서에 있다 —
-체크리스트(구간②)는 `checklist/README.md`.
+체크리스트(구간②)는 `authoring/checklist/README.md`.
 
 트레이딩 책 원문을 받아 ① 저자 매매기법 플레이북 ② 기계가 실행하는 체크리스트(`books/<slug>/tree.json`)를 2탭
 웹페이지로 만들고, jhts 시세로 판정한다. 체크리스트를 **만드는 곳은 구간② 하나, 읽는 곳은 구간③ 하나**다. 상세는 `README.md`.
@@ -25,42 +25,42 @@ description: 트레이딩 책을 읽어 실전 매매 플레이북 + 기계가 �
 ## ⛔ 절대 규칙 2 — 숫자를 지어내지 않는다
 
 조건·숫자·대상을 지어내지 않는다. 저자가 안 준 것은 없는 대로 둔다. 구간별 정본에 세부가 있다 —
-구간①(전사) = `playbook/PLAYBOOK.md`, 구간②(추출) = `checklist/EXTRACTOR.md`.
+구간①(전사) = `authoring/playbook/PLAYBOOK.md`, 구간②(추출) = `authoring/checklist/EXTRACTOR.md`.
 
 ## ⛔ 절대 규칙 3 — 검사는 실행으로, 책이 계약에 맞춘다
 
-검사는 글자가 아니라 실행으로 본다(목록은 `orchestration/run.py` CHECKS 하나 — 매 발행마다 돌고, `python -m orchestration.run check` 로 전부). 통과시키려고 검사를 느슨하게 만들지 않는다.
-책 계약(`checklist.verify_tree --contract`): 원문 소절 인덱스 · 트리 문법(여섯 칸 전부) · 트리 ref 가 실제 소절. 책 페이지(`web.verify_view --pages`): 페이지 구획과 UI 사본.
+검사는 글자가 아니라 실행으로 본다(목록은 `entry/run.py` CHECKS 하나 — 매 발행마다 돌고, `python -m entry.run check` 로 전부). 통과시키려고 검사를 느슨하게 만들지 않는다.
+책 계약(`verify.verify_tree --contract`): 원문 소절 인덱스 · 트리 문법(여섯 칸 전부) · 트리 ref 가 실제 소절. 책 페이지(`verify.verify_view --pages`): 페이지 구획과 UI 사본.
 
 ## 새 책 절차
 
 ```
-1) 원문 자르기   book_sources.json 에 원문 위치 → python -m playbook.book_source --write
+1) 원문 자르기   book_sources.json 에 원문 위치 → python -m authoring.playbook.book_source --write
                  (원문 전체는 리포에 넣지 않고 source_index.json 에 키·제목·줄범위·해시만 둔다)
 2) 전사(구간①)  서브에이전트가 책 전체를 읽어 #src 로 **충실 전사**(저자 문장 그대로 · 요약·분류 금지 · 노이즈만 제거)
-                 → 전사 대조 감사(별도 서브에이전트) → python -m playbook.verify_source_integrity --accept --why "새 책".
-                 산출물 2개: 전사본(=구간② 입력) · 사람용 요약 뷰(비핵심·파생). 세부는 playbook/PLAYBOOK.md.
+                 → 전사 대조 감사(별도 서브에이전트) → python -m verify.verify_source_integrity --accept --why "새 책".
+                 산출물 2개: 전사본(=구간② 입력) · 사람용 요약 뷰(비핵심·파생). 세부는 authoring/playbook/PLAYBOOK.md.
 3) 페이지        books/trend/playbook.html 을 베이스로 #src·머리말(제목·상품 소개)만 교체.
-                 시트 패널은 #verdict-data + #sheet-root 골격 그대로(UI 는 web/ui/*.js 가 주입된다).
-4) 체크리스트    checklist/README.md 절차대로(추출자 a·b → 사례 작성자 → 심판 → verify_tree 통과)
-5) 등록·배포     books.json 에 항목(slug/title/tickers/desc/live/engine.daily) → python -m orchestration.run daily
+                 시트 패널은 #verdict-data + #sheet-root 골격 그대로(UI 는 consumers/display/ui/*.js 가 주입된다).
+4) 체크리스트    authoring/checklist/README.md 절차대로(추출자 a·b → 사례 작성자 → 심판 → verify_tree 통과)
+5) 등록·배포     books.json 에 항목(slug/title/tickers/desc/live/engine.daily) → python -m entry.run daily
 ```
 
-### 검사 실패 → 고칠 곳 (체크리스트 채점 `verify_tree` 는 `checklist/README.md`)
+### 검사 실패 → 고칠 곳 (체크리스트 채점 `verify_tree` 는 `authoring/checklist/README.md`)
 
 | 실패 | 뜻 | 고칠 곳 |
 |---|---|---|
-| verify_tree --contract · verify_view --pages | 소절 인덱스·트리 문법·ref · 페이지 구획·UI 사본 | 해당 산출물을 만든 단계를 다시(UI 사본은 `python -m web.display.inject_ui <페이지>`) |
+| verify_tree --contract · verify_view --pages | 소절 인덱스·트리 문법·ref · 페이지 구획·UI 사본 | 해당 산출물을 만든 단계를 다시(UI 사본은 `python -m consumers.display.inject_ui <페이지>`) |
 | verify_code | 폴더 경계·주인 표 위반 | 위반 줄을 주인 파일의 공개 함수로(검사·표를 느슨하게 하지 않는다) |
 | verify_source_integrity | 플레이북 본문이 바뀜 | 의도한 원문 대조 수정이면 `--accept --why`, 아니면 되돌린다 |
-| verify_primitives · verify_trading | 원시 연산·체결 계산 오류 | `checklist/tradeTool.py`·`trading/trades.py`(책 쪽이 아니다) |
+| verify_primitives · verify_trading | 원시 연산·체결 계산 오류 | `dsl/tradeTool.py`·`consumers/backtest/trades.py`(책 쪽이 아니다) |
 
 ## 입력
 - 정제된 텍스트(.md) 있음 → 바로 1)
 - 스캔 PDF만 있음 → 먼저 이미지화→OCR→청킹(jhts 파이프라인 재사용) 후 1)
 
 ## 판정 운영
-`python -m orchestration.run daily` — 책마다 `web.display.verdict_view`(판정 → 알림) → `web.display.backtest_page`(백테스트 탭 데이터) →
-검사. `python -m orchestration.run watch [--every N]` 는 asof=지금으로 N분마다 재판정(장중 포함).
+`python -m entry.run daily` — 책마다 `consumers.display.verdict_view`(판정 → 알림) → `consumers.display.backtest_page`(백테스트 탭 데이터) →
+검사. `python -m entry.run watch [--every N]` 는 asof=지금으로 N분마다 재판정(장중 포함).
 알림은 `telegram.env`(TELEGRAM_BOT_TOKEN/CHAT_ID)가 있으면 텔레그램, 없으면 데스크톱. 시세는 jhts 패키지(`PYTHONPATH`)에서만
 온다. 스케줄 등록·내 포지션 파일은 `SETUP.md`.

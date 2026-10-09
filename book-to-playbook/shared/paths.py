@@ -9,7 +9,7 @@
   BASE   = $BOOK_TO_PLAYBOOK_HOME  또는  이 파일이 있는 폴더(shared/)의 부모
   LOGS   = BASE/logs
 
-화면은 로컬 실시간 서버(web.serve)가 매 요청 그린다 — 정적 발행(GitHub Pages)은 폐지됐다.
+화면은 로컬 실시간 서버(entry.serve)가 매 요청 그린다 — 정적 발행(GitHub Pages)은 폐지됐다.
 """
 import os
 import sys
@@ -124,7 +124,7 @@ def default_slug():
 
 
 def book_engine(slug, kind):
-    """그 책의 시세 엔진 모듈명(daily/intraday, 예: 'web.display.verdict_view').
+    """그 책의 시세 엔진 모듈명(daily/intraday, 예: 'consumers.display.verdict_view').
     없으면 None(=엔진 없는 책). 실행은 `python -m <모듈명> <slug>` (cwd=BASE)."""
     return (book_meta(slug).get("engine") or {}).get(kind)
 
@@ -158,7 +158,7 @@ def source_index_json(slug):
 
 
 def backtest_json(slug):
-    """책 페이지 '백테스트' 탭 데이터(books/<slug>/backtest.json) — web.display.backtest_page 가 쓰고 book_page 가 읽는다."""
+    """책 페이지 '백테스트' 탭 데이터(books/<slug>/backtest.json) — consumers.display.backtest_page 가 쓰고 book_page 가 읽는다."""
     return book_file(slug, "backtest.json")
 
 

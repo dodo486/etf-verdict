@@ -10,7 +10,7 @@
 
 ## 1. 지금 상태
 
-- tree.json 이 없다 → 판정 화면·백테스트는 tree 가 생겨야 돈다. `python -m orchestration.run check` 는 이 2건
+- tree.json 이 없다 → 판정 화면·백테스트는 tree 가 생겨야 돈다. `python -m entry.run check` 는 이 2건
   (`verify_tree --contract`·`verify_tree` 의 "tree.json 없음")만 정지하고 나머지 6개 통과가 정상.
 - 검증용 픽스처: run2 후보 `books/moneycopy/tree_candidates/a.json` 을 잠깐 `tree.json` 으로 복사해 돌린다(커밋 금지).
   시세는 `ETF_DEV_CACHE=<캐시 폴더>` 로 고정하면 전후 비교가 같은 값으로 된다.
@@ -48,7 +48,7 @@
 
 ### 6. run3 — tree.json 다시 만들기 (키스톤)
 - 순서: 구간① 전사 → 구간② 추출 a·b(서로·최종·사례 안 봄, 각자 다른 서브에이전트) → 사례 작성자(트리 안 봄) → 심판 →
-  `python -m checklist.verify_tree <slug>` exit 0. 옛 후보·`scenarios.json` 은 폐기하고 새로.
+  `python -m verify.verify_tree <slug>` exit 0. 옛 후보·`scenarios.json` 은 폐기하고 새로.
 - 절차 정본 `checklist/README.md`, 역할 지침 `playbook/PLAYBOOK.md` · `checklist/EXTRACTOR.md` · `SCENARIO.md` · `JUDGE.md`.
 - 원문 위치 `playbook/book_sources.json`(trend = `books/trend/source.md`, moneycopy = `~/jhts/hypotheses/sources/미국-돈복사-ETF-투자방법.md`).
 - 끝나면 `main` 에 합치기(사용자 승인).
@@ -62,7 +62,7 @@
 - **판정 JSON 의 `grade_rules` 빼기** — 서버 권위 뒤 화면이 안 쓴다(다음 출력 변경 때).
 - **웹 백테스트 탭 지표 채우기**(총수익·MDD·샤프·자산곡선 — 표시 코드는 있음) · **장중 손익 백테스트**(분봉 ~7일뿐이라 보류 —
   옛 CLI `replay`·`backtest.run_intraday` 는 `work/trading-cleanup` 정리에서 삭제했다. 되살릴 땐 통일 신호 경로 위에
-  재구현한다) · tree 재생성 뒤 `python -m trading.verify_trading --parity` 실측.
+  재구현한다) · tree 재생성 뒤 `python -m verify.verify_trading --parity` 실측.
 - **무인 판정을 막는 수동 조건** — (가) 연산으로 풀 것 = v3 기본 부품 조합 · (나) 데이터가 없는 것 = 실적 캘린더 · 뉴스 시각 ·
   지수 구성종목 등락(breadth) · 개인 매매 기록 — 외부 소스 생기기 전엔 서버 권위 수동 답으로 '1회 답'까지 · (다) 정성 판단 = 수동 답.
 - **jhts 실데이터 교체 + yfinance 임시 흔적 삭제**(`MIGRATION_NOTES.md` 체크리스트).
@@ -81,8 +81,8 @@
 ## 5. 검증 명령
 
 ```
-python -m orchestration.run check            # 전부(CHECKS 한 목록) — 요약 + 종료코드
-python -m orchestration.verify_code           # 코드 규칙 — 폴더 경계 + 주인 표
-python -m checklist.verify_tree <slug>        # 트리 동작 (--contract = 책 계약)
-python -m trading.verify_trading --parity     # 판정 = 백테스트 일치(시세 필요)
+python -m entry.run check            # 전부(CHECKS 한 목록) — 요약 + 종료코드
+python -m verify.verify_code           # 코드 규칙 — 폴더 경계 + 주인 표
+python -m verify.verify_tree <slug>        # 트리 동작 (--contract = 책 계약)
+python -m verify.verify_trading --parity     # 판정 = 백테스트 일치(시세 필요)
 ```
