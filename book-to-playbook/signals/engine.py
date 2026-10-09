@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""라이브 판정 엔진(구간③) — slug + 관측 시각(asof) → 전 상품 판정(Decision). 시세 조달·Judge 는 여기, 화면 모양은 web 이 빚는다.
+"""라이브 판정 엔진(구간③) — slug + 관측 시각(asof) → 전 상품 판정(Decision). 시세 조달·Judge 는 여기, 화면 모양은 consumers/display 가 빚는다.
 
-왜 trading 에 있나
-  '시세를 받아 판정을 내리는' 일은 구간③(판정)의 몫이다. 예전엔 이 드라이버가 web/verdict_view 에 섞여 있어
-  화면층이 판정을 '계산'하는 꼴이었다 — 등급 수학은 Judge/ProductEval 이 내지만, 그 Judge 를 세우고 시세를
-  조달하는 오케스트레이션이 web 에 있었다. 그 엔진 절반을 여기로 옮겨, web 은 이 엔진이 낸 Decision 을
-  '화면·알림 모양으로 빚기만' 한다(web 은 판정을 계산하지 않는다 — 서버 권위·판단/표시 분리).
+왜 signals 에 있나
+  '시세를 받아 판정을 내리는' 일은 구간③(판정)의 몫이다. 예전엔 이 드라이버가 화면층(consumers/display/verdict_view)에
+  섞여 있어 화면이 판정을 '계산'하는 꼴이었다 — 등급 수학은 Judge/ProductEval 이 내지만, 그 Judge 를 세우고 시세를
+  조달하는 오케스트레이션이 화면층에 있었다. 그 엔진 절반을 여기로 옮겨, consumers/display 는 이 엔진이 낸 Decision 을
+  '화면·알림 모양으로 빚기만' 한다(화면은 판정을 계산하지 않는다 — 서버 권위·판단/표시 분리).
 
   · open_history    책 열기(트리 로드+가드+시세) — 라이브·백테스트·검사가 공유하는 진입 preamble
   · load_positions  내 포지션(books/<slug>/positions.json — 커밋 안 하는 개인 파일) 읽기

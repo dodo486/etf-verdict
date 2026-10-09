@@ -56,7 +56,7 @@ python -m entry.run watch [--every N] # asof=지금 기준 N분(기본 5)마다 
 python -m consumers.display.verdict_view <slug> [--json] [--no-send]       # 오늘 판정(판정 JSON·알림)
 python -m consumers.backtest.runner <slug> [--days 365]   # 백테스트(로그·JSON)
 python -m consumers.display.backtest_page <slug>                            # 책 페이지 '백테스트' 탭 데이터
-python -m entry.serve                                           # 로컬 실시간 서버(RUN.md)
+python -m entry.serve                                           # 로컬 실시간 서버(SETUP.md §7)
 ```
 
 환경: jhts 시세 패키지가 pip 설치가 아니면 `PYTHONPATH=<jhts 경로>` 를 줘야 시세가 들어온다(없으면 판정이 ❔).
@@ -87,4 +87,4 @@ python -m entry.serve                                           # 로컬 실시�
 | `consumers/display/book_page.py` · `entry/serve.py` · `consumers/display/build_home.py` · `consumers/display/backtest_page.py` | 페이지 조립 · 로컬 실시간 서버 · 홈 · 백테스트 탭 데이터 |
 | `authoring/playbook/book_source.py` · `verify/verify_source_integrity.py` · `authoring/playbook/pages.py` | 원문 소절 인덱스 · 플레이북 본문 무결 · 책 페이지 찾기·신선도 |
 | `authoring/playbook/book_sources.json` · `authoring/playbook/source_baseline.json` | 원문 위치 · 본문 해시 기준(커밋 대상) |
-| `SETUP.md` · `RUN.md` | 설치·스케줄 등록 · 로컬 서버/폰에서 보기 |
+| `SETUP.md` | 설치·스케줄 등록 · 로컬 서버/폰에서 보기 |

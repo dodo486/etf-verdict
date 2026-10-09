@@ -157,3 +157,31 @@ schtasks /Delete /TN "book-to-playbook daily" /F            :: 해제
 | `판정 파일 없음 — 발행 중단` | `run.py daily` 가 먼저 돌아야 한다(jhts 가 PYTHONPATH 에 있는지 확인) |
 | 값이 안 바뀐다 | 캐시 TTL(기본 8초) 대기 또는 `/api/verdict?force=1` · 서버 재시작(`entry.serve`) |
 | `python` 을 못 찾음(Windows) | `BOOK_TO_PLAYBOOK_PYTHON` 에 python.exe 전체 경로 지정 |
+
+## 7. 로컬 실시간 서버로 보기 (폰 포함)
+
+판정 페이지는 **로컬 실시간 서버**로 본다(정적 발행·GitHub Pages 는 폐지 — §5). 매 요청마다 엔진을 새로
+돌려 그리고, SSE/폴링으로 값이 살아 움직인다(`🟢 실시간 · jhts(marketdata) · 갱신 HH:MM:SS`).
+
+```bash
+python3 -m entry.serve                 # http://127.0.0.1:8799/ · 판정 JSON /api/verdict
+PLAYBOOK_PORT=9000 python3 -m entry.serve   # 포트 변경
+```
+
+| 환경변수 | 기본 | 뜻 |
+|------|------|----|
+| `PLAYBOOK_PORT` | `8799` | 포트 |
+| `PLAYBOOK_HOST` | `0.0.0.0` | 바인딩 주소(LAN/테일스케일 접속 허용) |
+| `PLAYBOOK_TTL`  | `8`    | 판정 캐시 TTL(초) — 잦은 폴링이 시세 창구를 두드리지 않게 |
+| `PLAYBOOK_TICK` | `15`   | SSE tick 주기(초) |
+
+| 경로 | 내용 |
+|------|------|
+| `GET /` | 최신 판정을 구워 넣은 플레이북 페이지(이후 스스로 갱신) |
+| `GET /api/verdict` | 판정 JSON(라이브) — `consumers.display.verdict_view` 로 계산, 8초 TTL 캐시, CORS 허용. `?force=1` 이면 캐시 무시 |
+| `GET /events` | SSE — tick 마다 브라우저가 `/api/verdict` 를 다시 당겨 그림 |
+
+**폰에서 보기**: 서버는 `0.0.0.0` 바인딩이라 같은 와이파이면 데스크톱 LAN IP 로 바로 붙는다
+(`ipconfig getifaddr en0` → `http://192.168.x.y:8799/`). 집 밖에서도 보려면 [Tailscale](https://tailscale.com)
+을 데스크톱·폰 양쪽에 깔고 같은 계정으로 로그인한 뒤 `tailscale ip -4`(예 `100.x.y.z`) 주소로 붙는다
+(MagicDNS 를 켜면 호스트 이름으로도 됨). 종료는 서버 콘솔에서 `Ctrl+C`.

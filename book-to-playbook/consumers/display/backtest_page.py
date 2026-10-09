@@ -4,7 +4,7 @@
 결과를 화면이 읽는 요약(일별 행 제외, 1년·3년)으로 빚는다. 백테스트를 다시 정의하지 않는다.
 
 사용:
-    python -m consumers.display.backtest_page <slug>   → books/<slug>/backtest.json (책 페이지 조립 web/book_page 가 탭으로 심는다)
+    python -m consumers.display.backtest_page <slug>   → books/<slug>/backtest.json (책 페이지 조립 consumers/display/book_page 가 탭으로 심는다)
 """
 import json
 import sys

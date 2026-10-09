@@ -24,7 +24,7 @@
 사용:
     python -m consumers.backtest.runner <slug> [--days 365]   → books/<slug>/logs/backtest.json (일별 행 뺀 요약은 stdout)
 (책 페이지 '백테스트' 탭 데이터는 웹 화면층 consumers/display/backtest_page.py 가 이 run() 결과로 빚는다 —
- 자산곡선·MaxDD·샤프 등 계산기 지표는 consumers.display.backtest_page 가 trading.portfolio 를 직접 불러 낸다.)
+ 자산곡선·MaxDD·샤프 등 계산기 지표는 consumers.display.backtest_page 가 consumers.backtest.portfolio 를 직접 불러 낸다.)
 """
 import json
 import statistics

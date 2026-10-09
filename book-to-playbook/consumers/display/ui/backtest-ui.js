@@ -1,6 +1,6 @@
-/* 백테스트 탭 — 책 무관. #backtest-data(verdict.backtest --page 산출물)가 있으면 탭·패널을 만들어 그린다.
+/* 백테스트 탭 — 책 무관. #backtest-data(consumers.display.backtest_page 산출물)가 있으면 탭·패널을 만들어 그린다.
  *
- * 이 스크립트는 checklist-ui 보다 **먼저** 실행된다(web/book_page 가 그 앞에 주입) — checklist-ui 가
+ * 이 스크립트는 checklist-ui 보다 **먼저** 실행된다(consumers/display/book_page 가 그 앞에 주입) — checklist-ui 가
  * 페이지 로드 때 .tab 목록을 한 번 묶으므로, 그 전에 버튼·패널을 만들어 두면 기존 탭 전환에 그대로 묶인다.
  * 순서가 어긋나도 깨지지 않게 자기 클릭 처리도 따로 둔다.
  *
@@ -105,11 +105,11 @@
 
     Object.keys(P.products).forEach(function (p) {
       var S = P.products[p], T = S.trades || {}, st = T.stats || {};
-      var none = S.exit_policy === 'none';   // 매도 정책(web/backtest_page — 정본 trades.exit_policy): 책에 매도 규칙 없음
+      var none = S.exit_policy === 'none';   // 매도 정책(consumers/display/backtest_page — 정본 trades.exit_policy): 책에 매도 규칙 없음
       h += '<div class="bt-prod"><h2>' + esc(p) + (none ? '<span class="bt-tag none">' + esc(D.no_exit_note) + '</span>' : '') + '</h2>';
       h += '<p class="bt-sub">기간 보유(처음~끝) ' + pct(S.buy_hold, 1) + '</p>';
       if (T.unsized_note) h += '<p class="bt-sub">⚠ ' + esc(T.unsized_note) + '</p>';
-      // 금액(얼마나) — 엔진이 낸 횟수(stats.size_counts)와 문구(size_notes, 정본 trading/trades.size_of 정책)를 그대로
+      // 금액(얼마나) — 엔진이 낸 횟수(stats.size_counts)와 문구(size_notes, 정본 consumers/backtest/trades.size_of 정책)를 그대로
       var SC = st.size_counts;
       if (SC && SC.buys) h += '<p class="bt-sub">금액 = 비중 × 분할 비율 × 조심 배수 · 매수 ' + SC.buys + '회 중 조심으로 줄인 매수 ' + SC.cut + '회</p>';
       if ((T.size_notes || []).length) h += '<p class="bt-sub">⚠ ' + T.size_notes.map(esc).join(' · ') + '</p>';

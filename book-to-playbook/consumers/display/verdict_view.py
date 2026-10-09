@@ -4,8 +4,8 @@
 
 판정(시세 조달 + Judge)은 구간③ 엔진(signals/engine.live_decisions)이 내고, 이 파일은 그 Decision 과 평가 문맥을
 사람과 화면이 읽는 모양으로 빚기만 한다 — 화면은 트리를 다시 해석하지 않고 이 출력만 그린다(판단/표시 분리:
-web 은 판정을 계산하지 않는다). books.json 의 engine.daily 가 이 모듈이다(python -m consumers.display.verdict_view <slug> —
-라이브 서버·러너가 부르는 '진입+표시+알림' 껍데기 · 계산은 trading.engine 이 한다).
+화면은 판정을 계산하지 않는다). books.json 의 engine.daily 가 이 모듈이다(python -m consumers.display.verdict_view <slug> —
+라이브 서버·러너가 부르는 '진입+표시+알림' 껍데기 · 계산은 signals.engine 이 한다).
 
 출력 계약(알림 · 화면 · /api/verdict 가 소비):
   top     : {slug, title, ts, date, source, cash, common[], verdicts[], refs{}, missing{}, positions_note}
@@ -137,7 +137,7 @@ def ref_map(gw):
 
 # ------------------------------------------------------------------ 상품 하나
 def product_verdict(gw, p, d, xs):
-    """상품 하나의 판정 JSON — 판정(Decision d)은 엔진(trading.engine.live_decisions)이 내고, 여기는 그 사실을
+    """상품 하나의 판정 JSON — 판정(Decision d)은 엔진(signals.engine.live_decisions)이 내고, 여기는 그 사실을
     화면 모양으로 빚는다. xs = 이 상품의 내 포지션(로컬 파일). d.eval 로 같은 평가 문맥에서 view 를 빚는다."""
     base = {"prod": p, "index": gw.index(p), "note": gw.note(p)}
     if not d.has_data:

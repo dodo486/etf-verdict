@@ -13,7 +13,7 @@
         .replace(/&/g, '&amp;').replace(/</g, '&lt;')
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     },
-    // 조건 칸(zone) 키 → 한글 이름표. 정본은 파이썬(checklist/cond.ZONE_LABELS)이고 판정 JSON(#verdict-data 의
+    // 조건 칸(zone) 키 → 한글 이름표. 정본은 파이썬(dsl/tradeTool.ZONE_LABELS)이고 판정 JSON(#verdict-data 의
     //   VD.zones)으로 실려 온다 — 화면에 사본을 두지 않는다(주인 표: 칸·등급 이름표). 판정 JSON 이 없으면 키 그대로.
     zw: function(key){
       var vz = null;

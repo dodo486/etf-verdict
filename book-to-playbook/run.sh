@@ -22,4 +22,4 @@ fi
 
 if [ "$#" -eq 0 ]; then set -- daily; fi
 cd "$DIR" || exit 1
-exec "$PY" -m orchestration.run "$@"
+exec "$PY" -m entry.run "$@"

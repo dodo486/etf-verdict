@@ -6,5 +6,5 @@ set "DIR=%~dp0"
 if "%BOOK_TO_PLAYBOOK_PYTHON%"=="" (set "PY=python") else (set "PY=%BOOK_TO_PLAYBOOK_PYTHON%")
 if "%~1"=="" (set "MODE=daily") else (set "MODE=%*")
 cd /d "%DIR%"
-"%PY%" -m orchestration.run %MODE%
+"%PY%" -m entry.run %MODE%
 exit /b %ERRORLEVEL%

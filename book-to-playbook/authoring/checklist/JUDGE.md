@@ -30,7 +30,7 @@
   - `tree_diff` (**먼저 본다**): 상품·칸마다 a·b 를 트리 모양 그대로 맞춘 것. 노드마다 `same` · `diff` · `only_a` · `only_b`.
     같은 종류 묶음(all/any/atleast/not)은 자식끼리 다시 맞춘다 — 뼈대가 같고 잎 하나만 다르면 그 잎만 `diff`.
     같은지는 정규화한 식으로만 판정한다(이름·문장 무관). 짝 맞춤(이름·심볼 뺀 모양·안쪽 겹침)은 힌트일 뿐이다.
-    읽기 쉽게: `python -c "from checklist import verify_tree as vt; a=vt._load('<slug>','tree_candidates/a.json'); b=vt._load('<slug>','tree_candidates/b.json'); print(chr(10).join(vt.render_zone(vt.zone_diff(a,b,'<상품>','<칸>'))))"`
+    읽기 쉽게: `python -c "from verify import verify_tree as vt; a=vt._load('<slug>','tree_candidates/a.json'); b=vt._load('<slug>','tree_candidates/b.json'); print(chr(10).join(vt.render_zone(vt.zone_diff(a,b,'<상품>','<칸>'))))"`
   - `pairing`: 조건을 평평하게 — `common`(같은 식) · `only_a` · `only_b`, `same_behavior_as` = 3년간 판정이 한 번도
     안 갈린 상대(식은 달라도 같은 뜻일 수 있다는 근거. 수동은 기계가 값을 모르니 근거가 없다).
   - `sections`: 식이나 동작이 다른 칸 — 갈린 날의 양쪽 값·조건별 그날 값·최근 시세.

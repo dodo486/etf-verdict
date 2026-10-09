@@ -49,14 +49,14 @@
 ### 6. run3 — tree.json 다시 만들기 (키스톤)
 - 순서: 구간① 전사 → 구간② 추출 a·b(서로·최종·사례 안 봄, 각자 다른 서브에이전트) → 사례 작성자(트리 안 봄) → 심판 →
   `python -m verify.verify_tree <slug>` exit 0. 옛 후보·`scenarios.json` 은 폐기하고 새로.
-- 절차 정본 `checklist/README.md`, 역할 지침 `playbook/PLAYBOOK.md` · `checklist/EXTRACTOR.md` · `SCENARIO.md` · `JUDGE.md`.
-- 원문 위치 `playbook/book_sources.json`(trend = `books/trend/source.md`, moneycopy = `~/jhts/hypotheses/sources/미국-돈복사-ETF-투자방법.md`).
+- 절차 정본 `authoring/checklist/README.md`, 역할 지침 `authoring/playbook/PLAYBOOK.md` · `authoring/checklist/EXTRACTOR.md` · `SCENARIO.md` · `JUDGE.md`.
+- 원문 위치 `authoring/playbook/book_sources.json`(trend = `books/trend/source.md`, moneycopy = `~/jhts/hypotheses/sources/미국-돈복사-ETF-투자방법.md`).
 - 끝나면 `main` 에 합치기(사용자 승인).
 
 ### 그 뒤
-- **`observe` 레거시 제거** — 엔진(`checklist/tradeTool.py`)에만 남은 옛 포장재. 제대로 지우려면 "장중 데이터 없음 None →
+- **`observe` 레거시 제거** — 엔진(`dsl/tradeTool.py`)에만 남은 옛 포장재. 제대로 지우려면 "장중 데이터 없음 None →
   실전 🟡 / 백테스트 EXCLUDED" 자동 처리를 먼저 깔아야 한다(워밍업 None 과 구별하는 표식 필요). tree 생긴 뒤 파리티로 증명.
-  영향: `cond`·`grade`·`verify_primitives`·`verify_tree`·`trading/backtest`·`timeline`·`COND_DSL`.
+  영향: `dsl/tradeTool.py`(Cond·Grade) · `verify/verify_primitives` · `verify/verify_tree` · `consumers/backtest` · `authoring/checklist/COND_DSL.md`.
 - **백테스트 계산기 버그** — `portfolio` 가 1 unit = 시작자본 고정이라 손실 뒤 다음 진입이 남은 현금보다 클 수 있다
   (옛 표준 매도 사본에서 SOXL −162% 관측). 잔고 기준 사이징으로.
 - **판정 JSON 의 `grade_rules` 빼기** — 서버 권위 뒤 화면이 안 쓴다(다음 출력 변경 때).
@@ -65,7 +65,6 @@
   재구현한다) · tree 재생성 뒤 `python -m verify.verify_trading --parity` 실측.
 - **무인 판정을 막는 수동 조건** — (가) 연산으로 풀 것 = v3 기본 부품 조합 · (나) 데이터가 없는 것 = 실적 캘린더 · 뉴스 시각 ·
   지수 구성종목 등락(breadth) · 개인 매매 기록 — 외부 소스 생기기 전엔 서버 권위 수동 답으로 '1회 답'까지 · (다) 정성 판단 = 수동 답.
-- **jhts 실데이터 교체 + yfinance 임시 흔적 삭제**(`MIGRATION_NOTES.md` 체크리스트).
 - **이번 범위 밖**(트리 v3 에서 `skip` "연산 없음"으로 드러남): 계좌 전체 기준 · 종목 간 돈 이동 · 지난 매매 이력.
 
 ## 4. 참고 문서 (할 일 없음)
@@ -74,9 +73,8 @@
 |---|---|
 | `docs/ARCHITECTURE.md` | 구조·원칙 12개·변경 규율·검사 |
 | `docs/action-grammar-draft.md` | 트리 v3 초안(미확정) |
-| `docs/data-contract.md` | jhts 일봉·분봉 계약(md_feed 가 기대하는 것 vs 주는 것) |
-| `checklist/README.md` 외 지침 | 구간② 절차·역할 |
-| `MIGRATION_NOTES.md` | 옛 이관 기록 |
+| `authoring/checklist/README.md` 외 지침 | 구간② 절차·역할 |
+| `market/md_feed.py` docstring | jhts 일봉·분봉 계약(어댑터가 기대하는 것·반환 계약) |
 
 ## 5. 검증 명령
 

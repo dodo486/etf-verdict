@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 """조건 트리 DSL 평가 한 파일 — Cond(문법·평가) · Grade(등급·금액·수집).
 
-Cond  = 옛 checklist/cond.py — 규칙의 단일 문법과 평가기(책 무관). 호출: Cond.series(node, ctx) 등.
-Grade = 옛 checklist/grade.py — 날짜별 등급·금액·비중 + 시세 조달. 호출: Grade.ProductEval(...) · Grade.history_back(...).
+Cond  = 규칙의 단일 문법과 평가기(책 무관). 호출: Cond.series(node, ctx) 등.
+Grade = 날짜별 등급·금액·비중 + 시세 조달. 호출: Grade.ProductEval(...) · Grade.history_back(...).
 
-두 클래스는 아래 모듈 수준 정의를 묶는 '공개 얼굴'이다 — 본문은 옛 파일 그대로(동작 불변). 내부끼리는 모듈 이름으로 부른다.
+두 클래스는 아래 모듈 수준 정의를 묶는 '공개 얼굴'이다. 내부끼리는 모듈 이름으로 부른다.
 공개 DSL 은 이 두 클래스뿐(verify_code.PUBLIC_DSL). 공통 직렬화: python -m dsl.tradeTool fmt <파일...>
 """
 import json
@@ -828,7 +828,7 @@ def _series(node, ctx, s_sym):
 SECTIONS = ("filter", "entry", "avoid")                 # 조건 칸(등급)
 ZONES = SECTIONS + ("caution", "sizing", "exit")        # 반드시 다 적는 여섯 칸
 # 여섯 칸의 한글 이름표 — 여기 한 곳이 정본이다. 화면(shared-ui.js zw)은 복붙하지 않고
-# 판정 JSON(web/verdict_view 가 VD.zones 로 실어보냄, ZONES 순서)을 받아 쓴다.
+# 판정 JSON(consumers/display/verdict_view 가 VD.zones 로 실어보냄, ZONES 순서)을 받아 쓴다.
 ZONE_LABELS = {"filter": "필터", "avoid": "회피", "entry": "진입",
                "caution": "조심", "sizing": "비중·분할", "exit": "매도"}
 
@@ -952,7 +952,7 @@ def warmup_of(node, defs=None, _seen=None):
       3값 논리로 위에 전파돼 '모름'이 된다 — 데이터가 모자란 줄 모르고 ✅/🚫 확신을 내는 길목이다.
       시세가 rate-limit 로 잘려(워밍업 부족) 들어오면 바로 이 일이 난다(실제 발견된 버그).
       이 함수가 트리에서 '필요한 확정 봉 수'를 직접 뽑아, 그보다 짧은 구간의 1d 신호를 '불완전'으로
-      표면화하는 가드(checklist/grade)의 임계값이 된다 — WARMUP_DAYS(fetch 버퍼)와 무관하다.
+      표면화하는 가드(Grade)의 임계값이 된다 — WARMUP_DAYS(fetch 버퍼)와 무관하다.
 
     어떻게 세나 (연산마다 '그날 값이 서려면 그 앞에 몇 봉이 더 있어야 하나'를 더해 가장 깊은 사슬)
       · 창(ma/ema/stdev/highest/lowest/sum) n : n-1 + 안쪽
@@ -1388,7 +1388,7 @@ class Grade:
 
 트리는 원본 dict 가 아니라 TreeGateway(dsl/tree_gateway.py — 트리를 읽는 유일한 출입구)로 받는다.
 같은 뜻을 만드는 쪽(verify_tree 의 사례·a/b 비교)과 읽는 쪽(구간③ 판정·백테스트)이 함께 쓴다 — 화면용 설명(view·
-측정 증거·사유 문장)은 웹 화면층(web/condition_view.py)이 이 평가 문맥을 받아 빚는다."""
+측정 증거·사유 문장)은 웹 화면층(consumers/display/condition_view.py)이 이 평가 문맥을 받아 빚는다."""
     GRADES = GRADES
     GRADE_RULES = GRADE_RULES
     WARMUP_DAYS = WARMUP_DAYS

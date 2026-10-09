@@ -18,7 +18,7 @@
   · 백테스트 경로 : `consumers.backtest.run(slug, days=N)` 의 `daily` 행 → {date, prod, key, grade}.
                     (내부에서 judge.signal_series 가 Judge(tree, p, hist, cal).grade(i) 를 전체 달력에 돌린다.)
   · 실시간 경로   : 각 과거일 D 에 대해 hist 를 D 이하로 잘라(judge.truncate) `Judge(tree, p, hist, asof).latest()`
-                    — 라이브 판정 엔진(trading.engine.live_decisions)이 등급을 얻는 바로 그 호출이다.
+                    — 라이브 판정 엔진(signals.engine.live_decisions)이 등급을 얻는 바로 그 호출이다.
                     asof 는 그날 마감 시점(UTC).
   전 상품 × 창(데이터 있는 최근 WINDOW 거래일) 전부에서 두 경로의 (key, grade) 가 **일치**하는지. 불일치가 하나라도
   있으면 (상품·날짜·백테스트·실시간) 을 전부 나열한다 — 숨기지 않는다.

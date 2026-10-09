@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """판정기(구간③) — 한 상품의 한 시점 판정. 라이브 판정·백테스트·장중 재생·신호 파리티가 전부 여기를 지난다.
 
-  · Judge     트리(TreeGateway) + 시세 이력(+ 보유 Holding) → Decision. 상품마다 Grade.ProductEval(checklist/grade)을
+  · Judge     트리(TreeGateway) + 시세 이력(+ 보유 Holding) → Decision. 상품마다 Grade.ProductEval(dsl/tradeTool)을
               전체 달력에 한 번 세우고 시점(i)마다 꺼낸다(벡터 1회계산 — cond 연산이 인과적이라 미래를 보지 않는다).
               돈·잔고는 모른다(그건 계산기 portfolio 의 일). 등급은 grade(i) 하나 — 라이브는 latest()(달력 마지막 봉),
               백테스트는 signal_series 가 모든 i 에 같은 grade(i) 를 부른다.
@@ -10,7 +10,7 @@
               라이브 화면(Decision.amount)과 백테스트 매수 크기(trades.size_of 가 정책을 입혀 씀)가 같은 값을 쓴다.
               돈은 없다 — 모름(폭 미명시·확인 필요·비중 모름)을 금액에 어떻게 셀지는 정책 주인 trades.size_of 가 정한다.
   · Decision  그 시점의 판정 사실(등급·사유 재료·금액 Amount·조심 규칙·수동 확인 목록·보유 규칙 상태). 화면용
-              모양(view·사유 문장)은 웹 화면층(web/verdict_view)이 이 사실과 평가 문맥(eval)으로 빚는다.
+              모양(view·사유 문장)은 웹 화면층(consumers/display/verdict_view)이 이 사실과 평가 문맥(eval)으로 빚는다.
   · Holding   보유 상태(첫 매수 봉·평균 매입가·산 차수). pos 값(ret·days·maxret·minret)을 cond 에 주입하는 문맥은
               Holding.ctx 한 곳에서 만든다 — 라이브 보유 화면(Judge.hold)과 백테스트 체결 워크(trades.build_trades) 공통.
 """

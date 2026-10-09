@@ -5,11 +5,11 @@
 트리를 쓰지 않는 사례 작성자는 이 문서를 읽지 않는다(`SCENARIO.md` 만).
 흔히 쓰는 식을 어떤 모양으로 조합하는가는 문법 사용법이라 맨 끝 6절에 조합 패턴 예시로 둔다.
 
-평가기는 `checklist/cond.py`(문법 정본 = 그 파일 docstring), 등급·사유는 `checklist/grade.py`, 체결 규약은
+평가기·등급·사유는 `dsl/tradeTool.py`(Cond=문법 정본 = 그 파일 docstring · Grade=등급·사유), 체결 규약은
 `consumers/backtest/trades.py` — 만드는 쪽의 검사와 읽는 쪽의 판정이 **같은 코드**를 쓴다. 문법 밖의 키는 오류로 거부된다.
 트리를 만드는 곳은 구간② 하나, 읽는 곳은 구간③(판정 엔진·백테스트) 하나다. 화면은 ③의 판정 결과만 그린다.
 트리 파일의 키 배치를 아는 코드는 `dsl/tree_gateway.py`(TreeGateway — 파일 형식 검사·탐색) 하나다 — 판정·백테스트·
-검사기는 거기에 묻고 원본 키를 직접 읽지 않는다(`orchestration/verify_code` 주인 표 '트리 원본 키').
+검사기는 거기에 묻고 원본 키를 직접 읽지 않는다(`verify/verify_code` 주인 표 '트리 원본 키').
 
 ## 1. 여섯 칸 — 상품마다
 
@@ -73,7 +73,7 @@
 - **심볼**: `$self` = 그 상품, `$index` = 상품의 기준 지수(상품의 `index` 필드), `$s` = across 안의 종목, 그 외는 jhts
   심볼 코드 그대로 — 미국은 야후 심볼(`^NDX` `^GSPC` `^VIX` `^TNX`(10년물 금리, 값 = %) `NQ=F` `KRW=X`, 종목·ETF
   티커), 국내는 6자리 종목코드. 지수는 거래량이 0/결측일 수 있다.
-- **수집**: 수집 요청서는 따로 없다 — 구간③이 `TreeGateway.symbols()` 로 심볼을 뽑아 `shared/md_feed.histories()` 에서
+- **수집**: 수집 요청서는 따로 없다 — 구간③이 `TreeGateway.symbols()` 로 심볼을 뽑아 `market/md_feed.histories()` 에서
   받는다. 시세가 없는 심볼은 jhts 수집 요청을 자동으로 남기고 그 판정은 ❔ "시세 없음(수집 요청 #id)"으로 드러난다.
 
 ## 4. 규칙 칸의 형식

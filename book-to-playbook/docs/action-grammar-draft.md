@@ -1,7 +1,7 @@
 # 트리 v3 설계 — 초안(미확정, 사용자 검토 중)
 
 > 2026-10-08 사용자와 합의한 내용을 한 곳에 모은 것. 코드 반영은 폴더 재편·검사 정리·표준 매도 폐지·백테스트 양 반영
-> 다음 단계(작업 순서 5). 반영 때 `checklist/COND_DSL.md`·`EXTRACTOR.md`·`JUDGE.md`·`SCENARIO.md` 로 옮기고 이 파일은 지운다.
+> 다음 단계(작업 순서 5). 반영 때 `authoring/checklist/COND_DSL.md`·`EXTRACTOR.md`·`JUDGE.md`·`SCENARIO.md` 로 옮기고 이 파일은 지운다.
 
 ## 1. 왜 바꾸나
 
@@ -135,12 +135,12 @@ a·b 비교는 **규칙 식으로만**(매매 시뮬레이션 비교 없음, A�
 sumsince(세션 시작, 거래량) · 당일 고·저 = maxsince/minsince(세션 시작, …) · 시초가 = valuewhen(세션 시작, 시가) ·
 첫 N분 고가 = valuewhen(세션 시작 후 N번째 봉, maxsince(세션 시작, 고가)) · 첫 눌림 저점 = valuewhen(첫 반등, minsince(세션 시작, 저가)).
 
-**지울 흔적(5번 작업 때 전부)**: `checklist/cond.py`(계산·문법 목록·워밍업) · `checklist/COND_DSL.md`(문법·조합 표) ·
-`checklist/EXTRACTOR.md`(예시) · `checklist/verify_primitives.py`(테스트) · `web/condition_view.py`(화면 문구 "20일선"·"RSI14"·
-"k일 전 대비 변화율") · `web/verify_view.py` · `books/*/tree_candidates/`(run3 로 대체). `trading/` 에는 없음.
+**지울 흔적(5번 작업 때 전부)**: `dsl/tradeTool.py`(계산·문법 목록·워밍업) · `authoring/checklist/COND_DSL.md`(문법·조합 표) ·
+`authoring/checklist/EXTRACTOR.md`(예시) · `verify/verify_primitives.py`(테스트) · `consumers/display/condition_view.py`(화면 문구 "20일선"·"RSI14"·
+"k일 전 대비 변화율") · `verify/verify_view.py` · `books/*/tree_candidates/`(run3 로 대체). `signals/`·`consumers/backtest/` 에는 없음.
 주인 표(verify_code)에 "지운 연산 이름이 어디든 나오면 정지" 줄을 넣어 남김 없이.
 
-**구현은 pandas 로** — 지금 cond.py 는 순수 파이썬 반복문. 기본 부품은 pandas 에 1:1(lag=`shift` · sum/highest/lowest=`rolling` ·
+**구현은 pandas 로** — 지금 dsl/tradeTool.py(Cond)는 순수 파이썬 반복문. 기본 부품은 pandas 에 1:1(lag=`shift` · sum/highest/lowest=`rolling` ·
 smooth=`ewm(alpha)` · since 계열=구간별 `cumsum/cummax/cummin` · 순위=`rank` · 3값 논리=nullable `boolean`(Kleene, NA=모름)).
 우리 코드로 남는 것: `"?"`·수동·극성, asof·확정 일봉·일봉/분봉 혼합·워밍업. 지표 라이브러리(TA-Lib·pandas-ta)는 쓰지 않음
 (지표 하나씩 들여오기 = 같은 실수, 계산 관례도 제각각) — 단 조합 예시가 맞는지 대조하는 **테스트 정답지**로만.

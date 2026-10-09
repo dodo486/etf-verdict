@@ -647,7 +647,7 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
         .replace(/&/g, '&amp;').replace(/</g, '&lt;')
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     },
-    // 조건 칸(zone) 키 → 한글 이름표. 정본은 파이썬(checklist/cond.ZONE_LABELS)이고 판정 JSON(#verdict-data 의
+    // 조건 칸(zone) 키 → 한글 이름표. 정본은 파이썬(dsl/tradeTool.ZONE_LABELS)이고 판정 JSON(#verdict-data 의
     //   VD.zones)으로 실려 온다 — 화면에 사본을 두지 않는다(주인 표: 칸·등급 이름표). 판정 JSON 이 없으면 키 그대로.
     zw: function(key){
       var vz = null;
@@ -922,10 +922,10 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
   'use strict';
   /* ============================================================
      실전 체크리스트 — 조건 트리 판정 결과(#verdict-data)만 그린다 (책 무관 · 종목 하드코딩 없음)
-     · 트리를 직접 읽지 않는다. 판정 화면 데이터(web/verdict_view)가 낸 칸별 설명(view)을 그대로 그린다.
+     · 트리를 직접 읽지 않는다. 판정 화면 데이터(consumers/display/verdict_view)가 낸 칸별 설명(view)을 그대로 그린다.
      · 사람이 체크하는 건 수동(✋) 조건뿐이다. 체크하면 그 답을 서버(POST /api/verdict)에 보내고, 서버가 답까지
        반영해 낸 판정(등급·칸 값·금액)을 그대로 다시 그린다 — 서버 권위. 화면은 등급·3값 논리를 계산하지 않는다
-       (평가기는 checklist/cond.py 한 벌). 서버 없이 열면 체크는 저장되지만 판정은 바뀌지 않는다(그렇다고 알린다).
+       (평가기는 dsl/tradeTool.py 한 벌). 서버 없이 열면 체크는 저장되지만 판정은 바뀌지 않는다(그렇다고 알린다).
      ============================================================ */
 
   /* ---- 탭 전환 ---- */
@@ -951,11 +951,11 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
   // 수동 조건 답은 그날(판정일) 것만 쓴다 — 어제 체크가 오늘 판정에 섞이지 않게.
   function answers(){ const k = (VD && VD.slug || '') + ':' + (VD && VD.date || ''); store.ans = store.ans || {}; store.ans[k] = store.ans[k] || {}; return store.ans[k]; }
 
-  // 수동 답 열쇠 — 서버(checklist/cond.answer_key)와 같은 규칙: 여러 상품이 같이 보는 정의 안(shared)이면 책 전체에
+  // 수동 답 열쇠 — 서버(dsl/tradeTool.answer_key)와 같은 규칙: 여러 상품이 같이 보는 정의 안(shared)이면 책 전체에
   //   하나("*"), 아니면 상품마다(path 앞머리 = 상품). 본체는 "?" 식이면 엔진이 준 식 열쇠(it.mkey), 문장 수동은 그 문장.
   //   화면은 이 열쇠로 답을 모아 보낼 뿐 — 답으로 값을 계산하는 건 서버다.
   function mkey(it, path){ return (it.shared ? '*' : path.split('.')[0]) + '|' + (it.mkey || it.manual); }
-  // 등급 글자표는 엔진이 판정 JSON(VD.grades, = checklist/grade.GRADES)에 실어보낸다 — 화면은 받아 쓴다.
+  // 등급 글자표는 엔진이 판정 JSON(VD.grades, = dsl/tradeTool.GRADES)에 실어보낸다 — 화면은 받아 쓴다.
   // 고치는 곳은 파이썬 한 곳. 혹시 없으면 키 그대로 보여 깨지지 않게.
   const GR = k => ((VD && VD.grades) || {})[k] || k;
   const GCLS = {buy:'go', confirm:'small', unknown:'small', nofilter:'no', avoid:'no', wait:''};
@@ -1060,7 +1060,7 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
     h += '<p class="subtle" style="margin:2px 0 10px">엔진 판정: '+esc(v.reason)+(nAns?' <b style="color:var(--gold)">· 체크한 수동 조건 '+nAns+'개 반영(서버 판정)</b>':'')+'</p>';
     if(!v.zones){ return h; }
     const z = v.zones;
-    // 칸 이름표(필터·회피·진입·조심·매도)는 엔진 값(VD.zones = checklist/cond.ZONE_LABELS)에서 꺼낸다 — 복붙 금지.
+    // 칸 이름표(필터·회피·진입·조심·매도)는 엔진 값(VD.zones = dsl/tradeTool.ZONE_LABELS)에서 꺼낸다 — 복붙 금지.
     //   동그라미 번호는 화면 전용 머리글이라 그대로 두고, 이름표 글자만 VD.zones 에서 가져온다(없으면 키 그대로).
     const zl = k => (VD.zones && VD.zones[k]) || k;
     // 칸 머리 값 = 남은 수동 답과 상관없이 정해졌으면(서버의 낙관 opt == 비관 pes) 그 값, 아니면 서버 값(대개 ? 확인 필요).
@@ -1069,7 +1069,7 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
     h += zoneHead('② '+zl('avoid')+' — 참이면 보류', false, zv('avoid')) + node(z.avoid, P('avoid'), ans, 0);
     h += zoneHead('③ '+zl('entry')+' — 참이면 매수 자리', true, zv('entry')) + node(z.entry, P('entry'), ans, 0);
     if((v.caution||[]).length){
-      const c = v.amount || {}, f = c.factor == null ? 1 : c.factor;   // 금액 배수·폭 미명시·확인 필요 = 서버(checklist/grade)
+      const c = v.amount || {}, f = c.factor == null ? 1 : c.factor;   // 금액 배수·폭 미명시·확인 필요 = 서버(dsl/tradeTool Grade)
       h += '<div class="grouplabel ck-zone" style="color:var(--gold)">④ '+esc(zl('caution'))+' — 사더라도 금액을 줄인다 <span class="ck-zv">금액 ×'+f.toFixed(2)+((c.unspecified||[]).length?' · 폭 미명시 '+c.unspecified.length:'')+((c.unknown||[]).length?' · 확인 필요 '+c.unknown.length:'')+'</span></div>';
       v.caution.forEach((r,i)=>{
         const lab = r.label + (r.scale!=null ? ' (금액 ×'+(+r.scale).toFixed(2)+')' : ' (줄일 폭 저자 미명시)');
@@ -1094,7 +1094,7 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
       }
     }
     else if(v.exit_policy === 'none'){
-      // 매도 정책(엔진 필드 exit_policy — 정본 trading/trades.exit_policy): 책에 매도 규칙이 없다 — 문구도 엔진(VD.no_exit_note)
+      // 매도 정책(엔진 필드 exit_policy — 정본 consumers/backtest/trades.exit_policy): 책에 매도 규칙이 없다 — 문구도 엔진(VD.no_exit_note)
       h += '<div class="grouplabel ck-zone" style="color:var(--entry)">⑥ '+esc(zl('exit'))+'</div><p class="subtle" style="margin:6px 0 0">'+esc(VD.no_exit_note || '')+'</p>';
     }
     return h;
@@ -1112,7 +1112,7 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
           + '<div class="tablewrap" style="margin-top:6px"><table><thead><tr><th>상품</th><th>오늘 비중</th><th>오늘 금액</th><th>분할</th></tr></thead><tbody>';
     let sum = 0, known = true;
     vs.forEach(v=>{
-      // 금액 = 총 투자금 × 엔진이 낸 오늘 물량(units — trading/trades.to_units: 비중 × 분할 비율 × 조심 배수, 비중 모르면 null)
+      // 금액 = 총 투자금 × 엔진이 낸 오늘 물량(units — consumers/backtest/trades.to_units: 비중 × 분할 비율 × 조심 배수, 비중 모르면 null)
       const s = v.sizing, am = v.amount || {}, f = am.factor == null ? 1 : am.factor, unspec = am.unspecified || [];
       let w = s.weight, wtxt;
       if(!s.weight_set){ wtxt = '<span class="manual-tag">저자 미명시</span>'; w = null; }
