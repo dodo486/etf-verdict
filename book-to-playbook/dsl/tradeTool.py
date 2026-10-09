@@ -20,12 +20,12 @@ META = ("label", "ref", "id", "note")
 UNKNOWN = "?"             # 저자가 안 준 숫자 — 이 자리를 품은 판단 노드는 수동(사람이 정함)
 UNKNOWN_REASON = "저자 미명시: 기준 숫자를 주지 않음(식의 ? 자리)"
 PX_FIELDS = ("open", "high", "low", "close", "volume")
-POS_FIELDS = ("ret", "days", "maxret", "minret")
+POS_FIELDS = ("ret", "days", "maxret", "minret", "filled", "sold")
 ARITH = ("add", "sub", "mul", "div", "max", "min")
 TIMEFRAMES = ("1d", "1m", "5m")  # 봉 길이 — asof 축에서 자른다. 일봉은 확정(settled) 일봉, 분봉은 asof 이하
                            # 마지막 분봉, 5분봉은 1분봉을 세션 안에서 5분 OHLC 로 집계한 뒤 asof 이하 마지막.
                            # 데이터가 없으면 None(모름).
-WINDOW = ("ma", "ema", "stdev", "highest", "lowest", "sum")
+WINDOW = ("highest", "lowest", "sum")   # 창(n거래일) 집계 — ma/ema/stdev/rsi/pct 는 사칙·smooth·sqrt 조합으로 대체
 CMP = ("gt", "ge", "lt", "le")
 STREAK_CAP = 400          # 연속·경과일을 거꾸로 셀 때의 상한(데이터 길이보다 길면 무의미)
 
