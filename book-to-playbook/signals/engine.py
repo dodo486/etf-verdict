@@ -45,16 +45,18 @@ def load_positions(slug):
     return out
 
 
-def live_decisions(slug, asof=None, answers=None):
+def live_decisions(slug, asof=None, answers=None, tree=None, hist=None):
     """slug 의 라이브 판정 — 시세를 받아 상품마다 Judge(라이브 = 달력 마지막 봉)로 Decision 을 낸다.
     asof = 관측 시각(UTC datetime, None 이면 지금) · answers = 사람이 답한 수동 {Cond.answer_key: 참/거짓}(서버 권위).
+    tree·hist 를 주면 그대로 쓴다 — 피더가 전 책 심볼을 '한 번' 조회한 공유 시세(합집합 hist)를 책마다 넣어
+    주면, 이 책의 Judge 는 자기 심볼만 읽어(ProductEval) 혼자 받던 때와 같은 판정을 낸다(중복 조회 제거).
 
     → (tree, hist, positions, [(prod, Decision, [내 포지션])]).  트리가 없으면 (None, {}, {}, []).
     Decision 은 판정 '사실'(등급·금액 Amount·보유 규칙 상태) — 화면 모양·사유 문장은 web 이 빚는다(엔진은 화면을 모른다)."""
-    tree = TreeGateway.load(slug)
+    tree = tree if tree is not None else TreeGateway.load(slug)
     if tree is None:
         return None, {}, {}, []
-    hist = Grade.history_back(tree)
+    hist = hist if hist is not None else Grade.history_back(tree)
     positions = load_positions(slug)
     out = []
     for p in tree.products():
