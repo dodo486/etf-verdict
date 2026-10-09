@@ -153,7 +153,7 @@ def main(argv):
     modes = [a for a in argv if not a.startswith("-")]
     mode = modes[0] if modes else "daily"
     if mode == "watch":
-        from entry.watch import watch                 # 장중 주기 재판정 루프(구간③) — 한 회차 = 이 러너의 verdict 모드
+        from feed.feed import watch                 # 장중 주기 재판정 루프(구간③) — 한 회차 = 이 러너의 verdict 모드
         return watch(argv, lambda rest: main(["verdict"] + rest))
     if mode == "check":
         return check_main(argv)

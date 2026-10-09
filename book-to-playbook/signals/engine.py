@@ -8,6 +8,7 @@
   조달하는 오케스트레이션이 web 에 있었다. 그 엔진 절반을 여기로 옮겨, web 은 이 엔진이 낸 Decision 을
   '화면·알림 모양으로 빚기만' 한다(web 은 판정을 계산하지 않는다 — 서버 권위·판단/표시 분리).
 
+  · open_history    책 열기(트리 로드+가드+시세) — 라이브·백테스트·검사가 공유하는 진입 preamble
   · load_positions  내 포지션(books/<slug>/positions.json — 커밋 안 하는 개인 파일) 읽기
   · live_decisions  시세 조달 + 상품마다 Judge(라이브 = 달력 마지막 봉) → Decision(판정 사실)
 
@@ -21,6 +22,16 @@ from shared.paths import positions_json
 from dsl.tradeTool import Grade
 from dsl.tree_gateway import TreeGateway
 from signals.judge import Holding, Judge
+
+
+def open_history(slug, extra_days=0, tree=None, hist=None):
+    """책 열기 — slug → (tree, hist). tree 가 없으면 정지, hist 가 없으면 history_back(extra_days 만큼 더 과거까지).
+    여러 진입점(라이브·백테스트 러너·탭·검사)이 똑같이 하던 '로드+가드+시세' preamble 한 곳.
+    tree·hist 를 주면 그대로 쓴다(바깥이 이미 받아둔 걸 두 번 안 받게)."""
+    tree = tree or TreeGateway.load(slug)
+    if tree is None:
+        raise SystemExit("books/%s/tree.json 없음 — 조건 트리가 있어야 한다" % slug)
+    return tree, (hist if hist is not None else Grade.history_back(tree, extra_days))
 
 
 def load_positions(slug):

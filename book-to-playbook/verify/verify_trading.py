@@ -39,7 +39,7 @@ from shared.paths import BASE, live_slugs, read_text  # (UTF-8 출력 고정 포
 from dsl.tradeTool import Grade
 from dsl.tree_gateway import TreeGateway, empty_product, synthetic
 from consumers.backtest import trades as trades_mod
-from signals.commonTool import open_history
+from signals.engine import open_history
 
 Candle = namedtuple("Candle", "date open high low close volume")
 FAILS = []

@@ -39,7 +39,7 @@ SSE_TICK = float(os.environ.get("PLAYBOOK_TICK", "15"))  # 초 — SSE tick 주�
 # 어느 책을 라이브로 띄울지는 books.json 에서 온다(코드에 특정 책을 박지 않는다).
 # BOOK_SLUG 로 덮어쓸 수 있고, 기본은 첫 live 책.
 from shared.paths import BASE, default_slug, book_engine, live_slugs, load_manifest   # noqa: E402
-from feed import Feed   # 라이브 틱 피더(in-process pub-sub) — SSE·watch 공통 트리거 코어
+from feed.feed import Feed   # 라이브 틱 피더(in-process pub-sub) — SSE·watch 공통 트리거 코어
 DEFAULT_SLUG = os.environ.get("BOOK_SLUG") or (live_slugs() or [default_slug()])[0]
 
 # 라이브 틱 피더 하나 — 백그라운드 _ticker 가 SSE_TICK 초마다 틱을 올리면, 열린 SSE 연결들이 '구독'으로

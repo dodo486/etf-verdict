@@ -34,7 +34,7 @@ from datetime import datetime, timedelta
 from shared.paths import book_log, write_text
 from consumers.backtest import trades
 from signals.judge import signal_series
-from signals.commonTool import open_history
+from signals.engine import open_history
 
 HORIZONS = (5, 10, 20)
 BUY_OR_CONFIRM = "✅+🟡 (수동 확인 가정)"
