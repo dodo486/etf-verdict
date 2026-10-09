@@ -348,7 +348,7 @@ OWNERS = [
              ("verify/verify_trading.py", "parity_text"): ({"products"}, "파리티 보고 dict"),
              ("consumers/backtest/portfolio.py", "run_product"): ({"sell"}, "주문 dict 의 매도 표시"),
              ("consumers/display/verdict_view.py","ref_map"): ({"unexpressed"}, "판정 JSON refs 항목을 만드는 자리"),
-             ("consumers/display/verdict_view.py","render"): ({"sizing", "weight"}, "판정 JSON verdict.sizing 을 읽어 현금 % 계산"),
+             ("consumers/display/verdict_view.py","_format"): ({"sizing", "weight"}, "판정 JSON verdict.sizing 을 읽어 현금 % 계산"),
              ("consumers/display/verdict_view.py","build_text"): ({"sizing", "weight", "exit"}, "판정 JSON 을 알림 문장으로"),
          }),
     dict(concept="책 산출물 경로", owners=("shared/paths.py",), match=m_book_paths,

@@ -218,7 +218,18 @@ def _static_view(node, defs, index=None):
 def render(slug, asof=None, answers=None):
     """asof = 관측 시각(UTC datetime). None 이면 지금 — 장중(tf="1m") 조건을 이 시점 이하로 자른다.
     answers = 화면에서 사람이 답한 수동 {Cond.answer_key: 참/거짓} — 서버가 그 답으로 등급·칸 값·금액을 낸다
-    (서버 권위 — 화면은 다시 계산하지 않는다). None 이면 답 없는 판정(옛 출력 그대로), 주면 top["answers"] 로 되돌려 준다."""
+    (서버 권위 — 화면은 다시 계산하지 않는다). None 이면 답 없는 판정(옛 출력 그대로), 주면 top["answers"] 로 되돌려 준다.
+
+    계산(engine.live_decisions)과 모양 빚기(_format)를 쪼개 둔다 — 라이브 2단 pub-sub(entry/live)에서 신호
+    핸들러가 live_decisions 로 판정 사실을 내 verdict_bus 에 올리면, 화면 소비자가 그 사실로 _format 만 부른다
+    (한 번 계산, 두 소비자가 나눠 쓴다 — 이중 계산 없음)."""
+    return _format(slug, *engine.live_decisions(slug, asof=asof, answers=answers), answers=answers)
+
+
+def _format(slug, tree, hist, positions, decisions, answers=None):
+    """판정 사실(engine.live_decisions 의 결과)을 top(화면·알림·/api/verdict 가 소비하는 dict)으로 빚는다 —
+    render 의 뒷절반(live_decisions 호출 뒤 전부). 라이브 2단 pub-sub 의 화면 소비자가 verdict_bus 에서 받은
+    사실로 이걸 부른다(같은 모양을 라이브·배치가 공유)."""
     now = datetime.now(timezone.utc).astimezone()
     top = {"slug": slug, "title": book_title(slug), "ts": now.isoformat(), "source": SOURCE,
            "verdicts": [], "common": [], "refs": {}, "missing": {}, "cash": None,
@@ -233,7 +244,6 @@ def render(slug, asof=None, answers=None):
                      for s in ("filter", "avoid", "entry", "caution", "sizing", "exit")},
            # 매도 정책 "none"(책에 매도 규칙 없음) 문구 — 정본 consumers/backtest/trades.NO_EXIT_NOTE(화면이 받아 쓴다).
            "no_exit_note": NO_EXIT_NOTE}
-    tree, hist, positions, decisions = engine.live_decisions(slug, asof=asof, answers=answers)
     if tree is None:
         top["error"] = "조건 트리 없음 — books/%s/tree.json 이 있어야 판정한다" % slug
         return top
