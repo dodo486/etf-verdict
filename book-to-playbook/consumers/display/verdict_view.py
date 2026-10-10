@@ -141,9 +141,24 @@ def product_verdict(gw, p, d, xs):
     화면 모양으로 빚는다. xs = 이 상품의 내 포지션(로컬 파일). d.eval 로 같은 평가 문맥에서 view 를 빚는다."""
     base = {"prod": p, "index": gw.index(p), "note": gw.note(p)}
     if not d.has_data:
+        # 시세가 없어도 체크리스트 '구조'(규칙·조건 항목)는 정적으로 보여준다 — 값은 모름(❔), 지어내지 않는다.
         req = md_feed.requested().get(p, "-")
-        return dict(base, key="unknown", grade=Grade.GRADES["unknown"],
-                    reason="%s 시세 없음(수집 요청 %s)" % (p, req)), None
+        defs, index, sz = gw.defs(), gw.index(p), gw.sizing(p)
+        return dict(base, key="unknown", grade=Grade.GRADES["unknown"], date="", close=None, chg=None,
+                    reason="%s 시세 없음(수집 요청 %s) — 아래는 판정 전 체크리스트 구조" % (p, req),
+                    zones={sec: _static_view(gw.section(p, sec), defs, index) for sec in Cond.SECTIONS},
+                    opt={}, pes={},
+                    caution=[dict(r.shown("label", "ref", "note"), view=_static_view(r.when, defs, index))
+                             for r in gw.cautions(p)],
+                    amount={"factor": 1.0, "unspecified": [], "unknown": []},
+                    sizing={"label": sz.label, "ref": sz.ref, "note": sz.note,
+                            "weight": None, "weight_range": None, "weight_set": None, "units": None,
+                            "tranches": [dict(t.shown("label", "ref"), frac=(t.qty.x if t.qty else None),
+                                              **t.shown("note"), units=None, conditional=t.when is not None,
+                                              view=_static_view(t.when, defs, index)) for t in gw.tranches(p)]},
+                    exit=[{"label": r.label, "ref": r.ref, "allprod": r.allprod, "sell": sell_text(r.qty),
+                           "note": r.note, "view": _static_view(r.when, defs, index)} for r in gw.exit_rules(p)],
+                    exit_policy=exit_policy(gw, p)), None
     i, ctx = d.i, d.eval.ctx[None]
     reason = cv.reason_of(d.key, d.top, d.manual)
     # 데이터 완전성 가드 — 지금 가진 확정 봉이 트리가 쓰는 가장 긴 창(필요 워밍업)보다 짧으면 등급은 ❔(불완전
@@ -174,8 +189,8 @@ def product_verdict(gw, p, d, xs):
                                        units=live_units(a, t.qty), conditional=t.when is not None,
                                        view=_static_view(t.when, defs, index))
                                   for t in gw.tranches(p)]},
-             exit=[{"label": r.label, "ref": r.ref, "sell": sell_text(r.qty), "note": r.note,
-                    "view": _static_view(r.when, defs, index)} for r in gw.exit_rules(p)],
+             exit=[{"label": r.label, "ref": r.ref, "allprod": r.allprod, "sell": sell_text(r.qty),
+                    "note": r.note, "view": _static_view(r.when, defs, index)} for r in gw.exit_rules(p)],
              exit_policy=exit_policy(gw, p))
     pos = [dict(_holding_view(hs, defs, i), entry_date=x["entry_date"], entry_px=x["entry_px"], filled=x.get("filled", 1))
            for hs, x in zip(d.holdings, xs)]

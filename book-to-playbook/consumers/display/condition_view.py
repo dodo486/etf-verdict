@@ -220,7 +220,27 @@ def _view(node, defs, ctx, i, shared=False, fold=frozenset()):
     for k in ("label", "ref", "note"):
         if node.get(k):
             item[k] = node[k]
-    if Cond.is_unknown(node, defs):
+    if node.get("allprod"):                      # 공통(on 없음) 규칙 — 화면이 상품 카드에서 빼고 공통 섹션으로 모은다
+        item["allprod"] = True
+        # 상품에 안 기대는 공통 규칙($self/$index 안 씀)은 상품마다 값·질문이 같다 → 화면이 한 줄로 합쳐도 된다는 힌트.
+        #   답 열쇠(mkey)는 지금 규칙 그대로(상품별) — 화면이 그 한 줄의 수동 답을 세 상품 열쇠에 같이 넣는다(서버 무변).
+        if not Cond.product_specific(node, defs):
+            item["allsame"] = True
+    if op in LOGICAL:
+        # 묶음(all/any/atleast/not)은 '?' 가 안에 있어도 **항상 펼친다** — 사람이 확인할 건 묶음 자체가 아니라
+        #   그 안의 sub-조건들이다(각 '?' sub 는 재귀로 자기 수동 잎이 된다). 접어서 "수동 확인" 하나로 숨기지 않는다.
+        kids = node[op] if op in ("all", "any") else (node["of"] if op == "atleast" else [node["not"]])
+        kctx = ctx.flipped() if op == "not" else ctx
+        item["op"] = op
+        if op == "atleast":
+            item["n"] = node["atleast"]
+            if node["atleast"] == Cond.UNKNOWN:  # 몇 개 필요한지 저자 미명시 — 묶음은 수동(사람이 개수 판단), 단 후보는 펼친다
+                item["manual"] = Cond.UNKNOWN_REASON
+                item["mkey"] = Cond.manual_key(node)
+                if shared:
+                    item["shared"] = True
+        item["kids"] = [_view(k, defs, kctx, i, shared, fold) for k in kids]
+    elif Cond.is_unknown(node, defs):
         # 저자가 숫자를 안 준 식("?") — 사람이 정하는 수동 잎. 답을 묶는 열쇠는 식(문장 아님 — 같은 식 = 같은 질문).
         item["manual"] = Cond.UNKNOWN_REASON
         item["mkey"] = Cond.manual_key(node)
@@ -233,13 +253,6 @@ def _view(node, defs, ctx, i, shared=False, fold=frozenset()):
         if op == "observe":
             item["observed"] = True              # v 가 있으면 관측값(자동), 없으면 사람 확인
             item["kids"] = [_view(node["observe"], defs, ctx, i, shared, fold)]
-    elif op in LOGICAL:
-        kids = node[op] if op in ("all", "any") else (node["of"] if op == "atleast" else [node["not"]])
-        kctx = ctx.flipped() if op == "not" else ctx
-        item["op"] = op
-        if op == "atleast":
-            item["n"] = node["atleast"]
-        item["kids"] = [_view(k, defs, kctx, i, shared, fold) for k in kids]
     else:
         inner = [_view(k, defs, ctx, i, shared, fold) for k in _labeled_inside(node, defs)]
         if inner:

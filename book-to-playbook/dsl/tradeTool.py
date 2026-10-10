@@ -16,7 +16,8 @@ from datetime import datetime, timedelta
 from market import md_feed
 
 # ================= 문법·평가 (옛 cond.py) =================
-META = ("label", "ref", "id", "note")
+META = ("label", "ref", "id", "note", "allprod", "on")   # allprod = 화면 전용 플래그(공통 규칙 여부) — 평가기는 무시
+                                                         # on = 노드 레벨 대상 상품(series 가 처리) — 평가 중 상품이 빠지면 그 노드는 '항상 참'
 UNKNOWN = "?"             # 저자가 안 준 숫자 — 이 자리를 품은 판단 노드는 수동(사람이 정함)
 UNKNOWN_REASON = "저자 미명시: 기준 숫자를 주지 않음(식의 ? 자리)"
 PX_FIELDS = ("open", "high", "low", "close", "volume")
@@ -517,6 +518,14 @@ def series(node, ctx, s_sym=None):
     key = (repr(node), s_sym, ctx.manual_as)
     if key in ctx._memo:
         return ctx._memo[key]
+    # 노드 레벨 on: 평가 중 상품이 그 노드의 on 에 없으면 그 노드는 '항상 참'(제약 안 함 — all/atleast 안에서 투명).
+    #   규칙은 공통으로 두고 한 상품에만 더 붙는 조건을 쪼개지 않고 단다. on 이 없거나 상품이 들어 있으면 평소대로.
+    if isinstance(node, dict):
+        on = node.get("on")
+        if on and ctx.self_sym not in on:
+            out = [True] * len(ctx.cal)
+            ctx._memo[key] = out
+            return out
     out = _series(node, ctx, s_sym)
     m = _daily_axis(node, ctx, s_sym)
     if m is not None:
