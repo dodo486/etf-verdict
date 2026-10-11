@@ -561,21 +561,19 @@ def t_grade():
 
 
 def t_answers():
-    """사람이 답한 수동(Ctx answers) — 열쇠 = (shared ? "*" : 상품) + "|" + (문장 | "?" 식). 답은 manual_as 보다 먼저,
+    """사람이 답한 수동(Ctx answers) — 열쇠 = 상품 + "|" + (문장 | "?" 식). 답은 manual_as 보다 먼저,
     not 아래에서도 잎 값 그대로(not 이 뒤집을 뿐), 없는 열쇠는 manual_as, answers=None 이면 옛 동작 그대로."""
     from dsl.tradeTool import Grade
     cal = ["2022%04d" % i for i in range(3)]
     hist = {p: [Candle(d, 100, 100, 100, 100, 1000) for d in cal] for p in ("A", "B", "M")}
     m = {"manual": "실적 좋음"}
     unk = {"ge": [{"px": "close", "sym": "M"}, "?"], "label": "M 높음"}
-    defs = {"시장": {"all": [{"manual": "시장 좋음"}, {"gt": [{"px": "close", "sym": "M"}, 0]}]},
-            "자기": {"all": [{"manual": "자기 확인"}, {"gt": [C, 0]}]}}
 
     def v(node, ma, answers):
-        return Cond.series(node, Cond.Ctx(hist, cal, "A", None, defs, manual_as=ma, answers=answers))[0]
+        return Cond.series(node, Cond.Ctx(hist, cal, "A", None, manual_as=ma, answers=answers))[0]
     k = Cond.answer_key
-    check(k(m, "A", False) == "A|실적 좋음" and k(m, "A", True) == "*|실적 좋음", "답 열쇠(상품·공통)")
-    check(k(unk, "A", False) == "A|?" + json.dumps({"ge": [{"px": "close", "sym": "M"}, "?"]}, ensure_ascii=False,
+    check(k(m, "A") == "A|실적 좋음", "답 열쇠(상품)")
+    check(k(unk, "A") == "A|?" + json.dumps({"ge": [{"px": "close", "sym": "M"}, "?"]}, ensure_ascii=False,
                                                     sort_keys=True), "답 열쇠(\"?\" 식 — META 뗀 식)")
     for ma in (True, False, None):
         for ans in (True, False):
@@ -583,11 +581,7 @@ def t_answers():
             check(v({"not": m}, ma, {"A|실적 좋음": ans}) is (not ans), "not 아래 답은 잎 값 그대로(not 이 뒤집음)")
         check(v({"not": m}, ma, {}) is ma and v({"not": m}, ma, None) is ma, "답 없으면 극성 규칙 그대로(%r)" % ma)
     check(v(m, None, {"B|실적 좋음": True}) is None, "다른 상품의 답은 안 먹는다")
-    check(v({"def": "시장"}, None, {"*|시장 좋음": True}) is True and v({"def": "시장"}, None, {"A|시장 좋음": True}) is None,
-          "공통 정의(상품마다 같은 값) 안 수동 = \"*\" 열쇠")
-    check(v({"def": "자기"}, None, {"A|자기 확인": True}) is True and v({"def": "자기"}, None, {"*|자기 확인": True}) is None,
-          "상품마다 다른 정의($self) 안 수동 = 상품 열쇠")
-    check(v(unk, True, {k(unk, "A", False): False}) is False, "\"?\" 식도 답으로 풀린다")
+    check(v(unk, True, {k(unk, "A"): False}) is False, "\"?\" 식도 답으로 풀린다")
     obs = {"observe": {"gt": [C, 0]}, "manual": "장중"}
     check(v(obs, None, {"A|장중": False}) is True, "관측된 observe 는 답보다 관측값")
     tree = TreeGateway.of(synthetic({"A": None}, rule("실적", "산다", {"all": [m]})))
@@ -611,7 +605,6 @@ def t_warmup_guard():
     from dsl.tradeTool import Grade
 
     # 1) warmup_of / 출입구 warmup 산식 — 손으로 셀 수 있는 노드들로 전수 대조.
-    D = {"hi60": {"highest": [C, 60]}}
     cases = [
         (C, 0), ({"px": "close"}, 0), ({"manual": "x"}, 0), (5, 0),
         (AVG(C, 20), 19), ({"highest": [C, 60]}, 59), ({"sum": [C, 10]}, 9),
@@ -624,10 +617,9 @@ def t_warmup_guard():
         ({"atleast": 1, "of": [{"lag": [C, 2]}, AVG(C, 10)]}, 9),
         ({"not": AVG(C, 7)}, 6), ({"abs": {"pct": [C, 4]}}, 4),
         ({"case": [[{"gt": [C, 0]}, AVG(C, 8)]], "else": {"highest": [C, 40]}}, 39),
-        ({"def": "hi60"}, 59),                                   # 정의 펼침
     ]
     for node, exp in cases:
-        got = Cond.warmup_of(node, D)
+        got = Cond.warmup_of(node)
         check(got == exp, "warmup_of %r → %d (기대 %d)" % (node, got, exp))
 
     # 트리 상품 워밍업 = 등급을 내는 갈래(산다·안 산다) 전체의 최댓값.

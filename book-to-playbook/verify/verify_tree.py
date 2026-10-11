@@ -53,7 +53,7 @@ from market import md_feed
 from dsl.tree_gateway import TreeGateway
 
 Candle = namedtuple("Candle", "date open high low close volume")
-COMPARED = Cond.SECTIONS + ("caution", "sizing")      # 날마다 비교하는 칸(분할·매도는 거래로)
+COMPARED = Cond.SECTIONS + ("sizing",)               # 날마다 비교하는 칸(분할·매도는 거래로)
 MANUAL_HEADS = ("저자 미명시", "데이터 없음", "연산 없음")
 
 
@@ -75,10 +75,8 @@ def _history(trees, years):
 
 
 def _day_values(pe, i):
-    """칸별 그날 값 — 조건 칸은 수동 = 모름 평가, 조심은 (금액 배수, 폭 미명시, 확인 필요), 비중은 (값, 범위)."""
+    """칸별 그날 값 — 조건 칸은 수동 = 모름 평가, 비중은 (값, 범위)."""
     out = {sec: Cond.series(pe.gw.section(pe.prod, sec), pe.ctx[None])[i] for sec in Cond.SECTIONS}
-    f, unspec, unknown = pe.amount_factor(i)
-    out["caution"] = (round(f, 6), bool(unspec), bool(unknown))
     w, alt = pe.weight_of(i)
     out["sizing"] = (None if w is None else round(w, 6), tuple(alt or ()))
     out["grade"] = pe.grade_key(i)
@@ -173,7 +171,7 @@ def run_scenarios(tree, scen, overrides):
         hist, cal = _synthetic(sc, syms)
 
         def mk(m):
-            return Cond.Ctx(hist, cal, p, tree.index(p), tree.defs(), manual_as=m)
+            return Cond.Ctx(hist, cal, p, tree.index(p), manual_as=m)
         try:
             got = Cond.series(node, mk(None))[-1]
         except Exception as e:  # noqa: BLE001
@@ -202,26 +200,18 @@ def run_scenarios(tree, scen, overrides):
 
 
 # ------------------------------------------------------------------ 발화 통계
-def _has_manual(n, defs):
-    return bool(Cond.manual_leaves(n, defs))
+def _has_manual(n):
+    return bool(Cond.manual_leaves(n))
 
 
-def _stat_nodes(tree, prod, defs):
-    """통계 대상 라벨 노드 [(칸, 노드)] — 조건 칸 + 조심 규칙(규칙 자체와 그 안의 라벨 노드).
+def _stat_nodes(tree, prod):
+    """통계 대상 라벨 노드 [(칸, 노드)] — 조건 칸.
     장중 관측(observe) 안쪽은 뺀다 — asof 기준 분봉이 없는 날은 판정 불가가 정상이다(그날은 수동으로 푼다)."""
-    out = [(sec, n) for sec in Cond.SECTIONS for n in Cond.labeled(tree.section(prod, sec), defs)]
-    for r in tree.cautions(prod):
-        inner = Cond.labeled(r.when, defs)
-        # when 자체가 이름 있는 조건(이름 붙은 def 참조 포함)이면 그 이름으로 센다 — 규칙 이름표로 한 번 더 세지 않는다
-        named = isinstance(r.when, dict) and (r.when.get("label") or
-                                              any(_logic_key(n, defs) == _logic_key(r.when, defs) for n in inner))
-        if isinstance(r.when, dict) and not named:
-            out.append(("caution", dict(r.when, label=r.label)))
-        out.extend(("caution", n) for n in inner)
+    out = [(sec, n) for sec in Cond.SECTIONS for n in Cond.labeled(tree.section(prod, sec))]
     inside = set()
     for _sec, n in out:
         if "observe" in n:
-            inside.update(id(x) for x in Cond.labeled_all(n["observe"], defs))
+            inside.update(id(x) for x in Cond.labeled_all(n["observe"]))
     return [(sec, n) for sec, n in out if id(n) not in inside]
 
 
@@ -229,7 +219,6 @@ def fire_stats(tree, hist, years, ack=None):
     """ack = {경고문: 사유} — 심판이 '원문 그대로라 정상'이라 사유를 남긴 경고는 확인됨으로 센다."""
     ack = ack or {}
     warns, table = [], []
-    defs = tree.defs()
     for p in tree.products():
         cal = [c.date for c in hist.get(p) or []]
         ev, pe = _eval(tree, p, hist, cal)
@@ -237,9 +226,9 @@ def fire_stats(tree, hist, years, ack=None):
         idx = _window(cal, years)
         N = max(1, len(idx))
         nodes = []
-        top_avoid = {repr(n) for n in Grade._top_labeled(tree.section(p, "avoid"), defs)}
-        for sec, n in _stat_nodes(tree, p, defs):
-            if _has_manual(n, defs):
+        top_avoid = {repr(n) for n in Grade._top_labeled(tree.section(p, "avoid"))}
+        for sec, n in _stat_nodes(tree, p):
+            if _has_manual(n):
                 continue                         # 수동이 섞이면 '안 뜸/모름'이 정상이다
             s = Cond.series(n, ctx)
             v = [s[i] for i in idx]
@@ -306,11 +295,10 @@ def weight_overflow(tree, hist, years):
 def manual_heads(tree):
     """{머리: 개수} — 사유 머리(COND_DSL 2절)로 수동 조건을 센다(같은 사유는 하나로)."""
     seen, cnt = set(), {}
-    defs = tree.defs()
     for p in tree.products():
         for _z, _l, _r, node in tree.expressions(p):
-            for n in Cond.manual_leaves(node, defs):
-                key = n["manual"] if "manual" in n else _logic_key(n, defs)   # "?" 식은 식이 신원
+            for n in Cond.manual_leaves(node):
+                key = n["manual"] if "manual" in n else _logic_key(n)   # "?" 식은 식이 신원
                 if key in seen:
                     continue
                 seen.add(key)
@@ -324,27 +312,34 @@ def manual_heads(tree):
 def _zone_explain(pe, sec, i):
     if sec in Cond.SECTIONS:
         return pe.explain(i)[sec]
-    if sec == "caution":
-        return pe.caution_state(i)
     w, alt = pe.weight_of(i)
-    return {"weight": w, "weight_range": alt, "tranches": [t.raw() for t in pe.gw.tranches(pe.prod)]}
+    return {"weight": w, "weight_range": alt, "tranches": _tranche_rows(pe.gw, pe.prod)}
+
+
+def _tranche_rows(tree, prod):
+    """분할 차수의 덤프·비교용 모양 [{label, ref, frac, when}]."""
+    return [{"label": t.label, "ref": t.ref, "frac": t.qty.x, "when": t.when} for t in tree.tranches(prod)]
+
+
+def _zone_node(tree, prod, sec):
+    """칸 하나의 식 — 조건 칸만(규칙 칸은 None)."""
+    return tree.section(prod, sec) if sec in Cond.SECTIONS else None
 
 
 def _section_key(tree, prod, sec):
     """칸 하나의 식 지문(정규화) — 동작 비교로 안 보이는 차이(수동·"?" 식)까지 드러낸다."""
-    return _logic_key(tree.raw_zone(prod, sec), tree.defs())
+    return _logic_key(_zone_node(tree, prod, sec))
 
 
 def _conditions(tree, prod):
     """상품의 이름 달린 조건들 {지문: {"label", "zones", "expr"}} — 여섯 칸 어디든(조심·분할·매도 규칙 안 포함).
     같은 식이 여러 칸에 쓰이면 한 항목에 칸을 모은다."""
-    defs = tree.defs()
     out = {}
     for z, _l, _r, node in tree.expressions(prod):
         def walk(n):
             if isinstance(n, dict):
                 if n.get("label") and _factorable(n):
-                    k = _logic_key(n, defs)
+                    k = _logic_key(n)
                     it = out.setdefault(k, {"label": n["label"], "zones": [], "expr": json.loads(k)})
                     if z not in it["zones"]:
                         it["zones"].append(z)
@@ -353,7 +348,7 @@ def _conditions(tree, prod):
             elif isinstance(n, list):
                 for v in n:
                     walk(v)
-        walk(_inline(node, defs))
+        walk(node)
     return out
 
 
@@ -529,19 +524,17 @@ def _rules_diff(ra, rb):
 
 
 def zone_diff(ta, tb, prod, zone):
-    """상품 한 칸의 a·b 트리 모양 비교(def 를 펼쳐서)."""
-    xa = _inline(ta.raw_zone(prod, zone), ta.defs())
-    xb = _inline(tb.raw_zone(prod, zone), tb.defs())
+    """상품 한 칸의 a·b 트리 모양 비교."""
+    xa, xb = _zone_node(ta, prod, zone), _zone_node(tb, prod, zone)
     if zone in Cond.SECTIONS:
         return tree_diff(xa, xb)
     if zone in ("caution", "exit"):
         return {"status": "same" if _ckey(xa) == _ckey(xb) else "diff", "rules": _rules_diff(xa, xb)}
     out = {"status": "same" if _ckey(xa) == _ckey(xb) else "diff"}            # sizing
-    wa, wb = _inline(ta.sizing(prod).qty.x, ta.defs()), _inline(tb.sizing(prod).qty.x, tb.defs())
+    wa, wb = ta.sizing(prod).qty.x, tb.sizing(prod).qty.x
     if _ckey(wa) != _ckey(wb):
         out["weight"] = tree_diff(wa, wb) if isinstance(wa, dict) and isinstance(wb, dict) else {"a": wa, "b": wb}
-    ra = _inline([t.raw() for t in ta.tranches(prod)], ta.defs())
-    rb = _inline([t.raw() for t in tb.tranches(prod)], tb.defs())
+    ra, rb = _tranche_rows(ta, prod), _tranche_rows(tb, prod)
     if _ckey(ra) != _ckey(rb):
         out["tranches"] = _rules_diff(ra, rb)
     return out
@@ -622,12 +615,12 @@ def dump_disagreements(slug, per, years):
                               "a_explain": _zone_explain(pa, sec, i), "b_explain": _zone_explain(pb, sec, i),
                               "prices_last25[date,o,h,l,c,v]": prices})
             entry = {"agree": r["agree"], "diff_days": len(r["days"]), "expr_differs": sdiff,
-                     "a_tree": ta.raw_zone(p, sec), "b_tree": tb.raw_zone(p, sec), "cases": cases}
+                     "a_tree": _zone_node(ta, p, sec), "b_tree": _zone_node(tb, p, sec), "cases": cases}
             out["%s.%s" % (p, sec)] = entry
     path = book_log(slug, "disagree.json")
     pairing = {p: pair_conditions(ta, tb, p, hist, years) for p in ta.products() if tb.has(p)}
     shape = {p: {z: zone_diff(ta, tb, p, z) for z in Cond.ZONES} for p in ta.products() if tb.has(p)}
-    write_text(path, json.dumps({"defs_a": ta.raw_defs(), "defs_b": tb.raw_defs(), "tree_diff": shape, "pairing": pairing,
+    write_text(path, json.dumps({"tree_diff": shape, "pairing": pairing,
                                  "sections": out}, ensure_ascii=False, indent=1, default=str))
     for p, t in pairing.items():
         print("  %s 조건 짝: 공통 %d · a에만 %d · b에만 %d" % (p, len(t["common"]), len(t["only_a"]), len(t["only_b"])))
@@ -635,20 +628,6 @@ def dump_disagreements(slug, per, years):
 
 
 # ------------------------------------------------------------------ 트리 비교 도구(검사용)
-def _inline(node, defs):
-    """def 참조를 그 정의로 펼친다(다른 추출의 defs 와 이름이 겹쳐도 섞이지 않게)."""
-    if isinstance(node, dict):
-        if "def" in node and len([k for k in node if k not in Cond.META]) == 1:
-            body = _inline(defs[node["def"]], defs)
-            if isinstance(body, dict):
-                body = dict(body, **{k: v for k, v in node.items() if k in Cond.META})
-            return body
-        return {k: _inline(v, defs) for k, v in node.items()}
-    if isinstance(node, list):
-        return [_inline(x, defs) for x in node]
-    return node
-
-
 def _strip_meta(node):
     """META(label·ref·id·note)를 모든 깊이에서 떼낸 '순수 로직'만 남긴다 — 되접기 신원 비교용."""
     if isinstance(node, dict):
@@ -687,10 +666,10 @@ def _canon(node):
     return out
 
 
-def _logic_key(node, defs):
-    """같은 식인지 가리는 지문 — def 를 끝까지 펼치고 META(이름·출처)를 뗀 뒤 정규화(_canon)한 식.
+def _logic_key(node):
+    """같은 식인지 가리는 지문 — META(이름·출처)를 뗀 뒤 정규화(_canon)한 식.
     문장·이름과 무관하게 식이 같으면 같은 조건이다("?" 수동 식도 식 그대로 비교된다)."""
-    return json.dumps(_canon(_strip_meta(_inline(node, defs))), ensure_ascii=False, sort_keys=True)
+    return json.dumps(_canon(_strip_meta(node)), ensure_ascii=False, sort_keys=True)
 
 
 _RULE_OPS = ("all", "any", "atleast", "not", "manual")
@@ -717,33 +696,6 @@ def _factorable(node):
     if op in _RULE_OPS:
         return True
     return op in Cond.CMP and bool(node.get("label"))
-
-
-def name_conflicts(tree):
-    """한 상품 안에서 이름과 로직이 1:1 이 아닌 라벨 노드 [(상품, 종류, [이름…])] — 사람은 이름으로 조건을 구분한다.
-      · '같은 로직 다른 이름' — 한 조건이 두 이름으로 보여 두 조건처럼 읽힌다(심판이 한 이름으로 써야 한다).
-      · '같은 이름 다른 로직' — 다른 두 조건이 한 이름으로 보여 한 조건이 두 번 뜬 것처럼 읽힌다(이름을 갈라야 한다).
-    상품 사이는 보지 않는다 — $index·$self 는 상품마다 다른 종목이라 'S&P500 …'/'나스닥100 …'처럼 이름이 다른 게 맞다."""
-    defs = tree.defs()
-    out = []
-    for p in tree.products():
-        names, logics = {}, {}
-
-        def walk(node):
-            if isinstance(node, dict):
-                if node.get("label") and _factorable(node):
-                    k = _logic_key(node, defs)
-                    names.setdefault(k, set()).add(node["label"])
-                    logics.setdefault(node["label"], set()).add(k)
-                for v in node.values():
-                    walk(v)
-            elif isinstance(node, list):
-                for v in node:
-                    walk(v)
-        walk(_inline(tree.raw_product(p), defs))
-        out.extend((p, "같은 로직 다른 이름", sorted(ls)) for ls in names.values() if len(ls) > 1)
-        out.extend((p, "같은 이름 다른 로직", [lb]) for lb, ks in logics.items() if len(ks) > 1)
-    return out
 
 
 # ------------------------------------------------------------------ 매도 규칙(exit 칸) 이중 추출 비교
@@ -810,29 +762,6 @@ def _check_pair(slug, tree, ta, tb, hist, years):
     return stop
 
 
-def duplicate_bodies(tree):
-    """같은 식이 두 번 이상 '정의'된 이름 달린 조건 [[이름…]] — 참조({"def"})가 아니라 본문이 여러 벌인 것.
-    같은 조건은 def 하나에 한 번 쓰고 쓰는 곳은 참조해야 한다(두 벌이면 화면에 두 번 뜨고 답이 엇갈린다).
-    포지션 값(pos)을 쓰는 식은 문법상 def 에 둘 수 없어(매도·분할 규칙 안에 직접) 참조로 접을 길이 없으니 제외한다."""
-    defs = tree.defs()
-    seen = {}
-
-    def walk(n):
-        if isinstance(n, dict):
-            if n.get("label") and _factorable(n) and not Cond._uses_pos(n, defs):
-                seen.setdefault(_logic_key(n, defs), []).append(n["label"])
-            for k, v in n.items():
-                if k not in Cond.META:
-                    walk(v)
-        elif isinstance(n, list):
-            for v in n:
-                walk(v)
-    walk(defs)
-    for p in tree.products():
-        walk(tree.raw_product(p))
-    return [ls for ls in seen.values() if len(ls) > 1]
-
-
 def _nameless_manual(node, out=None):
     """label 없는 수동 잎 목록(문장 수동·"?" 식) — 이게 있으면 화면에 '수동 확인'(이름 없음)으로 새거나
     조용히 사라진다. 이름은 추출자가 단다."""
@@ -889,20 +818,6 @@ def check_book(slug, years):
     if nameless:
         stop.append("%s 이름 없는 수동 조건 %d개" % (slug, len(nameless)))
         print("  ❌ label 없는 수동 잎 %d개 — 화면에 '수동 확인'으로 샌다: %s" % (len(nameless), nameless[:3]))
-    # 0a. 이름↔로직 1:1 정지 — 한 조건이 두 이름이거나 두 조건이 한 이름이면 사람이 잘못 읽는다(심판이 고쳐 써야 함)
-    conflicts = name_conflicts(tree)
-    for kind in ("같은 로직 다른 이름", "같은 이름 다른 로직"):
-        hit = [(p, ls) for p, k, ls in conflicts if k == kind]
-        if hit:
-            stop.append("%s %s %d개" % (slug, kind, len(hit)))
-            print("  ❌ %s %d개 — %s: %s"
-                  % (kind, len(hit), "심판이 한 이름으로 tree.json 을 다시 쓴다" if kind.startswith("같은 로직")
-                     else "심판이 이름을 갈라 tree.json 을 다시 쓴다", hit[:2]))
-    # 0c. 같은 식 두 벌 정지 — 같은 조건은 def 하나·참조로
-    dups = duplicate_bodies(tree)
-    if dups:
-        stop.append("%s 같은 식이 두 번 정의됨 %d개" % (slug, len(dups)))
-        print("  ❌ 같은 식이 두 번 이상 정의됨 %d개 — 심판이 def 하나로 쓰고 참조한다: %s" % (len(dups), dups[:3]))
     # 0b. 식 없는 수동 정지 — '저자 미명시' 는 수치로 정할 수 있으면 "?" 식, 순수 주관이면 '(정성)' 문장
     unclassified = _unclassified_numeric_manual(tree.whole())
     if unclassified:

@@ -214,11 +214,10 @@ def t_sizing():
     check([x["qty"] for x in b] == [0.25, 0.75] and sz["weight_unknown"] == 2, "비중 모름은 ×1 %r %r" % (b, sz))
     # 수량 변환 하나(to_units) — basis 별 · 모름(None)은 None
     Led, tu = trades_mod.Ledger, trades_mod.to_units
-    led = Led(budget=0.4, order=0.5, bought=0.6, held=0.3)
-    got = [tu(Qty(of, x), led) for of, x in (("cash", 30), ("budget", 0.25), ("order", 0.5), ("bought", 0.3),
-                                              ("held", 0.5))]
-    check(all(same(g, w) for g, w in zip(got, (0.3, 0.05, 0.5, 0.18, 0.15))) and tu(Qty("held", None), led) is None,
-          "to_units 다섯 basis %r" % got)
+    led = Led(budget=0.4, bought=0.6, held=0.3)
+    got = [tu(Qty(of, x), led) for of, x in (("cash", 30), ("budget", 0.25), ("bought", 0.3), ("held", 0.5))]
+    check(all(same(g, w) for g, w in zip(got, (0.3, 0.1, 0.18, 0.15))) and tu(Qty("held", None), led) is None,
+          "to_units 네 basis %r" % got)
     # 매수(분할 차수)와 매도(산/남은 물량 비율)가 같은 변환 하나를 지난다
     seen, orig = [], trades_mod.to_units
     trades_mod.to_units = lambda q, ld: seen.append(q.of) or orig(q, ld)

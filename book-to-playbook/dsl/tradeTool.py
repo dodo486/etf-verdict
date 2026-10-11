@@ -59,21 +59,18 @@ def _op_of(node):
     return keys[0]
 
 
-def _has_unknown(x, defs, seen=frozenset()):
-    """식 안에 "?"(저자가 안 준 숫자)가 있나 — def 는 펼쳐 본다."""
+def _has_unknown(x):
+    """식 안에 "?"(저자가 안 준 숫자)가 있나."""
     if x == UNKNOWN:
         return True
     if isinstance(x, list):
-        return any(_has_unknown(y, defs, seen) for y in x)
+        return any(_has_unknown(y) for y in x)
     if isinstance(x, dict):
-        d = x.get("def")
-        if isinstance(d, str) and d in defs and d not in seen and _has_unknown(defs[d], defs, seen | {d}):
-            return True
-        return any(_has_unknown(y, defs, seen) for k, y in x.items() if k not in META and k != "def")
+        return any(_has_unknown(y) for k, y in x.items() if k not in META)
     return False
 
 
-def is_unknown(node, defs=None):
+def is_unknown(node):
     """"?" 를 품은 판단 노드인가 — 비교(gt/ge/lt/le)의 양쪽 식 어디든 "?", 또는 atleast 의 n 이 "?".
     저자가 숫자를 안 줘 기계가 참/거짓을 못 정하니 수동처럼 사람이 정한다(manual_as·극성 규칙 그대로)."""
     if not isinstance(node, dict):
@@ -83,13 +80,13 @@ def is_unknown(node, defs=None):
     except CondError:
         return False
     if op in CMP:
-        return _has_unknown(node[op], defs or {})
+        return _has_unknown(node[op])
     return op == "atleast" and node["atleast"] == UNKNOWN
 
 
-def is_manual(node, defs=None):
+def is_manual(node):
     """사람이 참/거짓을 정하는 잎 — 문장 수동({"manual"}·observe) 또는 "?" 를 품은 식."""
-    return isinstance(node, dict) and ("manual" in node or is_unknown(node, defs))
+    return isinstance(node, dict) and ("manual" in node or is_unknown(node))
 
 
 def manual_text(node):
@@ -113,14 +110,14 @@ def manual_key(node):
     return "?" + json.dumps(strip_meta(node), ensure_ascii=False, sort_keys=True)
 
 
-def answer_key(node, prod, shared):
-    """사람이 답한 수동의 열쇠 — 여러 상품이 같이 보는 정의 안(shared)이면 책 전체에 하나("*"), 아니면 상품마다."""
-    return ("*" if shared else prod) + "|" + manual_key(node)
+def answer_key(node, prod):
+    """사람이 답한 수동의 열쇠 — 상품마다(상품 + "|" + 수동 열쇠)."""
+    return prod + "|" + manual_key(node)
 
 
-def product_specific(node, defs):
+def product_specific(node):
     """$self/$index/pos 를 쓰는 식은 상품마다 값이 달라진다 — 여러 상품이 '같이 보는' 판단이 아니다."""
-    for n in labeled_all(node, defs):
+    for n in labeled_all(node):
         if "px" in n and n.get("sym", "$self") in ("$self", "$index"):
             return True
         if "pos" in n:
@@ -128,9 +125,8 @@ def product_specific(node, defs):
     return False
 
 
-def validate(node, defs=None, path="$"):
+def validate(node, path="$"):
     """문법 검사. 모르는 연산·키·인자 개수·필드는 전부 CondError(위치 포함)."""
-    defs = defs or {}
     if isinstance(node, bool):
         raise CondError("%s: 불리언 상수는 쓰지 않는다(빈 all/any 를 쓴다)" % path)
     if isinstance(node, (int, float)) or node == UNKNOWN:
@@ -158,23 +154,23 @@ def validate(node, defs=None, path="$"):
         if "tf" in node and node["tf"] not in TIMEFRAMES:
             raise CondError("%s.tf: 모르는 봉 %r (허용 %s)" % (path, node["tf"], "/".join(TIMEFRAMES)))
     elif op == "abs":
-        validate(v, defs, path + ".abs")
+        validate(v, path + ".abs")
     elif op == "case":
         if not (isinstance(v, list) and v and all(isinstance(b, list) and len(b) == 2 for b in v)):
             raise CondError("%s.case: [[조건, 값], ...] 목록이어야 한다" % path)
         if "else" not in node:
             raise CondError("%s.case: else 가 필요하다(모든 경우의 값을 명시)" % path)
         for i, (c, x) in enumerate(v):
-            validate(c, defs, "%s.case[%d][0]" % (path, i))
-            validate(x, defs, "%s.case[%d][1]" % (path, i))
-        validate(node["else"], defs, path + ".else")
+            validate(c, "%s.case[%d][0]" % (path, i))
+            validate(x, "%s.case[%d][1]" % (path, i))
+        validate(node["else"], path + ".else")
     elif op in ARITH or op in CMP:
         two(op)
-        validate(v[0], defs, path + "." + op + "[0]")
-        validate(v[1], defs, path + "." + op + "[1]")
+        validate(v[0], path + "." + op + "[0]")
+        validate(v[1], path + "." + op + "[1]")
     elif op in WINDOW or op in ("lag", "pct", "rsi"):
         two(op)
-        validate(v[0], defs, path + "." + op + "[0]")
+        validate(v[0], path + "." + op + "[0]")
         if op == "lag":
             if v[1] != UNKNOWN and not (isinstance(v[1], int) and not isinstance(v[1], bool) and v[1] >= 0):
                 raise CondError("%s.lag: k 는 0 이상의 정수" % path)
@@ -184,45 +180,42 @@ def validate(node, defs=None, path="$"):
         if not isinstance(v, list):
             raise CondError("%s.%s: 목록이어야 한다" % (path, op))
         for i, c in enumerate(v):
-            validate(c, defs, "%s.%s[%d]" % (path, op, i))
+            validate(c, "%s.%s[%d]" % (path, op, i))
     elif op == "atleast":
         posint(v, "n")
         of = node.get("of")
         if not isinstance(of, list):
             raise CondError("%s.atleast: of 목록이 필요하다" % path)
         for i, c in enumerate(of):
-            validate(c, defs, "%s.of[%d]" % (path, i))
+            validate(c, "%s.of[%d]" % (path, i))
     elif op == "not":
-        validate(v, defs, path + ".not")
+        validate(v, path + ".not")
     elif op == "count":
         two(op)
-        validate(v[0], defs, path + ".count[0]")
+        validate(v[0], path + ".count[0]")
         posint(v[1], "n")
     elif op in ("streak", "barssince"):
-        validate(v, defs, path + "." + op)
+        validate(v, path + "." + op)
     elif op in ("valuewhen", "minsince", "maxsince"):
         two(op)
-        validate(v[0], defs, path + ".valuewhen[0]")
-        validate(v[1], defs, path + ".valuewhen[1]")
+        validate(v[0], path + ".valuewhen[0]")
+        validate(v[1], path + ".valuewhen[1]")
     elif op == "across":
         if not (isinstance(v, dict) and set(v) == {"syms", "cond"}
                 and isinstance(v["syms"], list) and v["syms"]
                 and all(isinstance(s, str) for s in v["syms"])):
             raise CondError("%s.across: {syms:[...], cond:...} 형식이어야 한다" % path)
-        validate(v["cond"], defs, path + ".across.cond")
+        validate(v["cond"], path + ".across.cond")
     elif op == "manual":
         if not (isinstance(v, str) and v.strip()):
             raise CondError("%s.manual: 사유 문자열이 필요하다" % path)
     elif op == "observe":
-        validate(v, defs, path + ".observe")
+        validate(v, path + ".observe")
         if not (isinstance(node.get("manual"), str) and node["manual"].strip()):
             raise CondError("%s.observe: 관측값이 없을 때의 수동 사유(manual)가 필요하다" % path)
     elif op == "pos":
         if v not in POS_FIELDS:
             raise CondError("%s.pos: 모르는 포지션 값 %r (허용 %s)" % (path, v, "/".join(POS_FIELDS)))
-    elif op == "def":
-        if v not in defs:
-            raise CondError("%s.def: 정의되지 않은 이름 %r" % (path, v))
     else:
         raise CondError("%s: 모르는 연산 %r" % (path, op))
 
@@ -231,16 +224,15 @@ def validate(node, defs=None, path="$"):
 class Ctx:
     """평가 문맥. hist={심볼: [Candle(date,open,high,low,close,volume)]}, cal=날짜 목록."""
 
-    def __init__(self, hist, cal, self_sym, index_sym=None, defs=None, manual_as=None, pos=None, asof=None,
-                 unobserved=None, session_close=None, answers=None, shared=False):
+    def __init__(self, hist, cal, self_sym, index_sym=None, manual_as=None, pos=None, asof=None,
+                 unobserved=None, session_close=None, answers=None):
         """pos = (첫 매수일 인덱스, 평균 매입가 | 날짜별 평균 매입가 목록) — 매도·분할 규칙 평가 때만.
         asof = 관측 시각(UTC datetime) — 분봉(tf="1m"/"5m") 필드를 이 시각 이하로 자른다. None 이면 실제 지금.
         session_close = {심볼: {YYYYMMDD: 그날 정규장 마감(UTC datetime, tz-aware)}} — 일봉 확정(settled) 경계.
           거래소 캘린더(md_feed.sessions)에서 캐려 밖(cond)에서 넣는다(평가기는 jhts 를 모른다). 장중 asof 에서
           '마감이 asof 이후'인 일봉은 아직 미확정이므로 None 으로 가린다(look-ahead 0). asof=None 이거나 캘린더가
           비면(미설치·조회 실패) 아무것도 가리지 않는다 — 없는 캘린더가 조용히 일봉을 전부 지우지 않게.
-        answers = {answer_key: True|False} — 사람이 답한 수동(없는 열쇠는 manual_as). None 이면 옛 동작 그대로.
-        shared = 지금 상품마다 값이 같은 정의 안을 평가 중(answers 의 열쇠가 "*")."""
+        answers = {answer_key: True|False} — 사람이 답한 수동(없는 열쇠는 manual_as). None 이면 옛 동작 그대로."""
         self.pos = pos
         self.asof = asof          # 관측 시각(UTC datetime) — 분봉 조회를 이 시각 이하로 자른다. None 이면 실제 지금
         self.unobserved = unobserved  # None = 관측값 없는 observe 는 수동처럼 · "exclude" = 그 조건을 빼고 판단(백테스트)
@@ -248,7 +240,6 @@ class Ctx:
         self.cal = list(cal)
         self.self_sym = self_sym
         self.index_sym = index_sym
-        self.defs = defs or {}
         self.manual_as = manual_as
         self.session_close = session_close or {}  # {심볼: {YYYYMMDD: 마감 UTC datetime}} — 일봉 확정 경계
         self._px = {}
@@ -256,35 +247,22 @@ class Ctx:
         self._smap = {}       # 심볼 → settled_map 캐시(일봉축 마지막 확정 index 지도)
         self._flip = None
         self.answers = answers
-        self._shared = shared
-        self._shr = None
 
     def flipped(self):
         """수동 가정을 뒤집은 문맥(not 아래 평가용). 시세 캐시는 공유한다. 사람의 답(answers)은 뒤집지 않는다."""
         if self.manual_as is None:
             return self
         if self._flip is None:
-            f = Ctx(self.hist, self.cal, self.self_sym, self.index_sym, self.defs, not self.manual_as, self.pos,
-                    self.asof, self.unobserved, self.session_close, self.answers, self._shared)
+            f = Ctx(self.hist, self.cal, self.self_sym, self.index_sym, not self.manual_as, self.pos,
+                    self.asof, self.unobserved, self.session_close, self.answers)
             f._px, f._smap, f._flip = self._px, self._smap, self
             self._flip = f
         return self._flip
 
-    def shared(self):
-        """상품마다 값이 같은 정의 안을 평가하는 문맥(답 열쇠 "*"). 답이 없거나 이미 그 문맥이면 자기 자신."""
-        if self.answers is None or self._shared:
-            return self
-        if self._shr is None:
-            s = Ctx(self.hist, self.cal, self.self_sym, self.index_sym, self.defs, self.manual_as, self.pos,
-                    self.asof, self.unobserved, self.session_close, self.answers, True)
-            s._px, s._smap = self._px, self._smap
-            self._shr = s
-        return self._shr
-
     def manual_value(self, node):
         """수동 잎 하나의 값 — 사람이 답했으면 그 답, 아니면 manual_as(극성 반영된 가정)."""
         if self.answers is not None:
-            a = self.answers.get(answer_key(node, self.self_sym, self._shared))
+            a = self.answers.get(answer_key(node, self.self_sym))
             if a is not None:
                 return a
         return self.manual_as
@@ -484,7 +462,7 @@ def _daily_axis(node, ctx, s_sym):
     None — 그 경우 gather 를 건너뛴다(기존 동작 그대로). 같은 시장 심볼은 지도가 같으므로(세션 경계가 시장별) 한 지도로
     모은다 — 서로 다른 시장이 한 1d-순수 식에 섞이면(지도 엇갈림) 당기지 않는다(조용히 잘못 당기느니 기존 masked-None)."""
     syms = set()
-    for n in labeled_all(node, ctx.defs):
+    for n in labeled_all(node):
         if not isinstance(n, dict):
             continue
         op = _op_of(n)
@@ -495,7 +473,7 @@ def _daily_axis(node, ctx, s_sym):
             if sym == "$s":
                 return None                 # across 안 — 심볼 미확정, 안전하게 당기지 않음
             syms.add(ctx.bind(sym))
-        elif op in _NON_DAILY or is_unknown(n, ctx.defs):
+        elif op in _NON_DAILY or is_unknown(n):
             return None                     # 수동("?" 식 포함)·포지션·across — 1d-순수 아님
     if not syms:
         return None                         # px 잎이 없는 순수 숫자/비교식 — 당길 일봉축이 없음
@@ -542,7 +520,7 @@ def _series(node, ctx, s_sym):
         return [None] * L                    # 모르는 숫자 — 값은 모름(판단은 그것을 품은 노드가 수동으로)
     op = _op_of(node)
     v = node[op]
-    if is_unknown(node, ctx.defs):
+    if is_unknown(node):
         return [ctx.manual_value(node)] * L  # 저자가 숫자를 안 준 판단 — 사람이 정한다(수동과 같은 규칙)
     if op in WINDOW + ("lag", "pct", "rsi", "count") and v[1] == UNKNOWN:
         return [None] * L                    # 기간을 모름 — 값도 모름
@@ -823,28 +801,24 @@ def _series(node, ctx, s_sym):
             out.append(acc)
         return out
 
-    if op == "def":
-        body = ctx.defs[v]                   # 상품마다 값이 같은 정의 안의 수동 답은 책 전체에 하나(답 열쇠 "*")
-        c = ctx if ctx.answers is None or product_specific(body, ctx.defs) else ctx.shared()
-        return [None if x is EXCLUDED else x for x in series(body, c, s_sym)]
-
     raise CondError("모르는 연산 %r" % op)
 
 
 # ------------------------------------------------------------------ 칸의 뜻 · 파일 직렬화
-# 상품 한 개의 여섯 칸 (COND_DSL.md 1절). 조건 칸 셋은 등급을, 규칙 칸 셋은 금액·분할·매도를 낸다.
+# 상품 한 개의 칸. 조건 칸 셋은 등급을, 나머지는 비중·분할·매도를 낸다.
 # 트리 파일의 키 배치·형식 검사·탐색은 dsl/tree_gateway.py(TreeGateway) 하나가 맡는다 — 여기는 칸의 이름과 뜻만.
 SECTIONS = ("filter", "entry", "avoid")                 # 조건 칸(등급)
-ZONES = SECTIONS + ("caution", "sizing", "exit")        # 반드시 다 적는 여섯 칸
+FAVOR = {"filter": True, "entry": True, "avoid": False}  # 조건 칸이 '매수 쪽'인 값 — 극성(수동 가정·빠진 칸의 중립값)
+ZONES = ("filter", "avoid", "entry", "caution", "sizing", "exit")   # 화면 머리글 순서(판정 JSON zones)
 # 여섯 칸의 한글 이름표 — 여기 한 곳이 정본이다. 화면(shared-ui.js zw)은 복붙하지 않고
 # 판정 JSON(consumers/display/verdict_view 가 VD.zones 로 실어보냄, ZONES 순서)을 받아 쓴다.
 ZONE_LABELS = {"filter": "필터", "avoid": "회피", "entry": "진입",
                "caution": "조심", "sizing": "비중·분할", "exit": "매도"}
 
 
-def _uses_pos(node, defs):
-    """식이 포지션 값(pos)을 쓰나 — def 펼침."""
-    return any("pos" in n for n in labeled_all(node, defs))
+def _uses_pos(node):
+    """식이 포지션 값(pos)을 쓰나."""
+    return any("pos" in n for n in labeled_all(node))
 
 
 def compact_json(obj, width=100):
@@ -898,61 +872,41 @@ def is_compact(path):
     return raw == compact_json(json.loads(raw))
 
 
-def labeled(node, defs=None, acc=None):
-    """라벨 달린 노드 목록(설명·통계용) — def 를 펼쳐 따라간다.
-    def 참조 자리는 화면과 같게 'def 본문 위에 자리 META(label·ref·note)를 덮은' 노드 하나로 센다 — 자리의
-    원문 출처(ref)를 잃지 않고, 자리와 본문을 두 번 세지도 않는다."""
+def labeled(node, acc=None):
+    """라벨 달린 노드 목록(설명·통계용)."""
     acc = [] if acc is None else acc
-    defs = defs or {}
     if isinstance(node, dict):
-        x = node.get("def")
-        if isinstance(x, str) and x in defs and isinstance(defs[x], dict) \
-                and all(k == "def" or k in META for k in node):
-            body = defs[x]
-            site = {k: v for k, v in node.items() if k in ("label", "ref", "note")}
-            eff = dict(body, **site) if site else body
-            if eff.get("label"):
-                acc.append(eff)
-            for k, y in body.items():
-                if k not in META:
-                    labeled(y, defs, acc)
-            return acc
         if node.get("label"):
             acc.append(node)
         for k, x in node.items():
-            if k == "def" and x in defs:
-                labeled(defs[x], defs, acc)
-            elif k not in META:
-                labeled(x, defs, acc)
+            if k not in META:
+                labeled(x, acc)
     elif isinstance(node, list):
         for x in node:
-            labeled(x, defs, acc)
+            labeled(x, acc)
     return acc
 
 
-def manual_leaves(node, defs=None):
-    return [n for n in labeled_all(node, defs) if is_manual(n, defs)]
+def manual_leaves(node):
+    return [n for n in labeled_all(node) if is_manual(n)]
 
 
-def labeled_all(node, defs=None, acc=None):
-    """모든 dict 노드(def 펼침)."""
+def labeled_all(node, acc=None):
+    """모든 dict 노드."""
     acc = [] if acc is None else acc
-    defs = defs or {}
     if isinstance(node, dict):
         acc.append(node)
         for k, x in node.items():
-            if k == "def" and x in defs:
-                labeled_all(defs[x], defs, acc)
-            elif k not in META:
-                labeled_all(x, defs, acc)
+            if k not in META:
+                labeled_all(x, acc)
     elif isinstance(node, list):
         for x in node:
-            labeled_all(x, defs, acc)
+            labeled_all(x, acc)
     return acc
 
 
 # ------------------------------------------------------------------ 워밍업(필요 lookback)
-def warmup_of(node, defs=None, _seen=None):
+def warmup_of(node):
     """node 를 평가할 때 '첫 평가 봉'이 조용히 틀린 값을 내지 않으려면 그 앞에 몇 개의 확정 봉이
     더 있어야 하는지 — 트리가 실제로 쓰는 가장 긴 lookback(거래일 수).
 
@@ -974,25 +928,19 @@ def warmup_of(node, defs=None, _seen=None):
       · 산술·비교·abs·case·논리(all/any/atleast/not)·across : 자식 중 최댓값
       · px/manual/pos/상수                   : 0
     """
-    defs = defs or {}
-    _seen = _seen or set()
     if isinstance(node, (int, float)) and not isinstance(node, bool):
         return 0
     if not isinstance(node, dict):
         return 0
     op = _op_of(node)
     v = node[op]
-    w = lambda n: warmup_of(n, defs, _seen)
-    if is_unknown(node, defs):
+    w = warmup_of
+    if is_unknown(node):
         return 0                             # 사람이 정하는 판단 — 기계 lookback 없음
     if op in WINDOW + ("rsi", "lag", "pct", "count") and v[1] == UNKNOWN:
         return w(v[0])                       # 기간을 모름 — 그 값은 늘 모름이라 이 창은 워밍업에 안 넣는다
     if op == "px":
         return 0
-    if op == "def":
-        if v in _seen:                       # 정의 순환(있어선 안 되지만) — 무한재귀 방지
-            return 0
-        return warmup_of(defs[v], defs, _seen | {v})
     if op in WINDOW:
         return (v[1] - 1) + w(v[0])
     if op == "rsi":
@@ -1096,7 +1044,7 @@ def session_closes(symbols, cal, asof):
 
 
 class ProductEval:
-    """한 상품의 여섯 칸을 전체 달력에 대해 한 번 계산해 둔다."""
+    """한 상품의 조건 칸·비중을 전체 달력에 대해 한 번 계산해 둔다."""
 
     def __init__(self, gw, prod, hist, cal, unobserved=None, asof=None, answers=None):
         """gw = TreeGateway. unobserved="exclude" = 관측값이 없는 장중 조건(observe)을 빼고 판단한다(백테스트 비교용).
@@ -1104,23 +1052,19 @@ class ProductEval:
         확정(settled) 봉만 본다(미확정 그날 일봉은 None). None 이면 실제 지금(일봉은 마지막 확정봉).
         answers = 사람이 답한 수동 {answer_key: 참/거짓} — 등급·금액·비중이 그 답으로 풀린다(서버 권위).
         None 이면 옛 동작 그대로."""
-        defs, index = gw.defs(), gw.index(prod)
-        self.gw, self.prod, self.index, self.defs, self.cal, self.hist = gw, prod, index, defs, list(cal), hist
+        index = gw.index(prod)
+        self.gw, self.prod, self.index, self.cal, self.hist = gw, prod, index, list(cal), hist
         sc = session_closes(gw.symbols(), list(cal), asof)
-        mk = lambda m: Ctx(hist, cal, prod, index, defs, manual_as=m, unobserved=unobserved,
-                                asof=asof, session_close=sc, answers=answers)
+        mk = lambda m: Ctx(hist, cal, prod, index, manual_as=m, unobserved=unobserved,
+                           asof=asof, session_close=sc, answers=answers)
         self.ctx = {True: mk(True), False: mk(False), None: mk(None)}
-        neutral = {"filter": True, "entry": True, "avoid": False}      # 칸 전체가 빠지면 그 칸은 제약 없음
 
         def s(node, m, sec=None):
             out = series(node, self.ctx[m])
-            if sec is None:
-                return [None if x is EXCLUDED else x for x in out]
-            return [neutral[sec] if x is EXCLUDED else x for x in out]
-        self.opt = {sec: s(gw.section(prod, sec), sec != "avoid", sec) for sec in SECTIONS}
-        self.pes = {sec: s(gw.section(prod, sec), sec == "avoid", sec) for sec in SECTIONS}
-        self.caution = [(r, [False if x is EXCLUDED else x for x in series(r.when, self.ctx[None])])
-                        for r in gw.cautions(prod)]
+            # 칸 전체가 빠지면(EXCLUDED) 그 칸은 제약 없음 — 매수 쪽 값(FAVOR)
+            return [(None if sec is None else FAVOR[sec]) if x is EXCLUDED else x for x in out]
+        self.opt = {sec: s(gw.section(prod, sec), FAVOR[sec], sec) for sec in SECTIONS}
+        self.pes = {sec: s(gw.section(prod, sec), not FAVOR[sec], sec) for sec in SECTIONS}
         w = gw.sizing(prod).qty.x                # 비중 식(Qty "cash") — None = 저자 미명시
         self.weight = {m: (s(w, m) if w is not None else None) for m in (None, True, False)}
         # 데이터 완전성 가드 — 이 상품 등급이 실제로 쓰는 가장 긴 워밍업(트리에서 파생, 하드코딩 아님).
@@ -1168,13 +1112,7 @@ class ProductEval:
                 return rule["key"]
         return GRADE_RULES["default"]
 
-    # ---------------------------------------------------------------- 금액
-    def caution_state(self, i):
-        """[{label, ref, note, scale, value, manual}] — value 는 수동 = 모름으로 둔 평가."""
-        return [{"label": r.label, "ref": r.ref, "note": r.note, "scale": r.qty.x,
-                 "value": ser[i], "manual": [manual_text(n) for n in manual_leaves(r.when, self.defs)]}
-                for r, ser in self.caution]
-
+    # ---------------------------------------------------------------- 비중
     def weight_of(self, i):
         """그날 비중(%) — 수동 때문에 모르면 (None, [가능한 값들]) 로 범위를 함께 돌려준다."""
         if self.weight[None] is None:
@@ -1185,26 +1123,13 @@ class ProductEval:
         alt = sorted({x for x in (self.weight[True][i], self.weight[False][i]) if x is not None})
         return None, alt or None
 
-    def amount_factor(self, i):
-        """(금액 배수, 폭 미명시로 걸린 규칙, 확인이 필요한 규칙) — 걸린 caution 의 scale 곱."""
-        f, unspecified, unknown = 1.0, [], []
-        for st in self.caution_state(i):
-            if st["value"] is True:
-                if st["scale"] is None:
-                    unspecified.append(st["label"])
-                else:
-                    f *= st["scale"]
-            elif st["value"] is None:
-                unknown.append(st["label"])
-        return f, unspecified, unknown
-
     # ---------------------------------------------------------------- 설명
     def explain(self, i):
         """라벨 달린 노드의 그날 값 — 수동은 '모름'(None)으로 둔 평가. {구역: [(label, ref, 값)]}"""
         out = {}
         for sec in SECTIONS:
             out[sec] = [(n.get("label"), n.get("ref"), series(n, self.ctx[None])[i])
-                        for n in labeled(self.gw.section(self.prod, sec), self.defs)]
+                        for n in labeled(self.gw.section(self.prod, sec))]
         return out
 
     def top(self, i):
@@ -1213,7 +1138,7 @@ class ProductEval:
         out = {}
         for sec in SECTIONS:
             out[sec] = [(n.get("label"), n.get("ref"), series(n, self.ctx[None])[i])
-                        for n in _top_labeled(self.gw.section(self.prod, sec), self.defs)]
+                        for n in _top_labeled(self.gw.section(self.prod, sec))]
         return out
 
     def manual_items(self, i=None):
@@ -1222,28 +1147,23 @@ class ProductEval:
         for z, _l, _r, node in self.gw.expressions(self.prod):
             if z == "exit":
                 continue
-            for n in manual_leaves(node, self.defs):
+            for n in manual_leaves(node):
                 if i is not None and "observe" in n and series(n["observe"], self.ctx[None])[i] is not None:
                     continue
                 out.append((z, n.get("label") or manual_text(n), n.get("ref")))
         return out
 
 
-def _top_labeled(node, defs):
+def _top_labeled(node):
     """라벨 달린 가장 바깥 노드들. all/any/atleast 는 펼치고, not 아래는 들어가지 않는다."""
     if not isinstance(node, dict):
         return []
     if node.get("label"):
         return [node]
-    if "def" in node and node["def"] in defs:
-        # 참조 자리 META(label·ref·note)를 def 본문 위에 덮는다 — labeled 와 같은 규칙(자리의 원문 출처 보존)
-        site = {k: v for k, v in node.items() if k in ("label", "ref", "note")}
-        body = defs[node["def"]]
-        return _top_labeled(dict(body, **site) if site and isinstance(body, dict) else body, defs)
     kids = node.get("all") or node.get("any") or (node.get("of") if "atleast" in node else None) or []
     out = []
     for k in kids:
-        out.extend(_top_labeled(k, defs))
+        out.extend(_top_labeled(k))
     return out
 
 # ================= 공개 얼굴 =================
@@ -1288,8 +1208,7 @@ class Cond:
   극성: not 아래의 수동은 반대 값을 받는다(manual_as=True 는 '수동이 전부 구역에 유리하게 풀림'
   이라는 뜻 — '겹치면 쉼' = not(all(.., 수동)) 에서 낙관 평가가 오히려 겹침을 가정하던 버그를 막는다).
   사람이 답한 수동(Ctx answers — 조건별 답 맵)은 그 답이 manual_as 보다 먼저다. 답은 잎의 참/거짓 그 자체라
-  not 아래에서도 뒤집지 않는다(not 이 그 값을 뒤집을 뿐). 답 열쇠 = answer_key — (shared ? "*" : 상품) + "|" +
-  manual_key(잎). shared = 상품마다 값이 같은 정의(product_specific 아님) 안의 잎 — 한 번 답하면 모든 상품에 같다.
+  not 아래에서도 뒤집지 않는다(not 이 그 값을 뒤집을 뿐). 답 열쇠 = answer_key — 상품 + "|" + manual_key(잎).
 
 모르는 값 "?"
   저자가 숫자(기준·기간·개수)를 안 준 조건도 식으로 적는다 — 모르는 숫자 자리만 "?" 로 둔다.
@@ -1326,7 +1245,6 @@ class Cond:
   포지션        {"pos": "ret"|"days"|"maxret"|"minret"}   매도(exit)·2차 이후 분할 매수 규칙 안에서만.
                 ret = 평균 매입가 대비 오늘 종가 수익률(%), days = 첫 매수일부터 지난 봉(첫 매수일 0),
                 maxret/minret = 첫 매수일~오늘 종가 수익률의 최고/최저. 매수 전 날은 None.
-  재사용        {"def": "이름"}         트리 파일 defs 의 식
   메타(아무 노드에) "label", "ref", "id", "note"
 
 심볼: "$self"(그 상품) · "$index"(상품의 기준 지수) · "$s"(across 안의 종목) · 그 외 문자 그대로."""
@@ -1368,6 +1286,7 @@ class Cond:
     series = series
     _series = _series
     SECTIONS = SECTIONS
+    FAVOR = FAVOR
     ZONES = ZONES
     ZONE_LABELS = ZONE_LABELS
     _uses_pos = _uses_pos
@@ -1387,8 +1306,7 @@ class Grade:
 수동(manual) 조건은 '확인됨/안 됨' 두 번 평가한다:
   안 돼도 매수(비관) → ✅ · 확인돼야 매수(낙관만) → 🟡 확인 대기 · 데이터 부족으로 못 정함 → ❔ 판정 불가
   비관 = filter·entry 의 수동은 거짓, avoid 의 수동은 참 / 낙관 = 그 반대.
-규칙 칸 셋:
-  caution  걸린 규칙마다 그날 금액 × scale (null = 줄일 폭 저자 미명시)
+규칙:
   sizing   weight = 총 투자금 대비 비중(%) · tranches = 분할 매수(2차 이후는 포지션 값으로)
   exit     보유분의 매도 — 보유가 있을 때만 평가(구간③ trading)
 

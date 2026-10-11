@@ -8,12 +8,10 @@
 라이브 서버·러너가 부르는 '진입+표시+알림' 껍데기 · 계산은 signals.engine 이 한다).
 
 출력 계약(알림 · 화면 · /api/verdict 가 소비):
-  top     : {slug, title, ts, date, source, cash, common[], verdicts[], refs{}, missing{}, positions_note}
-  common  : [{name, label, ref, v, view}]           상품 여럿이 같이 보는 판단(defs) — 화면 맨 위 한 번
+  top     : {slug, title, ts, date, source, cash, verdicts[], refs{}, missing{}, positions_note}
   verdict : {prod, index, note, date, close, chg, key, grade, reason,
              zones{filter,avoid,entry: view[]}, opt{..}, pes{..},     조건 칸 셋의 중첩 설명 + 낙관·비관 값
-             caution[{label, ref, scale, v, manual, view}], amount{factor, unspecified, unknown},   (judge.Amount)
-             sizing{label, ref, weight, weight_range, units, tranches[{label, ref, frac, note, units, view?}]},
+             sizing{label, ref, weight, weight_range, units, tranches[{label, ref, frac, units, view?}]},
                                                      units = 오늘 물량(시작자본 1.0 기준 — trades.to_units, 비중 모르면 None)
              exit[{label, ref, sell(문장 — trades.sell_text), note, view}], exit_policy("book"|"none" — trades.exit_policy),
              positions[...]}                                         positions = 내 포지션(로컬 파일)이 있을 때만
@@ -45,65 +43,9 @@ def book_title(slug):
     return book_meta(slug).get("title") or slug
 
 
-# ------------------------------------------------------------------ 공통 조건(defs)
-def common_items(gw, pe):
-    """라벨 달린 정의 중 상품 둘 이상이 같이 보는 것(상품마다 값이 다른 식 제외) — 공통 칸에서 조건마다 한 번만 펼친다.
-
-    · 다른 공통 조건 안에 들어 있는 정의는 따로 나열하지 않는다(그 펼침에 보인다).
-    · 단, 공통 칸 안에서 두 번 이상 펼쳐질 정의(모드 둘이 같이 쓰는 '반도체 과열', 한 조건 안에 두 번 쓰인 점수 등)는
-      따로 한 번 나열하고, 그 밖의 자리에선 folded(한 줄 — 계산엔 그대로 쓰임)로 둔다. 가장 바깥 것부터 정한다."""
-    defs = gw.defs()
-    users = gw.def_users()
-    i = len(pe.cal) - 1
-    ctx = pe.ctx[None].shared()            # 공통 칸 = 상품마다 같은 판단 — 사람의 답 열쇠 "*"(답이 없으면 그대로)
-    shared = [name for name, node in defs.items()
-              if isinstance(node, dict) and node.get("label")
-              and len(users.get(name, ())) >= 2 and not Cond.product_specific(node, defs)]
-
-    def refs(n, stop, acc):
-        """n 안의 정의 참조를 센다 — stop(따로 나열한 정의) 안으로는 들어가지 않는다."""
-        if isinstance(n, dict):
-            x = n.get("def")
-            if isinstance(x, str) and x in defs:
-                acc[x] = acc.get(x, 0) + 1
-                if x not in stop:
-                    refs(defs[x], stop, acc)
-            for k, y in n.items():
-                if k not in Cond.META and k != "def":
-                    refs(y, stop, acc)
-        elif isinstance(n, list):
-            for y in n:
-                refs(y, stop, acc)
-        return acc
-
-    inside = set()
-    for name in shared:
-        inside |= set(refs(defs[name], set(), {}))
-    listed = [name for name in shared if name not in inside]
-    for _ in range(len(shared)):
-        cnt = {}
-        for name in listed:
-            for x, c in refs(defs[name], set(listed), {}).items():
-                cnt[x] = cnt.get(x, 0) + c
-        cands = {x for x, c in cnt.items() if c >= 2 and x in shared and x not in listed}
-        outer = {x for x in cands if not any(x in refs(defs[y], set(listed), {}) for y in cands if y != x)}
-        if not outer:
-            break
-        listed = [name for name in shared if name in set(listed) | outer]   # 정의 순서 유지
-    fold = frozenset(listed)
-    out = []
-    for name in listed:
-        node = defs[name]
-        v = Cond.series(node, ctx)[i]
-        out.append({"name": name, "label": node["label"], "ref": node.get("ref"), "v": v,
-                    "view": cv._view(node, defs, ctx, i, shared=True, fold=fold - {name})})
-    return out
-
-
 # ------------------------------------------------------------------ 원문 소절별 반영 현황
 def ref_map(gw):
     """{소절: {auto, manual, zones[], prods[]}} — 트리에 ref 로 달린 라벨 노드·규칙을 센다."""
-    defs = gw.defs()
     out = {}
 
     def add(ref, zone, prod, manual):
@@ -119,9 +61,9 @@ def ref_map(gw):
     for p in gw.products():
         for z, label, ref, node in gw.expressions(p):
             if label:
-                add(ref, z, p, bool(Cond.manual_leaves(node, defs)))
-            for n in Cond.labeled(node, defs):
-                add(n.get("ref"), z, p, bool(Cond.manual_leaves(n, defs)))
+                add(ref, z, p, bool(Cond.manual_leaves(node)))
+            for n in Cond.labeled(node):
+                add(n.get("ref"), z, p, bool(Cond.manual_leaves(n)))
         for t in gw.tranches(p):
             if t.when is None:
                 add(t.ref, "sizing", p, False)
@@ -136,6 +78,22 @@ def ref_map(gw):
 
 
 # ------------------------------------------------------------------ 상품 하나
+def _rule_views(gw, p, a=None):
+    """비중·분할·매도 규칙의 화면 모양 — 시세가 있든 없든 같은 모양(규칙 설명은 값 없는 정적 view).
+    a = 그날 Amount(judge.Judge.amount) — 없으면(시세 없음) 비중·물량은 None."""
+    index = gw.index(p)
+    sz = gw.sizing(p)
+    return {"sizing": {"label": sz.label, "ref": sz.ref, "note": sz.note,
+                       "weight": a and a.weight, "weight_range": a and a.weight_range, "weight_set": a and a.weight_set,
+                       "units": a and live_units(a),            # 오늘 물량(시작자본 1.0 기준, 화면이 × 총 투자금)
+                       "tranches": [{"label": t.label, "ref": t.ref, "frac": t.qty.x,
+                                     "units": a and live_units(a, t.qty), "conditional": t.when is not None,
+                                     "view": _static_view(t.when, index)} for t in gw.tranches(p)]},
+            "exit": [{"label": r.label, "ref": r.ref, "allprod": r.allprod, "sell": sell_text(r.qty),
+                      "note": r.note, "view": _static_view(r.when, index)} for r in gw.exit_rules(p)],
+            "exit_policy": exit_policy(gw, p)}
+
+
 def product_verdict(gw, p, d, xs):
     """상품 하나의 판정 JSON — 판정(Decision d)은 엔진(signals.engine.live_decisions)이 내고, 여기는 그 사실을
     화면 모양으로 빚는다. xs = 이 상품의 내 포지션(로컬 파일). d.eval 로 같은 평가 문맥에서 view 를 빚는다."""
@@ -143,76 +101,42 @@ def product_verdict(gw, p, d, xs):
     if not d.has_data:
         # 시세가 없어도 체크리스트 '구조'(규칙·조건 항목)는 정적으로 보여준다 — 값은 모름(❔), 지어내지 않는다.
         req = md_feed.requested().get(p, "-")
-        defs, index, sz = gw.defs(), gw.index(p), gw.sizing(p)
         return dict(base, key="unknown", grade=Grade.GRADES["unknown"], date="", close=None, chg=None,
                     reason="%s 시세 없음(수집 요청 %s) — 아래는 판정 전 체크리스트 구조" % (p, req),
-                    zones={sec: _static_view(gw.section(p, sec), defs, index) for sec in Cond.SECTIONS},
-                    opt={}, pes={},
-                    caution=[dict(r.shown("label", "ref", "note"), view=_static_view(r.when, defs, index))
-                             for r in gw.cautions(p)],
-                    amount={"factor": 1.0, "unspecified": [], "unknown": []},
-                    sizing={"label": sz.label, "ref": sz.ref, "note": sz.note,
-                            "weight": None, "weight_range": None, "weight_set": None, "units": None,
-                            "tranches": [dict(t.shown("label", "ref"), frac=(t.qty.x if t.qty else None),
-                                              **t.shown("note"), units=None, conditional=t.when is not None,
-                                              view=_static_view(t.when, defs, index)) for t in gw.tranches(p)]},
-                    exit=[{"label": r.label, "ref": r.ref, "allprod": r.allprod, "sell": sell_text(r.qty),
-                           "note": r.note, "view": _static_view(r.when, defs, index)} for r in gw.exit_rules(p)],
-                    exit_policy=exit_policy(gw, p)), None
+                    zones={sec: _static_view(gw.section(p, sec), gw.index(p)) for sec in Cond.SECTIONS},
+                    opt={}, pes={}, **_rule_views(gw, p)), None
     i, ctx = d.i, d.eval.ctx[None]
     reason = cv.reason_of(d.key, d.top, d.manual)
     # 데이터 완전성 가드 — 지금 가진 확정 봉이 트리가 쓰는 가장 긴 창(필요 워밍업)보다 짧으면 등급은 ❔(불완전
     #   데이터, 판정 보류)로 떨어져 있다(grade_key). 사유를 '모르고 매매 금지'로 분명히 적는다(✅/🚫 확신 금지).
     if d.incomplete:
         reason = "불완전 데이터(판정 보류) — 확정 봉 %d개 < 필요 워밍업 %d개, 창이 덜 차 신뢰불가" % (d.confirmed, d.warmup)
-    a = d.amount
-    f, unspec, unknown = a.factor, a.unspecified, a.unknown
-    if d.key in ("buy", "confirm"):
-        if f < 1:
-            reason += " · 금액 ×%.2f" % f
-        if unspec:
-            reason += " · 금액 축소(폭 저자 미명시): " + " · ".join(unspec[:2])
-        if unknown:
-            reason += " · 금액 축소 확인: " + " · ".join(unknown[:2])
-    sz, defs, index = gw.sizing(p), gw.defs(), gw.index(p)
     v = dict(base, date=d.date, close=d.close,
              chg=(d.close / d.prev_close - 1) * 100 if d.prev_close else None,
              key=d.key, grade=d.grade, reason=reason,
-             zones={sec: cv._view(gw.section(p, sec), defs, ctx, i) for sec in Cond.SECTIONS},
-             opt=d.opt, pes=d.pes,
-             caution=[dict(st, view=cv._view(r.when, defs, ctx, i), v=st["value"]) for st, r in d.caution],
-             amount={"factor": f, "unspecified": unspec, "unknown": unknown},
-             sizing={"label": sz.label, "ref": sz.ref, "note": sz.note,
-                     "weight": a.weight, "weight_range": a.weight_range, "weight_set": a.weight_set,
-                     "units": live_units(a),            # 오늘 물량(시작자본 1.0 기준, 화면이 × 총 투자금)
-                     "tranches": [dict(t.shown("label", "ref"), frac=t.qty.x, **t.shown("note"),
-                                       units=live_units(a, t.qty), conditional=t.when is not None,
-                                       view=_static_view(t.when, defs, index))
-                                  for t in gw.tranches(p)]},
-             exit=[{"label": r.label, "ref": r.ref, "allprod": r.allprod, "sell": sell_text(r.qty),
-                    "note": r.note, "view": _static_view(r.when, defs, index)} for r in gw.exit_rules(p)],
-             exit_policy=exit_policy(gw, p))
-    pos = [dict(_holding_view(hs, defs, i), entry_date=x["entry_date"], entry_px=x["entry_px"], filled=x.get("filled", 1))
+             zones={sec: cv._view(gw.section(p, sec), ctx, i) for sec in Cond.SECTIONS},
+             opt=d.opt, pes=d.pes, **_rule_views(gw, p, d.amount))
+    pos = [dict(_holding_view(hs, i), entry_date=x["entry_date"], entry_px=x["entry_px"], filled=x.get("filled", 1))
            for hs, x in zip(d.holdings, xs)]
     if pos:
         v["positions"] = pos
     return v, d.eval
 
 
-def _holding_view(hs, defs, i):
+def _holding_view(hs, i):
     """보유 하나(HoldingState) → {ret, days, exit:[{label, ref, sell, v, view}], next_tranche:{label, ref, frac, v, view}|None}."""
     if hs.error:
         return {"error": hs.error}
     out = {"ret": hs.ret, "days": hs.days,
-           "exit": [{"label": r.label, "ref": r.ref, "sell": sell_text(r.qty), "v": v, "view": cv._view(r.when, defs, hs.ctx, i)}
+           "exit": [{"label": r.label, "ref": r.ref, "sell": sell_text(r.qty), "v": v, "view": cv._view(r.when, hs.ctx, i)}
                     for r, v in hs.exits]}
     nt = hs.next_tranche
     out["next_tranche"] = None if nt is None else {
-        "label": nt[0].label, "ref": nt[0].ref, "frac": nt[0].qty.x, "v": nt[1], "view": cv._view(nt[0].when, defs, hs.ctx, i)}
+        "label": nt[0].label, "ref": nt[0].ref, "frac": nt[0].qty.x, "v": nt[1], "view": cv._view(nt[0].when, hs.ctx, i)}
     return out
 
 
-def _static_view(node, defs, index=None):
+def _static_view(node, index=None):
     """포지션 없이 보이는 규칙 설명(값 없음) — 라벨·논리 묶음·수동 사유만."""
     if node is None:
         return None
@@ -222,9 +146,9 @@ def _static_view(node, defs, index=None):
         if "kids" in it:
             it["kids"] = [strip(k) for k in it["kids"]]
         return it
-    ctx = Cond.Ctx({}, ["0"], "$none", index, defs, manual_as=None, pos=(0, 1.0))
+    ctx = Cond.Ctx({}, ["0"], "$none", index, manual_as=None, pos=(0, 1.0))
     try:
-        return strip(cv._view(node, defs, ctx, 0))
+        return strip(cv._view(node, ctx, 0))
     except Cond.CondError:
         return None
 
@@ -247,27 +171,24 @@ def _format(slug, tree, hist, positions, decisions, answers=None):
     사실로 이걸 부른다(같은 모양을 라이브·배치가 공유)."""
     now = datetime.now(timezone.utc).astimezone()
     top = {"slug": slug, "title": book_title(slug), "ts": now.isoformat(), "source": SOURCE,
-           "verdicts": [], "common": [], "refs": {}, "missing": {}, "cash": None,
+           "verdicts": [], "refs": {}, "missing": {}, "cash": None,
            # 등급 글자표(키→라벨)를 실어보낸다 — 화면이 따로 복붙하지 않고 이걸 받아 쓴다(단일 출처).
            "grades": Grade.GRADES,
            # 등급 판정 사다리(데이터) — 화면은 더 이상 등급을 다시 내지 않는다(서버 권위: answers 로 서버가 낸다).
            #   판정 JSON 모양을 그대로 두려고(서버 권위 전환 때 무답 출력 바이트 동일) 남겼다 — 다음 출력 변경 때 뺀다.
            "grade_rules": Grade.GRADE_RULES,
-           # 여섯 칸 키→한글 이름표(화면 머리글용) — Cond.ZONE_LABELS 가 정본이다. 화면(shared-ui zw)이
-           #   복붙하지 않고 이걸 받아 쓴다. 머리글 번호 순서대로(①필터 ②회피 ③진입 …) 실어보낸다.
-           "zones": {s: Cond.ZONE_LABELS[s]
-                     for s in ("filter", "avoid", "entry", "caution", "sizing", "exit")},
+           # 칸 키→한글 이름표(화면 머리글용) — Cond.ZONE_LABELS 가 정본이다. 화면(shared-ui zw)이
+           #   복붙하지 않고 이걸 받아 쓴다. 머리글 번호 순서대로(Cond.ZONES) 실어보낸다.
+           "zones": {s: Cond.ZONE_LABELS[s] for s in Cond.ZONES},
            # 매도 정책 "none"(책에 매도 규칙 없음) 문구 — 정본 consumers/backtest/trades.NO_EXIT_NOTE(화면이 받아 쓴다).
            "no_exit_note": NO_EXIT_NOTE}
     if tree is None:
         top["error"] = "조건 트리 없음 — books/%s/tree.json 이 있어야 판정한다" % slug
         return top
-    pe0 = None
     weights, all_known = [], True
     for p, d, xs in decisions:
-        v, pe = product_verdict(tree, p, d, xs)
+        v, _pe = product_verdict(tree, p, d, xs)
         top["verdicts"].append(v)
-        pe0 = pe0 or pe
         sz = v.get("sizing") or {}
         if sz.get("weight_set"):
             if sz.get("weight") is None:
@@ -277,8 +198,6 @@ def _format(slug, tree, hist, positions, decisions, answers=None):
     if weights and all_known:
         top["cash"] = max(0.0, 100.0 - sum(weights))
     top["date"] = max((v.get("date") or "" for v in top["verdicts"]), default=None)
-    if pe0 is not None:
-        top["common"] = common_items(tree, pe0)
     top["refs"] = ref_map(tree)
     top["missing"] = {s: md_feed.requested().get(s, "-") for s, cs in hist.items() if not cs}
     if answers is not None:
@@ -289,10 +208,6 @@ def _format(slug, tree, hist, positions, decisions, answers=None):
 
 
 # ------------------------------------------------------------------ 출력 텍스트 / 알림
-def _mark(v):
-    return {True: "🟢", False: "🔴"}.get(v, "❔")
-
-
 def build_text(top):
     now = datetime.fromisoformat(top["ts"])
     L = ["📈 %s  (%s KST · %s 종가 기준)" % (top.get("title") or top["slug"], now.strftime("%Y-%m-%d %H:%M"),
@@ -300,18 +215,13 @@ def build_text(top):
     if top.get("error"):
         L.append("❔ " + top["error"])
         return "\n".join(L)
-    if top["common"]:
-        L.append("공통 조건:")
-        for c in top["common"]:
-            L.append("   %s %s" % (_mark(c["v"]), c["label"]))
     L.append("─" * 30)
     for v in top["verdicts"]:
         L.append("%s  %s" % (v["prod"], v["grade"]))
         L.append("   %s" % v["reason"])
         sz = v.get("sizing") or {}
         if sz.get("weight") is not None:
-            L.append("   비중 %.0f%%%s" % (sz["weight"], "" if v["amount"]["factor"] >= 1
-                                          else " × 금액 %.2f" % v["amount"]["factor"]))
+            L.append("   비중 %.0f%%" % sz["weight"])
         elif sz.get("weight_range"):
             L.append("   비중 확인 필요: %s%%" % " / ".join("%.0f" % x for x in sz["weight_range"]))
         for ps in v.get("positions") or []:

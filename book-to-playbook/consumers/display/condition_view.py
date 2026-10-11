@@ -42,12 +42,10 @@ def _n(k):
     return "?" if k == Cond.UNKNOWN else "%d" % k
 
 
-def _describe_operand(e, defs):
+def _describe_operand(e):
     """값 표현식 → 짧은 사람 설명(없으면 '' — 그럼 숫자만 보여준다). 복합식(산술 등)은 라벨이 설명하므로 생략."""
     if not isinstance(e, dict):
         return ""                                # 상수(기준값) — 숫자 자체로
-    if "def" in e and e["def"] in defs and len([k for k in e if k not in Cond.META]) == 1:
-        return _describe_operand(defs[e["def"]], defs)
     try:
         op = Cond._op_of(e)
     except Cond.CondError:
@@ -66,7 +64,7 @@ def _describe_operand(e, defs):
     if op == "pct":
         return "전일 대비 변화율" if e["pct"][1] == 1 else "%s일 전 대비 변화율" % _n(e["pct"][1])
     if op == "lag":
-        inner = _describe_operand(e["lag"][0], defs)
+        inner = _describe_operand(e["lag"][0])
         return ("%s " % inner if inner else "") + "%s일 전" % _n(e["lag"][1])
     if op == "streak":
         return "연속 참 일수"
@@ -80,18 +78,16 @@ def _describe_operand(e, defs):
         return {"ret": "수익률(%)", "days": "보유일", "maxret": "최고수익(%)",
                 "minret": "최저수익(%)"}.get(e["pos"], "포지션")
     if op == "valuewhen":                        # 그 조건이 마지막으로 참이던 날의 값
-        return _describe_operand(e["valuewhen"][1], defs) + "(최근 신호일)"
+        return _describe_operand(e["valuewhen"][1]) + "(최근 신호일)"
     if op in ("minsince", "maxsince"):           # 신호 이후 최저/최고
-        return ("최저 " if op == "minsince" else "최고 ") + _describe_operand(e[op][1], defs) + "(신호 이후)"
+        return ("최저 " if op == "minsince" else "최고 ") + _describe_operand(e[op][1]) + "(신호 이후)"
     return ""                                    # add/sub/mul/div/case … 복합 → 숫자만(산술은 inputs 로 분해)
 
 
-def _unit_of(e, defs):
+def _unit_of(e):
     """값 표현식의 단위 힌트(%·일·배) — 모르면 '' (라벨이 단위를 말하므로 비워도 된다)."""
     if not isinstance(e, dict):
         return ""
-    if "def" in e and e["def"] in defs and len([k for k in e if k not in Cond.META]) == 1:
-        return _unit_of(defs[e["def"]], defs)
     try:
         op = Cond._op_of(e)
     except Cond.CondError:
@@ -109,7 +105,7 @@ def _unit_of(e, defs):
     return ""
 
 
-def _inputs_of(e, ctx, i, defs, acc, seen, top=True):
+def _inputs_of(e, ctx, i, acc, seen, top=True):
     """파생값이 '무슨 원시 숫자로 나왔나'를 [{d, v}]로 모은다 — 사용자가 검증할 수 있게.
     · pct(변화율)은 두 끝점(오늘·k일 전)을 보여준다. 예: 오늘 종가 770.6 · 5일 전 765.6.
     · 산술(합·차·비율)은 안의 시세 잎들을 보여준다. 예: 고가 771 · 종가 770.6.
@@ -117,8 +113,6 @@ def _inputs_of(e, ctx, i, defs, acc, seen, top=True):
     중복 설명은 한 번만."""
     if not isinstance(e, dict):
         return
-    if "def" in e and e["def"] in defs and len([k for k in e if k not in Cond.META]) == 1:
-        return _inputs_of(defs[e["def"]], ctx, i, defs, acc, seen, top)
 
     def add(d, v):
         if d and d not in seen:
@@ -131,32 +125,30 @@ def _inputs_of(e, ctx, i, defs, acc, seen, top=True):
         return
     if op == "pct":                                   # 변화율 — 두 끝점을 보여준다
         s, k = e["pct"]
-        base = _describe_operand(s, defs) or "값"
+        base = _describe_operand(s) or "값"
         add("오늘 " + base, _meas_val(s, ctx, i))
         add("%s일 전" % _n(k), _meas_val({"lag": [s, k]}, ctx, i))
         return
     if op in Cond.ARITH:
         for sub in e[op]:
-            _inputs_of(sub, ctx, i, defs, acc, seen, top=False)
+            _inputs_of(sub, ctx, i, acc, seen, top=False)
         return
     if op == "abs":
-        _inputs_of(e["abs"], ctx, i, defs, acc, seen, top=False)
+        _inputs_of(e["abs"], ctx, i, acc, seen, top=False)
         return
     # 단일 잎(px·ma·streak…): 산술 안쪽이면 값으로 보여주고, LHS 통째면(top) 분해하지 않는다
     if not top and op in ("px", "ma", "ema", "lag", "streak", "count", "barssince",
                           "rsi", "highest", "lowest", "sum", "stdev", "pos"):
-        add(_describe_operand(e, defs), _meas_val(e, ctx, i))
+        add(_describe_operand(e), _meas_val(e, ctx, i))
     # case·valuewhen 등은 생략(라벨이 설명을 맡는다)
 
 
-def _measure(node, defs, ctx, i, top=True):
+def _measure(node, ctx, i, top=True):
     """표시되는 조건 하나가 '무엇을 재서 얼마였나' — [{op, lhs, lhsd, rhs, rhsd, unit, inputs?}, …].
     하위에 라벨 달린 조건이 있으면 멈춘다(그 조건이 자기 증거를 따로 보여준다)."""
     if not isinstance(node, dict):
         return []
-    if "def" in node and node["def"] in defs and len([k for k in node if k not in Cond.META]) == 1:
-        return _measure(defs[node["def"]], defs, ctx, i, top)
-    if not top and (node.get("label") or Cond.is_manual(node, defs) or "observe" in node):
+    if not top and (node.get("label") or Cond.is_manual(node) or "observe" in node):
         return []
     try:
         op = Cond._op_of(node)
@@ -164,14 +156,14 @@ def _measure(node, defs, ctx, i, top=True):
         return []
     if op in Cond.CMP:
         a, b = node[op]
-        lhsd = _describe_operand(a, defs)
+        lhsd = _describe_operand(a)
         fact = {"op": op,
                 "lhs": _meas_val(a, ctx, i), "lhsd": lhsd,
                 "rhs": _meas_val(b, ctx, i),
-                "rhsd": _describe_operand(b, defs),     # "?"(저자가 안 준 기준)면 rhs None·rhsd '' — 화면이 '기준 ?'로
-                "unit": _unit_of(a, defs)}
+                "rhsd": _describe_operand(b),     # "?"(저자가 안 준 기준)면 rhs None·rhsd '' — 화면이 '기준 ?'로
+                "unit": _unit_of(a)}
         ins = []                           # 파생값(변화율·산술)이면 무슨 원시 숫자로 나왔는지 함께 보여준다
-        _inputs_of(a, ctx, i, defs, ins, set())
+        _inputs_of(a, ctx, i, ins, set())
         if ins:
             fact["inputs"] = ins
         return [fact]
@@ -187,33 +179,18 @@ def _measure(node, defs, ctx, i, top=True):
         return []
     facts = []
     for c in kids:
-        facts += _measure(c, defs, ctx, i, top=False)
+        facts += _measure(c, ctx, i, top=False)
     return facts
 
 
-def _view(node, defs, ctx, i, shared=False, fold=frozenset()):
+def _view(node, ctx, i):
     """노드 하나 → 화면 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, hidden?}.
 
     · 논리 노드(all/any/atleast/not)는 op 와 자식 항목 전부를 담는다 — 화면이 사람이 체크한 수동 조건으로
       같은 3값 논리를 다시 계산할 수 있게(not 아래 수동은 극성이 뒤집힌다 — cond 와 같은 규칙).
     · 그 밖의 노드는 그날 값(v)이 고정된 잎이다. 라벨이 없으면 hidden(화면에 안 보이지만 계산엔 쓴다),
       안쪽에 라벨 달린 노드가 있으면 참고용 kids(op 없음 — 다시 계산하지 않는다)로 붙인다.
-    · 정의 참조는 정의 본문 항목 하나로(자리 META 를 덮어) — 같은 조건을 두 줄로 그리지 않는다.
-    · 상품마다 값이 같은 정의(Cond.product_specific 아님) 안의 수동 조건은 shared=True — 한 번 답하면 그 조건을 쓰는
-      모든 상품에 같은 답이 들어간다(같은 시장 사실이므로). 답 열쇠 규칙은 Cond.answer_key 하나(서버가 판정).
-    · fold = 화면 다른 곳에 이미 펼쳐 둔 정의 이름들 — 그 참조는 folded 표시(화면은 한 줄, 계산은 kids).
     v 는 수동 = 모름(None)으로 둔 그날 값이다."""
-    if "def" in node and node["def"] in defs and not [k for k in node if k not in Cond.META and k != "def"]:
-        # 정의 참조 = 정의 본문 항목 하나(자리 META label·ref·note 를 덮어서) — '자리 줄 + 본문 줄'로 같은 조건을
-        #   두 번 그리지 않고, 자리의 원문 출처는 지킨다(Cond.labeled 와 같은 규칙).
-        body = defs[node["def"]]
-        site = {k: v for k, v in node.items() if k in ("label", "ref", "note")}
-        eff = dict(body, **site) if site and isinstance(body, dict) else body
-        sh = shared or not Cond.product_specific(body, defs)
-        item = _view(eff, defs, ctx.shared() if sh else ctx, i, sh, fold)   # 답 열쇠 "*" 문맥(답이 없으면 그대로)
-        if node["def"] in fold:
-            item["folded"] = True    # 같은 화면 다른 곳에 펼쳐 둔 조건 — 계산엔 kids 를 쓰되 화면엔 한 줄로
-        return item
     skip = ("of", "sym", "tf", "else") + (("manual",) if "observe" in node else ())
     op = next((k for k in node if k not in Cond.META and k not in skip), None)
     item = {"v": Cond.series(node, ctx)[i]}
@@ -224,7 +201,7 @@ def _view(node, defs, ctx, i, shared=False, fold=frozenset()):
         item["allprod"] = True
         # 상품에 안 기대는 공통 규칙($self/$index 안 씀)은 상품마다 값·질문이 같다 → 화면이 한 줄로 합쳐도 된다는 힌트.
         #   답 열쇠(mkey)는 지금 규칙 그대로(상품별) — 화면이 그 한 줄의 수동 답을 세 상품 열쇠에 같이 넣는다(서버 무변).
-        if not Cond.product_specific(node, defs):
+        if not Cond.product_specific(node):
             item["allsame"] = True
     if op in LOGICAL:
         # 묶음(all/any/atleast/not)은 '?' 가 안에 있어도 **항상 펼친다** — 사람이 확인할 건 묶음 자체가 아니라
@@ -237,38 +214,32 @@ def _view(node, defs, ctx, i, shared=False, fold=frozenset()):
             if node["atleast"] == Cond.UNKNOWN:  # 몇 개 필요한지 저자 미명시 — 묶음은 수동(사람이 개수 판단), 단 후보는 펼친다
                 item["manual"] = Cond.UNKNOWN_REASON
                 item["mkey"] = Cond.manual_key(node)
-                if shared:
-                    item["shared"] = True
-        item["kids"] = [_view(k, defs, kctx, i, shared, fold) for k in kids]
-    elif Cond.is_unknown(node, defs):
+        item["kids"] = [_view(k, kctx, i) for k in kids]
+    elif Cond.is_unknown(node):
         # 저자가 숫자를 안 준 식("?") — 사람이 정하는 수동 잎. 답을 묶는 열쇠는 식(문장 아님 — 같은 식 = 같은 질문).
         item["manual"] = Cond.UNKNOWN_REASON
         item["mkey"] = Cond.manual_key(node)
-        if shared:
-            item["shared"] = True
     elif op in ("manual", "observe"):
         item["manual"] = node["manual"]
-        if shared:
-            item["shared"] = True
         if op == "observe":
             item["observed"] = True              # v 가 있으면 관측값(자동), 없으면 사람 확인
-            item["kids"] = [_view(node["observe"], defs, ctx, i, shared, fold)]
+            item["kids"] = [_view(node["observe"], ctx, i)]
     else:
-        inner = [_view(k, defs, ctx, i, shared, fold) for k in _labeled_inside(node, defs)]
+        inner = [_view(k, ctx, i) for k in _labeled_inside(node)]
         if inner:
             item["kids"] = inner
         if not node.get("label"):
             item["hidden"] = True
     # 측정 증거 — 화면에 보이는 조건(라벨/수동/관측)에 그날 실제 값을 붙인다. "?" 식이면 알려진 쪽 값이
     #   근거 숫자다(기준은 저자가 안 줬으니 사람이 그 숫자를 보고 참/거짓을 고른다 — 깜깜이 판단 방지).
-    if node.get("label") or Cond.is_manual(node, defs) or "observe" in node:
-        facts = _measure(node, defs, ctx, i)
+    if node.get("label") or Cond.is_manual(node) or "observe" in node:
+        facts = _measure(node, ctx, i)
         if facts:
             item["detail"] = facts
     return item
 
 
-def _labeled_inside(node, defs):
+def _labeled_inside(node):
     """잎 노드 안쪽의 가장 바깥 라벨 노드들(참고 표시용)."""
     out = []
 
@@ -276,9 +247,6 @@ def _labeled_inside(node, defs):
         if isinstance(n, dict):
             if n.get("label") or "manual" in n:
                 out.append(n)
-                return
-            if "def" in n and n["def"] in defs:
-                walk(defs[n["def"]])
                 return
             for k, x in n.items():
                 if k not in Cond.META:

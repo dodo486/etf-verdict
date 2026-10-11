@@ -199,9 +199,9 @@ def _js_hits(src, regex):
 
 
 # ------------------------------------------------------------------ 주인 표의 매처 — Src → [(줄, 함수, 표식)]
-# 트리 원본 키 — tree.json 의 구조 키(COND_DSL 5절 파일 형식)를 첨자([..])·.get/.pop/.setdefault 로 읽는 자리.
-TREE_KEYS = {"products", "defs", "filter", "avoid", "entry", "caution", "sizing", "exit", "tranches", "sell",
-             "scale", "weight", "frac", "unexpressed", "review", "source", "sections_read", "exit_note"}
+# 트리 원본 키 — tree.json(v3)의 구조 키(COND_DSL 파일 형식)를 첨자([..])·.get/.pop/.setdefault 로 읽는 자리.
+#   label·ref·note·when·qty·on 처럼 트리 밖 dict 에도 흔한 이름은 뺀다(오탐) — 트리에만 있는 키로 본다.
+TREE_KEYS = {"version", "products", "names", "rules", "then", "do", "value", "skip", "why", "review"}
 
 
 def m_tree_keys(src):
@@ -267,8 +267,8 @@ def m_std_exit_gone(src):
 
 
 # 금액 정책 — 그날의 '얼마나' 사실(Judge.amount)을 매수 크기로 바꾸는 규칙(모름을 어떻게 세나). 정본 trades.size_of.
-#   사실을 꺼내는 grade 의 amount_factor·weight_of 는 Judge.amount 한 경로로만 읽는다(라이브·백테스트 같은 값).
-AMOUNT_FACTS = {"amount_factor", "weight_of"}
+#   사실을 꺼내는 grade 의 weight_of 는 Judge.amount 한 경로로만 읽는다(라이브·백테스트 같은 값).
+AMOUNT_FACTS = {"weight_of"}
 
 
 def m_amount_policy(src):
@@ -321,8 +321,8 @@ def m_labels(src):
             + [(ln, f, "grade_rules.json") for ln, f, v in lits if "grade_rules.json" in v])
 
 
-# 등급 사다리 — 날짜별 등급·금액 배수를 내는 함수(정본 grade.ProductEval.grade_key·caution_state·amount_factor).
-LADDER_PY = {"grade_key", "caution_state", "amount_factor"}
+# 등급 사다리 — 날짜별 등급을 내는 함수(정본 grade.ProductEval.grade_key).
+LADDER_PY = {"grade_key"}
 LADDER_JS = (r"\bfunction\s+(?:gradeKey|and3|or3|ev|cautionOf)\s*\("
              r"|\b(?:const|let|var)\s+(?:gradeKey|and3|or3|ev|cautionOf)\s*=")
 
@@ -338,18 +338,16 @@ def m_grade_ladder(src):
 # concept · owners(주인 파일 — 그 안에선 자유) · match(매처) · why(한 줄 사유) · hint(고칠 길) · allow(명시 예외, 사유 필수).
 OWNERS = [
     dict(concept="트리 원본 키", owners=("dsl/tree_gateway.py",), match=m_tree_keys,
-         why="tree.json 키 배치(products·defs·여섯 칸·sell/scale/frac…)를 아는 코드는 출입구 하나 — 형식 교체 시 한 파일만",
+         why="tree.json 키 배치(products·names·rules·then·do…)를 아는 코드는 출입구 하나 — 형식 교체 시 한 파일만",
          hint="TreeGateway 에 물어볼 것",
          allow={   # 같은 이름 키를 쓰는 '트리 아닌' dict
-             ("verify/verify_tree.py", "compare"): ({"sizing"}, "칸별 비교 결과 dict(트리 아님)"),
-             ("verify/verify_tree.py", "render_zone"): ({"weight", "tranches"}, "zone_diff 결과(심판 덤프) dict"),
-             ("dsl/tradeTool.py", "amount_factor"): ({"scale"}, "caution_state 결과(판정 JSON caution 항목)"),
-             ("verify/verify_trading.py", "t_trades"): ({"entry", "exit"}, "거래 dict 검사"),
              ("verify/verify_trading.py", "parity_text"): ({"products"}, "파리티 보고 dict"),
-             ("consumers/backtest/portfolio.py", "run_product"): ({"sell"}, "주문 dict 의 매도 표시"),
-             ("consumers/display/verdict_view.py","ref_map"): ({"unexpressed"}, "판정 JSON refs 항목을 만드는 자리"),
-             ("consumers/display/verdict_view.py","_format"): ({"sizing", "weight"}, "판정 JSON verdict.sizing 을 읽어 현금 % 계산"),
-             ("consumers/display/verdict_view.py","build_text"): ({"sizing", "weight", "exit"}, "판정 JSON 을 알림 문장으로"),
+             ("dsl/tradeTool.py", "grade_key"): ({"rules"}, "등급 사다리 grade_rules.json(트리 아님)"),
+             ("verify/verify_primitives.py", "raw_grade"): ({"rules"}, "등급 사다리 grade_rules.json(트리 아님)"),
+             ("verify/verify_primitives.py", "t_gateway"): ({"rules"}, "출입구 계약 검사 — 합성 트리 픽스처를 만드는 자리"),
+             ("verify/verify_tree.py", "render_zone"): ({"rules"}, "zone_diff 결과(심판 덤프) dict"),
+             ("verify/verify_tree.py", "check_exits"): ({"why"}, "옛 칸 단위 심판 기록(review) — 3동사 전환에서 규칙 why 로 바뀌며 사라짐"),
+             ("verify/verify_tree.py", "_check_pair"): ({"why"}, "옛 칸 단위 심판 기록(review) — 3동사 전환에서 규칙 why 로 바뀌며 사라짐"),
          }),
     dict(concept="책 산출물 경로", owners=("shared/paths.py",), match=m_book_paths,
          why="books/<slug>/ 아래 산출물 경로를 짓는 곳은 하나 — 옛 루트 산출물로 되돌아가지 않게",
@@ -359,20 +357,19 @@ OWNERS = [
              "폐지된 표준 매도(대체 규칙·숫자 파일·출처 글자·플래그)는 주인 포함 어디서도 되살리지 않는다",
          hint="trades.exit_policy · 화면은 exit_policy 필드와 no_exit_note 문구로", allow={}),
     dict(concept="금액 정책", owners=("consumers/backtest/trades.py",), match=m_amount_policy,
-         why="매수 크기(비중 × 분할 × 조심 배수)와 모름(폭 미명시·확인 필요·비중 모름)을 어떻게 셀지는 trades.size_of 하나 — "
+         why="매수 크기(비중 × 분할)와 모름(비중 미명시·모름)을 어떻게 셀지는 trades.size_of 하나 — "
              "그 사실은 Judge.amount 한 경로로만(라이브 화면 = 백테스트)",
          hint="Judge.amount 로 사실을, trades.size_of 로 크기를",
          allow={("signals/judge.py", "amount"): (AMOUNT_FACTS, "Judge.amount — 그날 사실(Amount)을 꺼내는 한 경로")}),
     dict(concept="수량 변환", owners=("consumers/backtest/trades.py",), match=m_qty_convert,
-         why="'얼마나'(Qty: cash·budget·order·bought·held)를 물량으로 바꾸는 곳은 trades.to_units 하나 — 매수(분할)·매도·"
-             "비중·조심이 같은 변환을 지난다. 밖은 Qty 를 건네기만 하고 basis 를 가르거나 셈하지 않는다",
-         hint="trades.to_units(Qty, Ledger) · 화면은 엔진이 낸 units·sell 문장으로",
-         allow={("dsl/tree_gateway.py", "_qty"): (None, "원본 키(sell·scale·frac·weight) → Qty 정규화(변환 아님)")}),
+         why="'얼마나'(Qty: cash·budget·bought·held)를 물량으로 바꾸는 곳은 trades.to_units 하나 — 매수(분할)·매도·"
+             "비중이 같은 변환을 지난다. 밖은 Qty 를 건네기만 하고 basis 를 가르거나 셈하지 않는다",
+         hint="trades.to_units(Qty, Ledger) · 화면은 엔진이 낸 units·sell 문장으로", allow={}),
     dict(concept="칸·등급 이름표", owners=("dsl/tradeTool.py",), match=m_labels,
          why="Cond.ZONE_LABELS · Grade.GRADES · grade_rules.json 이 정본 — 화면은 판정 JSON(zones·grades·grade_rules)으로 받는다",
          hint="판정 JSON 의 zones·grades·grade_rules 로", allow={}),
     dict(concept="등급 사다리", owners=("dsl/tradeTool.py",), match=m_grade_ladder,
-         why="날짜별 등급·금액 배수를 내는 곳은 Grade 하나 — 두 벌이면 엔진과 화면 등급이 갈라진다",
+         why="날짜별 등급을 내는 곳은 Grade 하나 — 두 벌이면 엔진과 화면 등급이 갈라진다",
          hint="판정 JSON 의 key 를 그대로(수동 답은 POST /api/verdict — 서버가 Cond.Ctx answers 로 낸다)", allow={}),
 ]
 SELF = "verify/verify_code.py"      # 표 자신(금지 표식 목록을 들고 있다) — 표식 검사에서 뺀다

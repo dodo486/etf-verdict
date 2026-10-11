@@ -102,7 +102,7 @@ feed.price_bus (1개) ──틱 {ts, trees, hist}── fan-out ─┬───�
 | tree.json 원본 키 | `dsl/tree_gateway.py` |
 | 책 산출물 경로 | `shared/paths.py` |
 | 매도 정책(책에 매도 규칙이 없을 때 = 매수 신호만 평가) | `consumers/backtest/trades.py` `exit_policy` |
-| 금액 정책(비중 × 분할 × 조심 배수, 모름 처리) | `consumers/backtest/trades.py` `size_of` (사실은 `Judge.amount` 한 경로) |
+| 금액 정책(비중 × 분할, 모름 처리) | `consumers/backtest/trades.py` `size_of` (사실은 `Judge.amount` 한 경로) |
 | 수량 변환('얼마나' → 물량, 매수·매도 공통) | `consumers/backtest/trades.py` `to_units` |
 | 칸·등급 이름표 | `dsl/tradeTool.py`(Cond·Grade) · `grade_rules.json` |
 | 등급 사다리(등급·금액 배수 계산) | `dsl/tradeTool.py`(Grade) — 화면은 다시 계산하지 않음(수동 답은 `POST /api/verdict`) |
