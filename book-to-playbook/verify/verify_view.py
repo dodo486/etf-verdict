@@ -18,7 +18,7 @@ from collections import namedtuple
 from shared import paths  # noqa: F401  (UTF-8 출력)
 from shared.paths import live_slugs, playbook_html, read_text
 from dsl.tradeTool import Grade
-from dsl.tree_gateway import TreeGateway, empty_product, synthetic
+from dsl.tree_gateway import TreeGateway, synthetic
 from consumers.display import condition_view as cv
 
 Candle = namedtuple("Candle", "date open high low close volume")
@@ -37,7 +37,7 @@ def t_view():
     cal = ["2022%04d" % i for i in range(len(xs))]
     hist = {"X": [Candle(d, c, c, c, c, 1000) for d, c in zip(cal, xs)]}
     jump = {"ge": [{"pct": [C, 1]}, 20]}
-    tree = TreeGateway.of(synthetic({"X": empty_product()}))
+    tree = TreeGateway.of(synthetic({"X": None}))
     pe = Grade.ProductEval(tree, "X", hist, cal)
     node = {"all": [dict(jump, label="급등", ref="1"), {"not": {"label": "수동", "manual": "x"}}]}
     v = cv._view(node, pe.defs, pe.ctx[None], len(xs) - 1)

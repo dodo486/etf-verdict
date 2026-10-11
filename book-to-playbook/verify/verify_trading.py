@@ -37,7 +37,7 @@ from datetime import datetime, timedelta, timezone
 
 from shared.paths import BASE, live_slugs, read_text  # (UTF-8 출력 고정 포함)
 from dsl.tradeTool import Grade
-from dsl.tree_gateway import TreeGateway, empty_product, synthetic
+from dsl.tree_gateway import Qty, TreeGateway, rule, synthetic
 from consumers.backtest import trades as trades_mod
 from signals.engine import open_history
 
@@ -59,22 +59,27 @@ def t_trades():
     def mk(rows):
         cal = ["2021%04d" % i for i in range(len(rows))]
         hist = {"X": [Candle(d, o, max(o, c), min(o, c), c, 1000) for d, (o, c) in zip(cal, rows)]}
-        tree = TreeGateway.of(synthetic({"X": empty_product()}))
-        return tree, hist, cal
+        return None, hist, cal
 
-    def bt(tree, hist, cal, starts, ex, trs=None):
-        """매도·분할 규칙 dict(트리 형식) → 출입구 Rule 로 감싸 build_trades 에."""
-        return trades_mod.build_trades(tree, "X", hist, cal, starts, TreeGateway.as_rules(ex),
-                                       None if trs is None else TreeGateway.as_rules(trs))
+    def bt(_tree, hist, cal, starts, ex, trs=None):
+        """판다·산다(분할) 규칙(합성 v3 트리) → 출입구가 건넨 Rule 로 build_trades 에."""
+        tree = TreeGateway.of(synthetic({"X": None}, *(ex + (trs or []))))
+        return trades_mod.build_trades(tree, "X", hist, cal, starts, tree.exit_rules("X"),
+                                       None if trs is None else tree.tranches("X"))
+
+    def sell(label, when, of, x):
+        return rule(label, "판다", when, (of, x))
+
+    def tr(label, x, when=None):
+        return rule(label, "산다", when, ("budget", x))
 
     R = {"pos": "ret"}
     # (1) 신호 0일 → 1일 시가 100 진입. 2일 종가 108(+8%) → 1차(처음 30%) 3일 시가 110 매도.
     #     4일 종가 116(+16%) → 2차(처음 30%) 5일 시가 117. 6일 종가 99(−1%) & maxret≥15 → 잔량 전량 7일 시가 98.
     rows = [(100, 100), (100, 101), (105, 108), (110, 112), (114, 116), (117, 110), (105, 99), (98, 97), (97, 97)]
     tree, hist, cal = mk(rows)
-    ex = [{"label": "1차", "when": {"ge": [R, 7]}, "sell": {"initial": 0.3}},
-          {"label": "2차", "when": {"ge": [R, 15]}, "sell": {"initial": 0.3}},
-          {"label": "잔량", "when": {"all": [{"ge": [{"pos": "maxret"}, 15]}, {"lt": [R, 0]}]}, "sell": "all"}]
+    ex = [sell("1차", {"ge": [R, 7]}, "bought", 0.3), sell("2차", {"ge": [R, 15]}, "bought", 0.3),
+          sell("잔량", {"all": [{"ge": [{"pos": "maxret"}, 15]}, {"lt": [R, 0]}]}, "held", 1)]
     t = bt(tree, hist, cal, [0], ex)
     check(len(t) == 1 and t[0]["closed"], "분할: 거래 1건 청산")
     if t:
@@ -88,8 +93,7 @@ def t_trades():
     # (2) 같은 날 두 규칙(처음 50% + 남은 50%) — 적힌 순서: 0.5 팔고 남은 0.5의 절반 → 남은 0.25 는 미청산
     rows = [(100, 100), (100, 100), (100, 110), (120, 120), (120, 125)]
     tree, hist, cal = mk(rows)
-    ex = [{"label": "a", "when": {"ge": [R, 5]}, "sell": {"initial": 0.5}},
-          {"label": "b", "when": {"ge": [R, 5]}, "sell": {"remaining": 0.5}}]
+    ex = [sell("a", {"ge": [R, 5]}, "bought", 0.5), sell("b", {"ge": [R, 5]}, "held", 0.5)]
     t = bt(tree, hist, cal, [0], ex)[0]
     check([round(x["qty"], 6) for x in t["sells"]] == [0.5, 0.25] and not t["closed"], "동시 발동 순서·미청산")
     exp = (0.5 * 120 + 0.25 * 120 + 0.25 * 125) / 100 * 100 - 100        # 남은 0.25 는 마지막 종가 125 로 평가
@@ -97,24 +101,25 @@ def t_trades():
     # (3) 보유 중 신호 건너뛰기 · 청산 다음 날부터 다시 진입
     rows = [(100, 100)] * 3 + [(100, 106), (106, 106)] + [(100, 100)] * 4
     tree, hist, cal = mk(rows)
-    ex = [{"label": "익절", "when": {"ge": [R, 5]}, "sell": "all"}]
+    ex = [sell("익절", {"ge": [R, 5]}, "held", 1)]
     t = bt(tree, hist, cal, [0, 1, 2, 5], ex)
     check([x["entry"] for x in t] == [cal[1], cal[6]], "보유 중 신호 건너뜀: %r" % [x["entry"] for x in t])
     check(t[0]["exit"] == cal[4] and t[0]["sells"][0]["px"] == 106, "청산일·가격")
     # (4) 같은 규칙은 한 번만 — 다시 조건이 참이 돼도 두 번 팔지 않는다
     rows = [(100, 100), (100, 108), (108, 100), (100, 109), (109, 109)]
     tree, hist, cal = mk(rows)
-    t = bt(tree, hist, cal, [0], [{"label": "1차", "when": {"ge": [R, 7]}, "sell": {"initial": 0.3}}])[0]
+    t = bt(tree, hist, cal, [0], [sell("1차", {"ge": [R, 7]}, "bought", 0.3)])[0]
     check(len(t["sells"]) == 1, "규칙 한 번만")
     # (5) 매도 비율 null(저자 미명시) — 걸려도 팔지 않고 문구로 드러낸다
-    ex = [{"label": "축소", "when": {"ge": [R, 7]}, "sell": {"remaining": None}}]
+    ex = [sell("축소", {"ge": [R, 7]}, "held", "?")]
     t = bt(tree, hist, cal, [0], ex)[0]
     check(t["sells"] == [] and not t["closed"], "비율 미명시 매도는 팔지 않음 %r" % t["sells"])
-    check("「축소」" in (trades_mod.unsized_note(tree, "X", TreeGateway.as_rules(ex)) or ""), "비율 미명시 매도 문구")
+    tx = TreeGateway.of(synthetic({"X": None}, *ex))
+    check("「축소」" in (trades_mod.unsized_note(tx, "X", tx.exit_rules("X")) or ""), "비율 미명시 매도 문구")
     # (5) 마지막 날 신호 → 다음 날이 없어 체결 못 함(미청산), fixed20 은 20거래일 모자라면 None
     rows = [(100, 100), (100, 100), (100, 120)]
     tree, hist, cal = mk(rows)
-    t = bt(tree, hist, cal, [0], [{"label": "x", "when": {"ge": [R, 5]}, "sell": "all"}])[0]
+    t = bt(tree, hist, cal, [0], [sell("x", {"ge": [R, 5]}, "held", 1)])[0]
     check(not t["closed"] and t["sells"] == [] and t["fixed20"] is None, "마지막 날 신호는 체결 안 됨")
     # (6) fixed20 = 진입일 포함 20번째 거래일 종가
     rows = [(100, 100)] + [(100, 100 + i) for i in range(1, 30)]
@@ -124,18 +129,16 @@ def t_trades():
     # (7) manual 은 '매도가 안 나가는 쪽'으로 풀린다 — 확인 못 한 조건 때문에 팔지 않는다(not 아래도 마찬가지)
     rows = [(100, 100), (100, 100), (100, 100), (100, 100)]
     tree, hist, cal = mk(rows)
-    t = bt(tree, hist, cal, [0], [{"label": "m", "when": {"manual": "실적"}, "sell": "all"}])[0]
+    t = bt(tree, hist, cal, [0], [sell("m", {"manual": "실적"}, "held", 1)])[0]
     check(t["sells"] == [], "manual 매도는 안 걸림")
-    t = bt(tree, hist, cal, [0], [{"label": "nm", "when": {"not": {"manual": "x"}}, "sell": "all"}])[0]
+    t = bt(tree, hist, cal, [0], [sell("nm", {"not": {"manual": "x"}}, "held", 1)])[0]
     check(t["sells"] == [], "not 아래 manual 도 매도를 일으키지 않는다(안쪽을 참으로 풀어 not = 거짓)")
     # (8) 분할 매수 — 1차 25% 1일 시가 100. 2차(종가 ≥ +5%) 2일 종가 106 → 3일 시가 108 에 30%.
     #     평균 매입가 = (0.25·100 + 0.30·108)/0.55 = 104.36… 4일 종가 115(+10.2%) → 익절(산 물량 전부) 5일 시가 116.
     rows = [(100, 100), (100, 101), (103, 106), (108, 109), (112, 115), (116, 117), (117, 117)]
     tree, hist, cal = mk(rows)
-    trs = [{"label": "1차", "frac": 0.25}, {"label": "2차", "frac": 0.30, "when": {"ge": [R, 5]}},
-           {"label": "3차", "frac": 0.45, "when": {"ge": [R, 50]}}]
-    t = bt(tree, hist, cal, [0],
-                        [{"label": "익절", "when": {"ge": [R, 10]}, "sell": {"initial": 1.0}}], trs)[0]
+    trs = [tr("1차", 0.25), tr("2차", 0.30, {"ge": [R, 5]}), tr("3차", 0.45, {"ge": [R, 50]})]
+    t = bt(tree, hist, cal, [0], [sell("익절", {"ge": [R, 10]}, "bought", 1.0)], trs)[0]
     avg = (0.25 * 100 + 0.30 * 108) / 0.55
     check([(b["date"], b["px"], b["qty"]) for b in t["buys"]] == [(cal[1], 100, 0.25), (cal[3], 108, 0.30)],
           "분할: 매수 날짜·가격·수량 %r" % t["buys"])
@@ -145,14 +148,13 @@ def t_trades():
     # 같은 날 매도가 걸리면 그날은 추가 매수하지 않는다
     rows = [(100, 100), (100, 100), (100, 106), (106, 106), (106, 106)]
     tree, hist, cal = mk(rows)
-    t = bt(tree, hist, cal, [0],
-                        [{"label": "반", "when": {"ge": [R, 5]}, "sell": {"remaining": 0.5}}], trs)[0]
+    t = bt(tree, hist, cal, [0], [sell("반", {"ge": [R, 5]}, "held", 0.5)], trs)[0]
     check([b["date"] for b in t["buys"]] == [cal[1], cal[4]],      # 2일 매도 신호 → 3일 시가 매수 안 함, 3일 신호 → 4일 매수
           "매도가 걸린 날은 추가 매수 안 함 %r" % t["buys"])
     # 분할이 없으면 한 번에 전량(옛 규약과 같은 결과) · 비율이 저자 미명시(null)여도 전량(비율을 지어내지 않는다)
     t = bt(tree, hist, cal, [0], [], [])[0]
     check([b["qty"] for b in t["buys"]] == [1.0], "분할 없음 = 전량")
-    nul = [{"label": "1차", "frac": None}, {"label": "2차", "frac": None, "when": {"ge": [R, 5]}}]
+    nul = [tr("1차", "?"), tr("2차", "?", {"ge": [R, 5]})]
     t = bt(tree, hist, cal, [0], [], nul)[0]
     check([b["qty"] for b in t["buys"]] == [1.0], "분할 비율 미명시 = 전량 한 번")
 
@@ -164,9 +166,9 @@ def t_no_exit():
     today = datetime.now()
     cal = [(today - timedelta(days=60 - k)).strftime("%Y%m%d") for k in range(60)]
     hist = {"X": [Candle(d, 100 + k, 101 + k, 99 + k, 100 + k, 1000) for k, d in enumerate(cal)]}
-    ex = [{"label": "익절", "when": {"ge": [{"pos": "ret"}, 5]}, "sell": "all"}]
+    ex = [rule("익절", "판다", {"ge": [{"pos": "ret"}, 5]}, ("held", 1))]
     for exits, pol in (([], "none"), (ex, "book")):
-        tree = TreeGateway.of(synthetic({"X": empty_product(exit=exits)}))
+        tree = TreeGateway.of(synthetic({"X": None}, rule("늘", "산다", {"all": []}), *exits))   # 매수 신호는 늘 참
         check(trades_mod.exit_policy(tree, "X") == pol, "exit_policy %r" % pol)
         res = runner.run("x", 365, hist=hist, tree=tree)
         t = res["trades"]["X"]
@@ -180,40 +182,38 @@ def t_no_exit():
 
 
 def t_sizing():
-    """금액 정책(trades.size_of) — 매수 크기 = 분할 비율 × 비중(%)/100 × 조심 배수. 크기는 그날 판정의 Judge.amount
-    (라이브 화면과 같은 경로)에서 온다. 폭 미명시 조심·확인 필요 조심·비중 모름은 ×1 로 두고 횟수를 센다."""
+    """금액 정책(trades.size_of) — 매수 크기 = 분할 비율 × 비중(%)/100. 크기는 그날 판정의 Judge.amount
+    (라이브 화면과 같은 경로)에서 온다. 비중 미명시·모름은 ×1 로 두고 횟수를 센다."""
     from signals.judge import Judge
     R = {"pos": "ret"}
     ON = {"gt": [{"px": "close"}, 0]}                     # 늘 참
     rows = [(100, 100), (100, 100), (100, 106), (106, 106), (106, 108), (108, 108)]
     cal = ["2021%04d" % i for i in range(len(rows))]
     hist = {"X": [Candle(d, o, max(o, c), min(o, c), c, 1000) for d, (o, c) in zip(cal, rows)]}
-    trs = [{"label": "1차", "frac": 0.25}, {"label": "2차", "frac": 0.75, "when": {"ge": [R, 5]}}]
+    trs = [rule("1차", "산다", None, ("budget", 0.25)), rule("2차", "산다", {"ge": [R, 5]}, ("budget", 0.75))]
 
-    def run(caution, weight):
-        tree = TreeGateway.of(synthetic({"X": empty_product(caution=caution, sizing={"weight": weight, "tranches": trs})}))
+    def run(weight):
+        cash = [] if weight is None else [rule("비중", "산다", None, ("cash", weight))]
+        tree = TreeGateway.of(synthetic({"X": None}, *(cash + trs)))
         j = Judge(tree, "X", hist, cal)
         tl = trades_mod.build_trades(tree, "X", hist, cal, [0], [], amount=j.amount)
         return tl[0]["buys"], trades_mod._parity_stats(tl)["size_counts"]
 
-    # 조심 배수 ×0.5 · 비중 40% → 1차 0.25×0.4×0.5 · 2차(2일 +6% → 3일 시가) 0.75×0.4×0.5
-    b, sz = run([{"label": "반", "when": ON, "scale": 0.5}], 40)
-    check([round(x["qty"], 9) for x in b] == [0.05, 0.15] and [x["date"] for x in b] == [cal[1], cal[3]],
-          "비중·조심 배수·분할 비율 곱 %r" % b)
-    check(sz["buys"] == 2 and sz["cut"] == 2 and not trades_mod.size_notes(sz), "조심으로 줄인 횟수 %r" % sz)
-    # 폭 미명시 조심(scale null) → ×1(줄이지 않음) + 횟수 · 비중 저자 미명시 → 상품 예산 100%
-    b, sz = run([{"label": "폭", "when": ON, "scale": None}], None)
-    check([x["qty"] for x in b] == [0.25, 0.75], "폭 미명시 조심·비중 미명시는 ×1 %r" % b)
+    # 비중 40% → 1차 0.25×0.4 · 2차(2일 +6% → 3일 시가) 0.75×0.4
+    b, sz = run(40)
+    check([round(x["qty"], 9) for x in b] == [0.1, 0.3] and [x["date"] for x in b] == [cal[1], cal[3]],
+          "비중·분할 비율 곱 %r" % b)
+    check(sz["buys"] == 2 and not trades_mod.size_notes(sz), "비중 명시 — 문구 없음 %r" % sz)
+    # 비중 저자 미명시 → 상품 예산 100% + 횟수
+    b, sz = run(None)
     notes = trades_mod.size_notes(sz)
-    check(sz["unspecified"] == 2 and sz["weight_unset"] == 2 and sz["cut"] == 0
-          and any("폭 미명시 조심 2회" in n for n in notes) and any("비중 저자 미명시" in n for n in notes),
-          "폭 미명시·비중 미명시 횟수와 문구 %r %r" % (sz, notes))
-    # 확인 필요(수동) 조심 → ×1 + 횟수 · 비중 식은 있으나 값 모름("?") → 100% + 횟수
-    b, sz = run([{"label": "수동", "when": {"manual": "x"}, "scale": 0.5}], {"case": [[ON, "?"]], "else": "?"})
-    check([x["qty"] for x in b] == [0.25, 0.75] and sz["unknown"] == 2 and sz["weight_unknown"] == 2,
-          "확인 필요 조심·비중 모름은 ×1 %r %r" % (b, sz))
-    # 수량 변환 하나(to_units) — 다섯 basis · 모름(None)은 None
-    Qty, Led, tu = TreeGateway.as_rules([{"frac": 1}])[0].qty.__class__, trades_mod.Ledger, trades_mod.to_units
+    check([x["qty"] for x in b] == [0.25, 0.75] and sz["weight_unset"] == 2
+          and any("비중 저자 미명시" in n for n in notes), "비중 미명시는 ×1 + 문구 %r %r" % (sz, notes))
+    # 비중 식은 있으나 값 모름("?") → 100% + 횟수
+    b, sz = run({"case": [[ON, "?"]], "else": "?"})
+    check([x["qty"] for x in b] == [0.25, 0.75] and sz["weight_unknown"] == 2, "비중 모름은 ×1 %r %r" % (b, sz))
+    # 수량 변환 하나(to_units) — basis 별 · 모름(None)은 None
+    Led, tu = trades_mod.Ledger, trades_mod.to_units
     led = Led(budget=0.4, order=0.5, bought=0.6, held=0.3)
     got = [tu(Qty(of, x), led) for of, x in (("cash", 30), ("budget", 0.25), ("order", 0.5), ("bought", 0.3),
                                               ("held", 0.5))]
@@ -223,13 +223,13 @@ def t_sizing():
     seen, orig = [], trades_mod.to_units
     trades_mod.to_units = lambda q, ld: seen.append(q.of) or orig(q, ld)
     try:
-        tree = TreeGateway.of(synthetic({"X": empty_product(sizing={"weight": 40, "tranches": trs})}))
-        ex = TreeGateway.as_rules([{"label": "반", "when": {"ge": [R, 5]}, "sell": {"initial": 0.5}},
-                                   {"label": "끝", "when": {"ge": [R, 5]}, "sell": "all"}])
-        trades_mod.build_trades(tree, "X", hist, cal, [0], ex, amount=Judge(tree, "X", hist, cal).amount)
+        ex = [rule("반", "판다", {"ge": [R, 5]}, ("bought", 0.5)), rule("끝", "판다", {"ge": [R, 5]}, ("held", 1))]
+        tree = TreeGateway.of(synthetic({"X": None}, rule("비중", "산다", None, ("cash", 40)), *(trs + ex)))
+        trades_mod.build_trades(tree, "X", hist, cal, [0], tree.exit_rules("X"),
+                                amount=Judge(tree, "X", hist, cal).amount)
     finally:
         trades_mod.to_units = orig
-    check({"budget", "cash", "order", "bought", "held"} <= set(seen), "매수·매도·비중·조심이 to_units 하나로 %r" % seen)
+    check({"budget", "cash", "bought", "held"} <= set(seen), "매수·매도·비중이 to_units 하나로 %r" % seen)
 
 
 def t_live_path():

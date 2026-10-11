@@ -25,17 +25,22 @@ TREE_TOP = ("version", "products", "names", "rules", "note",
             "defs", "source", "unexpressed", "review")   # 뒤 4개는 옛 v2 호환(읽기만)
 PRODUCT_KEYS = ("index", "ref", "note", "exit_note")
 DO_VERBS = ("안 산다", "산다", "판다")
-# 옛 v2 이름들(합성 트리·검사기 호환용 — v3 에선 안 쓰지만 import 가 깨지지 않게 남긴다)
-EMPTY_ZONE = {"filter": {"all": []}, "entry": {"all": []}, "avoid": {"any": []},
-              "caution": [], "sizing": {"weight": None, "tranches": []}, "exit": []}
+def rule(label, do, when=None, qty=None, **meta):
+    """합성 트리(검사용)의 행동 규칙 하나 — 갈래 하나짜리. qty = (of, x) 또는 None. meta = ref·note·on 등."""
+    br = {"do": do}
+    if when is not None:
+        br["when"] = when
+    if qty is not None:
+        br["qty"] = {"of": qty[0], "x": qty[1]}
+    return dict(meta, label=label, then=[br])
 
 
-def empty_product(**zones):
-    return dict(EMPTY_ZONE, **zones)
-
-
-def synthetic(products, **top):
-    return dict(top, products=products)
+def synthetic(products, *rules, **top):
+    """합성 트리(검사용, v3). products = {종목: 기준지수 | None} 또는 {종목: {index…}}. 규칙이 없으면 skip 하나를 둔다
+    (v3 는 빈 rules 를 거부한다)."""
+    prods = {p: (v if isinstance(v, dict) else ({"index": v} if v else {})) for p, v in products.items()}
+    return dict(top, version=3, products=prods,
+                rules=list(rules) or [{"label": "(합성 — 규칙 없음)", "skip": "연산 없음: 합성 트리"}])
 
 
 class Qty(namedtuple("Qty", "of x")):
