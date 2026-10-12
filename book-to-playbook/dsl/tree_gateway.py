@@ -12,7 +12,7 @@
     · weight — 산다 + qty cash(비중) · tranches — 산다 + qty budget(분할) · sells — 판다
   수량은 트리의 qty {of, x} 를 그대로 Qty(of, x) 로 건넨다("?" → None). 물량 변환은 consumers/backtest/trades.to_units.
   `{"rule": "이름"}` 참조와 이름 심볼(`$빅테크` 등 names)은 건네기 전에 **펼친다** — 평가기(Cond)는 평범한 식만 본다.
-  `{"pos": "filled"/"sold", "rule": ...}` 는 pos 값만 남긴다(포지션이 없으면 None → 그 갈래 안 침 — 정직한 degrade).
+  `{"pos": "filled", "rule": 이름}`(그 규칙으로 산 횟수)은 그대로 건넨다 — 값은 체결 장부(trades)가 낸다.
 """
 import json
 import os
@@ -136,9 +136,8 @@ class TreeGateway:
             return [self._expand(x, seen) for x in node]
         if not isinstance(node, dict):
             return node
-        # {"pos": ..., "rule": ...} → pos 값만 (포지션 없으면 None → 갈래 안 침)
-        if "pos" in node:
-            return {"pos": node["pos"]}
+        if "pos" in node:                        # 포지션 값 — {"pos": "filled", "rule": 이름} 의 rule 은 참조가 아니라 장부 열쇠
+            return dict(node)
         # bare {"rule": "이름"} → 그 규칙의 value(없으면 첫 갈래 when)
         if "rule" in node and set(node) - set(Cond.META) == {"rule"}:
             name = node["rule"]

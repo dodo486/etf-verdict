@@ -53,6 +53,8 @@ def _op_of(node):
         keys = [k for k in keys if k not in ("sym", "tf")]
     if node.get("case") is not None:
         keys = [k for k in keys if k != "else"]
+    if node.get("pos") is not None:
+        keys = [k for k in keys if k != "rule"]
     if len(keys) != 1:
         raise CondError("노드에 연산이 정확히 하나여야 한다: %r" % sorted(node))
     return keys[0]
@@ -207,6 +209,8 @@ def validate(node, path="$"):
     elif op == "pos":
         if v not in POS_FIELDS:
             raise CondError("%s.pos: 모르는 포지션 값 %r (허용 %s)" % (path, v, "/".join(POS_FIELDS)))
+        if "rule" in node and (v != "filled" or not isinstance(node["rule"], str)):
+            raise CondError("%s.pos: rule 은 filled 에만(그 규칙으로 산 횟수 — 규칙 이름 문자열)" % path)
     else:
         raise CondError("%s: 모르는 연산 %r" % (path, op))
 
@@ -217,7 +221,8 @@ class Ctx:
 
     def __init__(self, hist, cal, self_sym, index_sym=None, manual_as=None, pos=None, asof=None,
                  session_close=None, answers=None):
-        """pos = (첫 매수일 인덱스, 평균 매입가 | 날짜별 평균 매입가 목록) — 매도·분할 규칙 평가 때만.
+        """pos = (첫 매수일 인덱스, 평균 매입가 | 날짜별 평균 매입가 목록[, 장부]) — 판다·분할 갈래 평가 때만.
+        장부 = {"filled": {규칙 이름 | None(전체): 날짜별 산 횟수}, "sold": 날짜별 판 비율} — 없으면 filled·sold 는 모름.
         asof = 관측 시각(UTC datetime) — 분봉(tf="1m"/"5m") 필드를 이 시각 이하로 자른다. None 이면 실제 지금.
         session_close = {심볼: {YYYYMMDD: 그날 정규장 마감(UTC datetime, tz-aware)}} — 일봉 확정(settled) 경계.
           거래소 캘린더(md_feed.sessions)에서 캐려 밖(cond)에서 넣는다(평가기는 jhts 를 모른다). 장중 asof 에서
@@ -656,7 +661,11 @@ def _series(node, ctx, s_sym):
     if op == "pos":
         if ctx.pos is None:
             raise CondError("pos 는 매도·분할 규칙 안에서만 쓴다")
-        e, cost = ctx.pos                    # cost = 평균 매입가(숫자) 또는 날짜별 평균 매입가 목록(분할 매수)
+        e, cost = ctx.pos[:2]                # cost = 평균 매입가(숫자) 또는 날짜별 평균 매입가 목록(분할 매수)
+        if v in ("filled", "sold"):          # 장부 값 — 체결 워크(trades)가 날짜별로 넣는다. 장부가 없으면 모름
+            book = ctx.pos[2] if len(ctx.pos) > 2 else None
+            s = None if book is None else (book["sold"] if v == "sold" else book["filled"].get(node.get("rule"), [0] * L))
+            return [float(s[i]) if (s is not None and i >= e and s[i] is not None) else None for i in range(L)]
         close = ctx.px(ctx.self_sym, "close")
         px = cost if isinstance(cost, list) else [cost] * L
         ret = [((close[i] / px[i] - 1) * 100 if (i >= e and _exact(close[i]) and px[i]) else None)
@@ -1083,6 +1092,8 @@ class Cond:
   포지션        {"pos": "ret"|"days"|"maxret"|"minret"|"filled"|"sold"}   판다·2차 이후 분할(산다) 갈래 안에서만.
                 ret = 평균 매입가 대비 오늘 종가 수익률(%), days = 첫 매수일부터 지난 봉(첫 매수일 0),
                 maxret/minret = 첫 매수일~오늘 종가 수익률의 최고/최저. 매수 전 날은 None.
+                filled = 산 횟수({"pos": "filled", "rule": "1차"} = 그 규칙으로 산 횟수, rule 없으면 전체) ·
+                sold = 지금까지 판 비율(판 물량 ÷ 산 물량). 둘은 체결 장부가 있어야 안다(없으면 모름).
   메타(아무 노드에) "label", "ref", "id", "note"
 
 심볼: "$self"(그 상품) · "$index"(상품의 기준 지수) · "$s"(across 안의 종목) · 그 외 문자 그대로."""

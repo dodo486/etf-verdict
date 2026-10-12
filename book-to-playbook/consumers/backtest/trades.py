@@ -151,6 +151,8 @@ def build_trades(gw, prod, hist, cal, starts, sell_rules, tranches=None, amount=
         산 물량·남은 물량 장부로. amount 생략(검사기 합성)이면 비중 100%.
       · 1차: 신호 시작일 T 의 다음 날 시가(T+1)에. 한 상품에 포지션은 하나(보유 중 신호는 건너뜀).
       · 2차 이후: 매일 종가에 다음 차수 when 을 평가 → 참이면 다음 날 시가에(차례대로 각 한 번).
+      · 장부(pos filled·sold): 그날까지 체결된 매수의 차수별 횟수와 판 비율을 날짜별로 cond 에 넣는다
+        (체결 = 다음 날 시가 — 체결한 날 종가 평가부터 반영). 매수·매도가 있을 때마다 다시 넣는다.
         같은 날 매도가 걸렸으면 그날은 사지 않는다.
       · 매도: 매일 종가에 규칙 평가 → 걸리면 다음 날 시가에. 규칙마다 한 번만(같은 날 여럿이면 적힌 순서) —
         repeat 인 판다 갈래는 조건이 다시 맞을 때마다(거짓·모름 → 참으로 바뀐 날) 또 판다.
@@ -168,6 +170,7 @@ def build_trades(gw, prod, hist, cal, starts, sell_rules, tranches=None, amount=
         return {"date": cal[at], "px": opens[at], "qty": to_units(t.qty, led), "tranche": t.label,
                 "size": to_units(Qty("budget", 1.0), led), "flags": sorted(fl)}
     cs = {c.date: c for c in hist.get(prod) or []}
+    at = {d: k for k, d in enumerate(cal)}
     opens = [cs[d].open if d in cs else None for d in cal]
     closes = [cs[d].close if d in cs else None for d in cal]
     L = len(cal)
@@ -183,19 +186,34 @@ def build_trades(gw, prod, hist, cal, starts, sell_rules, tranches=None, amount=
         remaining = bought
         cost = [None] * L
 
+        def book():
+            """날짜별 체결 장부 — 차수(규칙 이름)별·전체 산 횟수, 판 비율(판 물량 ÷ 산 물량). 체결일부터 센다."""
+            filled, got, gone = {None: [0] * L}, [0.0] * L, [0.0] * L
+            for b in buys:
+                k = at[b["date"]]
+                filled.setdefault(b["tranche"], [0] * L)
+                for j in range(k, L):
+                    filled[b["tranche"]][j] += 1
+                    filled[None][j] += 1
+                    got[j] += b["qty"]
+            for x in sells:
+                for j in range(at[x["date"]], L):
+                    gone[j] += x["qty"]
+            return {"filled": filled, "sold": [(g / q) if q > 1e-12 else None for g, q in zip(gone, got)]}
+
         def rebuild(frm):
-            """frm 부터 평단이 바뀐다 → 날짜별 평단(cost)을 다시 계산해 pos 로 cond 에 주입(상태 주입).
-            cond 는 그 값을 읽어 ret/days/maxret/minret 로 판다·분할 갈래만 평가한다(역류 아님)."""
+            """frm 부터 평단이 바뀐다 → 날짜별 평단(cost)을 다시 계산해 장부와 함께 pos 로 cond 에 주입(상태 주입).
+            cond 는 그 값을 읽어 ret/days/maxret/minret/filled/sold 로 판다·분할 갈래만 평가한다(역류 아님)."""
             q = sum(b["qty"] for b in buys)
             avg = sum(b["qty"] * b["px"] for b in buys) / q
             for k in range(frm, L):
                 cost[k] = avg
-            ctx = Holding(e, list(cost)).ctx(gw, prod, hist, cal, manual_as=False)
+            ctx = Holding(e, list(cost), book=book()).ctx(gw, prod, hist, cal, manual_as=False)
             return ([Cond.series(r.when, ctx) for r in sell_rules],
                     [Cond.series(t.when, ctx) if t.when is not None else None for t in tranches])
 
-        whens, twhens = rebuild(e)
         nxt, sells, fired, last = 1, [], set(), None
+        whens, twhens = rebuild(e)
         for d in range(e, L):
             sold_today = False
             for k, r in enumerate(sell_rules):
@@ -218,6 +236,8 @@ def build_trades(gw, prod, hist, cal, starts, sell_rules, tranches=None, amount=
             if remaining <= 1e-9:
                 last = d + 1
                 break
+            if sold_today:
+                whens, twhens = rebuild(d + 1)    # 판 비율(pos sold)이 바뀌었다 — 장부를 다시 넣는다
             if (not sold_today and nxt < len(tranches) and twhens[nxt] is not None
                     and twhens[nxt][d] is True and d + 1 < L and opens[d + 1]):
                 b = buy(d, d + 1, tranches[nxt])

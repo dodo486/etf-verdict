@@ -310,6 +310,23 @@ def t_pos(rng):
     got = Cond.series({"pos": "ret"}, ctx)
     check(got[0] is None and same(got[2], 10.0) and same(got[3], (120 / 105 - 1) * 100)
           and same(got[4], (90 / 105 - 1) * 100), "pos.ret 평균 매입가 목록 %r" % got)
+    # 장부 값(filled·sold) — 체결 워크가 날짜별로 넣는다. 장부가 없으면 모름(옛 동작: minret 로 잘못 계산되던 자리)
+    book = {"filled": {None: [0, 1, 1, 2, 2], "1차": [0, 1, 1, 1, 1], "2차": [0, 0, 0, 1, 1]},
+            "sold": [None, 0.0, 0.0, 0.0, 0.5]}
+    ctx.pos = (1, 100.0, book)
+    F = lambda node: Cond.series(node, ctx)
+    check(F({"pos": "filled"}) == [None, 1.0, 1.0, 2.0, 2.0] and F({"pos": "filled", "rule": "2차"}) == [None, 0.0, 0.0, 1.0, 1.0]
+          and F({"pos": "filled", "rule": "없는 차수"}) == [None, 0.0, 0.0, 0.0, 0.0]
+          and F({"pos": "sold"}) == [None, 0.0, 0.0, 0.0, 0.5], "pos filled·sold 장부 값")
+    ctx = make_ctx(xs)                       # 새 문맥(계산 캐시는 문맥마다) — 장부 없이
+    ctx.pos = (1, 100.0)
+    check(F({"pos": "filled", "rule": "1차"}) == [None] * 5 and F({"pos": "sold"}) == [None] * 5, "장부 없으면 filled·sold 는 모름")
+    for bad in ({"pos": "ret", "rule": "1차"}, {"pos": "filled", "rule": 3}):
+        try:
+            Cond.validate(bad)
+            FAILS.append("잘못된 pos rule 통과 %r" % bad)
+        except Cond.CondError:
+            pass
 
 
 # ------------------------------------------------------------------ 4. 인과성
@@ -732,8 +749,9 @@ def t_gateway():
     check((sz.label, sz.ref, sz.qty) == ("비중", "4-1", ("cash", 30)), "weight = 산다 qty cash")
     trs = g.tranches("A")
     check([(t.label, t.qty, t.when) for t in trs] == [("1차", ("budget", 0.5), None),
-                                                       ("2차", ("budget", 0.5), {"ge": [{"pos": "filled"}, 1]})]
-          and g.tranches("B") == [], "tranches = 산다 qty budget(pos 의 rule 은 뗀다) %r" % [(t.label, t.when) for t in trs])
+                                                       ("2차", ("budget", 0.5), {"ge": [{"pos": "filled", "rule": "1차"}, 1]})]
+          and g.tranches("B") == [], "tranches = 산다 qty budget(pos filled 의 rule = 장부 열쇠로 남김) %r"
+          % [(t.label, t.when) for t in trs])
     e = g.sells("A")
     check([(r.label, r.qty) for r in e] == [("익절", ("held", 1))], "sells = 판다 %r" % [(r.label, r.qty) for r in e])
     check(g.symbols() == {"A", "B", "^NDX", "NQ=F", "N1", "N2"} and g.symbols(["B"]) == {"B"}, "symbols %r" % g.symbols())

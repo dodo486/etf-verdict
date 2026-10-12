@@ -154,6 +154,20 @@ def t_trades():
     t = bt(tree, hist, cal, [0], [sell("반", {"ge": [R, 5]}, "held", 0.5)], trs)[0]
     check([b["date"] for b in t["buys"]] == [cal[1], cal[4]],      # 2일 매도 신호 → 3일 시가 매수 안 함, 3일 신호 → 4일 매수
           "매도가 걸린 날은 추가 매수 안 함 %r" % t["buys"])
+    # 2차 조건이 '1차로 산 횟수'(pos filled rule) — 1차 체결(1일)부터 참 → 2일 시가에 2차. 3차는 '판 비율 ≥ 0.5' 라 안 산다.
+    rows = [(100, 100), (100, 100), (101, 101), (102, 102), (103, 103)]
+    tree, hist, cal = mk(rows)
+    fl = [tr("1차", 0.25), tr("2차", 0.25, {"ge": [{"pos": "filled", "rule": "1차"}, 1]}),
+          tr("3차", 0.5, {"ge": [{"pos": "sold"}, 0.5]})]
+    t = bt(tree, hist, cal, [0], [], fl)[0]
+    check([(b["date"], b["tranche"]) for b in t["buys"]] == [(cal[1], "1차"), (cal[2], "2차")],
+          "분할 조건 pos filled(그 규칙으로 산 횟수)·sold(판 비율) %r" % [(b["date"], b["tranche"]) for b in t["buys"]])
+    # 판 비율 — 절반까지만 판다(sold < 0.5): +0%·+1%·+2%·… 매일 참인 30% 매도 repeat 는 판 비율이 0.5 를 넘으면 멈춘다
+    rows = [(100, 100), (100, 100), (100, 99), (100, 101), (100, 99), (100, 101), (100, 99), (100, 101), (100, 100)]
+    tree, hist, cal = mk(rows)
+    half = rule("절반까지", Cond.SELL, {"all": [{"ge": [R, 1]}, {"lt": [{"pos": "sold"}, 0.5]}]}, ("bought", 0.3), repeat=True)
+    t = bt(tree, hist, cal, [0], [half])[0]
+    check([round(x["qty"], 6) for x in t["sells"]] == [0.3, 0.3], "pos sold 로 '절반까지만' %r" % t["sells"])
     # 분할이 없으면 한 번에 전량(옛 규약과 같은 결과) · 비율이 저자 미명시(null)여도 전량(비율을 지어내지 않는다)
     t = bt(tree, hist, cal, [0], [], [])[0]
     check([b["qty"] for b in t["buys"]] == [1.0], "분할 없음 = 전량")

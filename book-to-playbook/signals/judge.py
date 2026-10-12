@@ -21,10 +21,11 @@ from dsl.tradeTool import Grade
 
 
 class Holding:
-    """보유 상태 — entry_i = 첫 매수 봉 index(없으면 None), cost = 평균 매입가(수 하나 또는 봉마다 평단 목록), filled = 산 차수."""
+    """보유 상태 — entry_i = 첫 매수 봉 index(없으면 None), cost = 평균 매입가(수 하나 또는 봉마다 평단 목록), filled = 산 차수,
+    book = 날짜별 체결 장부 {"filled": {규칙 이름|None: 산 횟수}, "sold": 판 비율}(백테스트 체결 워크가 넣는다 — 없으면 모름)."""
 
-    def __init__(self, entry_i, cost, filled=1, entry_date=None):
-        self.entry_i, self.cost, self.filled, self.entry_date = entry_i, cost, filled, entry_date
+    def __init__(self, entry_i, cost, filled=1, entry_date=None, book=None):
+        self.entry_i, self.cost, self.filled, self.entry_date, self.book = entry_i, cost, filled, entry_date, book
 
     @classmethod
     def at(cls, cal, entry_date, cost, filled=1):
@@ -33,8 +34,9 @@ class Holding:
         return cls(later[0] if later else None, cost, filled, entry_date)
 
     def ctx(self, gw, prod, hist, cal, manual_as=None):
-        """이 보유를 pos 로 주입한 평가 문맥 — cond 는 그 값을 '읽어' ret·days·maxret·minret 로 판다·분할 갈래만 평가한다."""
-        return Cond.Ctx(hist, cal, prod, gw.index(prod), manual_as=manual_as, pos=(self.entry_i, self.cost))
+        """이 보유를 pos 로 주입한 평가 문맥 — cond 는 그 값을 '읽어' ret·days·maxret·minret·filled·sold 로 판다·분할 갈래만 평가한다."""
+        pos = (self.entry_i, self.cost) if self.book is None else (self.entry_i, self.cost, self.book)
+        return Cond.Ctx(hist, cal, prod, gw.index(prod), manual_as=manual_as, pos=pos)
 
 
 @dataclass
