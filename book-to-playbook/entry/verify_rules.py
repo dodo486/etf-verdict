@@ -12,7 +12,7 @@
   · signals/      tree+시세 → 판정 데이터(Judge·라이브 엔진·공통 책열기)
   · feed/        라이브 틱 피더(in-process pub-sub 트리거)
   · consumers/   신호를 받아 쓰는 소비자 — backtest(체결·돈·러너)·notify(알림)·display(화면 모양·UI JS)
-  · entry/       진입점 — run(스케줄 러너)·serve(로컬 서버)·watch(장중 루프) · verify_rules(이 검사 — 전 층을 보므로 여기)
+  · entry/       진입점 — run(스케줄 러너·check)·serve(로컬 서버)·live(라이브 버스 조립) · verify_rules(이 검사 — 전 층을 보므로 여기)
   · authoring/   책 → 플레이북 → 트리를 '만드는' 쪽 — playbook(원문 인덱스)·checklist(지침 md·비교 도구)
   검사는 따로 층이 없다 — 검사하는 대상 옆에 verify_*.py 로 둔다(그 층의 import 규칙을 그대로 따른다).
 

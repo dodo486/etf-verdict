@@ -83,7 +83,7 @@ python -m entry.serve                                           # 로컬 실시�
 | 각 층의 `verify_*.py` | 검사 — 검사하는 대상 옆에 둔다(`dsl/verify_primitives` · `signals/verify_view` · `consumers/backtest/verify_trading` · `consumers/display/verify_page` · `entry/verify_rules` 등). 전부 한 번에 `python -m entry.run check` |
 | `consumers/display/ui/*.js` · `consumers/display/inject_ui.py` | 화면 JS(책 무관 공유) · 페이지 주입 |
 | `dsl/tree_gateway.py` · `tradeTool.py` | 구간② 공개 DSL — 트리 출입구 · Cond(문법·평가기) · Grade(등급의 뜻 — 등급·금액·비중·워밍업·시세 조달) |
-| `signal/{judge,engine}.py` · `consumers/backtest/{trades,portfolio,runner}.py` · `consumers/notify/{telegram,desktop}.py` | ① 신호(판정기·라이브 엔진) · ② 백테스트 소비(체결·vectorbt 돈·러너) · ② 알림 소비 |
+| `signals/judge.py` · `entry/live.py` · `consumers/backtest/{trades,portfolio,runner}.py` · `consumers/notify/{telegram,desktop}.py` | ① 신호(판단자 Judge · 라이브 버스 조립) · ② 백테스트 소비(체결·vectorbt 돈·러너) · ② 알림 소비 |
 | `market/md_feed.py` | **jhts 시세 창구 — 유일한 수집 입구**(없으면 수집 요청) |
 | `consumers/display/verdict_view.py` · `consumers/notify/{telegram,desktop}.py` | 판정 JSON·알림 문장(books.json engine.daily) · 알림 송신(텔레그램·데스크톱) |
 | `consumers/display/book_page.py` · `entry/serve.py` · `consumers/display/build_home.py` · `consumers/display/backtest_page.py` | 페이지 조립 · 로컬 실시간 서버 · 홈 · 백테스트 탭 데이터 |

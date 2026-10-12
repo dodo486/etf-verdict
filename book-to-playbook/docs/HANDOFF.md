@@ -21,7 +21,8 @@ tree.json 은 지운 연산(pct·count·streak)·옛 `review` 키 때문에 **�
 
 | 커밋 | 내용 |
 |---|---|
-| verify/ 폐지 | **verify/ 폴더 폐지** — 검사는 대상 옆 `verify_*.py`(동작 불변): 트리 `authoring/checklist/verify_tree` · 원문 `authoring/playbook/verify_source` · 페이지 `consumers/display/verify_page` · 연산 `dsl/verify_primitives` · 설명 `signals/verify_view` · 체결 `consumers/backtest/verify_trading` · 코드 규칙 `entry/verify_rules` |
+| (문서) | entry 설명 바로잡음(없는 watch.py → live.py · watch 루프는 feed/feed.watch) · README 옛 `signal/{judge,engine}.py` 경로 |
+| `d11a164` | **verify/ 폴더 폐지** — 검사는 대상 옆 `verify_*.py`(동작 불변): 트리 `authoring/checklist/verify_tree` · 원문 `authoring/playbook/verify_source` · 페이지 `consumers/display/verify_page` · 연산 `dsl/verify_primitives` · 설명 `signals/verify_view` · 체결 `consumers/backtest/verify_trading` · 코드 규칙 `entry/verify_rules` |
 | `43ebea0` | **검사는 바뀔 때만** — daily·verdict·watch 에서 검사 제거, `--no-verify-tree` 폐지. 바꿨으면 커밋 전 `run check` |
 | `fba5686` | **만드는 곳 = 검증하는 곳**(동작 불변) — 트리 채점 → `authoring/checklist/score.py`(+`--quick` 트리 계약) · 본문 해시 → `authoring/playbook/` · 책 페이지 검사 → `consumers/display/book_page.py` · `verify/` 는 코드 검사만 |
 | `d25526f` | 심판 비교 도구를 `authoring/checklist/compare.py` 로(채점과 '같은 뜻' 잣대 한 벌) — authoring 층 import 에 signals |
