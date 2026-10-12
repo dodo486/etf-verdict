@@ -124,7 +124,7 @@ def _answers_of(body):
 def render_page(slug):
     """책 slug 페이지 HTML — 요청 시점의 라이브 판정(내 포지션 포함)을 구워 넣는다. 조립은 assemble 하나로.
     판정 계산이 실패해도 페이지는 내보낸다(프런트가 폴링으로 재시도)."""
-    from consumers.display.verify_page import assemble
+    from consumers.display.book_page import assemble
     try:
         data, _ = compute_verdict(slug)
     except Exception:
