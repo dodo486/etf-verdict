@@ -57,6 +57,18 @@ class Qty(namedtuple("Qty", "of x")):
     __slots__ = ()
 
 
+class Card(namedtuple("Card", "label ref note on value branches skip why")):
+    """규칙 하나를 **적힌 그대로**(펼치지 않음 — {"rule"} 참조 그대로, 갈래의 "$value" 만 그 규칙 value 로) — 원시 트리 보기용.
+    ref = 원문 소절 글자("·" 로 여럿) · on = 대상 상품 목록(None = 전부) · value = 이름 조건·측정(없으면 None)
+    · branches = [CardBranch] · skip = 못 옮긴 사유(없으면 None) · why = 심판 기록."""
+    __slots__ = ()
+
+
+class CardBranch(namedtuple("CardBranch", "do when qty repeat")):
+    """규칙 카드의 갈래 하나 — do = 동사 · when = 조건(적힌 그대로) · qty = Qty(of, x — x 는 적힌 그대로, "?" 포함) | None."""
+    __slots__ = ()
+
+
 class Branch:
     """갈래 하나(분할 차수·매도·비중)의 읽기 전용 값. 없는 필드는 None. qty = Qty(얼마나).
     repeat = 조건이 다시 맞을 때마다(판다 갈래만 — 기본은 한 번)."""
@@ -465,6 +477,21 @@ class TreeGateway:
         """심판이 그 규칙을 a·b 중 고른 이유(최종 트리만) — 없으면 None."""
         return (self._by_label.get(label) or {}).get("why")
 
+
+    def cards(self):
+        """규칙 카드 [Card](파일 순서) — 판정 로직(동사별 재배치·등급·펼치기) 안 거친 트리 1:1. 원시 트리 보기(화면)용."""
+        out = []
+        for r in self._d.get("rules", []):
+            if not isinstance(r, dict):
+                continue
+            val = r.get("value")
+            brs = [CardBranch(t.get("do"),
+                              self._sub_value(t["when"], val) if ("when" in t and val is not None) else t.get("when"),
+                              Qty((t.get("qty") or {}).get("of"), (t.get("qty") or {}).get("x")) if t.get("qty") else None,
+                              bool(t.get("repeat")))
+                   for t in r.get("then") or [] if isinstance(t, dict)]
+            out.append(Card(r.get("label"), r.get("ref"), r.get("note"), r.get("on"), val, brs, r.get("skip"), r.get("why")))
+        return out
 
     def conditions(self):
         """트리에 적힌 조건식 전부(펼치기 전, 적힌 그대로) — 규칙의 value·갈래 when·qty 식. 검사기가 수동 잎의

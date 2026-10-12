@@ -763,6 +763,12 @@ def t_gateway():
     check(g.skips() == [{"rule": "못 옮김", "ref": "9-9", "reason": "데이터 없음: x"}], "skip 규칙")
     check(not TreeGateway({}) and bool(g) and TreeGateway.load("__없는책__") is None, "빈·없는 트리")
     check(W in g.conditions() and {"all": [{"rule": "20일선 위"}, M]} in g.conditions(), "conditions = 적힌 그대로의 조건식")
+    cd = {c.label: c for c in g.cards()}
+    check(list(cd) == g.labels() and cd["20일선 위"].value == W and cd["20일선 위"].branches == []
+          and cd["선물 양"].on == ["A"] and cd["선물 양"].branches[0].when == {"all": [{"rule": "20일선 위"}, M]}
+          and cd["1차"].branches[0].qty == ("budget", 0.5) and cd["1차"].branches[0].when is None
+          and cd["못 옮김"].skip == "데이터 없음: x" and cd["익절"].ref == "5-1",
+          "cards = 규칙 카드(적힌 그대로 — 참조 안 펼침)")
     # on 은 상품만 · qty 식의 {"rule"} 은 펼친다 · 규칙 note 는 갈래까지
     g2 = TreeGateway.of(dict(data, rules=data["rules"] + [rule("A 전용 익절", Cond.SELL, W, ("held", 0.5), on=["A"], note="메모"),
                                                           rule("식 비중", Cond.BUY, None, ("cash", {"rule": "20일선 위"}))]))

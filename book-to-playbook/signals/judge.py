@@ -415,3 +415,7 @@ class Judge:
 
     def conditions(self):
         return self._tree.conditions()
+
+    def cards(self):
+        """규칙 카드(적힌 그대로) — 원시 트리 보기(화면)용."""
+        return self._tree.cards()

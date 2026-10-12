@@ -75,9 +75,27 @@ def _inject_backtest(html, slug):
     return html.replace("</body>", block + "</body>", 1)
 
 
+def _inject_rawtree(html, slug):
+    """원시 트리를 플레이북 소절 밑에 붙인다(별도 탭 아님) — 판단자가 내준 규칙 카드(적힌 그대로)를 소절 ref 로 묶어
+    #rawtree-by-ref 블롭 + 스타일로 심는다(playbook-ui 가 소절마다 '🌲 규칙' 토글로 보인다). 트리가 없으면 안 심는다.
+    다시 조립하면 이전 주입분을 갈아끼운다(멱등). #src 앞에 둬 playbook-ui 보다 먼저 파싱되게.
+    형식 검사는 하지 않는다(Judge.read) — 검사에 걸린 트리도 무엇이 뽑혔는지 그대로 보여야 고칠 수 있다."""
+    html = re.sub(r'<style id="rawtree-css">.*?</style>\n?', "", html, flags=re.S)
+    html = re.sub(r'<script type="application/json" id="rawtree-by-ref">.*?</script>\n?', "", html, flags=re.S)
+    from signals.judge import Judge
+    from consumers.display import raw_tree
+    judge = Judge.read(slug, "tree.json")
+    if not judge:
+        return html
+    body = json.dumps(raw_tree.render_by_ref(judge), ensure_ascii=False).replace("</", "<\\/")
+    block = ('<style id="rawtree-css">%s</style>\n'
+             '<script type="application/json" id="rawtree-by-ref">%s</script>\n') % (raw_tree.PANEL_CSS, body)
+    return re.sub(r'<script type="text/markdown" id="src">', lambda m: block + m.group(0), html, count=1)
+
+
 def assemble(slug, data):
     """책 페이지 한 장을 조립한다 — 로컬 실시간 서버(serve)가 쓰는 단일 경로.
-    판정(#verdict-data) · 공유 UI(ui/*.js) · 책 레일 · 소절 원문 · 백테스트 탭을 얹는다.
+    판정(#verdict-data) · 공유 UI(ui/*.js) · 책 레일 · 소절 원문 · 백테스트 탭 · 소절별 원시 트리를 얹는다.
     (로컬 전용이라 내 포지션을 그대로 싣는다 — 정적 발행이 폐지돼 '공개 페이지' 분기는 없다.)"""
     html = read_text(playbook_html(slug))
     if data is not None:
@@ -90,4 +108,5 @@ def assemble(slug, data):
     from consumers.display.inject_nav import inject as _inject_nav
     html = _inject_nav(html, slug)
     html = _inject_source(html, slug)
-    return _inject_backtest(html, slug)
+    html = _inject_backtest(html, slug)
+    return _inject_rawtree(html, slug)

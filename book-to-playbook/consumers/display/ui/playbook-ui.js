@@ -130,6 +130,32 @@
     });
   })();
 
+  // ── 소절에서 뽑힌 규칙(원시 트리) ────────────────────────────────────────
+  //   #rawtree-by-ref(소절 ref → 그 소절을 근거로 단 규칙 HTML)를 각 소절 헤딩에 '규칙' 토글로 붙인다.
+  //   판정 로직(동사별 재배치·등급·펼치기) 안 거친 트리 1:1 — 원문 소절 바로 옆에서 추출 충실성을 본다.
+  //   서버(consumers/display/raw_tree)가 HTML·스타일을 그려 박고, 여기선 토글만 배선한다(렌더러 한 벌).
+  (function(){
+    var RT = {}; try { RT = JSON.parse(document.getElementById('rawtree-by-ref').textContent) || {}; } catch(e){}
+    Array.prototype.forEach.call(document.querySelectorAll('#content h3.sec'), function(h){
+      var m = (h.textContent||'').match(window.BP.REF_RE); if(!m) return;
+      var rules = RT[m[1]];
+      if(!rules) return;                              // 이 소절에서 뽑힌 규칙 없음 — 버튼 안 붙인다
+      var n = (rules.match(/class='rt-rule/g)||[]).length;
+      var btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'pb-rt-btn'; btn.textContent = '🌲 규칙 ' + n;
+      var panel = document.createElement('div');
+      panel.className = 'rtx'; panel.innerHTML = rules; panel.style.display = 'none';
+      btn.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        var show = panel.style.display === 'none';
+        panel.style.display = show ? 'block' : 'none';
+        btn.classList.toggle('on', show);
+      });
+      h.appendChild(btn);
+      h.parentNode.insertBefore(panel, h.nextSibling);
+    });
+  })();
+
   document.getElementById('nav').innerHTML = nav.map(n=>
     '<li><a class="navlink" href="#'+n.id+'"><span class="n">'+esc(n.num)+'</span><span>'+esc(n.title)+'</span></a></li>'
   ).join('');

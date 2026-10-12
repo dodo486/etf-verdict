@@ -21,6 +21,7 @@ tree.json 은 지운 연산(pct·count·streak)·옛 `review` 키·옛 종목 �
 
 | 커밋 | 내용 |
 |---|---|
+| 원시 트리 | **원시 트리 보기**(브랜치에서 옮김) — 플레이북 소절 헤딩의 '🌲 규칙' 토글로 그 소절에서 뽑힌 규칙을 판정 로직 없이 1:1(`consumers/display/raw_tree.py`). 트리는 판단자에게 묻는다 — 출입구 질문 `cards()`(규칙 카드, 적힌 그대로) 추가(브랜치의 뒷문 `whole()`·원본 키 직접 접근은 쓰지 않음) |
 | on+sym | **종목 모델 `on`(어느 상품) + `sym`(구체 티커) 둘로**(브랜치 `cleanup/symbol-model` 을 지금 구조로 옮김) — `$self`·`$index`·`$s`·`names`·`products.index`·`across` 폐지(형식 검사가 거부, 평가기·출입구·설명·화면·검사에서 지원 삭제). 동치 확인: 같은 뜻을 옛/새 표기로 쓴 합성 트리가 실제 시세 3년치 판정·비중·백테스트 거래까지 동일 |
 | (문서) | entry 설명 바로잡음(없는 watch.py → live.py · watch 루프는 feed/feed.watch) · README 옛 `signal/{judge,engine}.py` 경로 |
 | `d11a164` | **verify/ 폴더 폐지** — 검사는 대상 옆 `verify_*.py`(동작 불변): 트리 `authoring/checklist/verify_tree` · 원문 `authoring/playbook/verify_source` · 페이지 `consumers/display/verify_page` · 연산 `dsl/verify_primitives` · 설명 `signals/verify_view` · 체결 `consumers/backtest/verify_trading` · 코드 규칙 `entry/verify_rules` |
