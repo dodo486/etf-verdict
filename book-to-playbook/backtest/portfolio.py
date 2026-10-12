@@ -92,7 +92,7 @@ def _orders_from_trades(trade_list, cal):
     """backtest.trades.build_trades 가 낸 거래 목록(각 거래의 buys/sells)을 '거래일별 주문'으로 편다.
     돌려주는 것: 날짜 인덱스 i → (signed_units, fill_price, is_sell_bar).
       signed_units > 0 매수, < 0 매도(한 봉에 매수·매도가 겹치면 합산; 세금은 매도가 있으면 가산).
-    단위(units)는 규칙 평가 워크의 물량(상품 예산 1.0 기준 — 분할 비율 × 비중, 금액 정책 trades.size_of)
+    단위(units)는 규칙 평가 워크의 물량(상품 예산 1.0 기준 — 분할 비율 × 비중, 금액 정책 judge.size_of)
     그대로다 — 계산기가 물량을 다시 정하지 않는다."""
     di = {d: i for i, d in enumerate(cal)}
     orders = {}  # i -> {"units": float, "price": float, "sell": bool}

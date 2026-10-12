@@ -105,11 +105,11 @@
 
     Object.keys(P.products).forEach(function (p) {
       var S = P.products[p], T = S.trades || {}, st = T.stats || {};
-      var none = S.exit_policy === 'none';   // 매도 정책(web/backtest_page — 정본 trades.exit_policy): 책에 매도 규칙 없음
+      var none = S.exit_policy === 'none';   // 매도 정책(web/backtest_page — 정본 judge.exit_policy): 책에 매도 규칙 없음
       h += '<div class="bt-prod"><h2>' + esc(p) + (none ? '<span class="bt-tag none">' + esc(D.no_exit_note) + '</span>' : '') + '</h2>';
       h += '<p class="bt-sub">기간 보유(처음~끝) ' + pct(S.buy_hold, 1) + '</p>';
       if (T.unsized_note) h += '<p class="bt-sub">⚠ ' + esc(T.unsized_note) + '</p>';
-      // 금액(얼마나) — 엔진이 낸 횟수(stats.size_counts)와 문구(size_notes, 정본 backtest/trades.size_of 정책)를 그대로
+      // 금액(얼마나) — 엔진이 낸 횟수(stats.size_counts)와 문구(size_notes, 정본 judge/judge.size_of 정책)를 그대로
       var SC = st.size_counts;
       if (SC && SC.buys) h += '<p class="bt-sub">금액 = 비중 × 분할 비율 · 매수 ' + SC.buys + '회</p>';
       if ((T.size_notes || []).length) h += '<p class="bt-sub">⚠ ' + T.size_notes.map(esc).join(' · ') + '</p>';

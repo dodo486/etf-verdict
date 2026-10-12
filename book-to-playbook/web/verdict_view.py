@@ -13,8 +13,8 @@
   verdict : {prod, index, note, date, close, chg, key, grade, reason,
              gates{안 산다, 산다: view}, opt{..}, pes{..},     등급 동사 둘의 중첩 설명 + 낙관·비관 값
              size{label, ref, weight, weight_range, units, tranches[{label, ref, frac, units, view?}]},   얼마나(산다 qty)
-                                                     units = 오늘 물량(시작자본 1.0 기준 — trades.to_units, 비중 모르면 None)
-             sells[{label, ref, sell(문장 — trades.sell_text), note, view}], exit_policy("book"|"none" — trades.exit_policy),
+                                                     units = 오늘 물량(시작자본 1.0 기준 — judge.to_units, 비중 모르면 None)
+             sells[{label, ref, sell(문장 — judge.sell_text), note, view}], exit_policy("book"|"none" — judge.exit_policy),
              positions[{…, sells[], next_tranche}]}                  positions = 내 포지션(로컬 파일)이 있을 때만
 view 는 노드 하나당 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, hidden?} (판단자 설명 judge/explain.view)
 — 수동은 '모름'(사람이 답했으면 그 답 — render(answers=))으로 둔 그날 값. 화면은 다시 계산하지 않고 그대로 그린다.
@@ -25,8 +25,7 @@ from shared.paths import book_meta
 from market import md_feed
 from tree.tradeTool import Cond
 from tree.tradeTool import Grade
-from judge.judge import Judge
-from backtest.trades import NO_EXIT_NOTE, exit_policy, live_units, sell_text
+from judge.judge import NO_EXIT_NOTE, Judge, exit_policy, live_units, sell_text
 
 SOURCE = "jhts 시세팀(일봉)"
 
@@ -136,7 +135,7 @@ def _format(slug, book, prices, decisions, answers=None):
            "grades": Grade.GRADES,
            # 동사 셋(화면 머리글·판정 JSON 키) — Cond.VERBS 가 정본이다. 화면은 복붙하지 않고 이걸 받아 쓴다.
            "verbs": list(Cond.VERBS),
-           # 매도 정책 "none"(책에 매도 규칙 없음) 문구 — 정본 backtest/trades.NO_EXIT_NOTE(화면이 받아 쓴다).
+           # 매도 정책 "none"(책에 매도 규칙 없음) 문구 — 정본 judge/judge.NO_EXIT_NOTE(화면이 받아 쓴다).
            "no_exit_note": NO_EXIT_NOTE}
     if book is None:
         top["error"] = "조건 트리 없음 — books/%s/tree.json 이 있어야 판정한다" % slug

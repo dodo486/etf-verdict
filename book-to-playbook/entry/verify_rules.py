@@ -240,7 +240,7 @@ def m_book_paths(src):
     return out
 
 
-# 매도 정책 — 책에 매도 규칙이 없으면 어떻게 하나(정본 trades.exit_policy: "book" | "none" = 매수 신호만 평가).
+# 매도 정책 — 책에 매도 규칙이 없으면 어떻게 하나(정본 judge.exit_policy: "book" | "none" = 매수 신호만 평가).
 #   폐지된 '표준 매도'(대체 매도 규칙·그 숫자 파일·출처 글자·화면 플래그)의 이름은 주인 포함 어디서도 다시 쓰지 않는다.
 STD_GONE = ("STANDARD", "exit_defaults", "standard_label", "uses_standard_exit", "exit_standard",
             "standard_exit_label", "exits_of", "exit_source")
@@ -264,7 +264,7 @@ def m_std_exit_gone(src):
             + [(ln, None, t) for ln, v in src.lits for t in STD_GONE_TEXT if t in v])
 
 
-# 금액 정책 — 그날의 '얼마나' 사실(Judge.amount)을 매수 크기로 바꾸는 규칙(모름을 어떻게 세나). 정본 trades.size_of.
+# 금액 정책 — 그날의 '얼마나' 사실(Judge.amount)을 매수 크기로 바꾸는 규칙(모름을 어떻게 세나). 정본 judge.size_of.
 #   사실을 꺼내는 grade 의 weight_of 는 Judge.amount 한 경로로만 읽는다(라이브·백테스트 같은 값).
 AMOUNT_FACTS = {"weight_of"}
 
@@ -280,7 +280,7 @@ def m_amount_policy(src):
     return [(ln, None, x) for ln, x in _js_hits(src, r"\bfunction\s+size_?[oO]f\s*\(")]
 
 
-# 수량 변환 — 정규화된 '얼마나'(출입구 Qty(of, x))를 물량으로 바꾸는 곳은 trades.to_units 하나(매수·매도·비중 모두).
+# 수량 변환 — 정규화된 '얼마나'(출입구 Qty(of, x))를 물량으로 바꾸는 곳은 judge.to_units 하나(매수·매도·비중 모두).
 #   밖에서 basis(of)를 가르거나 수량(qty.x)으로 셈을 하면 종류별 해석이 다시 흩어진다.
 QTY_BASES = ("bought", "held", "budget")
 QTY_JS = (r"\.of\b|\b(?:frac|scale|weight)\b\s*\*(?!\s*100\b)"
@@ -400,6 +400,16 @@ def m_grade_ladder(src):
     return [(ln, None, x) for ln, x in _js_hits(src, LADDER_JS)]
 
 
+# 소절 키 규칙 — 책 본문에서 소절 키('N-M'·프롤로그·에필로그)를 알아보는 정규식(정본 shared/sections).
+SECTION_KEY_MARKS = (r"\d+-\d+", "프롤로그|에필로그")
+
+
+def m_section_keys(src):
+    if src.kind != "py":
+        return []
+    return [(ln, f, m) for ln, f, v in _py_strs(src) for m in SECTION_KEY_MARKS if m in v]
+
+
 # ------------------------------------------------------------------ 주인 표 — 개념 하나 = 주인 하나(여기 한 곳)
 # concept · owners(주인 파일 — 그 안에선 자유) · match(매처) · why(한 줄 사유) · hint(고칠 길) · allow(명시 예외, 사유 필수).
 OWNERS = [
@@ -417,20 +427,18 @@ OWNERS = [
     dict(concept="책 산출물 경로", owners=("shared/paths.py",), match=m_book_paths,
          why="books/<slug>/ 아래 산출물 경로를 짓는 곳은 하나 — 옛 루트 산출물로 되돌아가지 않게",
          hint="shared/paths.py(book_dir·book_file…)로", allow={}),
-    dict(concept="매도 정책", owners=("backtest/trades.py",), match=m_exit_policy, everywhere=m_std_exit_gone,
-         why="책에 매도 규칙이 없을 때의 정책은 trades.exit_policy 하나(\"none\" = 대체 규칙 없이 매수 신호만 평가) — "
+    dict(concept="매도 정책", owners=("judge/judge.py",), match=m_exit_policy, everywhere=m_std_exit_gone,
+         why="책에 매도 규칙이 없을 때의 정책은 judge.exit_policy 하나(\"none\" = 대체 규칙 없이 매수 신호만 평가) — "
              "폐지된 표준 매도(대체 규칙·숫자 파일·출처 글자·플래그)는 주인 포함 어디서도 되살리지 않는다",
-         hint="trades.exit_policy · 화면은 exit_policy 필드와 no_exit_note 문구로", allow={}),
-    dict(concept="금액 정책", owners=("backtest/trades.py",), match=m_amount_policy,
-         why="매수 크기(비중 × 분할)와 모름(비중 미명시·모름)을 어떻게 셀지는 trades.size_of 하나 — "
+         hint="judge.exit_policy · 화면은 exit_policy 필드와 no_exit_note 문구로", allow={}),
+    dict(concept="금액 정책", owners=("judge/judge.py",), match=m_amount_policy,
+         why="매수 크기(비중 × 분할)와 모름(비중 미명시·모름)을 어떻게 셀지는 judge.size_of 하나 — "
              "그 사실은 Judge.amount 한 경로로만(라이브 화면 = 백테스트)",
-         hint="Judge.amount 로 사실을, trades.size_of 로 크기를",
-         allow={("judge/judge.py", "amount"): (AMOUNT_FACTS, "ProductJudge.amount — 그날 사실(Amount)을 꺼내는 한 경로"),
-                ("judge/judge.py", "weight_at"): (AMOUNT_FACTS, "검사기용 그날 비중 사실(매수 크기 정책 아님)")}),
-    dict(concept="수량 변환", owners=("backtest/trades.py",), match=m_qty_convert,
-         why="'얼마나'(Qty: cash·budget·bought·held)를 물량으로 바꾸는 곳은 trades.to_units 하나 — 매수(분할)·매도·"
+         hint="Judge.amount 로 사실을, judge.size_of 로 크기를", allow={}),
+    dict(concept="수량 변환", owners=("judge/judge.py",), match=m_qty_convert,
+         why="'얼마나'(Qty: cash·budget·bought·held)를 물량으로 바꾸는 곳은 judge.to_units 하나 — 매수(분할)·매도·"
              "비중이 같은 변환을 지난다. 밖은 Qty 를 건네기만 하고 basis 를 가르거나 셈하지 않는다",
-         hint="trades.to_units(Qty, Ledger) · 화면은 엔진이 낸 units·sell 문장으로", allow={}),
+         hint="judge.to_units(Qty, Ledger) · 화면은 엔진이 낸 units·sell 문장으로", allow={}),
     dict(concept="트리 출입구 사용", owners=("tree/gateway.py", "tree/tradeTool.py", "judge/judge.py"),
          match=m_gateway_use,
          why="트리 원본을 쓰는 곳은 판단자(judge/judge) 하나 — 다른 층(체결·화면·라이브·검사)은 판단자에게 묻는다",
@@ -455,6 +463,9 @@ OWNERS = [
          allow={("tree/tradeTool.py", None): (None, "지운 연산 목록 정본(GONE_OPS)"),
                 ("tree/verify_primitives.py", "t_syntax"): ({"ma", "across"}, "지운 연산이 문법에서 거부되는지 보는 자리"),
                 ("tree/verify_primitives.py", "t_gateway"): ({"across"}, "폐지된 across 트리를 출입구가 거부하는지 보는 자리")}),
+    dict(concept="소절 키 규칙", owners=("shared/sections.py",), match=m_section_keys,
+         why="소절 키를 알아보는 정규식은 shared/sections 하나 — 전사(원문 인덱스)와 화면(원문 탭)이 같은 키를 본다",
+         hint="shared.sections 의 KEY·MARK_*·PB_HEAD·marks 로", allow={}),
     dict(concept="동사·등급 이름표", owners=("tree/tradeTool.py",), match=m_labels,
          why="Cond.VERBS(안 산다·산다·판다) · Grade.GRADES · grade_rules.json 이 정본 — 화면은 판정 JSON(verbs·grades)으로 받는다",
          hint="파이썬은 Cond.BLOCK·BUY·SELL·VERBS, 화면은 판정 JSON 의 verbs·grades 로", allow={}),

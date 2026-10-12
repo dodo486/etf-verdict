@@ -62,6 +62,11 @@ tree.json 은 지운 연산(pct·count·streak)·옛 `review` 키·옛 종목 �
 - 초안 문서는 위가 끝나면 지침(`COND_DSL`·`EXTRACTOR`·`JUDGE`·`SCENARIO`)으로 옮기고 지운다(초안 머리말 규칙).
 
 ### 그 뒤
+- **원문 탭 소절 자르기 버그(화면)** — `web/book_page._source_sections` 는 장 표지(`Chapter N.`)를 경계로 안 보고 `프롤로그:` 도
+  못 알아본다. trend 원문 탭: 프롤로그·에필로그 없음, 1-5 끝에 "Chapter 2." 줄, 3-3 끝에 에필로그 본문이 붙는다. 원문 인덱스와
+  같은 `shared.sections.marks` 로 자르면 고쳐진다(화면이 바뀌는 기능 커밋).
+- **화면 JS 의 소절 키 정규식 사본** — `web/ui/shared-ui.js` REF_RE·REF_HEAD_RE 가 `shared/sections` 와 같은 키를 따로 적는다
+  (JS 라 import 불가). 서버가 판정 JSON 에 키 패턴을 실어 보내면 한 벌.
 - **트리 출입구 강제의 빈틈** — 주인 표 '트리 원본 키'는 `r["rules"]`·`.get("then")` 꼴만 잡는다. `"then" in r`·흔한 키
   (`when`·`qty`)·`book_file(slug, "tree.json")` 직접 열기는 안 잡힌다(지금 위반은 0). 출입구 밖에서 `"tree.json"`·`"tree_candidates"`
   를 파일 열기에 넘기면 정지하는 줄을 주인 표에. (후보 파일 이름은 출입구 `gateway.FILES` 한 곳으로 모음 — `Judge.read(slug, "a")`)

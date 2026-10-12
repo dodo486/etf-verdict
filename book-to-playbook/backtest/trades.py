@@ -1,30 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""판다·분할 규칙 리더 + 규칙 평가 워크(구간③) — 트리(books/<slug>/tree.json)의
-판다 갈래·산다 분할(qty budget)을 읽어, 봉마다 평가해 체결 일정·거래 요약을 만든다(책 무관, 돈·수수료·지표 없음).
+"""규칙 평가 워크(구간③) — 상품 판단자가 건넨 판다 갈래·산다 분할(qty budget)을 봉마다 평가해
+체결 일정·거래 요약을 만든다(책 무관, 돈·수수료·지표 없음).
 
-이 모듈은 '규칙'만 다룬다 — 돈·수수료·성적(자산곡선·MaxDD·샤프)은 계산기(backtest/portfolio)가
-build_trades 결과(체결 일정)를 받아서 낸다. 매도 정책(책에 매도 규칙이 없으면 어떻게 하나)의 주인도 이 파일.
-
-규칙 리더
-  · exit_policy : 매도 정책 "book"(책 매도 규칙으로 청산 시뮬레이션) | "none"(책에 매도 규칙 없음 — 대체 규칙을
-                  지어내지 않고 매수 신호 뒤 N거래일 보유 수익률로만 평가, 표시 문구 NO_EXIT_NOTE). 모두 이걸 묻는다.
-  · tranches_of : 분할 매수 차수. 분할이 없거나 저자가 비율을 안 줬으면("?") 전량 한 번(비율을 지어내지 않는다).
-  · unsized_note: 분할 비율·매도 비율 '저자 미명시'를 백테스트가 어떻게 계산했는지 결과에 표시할 문구.
-
-수량 변환(이 파일 하나가 주인, entry.verify_rules 주인 표 '수량 변환')
-  · to_units    : 정규화된 '얼마나'(출입구 Qty(of, x) — cash·budget·bought·held)를 물량으로 바꾸는 단 하나의
-                  함수. 매수(분할 차수)·매도(산/남은 물량의 비율)·비중이 전부 여기를 지난다. 장부 = Ledger.
-  · sell_text · live_units : 화면이 basis 를 다시 해석하지 않게 매도 문장·라이브 오늘 장부를 여기서 빚는다.
-
-금액 정책(얼마나 사나 — 이 파일 하나가 주인, entry.verify_rules 주인 표 '금액 정책')
-  · size_of     : 그날의 '얼마나' 사실(judge.Amount — 라이브 화면과 같은 Judge.amount 한 경로)을 그날 장부
-                  Ledger(budget = 비중)로. 매수 물량 = to_units(분할 차수 Qty, 그 장부) = 분할 비율 × 비중(%)/100.
-                  모름은 지어내지 않는다(아래 SIZE_NOTES 로 횟수를 결과에 드러낸다):
-                    · 비중 저자 미명시(산다 qty cash 없음) → 상품 예산 100% 기준(배수 1)
-                    · 비중 식은 있으나 그날 값 모름(저자 미명시 숫자 "?"·수동) → 상품 예산 100% 기준(배수 1)
-                    · 금액 사실이 없음(그 봉의 판정 없음) → 배수 1
-  · size_notes  : 위 횟수(_parity_stats 의 size_counts)를 결과에 보일 문구로.
+이 모듈은 '체결'만 다룬다 — 돈·수수료·성적(자산곡선·MaxDD·샤프)은 계산기(backtest/portfolio)가
+build_trades 결과(체결 일정)를 받아서 낸다. '얼마나'(매도 정책 exit_policy · 수량 변환 to_units · 금액 정책 size_of ·
+분할 tranches_of)는 판정의 일부라 판단자(judge/judge.py '얼마나' 절)가 주인 — 여기는 그걸 불러 쓰기만 한다.
 
 규칙 평가 워크(돈·수수료·지표 없음)
   · build_trades   : 머리(tree)가 정한 진입 신호·분할·매도 규칙을 받아 '한 진입 → 그 청산까지'의
@@ -38,104 +19,9 @@ build_trades 결과(체결 일정)를 받아서 낸다. 매도 정책(책에 매
 '이 보유 상태로 조건 값'(conditions)을 받아 체결(언제 몇 주)만 정한다. 수량은 정규화된 Qty(of, x)로만 다룬다.
 """
 import statistics
-from collections import namedtuple
 
-from tree.gateway import Branch, Qty
-from judge.judge import Holding
-
-FULL = [Branch("전량", qty=Qty("budget", 1.0))]    # 한 번에 전량 — 분할이 없거나 비율 미명시일 때
-NO_EXIT_NOTE = "책에 매도 규칙 없음 — 매수 신호만 평가"   # 매도 정책 "none" 의 표시 문구(백테스트 탭·판정 화면이 받아 쓴다)
-
-
-def exit_policy(sells):
-    """매도 정책 — 이 함수 하나가 주인이다(밖은 이걸 묻는다). "book" = 책의 매도 규칙으로 청산까지 시뮬레이션.
-    "none" = 책에 매도 규칙이 없다 → 대체 매도 규칙을 지어내지 않고, 거래 시뮬레이션 없이 매수 신호 뒤
-    N거래일 보유 수익률(backtest 의 HORIZONS)로만 평가한다(화면 문구 NO_EXIT_NOTE)."""
-    return "book" if sells else "none"
-
-
-def tranches_of(trs):
-    """시뮬레이션에 쓰는 분할 — 없거나 저자가 비율을 안 줬으면("?") 전량 한 번으로
-    계산한다(비율을 지어내지 않는다 — 결과에 unsized_note 로 표시)."""
-    return FULL if (not trs or trs[0].qty.x is None) else trs
-
-
-def unsized_note(trs, sells):
-    """저자가 비율을 안 준 수량 자리를 백테스트가 어떻게 계산했는지 — 없으면 None."""
-    out = ["분할 비율 저자 미명시 — 전량 한 번 매수로 계산"] if trs and trs[0].qty.x is None else []
-    out += ["매도 비율 저자 미명시 「%s」 — 팔지 않은 것으로 계산" % r.label for r in sells if r.qty.x is None]
-    return " · ".join(out) or None
-
-
-# ------------------------------------------------------------------ 수량 변환: 정규화된 '얼마나'(Qty) → 물량
-class Ledger(namedtuple("Ledger", "budget bought held")):
-    """수량 변환의 그 시점 장부(물량 단위 = 시작자본 1.0). budget = 오늘 이 상품에 배정된 물량(비중) ·
-    bought = 지금까지 산 물량 · held = 지금 남은 물량."""
-    __slots__ = ()
-
-    def __new__(cls, budget=1.0, bought=0.0, held=0.0):
-        return super().__new__(cls, budget, bought, held)
-
-
-def to_units(q, led):
-    """정규화된 '얼마나'(출입구 Qty(of, x)) → 물량 — 매수·매도·비중이 전부 지나는 단 하나의 변환
-    (entry.verify_rules 주인 표 '수량 변환'). led = 그 시점 장부(Ledger).
-      cash   x → x/100            총 투자금의 x %          (비중)
-      budget x → x × led.budget   이 상품 배정 금액의 x    (분할 차수)
-      bought x → x × led.bought   지금까지 산 물량의 x     (매도)
-      held   x → x × led.held     지금 남은 물량의 x(1=전량)(매도)
-    x None(저자 미명시) → None — 지어내지 않는다(호출자 정책: 매도는 팔지 않음 · 비중은 size_of)."""
-    if q.x is None:
-        return None
-    return {"cash": lambda: q.x / 100.0, "budget": lambda: q.x * led.budget,
-            "bought": lambda: q.x * led.bought, "held": lambda: q.x * led.held}[q.of]()
-
-
-def sell_text(q, repeat=False):
-    """매도 수량(Qty)의 사람 문장 — 화면이 basis 를 다시 해석하지 않게 여기서 빚는다. repeat = 다시 맞을 때마다."""
-    again = " · 다시 맞을 때마다" if repeat else ""
-    if q.x is None:
-        return ("산 물량의 " if q.of == "bought" else "남은 물량의 ") + "? (비율 저자 미명시)" + again
-    if q.of == "held" and q.x == 1:
-        return "남은 전량" + again
-    if not isinstance(q.x, (int, float)):
-        return ("산 물량의 " if q.of == "bought" else "남은 물량의 ") + "식으로 정한 비율" + again
-    return ("산 물량의 " if q.of == "bought" else "남은 물량의 ") + "%d%%" % round(q.x * 100) + again
-
-
-def live_units(a, q=None):
-    """라이브 화면의 오늘 물량(시작자본 1.0 기준) — q(분할 차수 Qty) 생략이면 이 상품 오늘 배정 전체.
-    비중을 모르면(미명시·그날 값 모름) None(화면은 금액을 '—'로 — 백테스트 정책으로 채우지 않는다)."""
-    if not a.weight_set or a.weight is None:
-        return None
-    led = Ledger(budget=to_units(Qty("cash", a.weight), Ledger()))
-    return to_units(q or Qty("budget", 1.0), led)
-
-
-# ------------------------------------------------------------------ 금액 정책: 그날의 '얼마나' 사실 → 매수 장부
-# 결과에 남기는 모름의 종류 → 문구(%d = 매수 결정 횟수). 판단 근거는 모듈 docstring '금액 정책'.
-SIZE_NOTES = (("weight_unset", "비중 저자 미명시 — 상품 예산 100%% 기준(%d회)"),
-              ("weight_unknown", "비중 그날 값 모름 %d회 — 상품 예산 100%% 기준"),
-              ("no_facts", "금액 사실 없음 %d회 — 배수 1"))
-
-
-def size_of(a):
-    """그날의 Amount(judge.Judge.amount) → (오늘 장부 Ledger(budget=비중), 모름 표시 집합).
-    물량 계산은 to_units 하나 — 여기는 모름을 어떻게 채울지(정책, 모듈 docstring '금액 정책')만 정한다:
-    모름은 줄이지도 늘리지도 않고(상품 예산 100%) 표시 집합으로 센다."""
-    if a is None:
-        return Ledger(), {"no_facts"}
-    flags = set()
-    budget = to_units(Qty("cash", a.weight), Ledger()) if a.weight_set else None
-    if budget is None:
-        flags.add("weight_unknown" if a.weight_set else "weight_unset")
-        budget = 1.0
-    return Ledger(budget=budget), flags
-
-
-def size_notes(counts):
-    """_parity_stats 의 size_counts 횟수 → 결과에 보일 문구 목록(모름이 없으면 [])."""
-    return [txt % counts[k] for k, txt in SIZE_NOTES if counts.get(k)]
+from tree.gateway import Qty
+from judge.judge import SIZE_NOTES, Holding, Ledger, size_of, to_units, tranches_of
 
 
 # ------------------------------------------------------------------ 규칙 평가 워크: 신호·규칙 → 체결 일정(buys/sells)
@@ -221,7 +107,7 @@ def build_trades(judge, starts, sell_rules, tranches=None, amount=None):
                 fired.add(k)
                 q = to_units(r.qty, Ledger(bought=bought, held=remaining))
                 if q is None:
-                    continue                      # 비율 저자 미명시 — 팔지 않는다(unsized_note 로 표시)
+                    continue                      # 비율 저자 미명시 — 팔지 않는다(judge.unsized_note 로 표시)
                 if d + 1 >= L or not opens[d + 1]:
                     continue                      # 다음 날이 없다 — 체결 못 함(미청산으로 남는다)
                 q = min(q, remaining)             # 남은 것보다 많이 팔 수는 없다
@@ -263,7 +149,7 @@ def _parity_stats(trade_list, last_close=None):
     build_trades 가 낸 체결 일정을 그대로 쓰므로 거래당 수익률은 구성상 동일하다.
       trades/closed/open · win/avg/median/days(청산 거래 기준) · f20_win/f20_avg(20거래일 보유)
       · rule_hits(매도 규칙별 발동 수) · tranche_hits(2차 이후 분할 매수 수)
-      · size_counts(금액 정책 — 매수 결정 buys 회 중 모름 종류별 횟수, 문구는 size_notes)."""
+      · size_counts(금액 정책 — 매수 결정 buys 회 중 모름 종류별 횟수, 문구는 judge.size_notes)."""
     closed = [t for t in trade_list if t["closed"]]
     rets = [t["ret"] for t in closed]
     f20 = [t["fixed20"] for t in trade_list if t["fixed20"] is not None]

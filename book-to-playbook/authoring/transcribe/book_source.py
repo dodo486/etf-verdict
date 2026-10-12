@@ -18,10 +18,7 @@
 
 ## 자르는 규칙
 
-    ^\\s*(Chapter\\s+\\d+)\\.   또는  ^\\s*(\\d+)\\s*장\\.   → 장 경계
-    ^\\s*(\\d+-\\d+)\\.                                    → 소절
-    ^\\s*(프롤로그|에필로그)[:\\s]                          → 특수 소절
-
+장·소절·특수 소절 표지는 `shared/sections.py`(소절 키 규칙의 주인)가 알아본다.
 소절 본문은 **다음 표지 전까지**(장 표지도 표지로 친다).
 
 ## 책마다 원문이 같지 않다 (정직하게)
@@ -54,6 +51,7 @@ import sys
 
 from shared import paths  # noqa: F401  (경로·UTF-8 출력 고정)
 from shared.paths import BASE
+from shared import sections as section_rule   # 소절 키 규칙(parse 의 지역 이름 sections 와 겹치지 않게)
 
 
 
@@ -63,10 +61,6 @@ def norm(t):
 
 # 원문 위치 설정은 이 팀(①)만 쓰므로 팀 폴더 안에 산다.
 CONFIG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "book_sources.json")
-
-MARK_CHAPTER = re.compile(r"^\s*(?:Chapter\s+(\d+)|(\d+)\s*장)\.")
-MARK_SECTION = re.compile(r"^\s*(\d+-\d+)\.")
-MARK_SPECIAL = re.compile(r"^\s*(프롤로그|에필로그)[:\s]")
 
 # 하드랩 판정 — 본문 줄 길이 중앙값이 이보다 짧으면 고정폭 레이아웃으로 본다.
 WRAP_MEDIAN_MAX = 45
@@ -133,25 +127,6 @@ def _wrapped(lines):
     return med < WRAP_MEDIAN_MAX, p90
 
 
-def _marks(lines):
-    """표지 위치 전부. [(i, kind, key, rest)] — kind: chapter|section|special"""
-    out = []
-    for i, line in enumerate(lines):
-        m = MARK_CHAPTER.match(line)
-        if m:
-            key = m.group(1) or m.group(2)
-            out.append((i, "chapter", key, line[m.end():].strip()))
-            continue
-        m = MARK_SECTION.match(line)
-        if m:
-            out.append((i, "section", m.group(1), line[m.end():].strip()))
-            continue
-        m = MARK_SPECIAL.match(line)
-        if m:
-            out.append((i, "special", m.group(1), line[m.end():].strip()))
-    return out
-
-
 def _tnorm(s):
     """제목 비교용 — 공백·가운뎃점·따옴표 같은 OCR 흔들림을 전부 걷어낸다.
 
@@ -203,7 +178,7 @@ def parse(slug):
     text = io.open(p, encoding="utf-8").read()
     lines = text.split("\n")
     wrapped, wrap_w = _wrapped(lines)
-    marks = _marks(lines)
+    marks = section_rule.marks(lines)
     if not marks:
         raise SourceMissing("표지를 하나도 못 찾았습니다: %s" % p)
 
@@ -341,9 +316,6 @@ def write_index(slug):
 
 
 # ---------------------------------------------------------------- 플레이북 대조
-PB_HEAD = re.compile(r"^#{2,3}\s*(\d+-\d+|프롤로그|에필로그)\s*[.\s—-]")
-
-
 def playbook_path(slug):
     p = paths.playbook_html(slug)
     return p if os.path.exists(p) else None
@@ -360,7 +332,7 @@ def playbook_keys(slug):
         return None
     out = []
     for line in m.group(1).split("\n"):
-        mm = PB_HEAD.match(line)
+        mm = section_rule.PB_HEAD.match(line)
         if mm and mm.group(1) not in out:
             out.append(mm.group(1))
     return out

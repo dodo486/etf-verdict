@@ -16,7 +16,7 @@
     같은 상승을 여러 번 번 것처럼 부풀려진다.
   · 비교 기준 = 같은 종목에 '아무 날이나' 진입했을 때(전체 거래일)의 같은 수익률.
 
-거래 성적(진입 → 책 매도 규칙으로 청산)은 매도 정책(trades.exit_policy)이 "book" 일 때만 낸다 — 책에 매도 규칙이
+거래 성적(진입 → 책 매도 규칙으로 청산)은 매도 정책(judge.exit_policy)이 "book" 일 때만 낸다 — 책에 매도 규칙이
 없으면("none") 대체 매도 규칙을 지어내지 않고 위의 신호 검증(매수 신호 뒤 N거래일 보유)만 남는다.
 
 수동(manual) 조건은 과거를 확인할 수 없다. ✅(확인 없이도 매수)와 🟡(확인되면 매수)를 따로 세고,
@@ -34,7 +34,7 @@ from datetime import datetime, timedelta
 
 from shared.paths import book_log, book_meta, write_text
 from backtest import trades
-from judge.judge import Judge
+from judge.judge import Judge, exit_policy, size_notes, unsized_note
 
 HORIZONS = (5, 10, 20)
 BUY_OR_CONFIRM = "✅+🟡 (수동 확인 가정)"
@@ -108,7 +108,7 @@ def run(slug, days=365, prices=None, book=None):
         rows.extend(prow)
         summary[p] = _summarize(prow, dates, opens, closes)
         # 거래: 매수 신호(✅·🟡) 시작일 다음 날 시가 진입 → 책 판다 규칙으로 청산(보유 중 신호는 건너뜀).
-        #   매도 정책(trades.exit_policy)이 "none"(책에 판다 규칙 없음)이면 거래를 만들지 않는다.
+        #   매도 정책(judge.exit_policy)이 "none"(책에 판다 규칙 없음)이면 거래를 만들지 않는다.
         day_of = {d: i for i, d in enumerate(dates)}
         starts, prev = [], False
         for r in prow:
@@ -117,15 +117,15 @@ def run(slug, days=365, prices=None, book=None):
                 starts.append(day_of[r["date"]])
             prev = b
         sells = judge.sells()
-        pol = trades.exit_policy(sells)
+        pol = exit_policy(sells)
         if pol == "none":           # 책에 판다 규칙 없음 — 거래를 지어내지 않는다(매수 신호 뒤 N거래일 보유만: summary)
             trade_res[p] = {"exit_policy": pol}
         else:
-            # 매수 크기 = 그날 판정의 '얼마나'(judge.amount — 라이브 화면과 같은 경로)에 금액 정책(trades.size_of)
+            # 매수 크기 = 그날 판정의 '얼마나'(judge.amount — 라이브 화면과 같은 경로)에 금액 정책(judge.size_of)
             tl = trades.build_trades(judge, starts, sells, amount=judge.amount)
             st = trades._parity_stats(tl)
-            trade_res[p] = {"exit_policy": pol, "unsized_note": trades.unsized_note(judge.tranches(), sells),
-                            "size_notes": trades.size_notes(st["size_counts"]), "stats": st, "trades": tl}
+            trade_res[p] = {"exit_policy": pol, "unsized_note": unsized_note(judge.tranches(), sells),
+                            "size_notes": size_notes(st["size_counts"]), "stats": st, "trades": tl}
         manual[p] = [{"do": do, "rule": l, "ref": r} for do, l, r in judge.manual_items()]
         if prow and period is None:
             period = [prow[0]["date"], prow[-1]["date"], len(prow)]

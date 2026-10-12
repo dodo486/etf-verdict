@@ -9,6 +9,7 @@
 """
 import os, re
 import json
+from shared import sections
 from shared.paths import backtest_json, book_file, playbook_html, read_text, source_index_json
 
 VERDICT_RE = re.compile(
@@ -29,7 +30,7 @@ def _source_sections(slug):
         return {}
     secs, key, buf = {}, None, []
     for line in read_text(p).split("\n"):
-        m = re.match(r"^\s*(\d+-\d+|프롤로그|에필로그)[.\s]", line)
+        m = re.match(r"^\s*(%s)[.\s]" % sections.KEY, line)   # 키는 sections, 끝맺음 [.\s] 는 sections.marks 와 다르다
         if m:
             if key:
                 secs[key] = "\n".join(buf).strip()

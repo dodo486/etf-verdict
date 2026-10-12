@@ -1535,7 +1535,7 @@ UPRO는 시장의 폭을 산다. S&P500에는 기술주 외에 금융·헬스케
       }
     }
     else if(!(v.sells||[]).length && v.exit_policy === 'none'){
-      // 매도 정책(엔진 필드 exit_policy — 정본 backtest/trades.exit_policy): 책에 판다 규칙이 없다 — 문구도 엔진(VD.no_exit_note)
+      // 매도 정책(엔진 필드 exit_policy — 정본 judge/judge.exit_policy): 책에 판다 규칙이 없다 — 문구도 엔진(VD.no_exit_note)
       // (공통 판다 규칙만 있어 카드가 비는 경우는 제외 — 그 규칙들은 공통 섹션에서 보인다.)
       h += '<div class="grouplabel ck-zone" style="color:var(--entry)">③ '+esc(SELL)+'</div><p class="subtle" style="margin:6px 0 0">'+esc(VD.no_exit_note || '')+'</p>';
     }
@@ -1554,7 +1554,7 @@ UPRO는 시장의 폭을 산다. S&P500에는 기술주 외에 금융·헬스케
           + '<div class="tablewrap" style="margin-top:6px"><table><thead><tr><th>상품</th><th>오늘 비중</th><th>오늘 금액</th><th>분할</th></tr></thead><tbody>';
     let sum = 0, known = true;
     vs.forEach(v=>{
-      // 금액 = 총 투자금 × 엔진이 낸 오늘 물량(units — backtest/trades.to_units: 비중 × 분할 비율, 비중 모르면 null)
+      // 금액 = 총 투자금 × 엔진이 낸 오늘 물량(units — judge/judge.to_units: 비중 × 분할 비율, 비중 모르면 null)
       const s = v.size;
       let w = s.weight, wtxt;
       if(!s.weight_set){ wtxt = '<span class="manual-tag">저자 미명시</span>'; w = null; }

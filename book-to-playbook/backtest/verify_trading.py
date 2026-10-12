@@ -38,6 +38,7 @@ from shared.paths import BASE, live_slugs, read_text  # (UTF-8 출력 고정 포
 from tree.tradeTool import Cond, Grade
 from tree.gateway import Qty, rule, synthetic
 from backtest import trades as trades_mod
+from judge import judge as judge_mod
 from judge.judge import Judge
 
 Candle = namedtuple("Candle", "date open high low close volume")
@@ -117,7 +118,7 @@ def t_trades():
     t = bt(tree, hist, cal, [0], ex)[0]
     check(t["sells"] == [] and not t["closed"], "비율 미명시 매도는 팔지 않음 %r" % t["sells"])
     tx = Judge.of(synthetic(["X"], *ex)).product("X", hist, days=cal)
-    check("「축소」" in (trades_mod.unsized_note(tx.tranches(), tx.sells()) or ""), "비율 미명시 매도 문구")
+    check("「축소」" in (judge_mod.unsized_note(tx.tranches(), tx.sells()) or ""), "비율 미명시 매도 문구")
     # (5) 마지막 날 신호 → 다음 날이 없어 체결 못 함(미청산), fixed20 은 20거래일 모자라면 None
     rows = [(100, 100), (100, 100), (100, 120)]
     tree, hist, cal = mk(rows)
@@ -185,7 +186,7 @@ def t_no_exit():
     ex = [rule("익절", Cond.SELL, {"ge": [{"pos": "ret"}, 5]}, ("held", 1))]
     for exits, pol in (([], "none"), (ex, "book")):
         book = Judge.of(synthetic(["X"], rule("늘", Cond.BUY, {"all": []}), *exits))   # 매수 신호는 늘 참
-        check(trades_mod.exit_policy(book.product("X", hist).sells()) == pol, "exit_policy %r" % pol)
+        check(judge_mod.exit_policy(book.product("X", hist).sells()) == pol, "exit_policy %r" % pol)
         res = runner.run("x", 365, prices=hist, book=book)
         t = res["trades"]["X"]
         check(t["exit_policy"] == pol, "backtest 매도 정책 %r" % t)
@@ -198,7 +199,7 @@ def t_no_exit():
 
 
 def t_sizing():
-    """금액 정책(trades.size_of) — 매수 크기 = 분할 비율 × 비중(%)/100. 크기는 그날 판정의 Judge.amount
+    """금액 정책(judge.size_of) — 매수 크기 = 분할 비율 × 비중(%)/100. 크기는 그날 판정의 Judge.amount
     (라이브 화면과 같은 경로)에서 온다. 비중 미명시·모름은 ×1 로 두고 횟수를 센다."""
     R = {"pos": "ret"}
     ON = {"gt": [{"px": "close", "sym": "X"}, 0]}                     # 늘 참
@@ -217,30 +218,31 @@ def t_sizing():
     b, sz = run(40)
     check([round(x["qty"], 9) for x in b] == [0.1, 0.3] and [x["date"] for x in b] == [cal[1], cal[3]],
           "비중·분할 비율 곱 %r" % b)
-    check(sz["buys"] == 2 and not trades_mod.size_notes(sz), "비중 명시 — 문구 없음 %r" % sz)
+    check(sz["buys"] == 2 and not judge_mod.size_notes(sz), "비중 명시 — 문구 없음 %r" % sz)
     # 비중 저자 미명시 → 상품 예산 100% + 횟수
     b, sz = run(None)
-    notes = trades_mod.size_notes(sz)
+    notes = judge_mod.size_notes(sz)
     check([x["qty"] for x in b] == [0.25, 0.75] and sz["weight_unset"] == 2
           and any("비중 저자 미명시" in n for n in notes), "비중 미명시는 ×1 + 문구 %r %r" % (sz, notes))
     # 비중 식은 있으나 값 모름("?") → 100% + 횟수
     b, sz = run({"case": [[ON, "?"]], "else": "?"})
     check([x["qty"] for x in b] == [0.25, 0.75] and sz["weight_unknown"] == 2, "비중 모름은 ×1 %r %r" % (b, sz))
     # 수량 변환 하나(to_units) — basis 별 · 모름(None)은 None
-    Led, tu = trades_mod.Ledger, trades_mod.to_units
+    Led, tu = judge_mod.Ledger, judge_mod.to_units
     led = Led(budget=0.4, bought=0.6, held=0.3)
     got = [tu(Qty(of, x), led) for of, x in (("cash", 30), ("budget", 0.25), ("bought", 0.3), ("held", 0.5))]
     check(all(same(g, w) for g, w in zip(got, (0.3, 0.1, 0.18, 0.15))) and tu(Qty("held", None), led) is None,
           "to_units 네 basis %r" % got)
     # 매수(분할 차수)와 매도(산/남은 물량 비율)가 같은 변환 하나를 지난다
-    seen, orig = [], trades_mod.to_units
-    trades_mod.to_units = lambda q, ld: seen.append(q.of) or orig(q, ld)
+    #   (체결 워크가 부르는 이름 trades.to_units 와 금액 정책 size_of 가 부르는 judge.to_units 를 같이 엿본다)
+    seen, orig = [], judge_mod.to_units
+    trades_mod.to_units = judge_mod.to_units = lambda q, ld: seen.append(q.of) or orig(q, ld)
     try:
         ex = [rule("반", Cond.SELL, {"ge": [R, 5]}, ("bought", 0.5)), rule("끝", Cond.SELL, {"ge": [R, 5]}, ("held", 1))]
         judge = Judge.of(synthetic(["X"], rule("비중", Cond.BUY, None, ("cash", 40)), *(trs + ex))).product("X", hist, days=cal)
         trades_mod.build_trades(judge, [0], judge.sells(), amount=judge.amount)
     finally:
-        trades_mod.to_units = orig
+        trades_mod.to_units = judge_mod.to_units = orig
     check({"budget", "cash", "bought", "held"} <= set(seen), "매수·매도·비중이 to_units 하나로 %r" % seen)
 
 

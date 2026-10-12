@@ -10,7 +10,7 @@
   파일은 `rules` 목록(원문 판단 하나 = 규칙 하나, 동사 셋 안 산다·산다·판다 — 정본 Cond.VERBS). 소비자는 동사로 묻는다:
     · gate(안 산다)·gate(산다) — 그 동사 갈래의 any 묶음(등급용, 포지션 쓰는 갈래 제외)
     · weight — 산다 + qty cash(비중) · tranches — 산다 + qty budget(분할) · sells — 판다
-  수량은 트리의 qty {of, x} 를 그대로 Qty(of, x) 로 건넨다("?" → None). 물량 변환은 backtest/trades.to_units.
+  수량은 트리의 qty {of, x} 를 그대로 Qty(of, x) 로 건넨다("?" → None). 물량 변환은 judge/judge.to_units.
   `{"rule": "이름"}` 참조는 건네기 전에 **펼친다** — 평가기(Cond)는 평범한 식만 본다.
   트리는 상품을 모르는 공통 로직이다. 상품마다 달라지는 것은 해석기(판단자)가 채운다:
     · 시세 잎 sym = 역할 `$self`(판정 중인 상품) · `$index`(그 상품의 지수 — products 의 index) · 또는 구체 티커(^VIX 등)
@@ -344,7 +344,7 @@ class TreeGateway:
                 for r, t in self._qty_branches(prod, BUY, "budget")]
 
     def sells(self, prod):
-        """판다 갈래 [Branch(when, qty bought/held)] — qty 없으면 남은 전량. 없으면 [](trades.exit_policy 가 정책을 정한다)."""
+        """판다 갈래 [Branch(when, qty bought/held)] — qty 없으면 남은 전량. 없으면 [](judge.exit_policy 가 정책을 정한다)."""
         return [Branch(r.get("label"), r.get("ref"), r.get("note"), when=self._when_of(r, t),
                      qty=_qty(t.get("qty"), Qty("held", 1.0), self._x_of(r)), allprod=not r.get("on"),
                      repeat=bool(t.get("repeat")))

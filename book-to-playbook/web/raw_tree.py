@@ -138,7 +138,7 @@ def _card_html(c):
         for b in c.branches:
             q = ""
             if b.qty is not None:
-                of, x = b.qty                       # 적힌 그대로(변환하지 않는다 — 물량 변환은 trades.to_units)
+                of, x = b.qty                       # 적힌 그대로(변환하지 않는다 — 물량 변환은 judge.to_units)
                 q = " <span class='rt-qty'>[qty %s %s]</span>" % (_esc(of), _esc(e(x)))
             rep = " <span class='rt-kind'>반복</span>" if b.repeat else ""
             when = _prose_html(b.when) if b.when is not None else "(조건 없음)"
