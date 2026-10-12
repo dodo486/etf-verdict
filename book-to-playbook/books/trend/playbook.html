@@ -1031,7 +1031,7 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
     if(!seen) seen = new Set();
     // 표시 전용 중복 제거: 같은 조건(라벨+기준+측정값)이 한 패턴 안에서 되풀이되면 한 번만.
     //   (streak/barssince 파생조건이 라벨 없이 안쪽 건물블록만 반복 노출되는 경우를 걷어낸다.)
-    //   zone 바로 밑 패턴마다 집합을 새로 둬서 다른 패턴끼리는 제거하지 않는다(각 카드가 자기 조건을 다 보이게).
+    //   동사 바로 밑 패턴마다 집합을 새로 둬서 다른 패턴끼리는 제거하지 않는다(각 카드가 자기 조건을 다 보이게).
     const sig = (it.label || it.manual) ? ((it.label||it.manual)+'|'+(it.ref||'')+'|'+(it.detail?JSON.stringify(it.detail):'')) : null;
     const dup = !!(sig && seen.has(sig));
     if(sig) seen.add(sig);
@@ -1063,17 +1063,17 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
       + '<div class="ck-line">'+ctl+'<span class="ck-t">'+esc(it.label || '수동 확인')+opl+num+refChip(it.ref)+'</span></div>'
       + why + evLine(it.detail) + (kidsHtml ? '<div class="ck-kids">'+kidsHtml+'</div>' : '') + '</div>';
   }
-  function zoneHead(title, want, val){
+  function verbHead(title, want, val){
     const ok = val === null ? '' : (val === want ? ' ok' : ' bad');
-    return '<div class="grouplabel ck-zone'+ok+'">'+title+' <span class="ck-zv">'+(val===true?'참':val===false?'거짓':'확인 필요')+'</span></div>';
+    return '<div class="grouplabel ck-verb'+ok+'">'+title+' <span class="ck-verb-v">'+(val===true?'참':val===false?'거짓':'확인 필요')+'</span></div>';
   }
   // 등급 동사 묶음(안 산다·산다 = any)을 원문 소절(ref)별로 모아 같은 절의 규칙이 붙어 보이게 한다(순서 보존).
   //   원문 표시는 각 규칙 줄의 뱃지 하나뿐 — 따로 소절 머리글을 달지 않는다(같은 원문을 두 번 보이지 않게).
-  function zoneByRef(zone, path, ans){
-    if(!zone || !zone.kids || !zone.kids.length) return node(zone, path, ans, 0);
+  function verbByRef(verb, path, ans){
+    if(!verb || !verb.kids || !verb.kids.length) return node(verb, path, ans, 0);
     const order = [], bucket = {};
     // 공통(allprod) 규칙은 맨 위 공통 섹션에서만 그린다 — 상품 카드에선 그 상품 전용(on 에 그 상품이 든)만.
-    zone.kids.forEach((k,i)=>{ if(isAllprod(k)) return; const r = k.ref || ''; if(!(r in bucket)){ bucket[r] = []; order.push(r); } bucket[r].push([k,i]); });
+    verb.kids.forEach((k,i)=>{ if(isAllprod(k)) return; const r = k.ref || ''; if(!(r in bucket)){ bucket[r] = []; order.push(r); } bucket[r].push([k,i]); });
     return order.map(r => bucket[r].map(([k,i]) => node(k, path+'.'+i, ans, 0)).join('')).join('');
   }
   // 공통(allprod) 규칙만 걸러낸다 — 상품 카드에선 빼고, 화면 맨 위 "공통 시장 신호" 섹션에 한 번만 그린다.
@@ -1119,7 +1119,7 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
       const order = [];
       kidsOf(vs[0]).forEach(k=>{ if(isAllprod(k) && order.indexOf(k.label) < 0) order.push(k.label); });
       if(!order.length) return;
-      body += '<div class="grouplabel ck-zone" style="margin-top:14px">'+num+esc(sec)+'</div>';
+      body += '<div class="grouplabel ck-verb" style="margin-top:14px">'+num+esc(sec)+'</div>';
       order.forEach(lab=>{
         // 각 상품에서 같은 label 의 항목을 찾아 교차참조(한 상품에만 있어도 공통 규칙이면 보인다)
         const perProd = vs.map(v=>[v.prod, (kidsOf(v).find(k=>k.label===lab)||null)]).filter(x=>x[1]);
@@ -1169,13 +1169,13 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
     const z = v.gates, V = VD.verbs || [], BLOCK = V[0], BUY = V[1], SELL = V[2];
     // 동사 머리 값 = 남은 수동 답과 상관없이 정해졌으면(서버의 낙관 opt == 비관 pes) 그 값, 아니면 서버 값(대개 ? 확인 필요).
     const zv = s => (v.opt && v.pes && v.opt[s] === v.pes[s]) ? v.opt[s] : (z[s] ? z[s].v : null);
-    h += zoneHead('① '+esc(BLOCK)+' — 하나라도 참이면 안 산다', false, zv(BLOCK)) + zoneByRef(z[BLOCK], P(BLOCK), ans);
-    h += zoneHead('② '+esc(BUY)+' — 하나라도 참이면 살 자리', true, zv(BUY)) + zoneByRef(z[BUY], P(BUY), ans);
+    h += verbHead('① '+esc(BLOCK)+' — 하나라도 참이면 안 산다', false, zv(BLOCK)) + verbByRef(z[BLOCK], P(BLOCK), ans);
+    h += verbHead('② '+esc(BUY)+' — 하나라도 참이면 살 자리', true, zv(BUY)) + verbByRef(z[BUY], P(BUY), ans);
     // 판다 규칙 + 내 포지션 — 공통(allprod) 판다 규칙은 공통 섹션에서 그리고, 카드엔 그 상품 전용만.
     //   포지션(ps.sells)은 게이트웨이 순서(원래 i)로 쌓였으니 인덱스를 보존해 매칭한다.
     const exitOwn = (v.sells||[]).map((r,i)=>[r,i]).filter(([r])=>!isAllprod(r));
     if(exitOwn.length){
-      h += '<div class="grouplabel ck-zone" style="color:var(--entry)">③ '+esc(SELL)+' — 보유분을 팔 때 (걸리면 다음 날 시가)</div>';
+      h += '<div class="grouplabel ck-verb" style="color:var(--entry)">③ '+esc(SELL)+' — 보유분을 팔 때 (걸리면 다음 날 시가)</div>';
       const pos = v.positions || [];
       exitOwn.forEach(([r,i])=>{
         const live = pos.map(ps => (ps.sells||[])[i]).filter(Boolean);
@@ -1193,7 +1193,7 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
     else if(!(v.sells||[]).length && v.exit_policy === 'none'){
       // 매도 정책(엔진 필드 exit_policy — 정본 judge/judge.exit_policy): 책에 판다 규칙이 없다 — 문구도 엔진(VD.no_exit_note)
       // (공통 판다 규칙만 있어 카드가 비는 경우는 제외 — 그 규칙들은 공통 섹션에서 보인다.)
-      h += '<div class="grouplabel ck-zone" style="color:var(--entry)">③ '+esc(SELL)+'</div><p class="subtle" style="margin:6px 0 0">'+esc(VD.no_exit_note || '')+'</p>';
+      h += '<div class="grouplabel ck-verb" style="color:var(--entry)">③ '+esc(SELL)+'</div><p class="subtle" style="margin:6px 0 0">'+esc(VD.no_exit_note || '')+'</p>';
     }
     return h;
   }
@@ -1217,7 +1217,7 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
       else if(w == null){ known = false; wtxt = '<span class="manual-tag">✋ 확인 필요 '+(s.weight_range||[]).map(x=>x.toFixed(0)+'%').join(' / ')+'</span>'; }
       else { sum += w; wtxt = w.toFixed(1)+'%'; }
       const amt = s.units == null ? null : cap * s.units;
-      const trs = (s.tranches||[]).map(t=>esc(t.label)+(t.frac==null ? ' <span class="manual-tag">비율 저자 미명시</span>' : ' '+Math.round(t.frac*100)+'%'+(t.units!=null?' = '+Math.round(cap*t.units).toLocaleString('ko-KR')+'만':''))+(t.conditional?' <span class="subtle">(조건부)</span>':'')).join('<br>') || '한 번에 전량';
+      const trs = (s.tranches||[]).map(t=>esc(t.label)+(t.ratio==null ? ' <span class="manual-tag">비율 저자 미명시</span>' : ' '+Math.round(t.ratio*100)+'%'+(t.units!=null?' = '+Math.round(cap*t.units).toLocaleString('ko-KR')+'만':''))+(t.conditional?' <span class="subtle">(조건부)</span>':'')).join('<br>') || '한 번에 전량';
       h += '<tr><td style="color:var(--'+esc(v.prod.toLowerCase())+',var(--head))"><b>'+esc(v.prod)+'</b>'+refChip(s.ref)+'</td><td>'+wtxt+'</td><td>'
          + (amt!=null ? Math.round(amt).toLocaleString('ko-KR')+'만' : '—') + '</td><td>'+trs+'</td></tr>';
     });
@@ -1287,10 +1287,10 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
       '#sheet-root{font-size:13.5px}'
       +'#sheet-root .ck-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}'
       // 동사 머리글(①안 산다 ②산다 …) — 왼쪽 색 띠 바(참=초록·거짓=빨강)
-      +'#sheet-root .ck-zone{margin:20px 0 8px;padding:9px 13px;background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--mute);border-radius:9px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;font-weight:700;color:var(--head);line-height:1.4;letter-spacing:.01em}'
-      +'#sheet-root .ck-zone.ok{border-left-color:var(--entry)} #sheet-root .ck-zone.bad{border-left-color:var(--warn)}'
-      +'#sheet-root .ck-zone .ck-zv{font-size:11.5px;font-weight:600;color:var(--mute);white-space:nowrap}'
-      +'#sheet-root .ck-zone.ok .ck-zv{color:var(--entry)} #sheet-root .ck-zone.bad .ck-zv{color:var(--warn)}'
+      +'#sheet-root .ck-verb{margin:20px 0 8px;padding:9px 13px;background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--mute);border-radius:9px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;font-weight:700;color:var(--head);line-height:1.4;letter-spacing:.01em}'
+      +'#sheet-root .ck-verb.ok{border-left-color:var(--entry)} #sheet-root .ck-verb.bad{border-left-color:var(--warn)}'
+      +'#sheet-root .ck-verb .ck-verb-v{font-size:11.5px;font-weight:600;color:var(--mute);white-space:nowrap}'
+      +'#sheet-root .ck-verb.ok .ck-verb-v{color:var(--entry)} #sheet-root .ck-verb.bad .ck-verb-v{color:var(--warn)}'
       // 조건 한 칸 = 카드(편안한 여백)
       +'#sheet-root .ck-row{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 13px;margin:7px 0}'
       +'#sheet-root .ck-row.man{border-left:3px solid var(--gold)}'

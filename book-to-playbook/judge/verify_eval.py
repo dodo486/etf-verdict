@@ -514,13 +514,13 @@ def t_answers():
     tree = TreeGateway.of(synthetic(["A"], rule("실적", BUY, {"all": [m]})))
     got = [RuleSeries(tree, "A", hist, cal, answers=a).grade_key(2)
            for a in (None, {"A|실적 좋음": True}, {"A|실적 좋음": False})]
-    check(got == ["confirm", "buy", "wait"], "등급까지 답으로 풀린다(확인 대기 → 매수 후보·관망) %r" % got)
+    check(got == ["confirm", "buy", "wait"], "등급까지 답으로 풀린다(확인 대기 → 산다·관망) %r" % got)
 
 
 # ------------------------------------------------------------------ 6. 데이터 완전성 가드(워밍업 부족 → 불완전)
 def t_warmup_guard():
     """★ 실제 발견된 버그 방지(영구): 시세가 rate-limit 로 잘려(워밍업 부족) 와도 엔진이 그 불완전 데이터로
-    조용히 ✅/🚫 확신을 내면 모르고 매매하게 된다. 가드는 트리가 쓰는 가장 긴 lookback(워밍업)을 트리에서
+    조용히 ✅/⛔ 확신을 내면 모르고 매매하게 된다. 가드는 트리가 쓰는 가장 긴 lookback(워밍업)을 트리에서
     직접 뽑아, 그보다 확정 봉이 적은 초기 구간의 1d 신호를 '불완전 데이터(❔)'로 표면화한다.
 
     확인:
@@ -564,7 +564,7 @@ def t_warmup_guard():
     # 초기 W 개 봉(index 0..W-1)은 확정 봉이 모자라 incomplete → grade_key 가 ❔(unknown).
     check(all(pe.incomplete(i) for i in range(W)), "워밍업 부족 구간(0..%d) 전부 incomplete" % (W - 1))
     check(all(pe.grade_key(i) == "unknown" for i in range(W)),
-          "워밍업 부족 구간 1d 등급은 ❔(판정 불가)여야 — 조용히 ✅/🚫 안 냄")
+          "워밍업 부족 구간 1d 등급은 ❔(판정 불가)여야 — 조용히 ✅/⛔ 안 냄")
     # 워밍업이 충분해진 뒤(index >= W)는 incomplete=False — 신호를 낸다.
     check(not any(pe.incomplete(i) for i in range(W, len(xs))), "워밍업 채운 뒤는 incomplete 아님(오탐 0)")
 

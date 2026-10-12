@@ -124,7 +124,7 @@ class RuleSeries:
         self.weight = {m: (s(w, m) if w is not None else None) for m in (None, True, False)}
         # 데이터 완전성 가드 — 이 상품 등급이 실제로 쓰는 가장 긴 워밍업(트리에서 파생, 하드코딩 아님).
         #   그보다 '확정 봉'이 적은 초기 구간의 1d 신호는 창이 덜 차 조용히 None/틀릴 수 있어 신뢰불가다
-        #   → grade_key 가 '불완전 데이터(❔ 보류)'로 표시한다(✅/🚫 확신 금지). WARMUP_DAYS(fetch 버퍼)와 무관.
+        #   → grade_key 가 '불완전 데이터(❔ 보류)'로 표시한다(✅/⛔ 확신 금지). WARMUP_DAYS(fetch 버퍼)와 무관.
         self.warmup = board.warmup
         # 심볼 확정봉 지도 — asof 장중이면 오늘 미확정 봉을 뺀 '마지막 확정 index'(없으면 전부 확정 = 항등).
         #   여러 심볼을 보면 가장 적게 확정된 심볼(지연된 feed)이 기준이다 — 하나라도 모자라면 불완전.
@@ -153,7 +153,7 @@ class RuleSeries:
     # ---------------------------------------------------------------- 등급
     def grade_key(self, day):
         # 데이터 완전성 가드 — 워밍업이 모자란 봉은 확신 판정을 내지 않고 '판정 불가(불완전 데이터)'로 둔다.
-        #   (조용히 None 이 섞인 opt/pes 로 ✅/🚫 를 내면 모르고 매매하게 된다 — 정직성 원칙.)
+        #   (조용히 None 이 섞인 opt/pes 로 ✅/⛔ 를 내면 모르고 매매하게 된다 — 정직성 원칙.)
         if self.incomplete(day):
             return "unknown"
         # grade_rules.json 을 위에서 아래로 본다 — when 의 모든 동사가 맞는 첫 규칙이 이긴다.

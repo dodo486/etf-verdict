@@ -158,7 +158,7 @@ def pair_rules(ta, tb):
 
 
 # ------------------------------------------------------------------ 심판의 비교 도구(덤프 — 판단은 안 함)
-def _zone_explain(judge, sec, i):
+def _verb_explain(judge, sec, i):
     if sec in GATES:
         return judge.explain(i)[sec]
     w, alt = judge.weight_at(i)
@@ -166,32 +166,32 @@ def _zone_explain(judge, sec, i):
 
 
 def _tranche_rows(tranches):
-    """분할 차수의 덤프·비교용 모양 [{label, ref, frac, when}]."""
-    return [{"label": t.label, "ref": t.ref, "frac": t.qty.x, "when": t.when} for t in tranches]
+    """분할 차수의 덤프·비교용 모양 [{label, ref, ratio, when}]."""
+    return [{"label": t.label, "ref": t.ref, "ratio": t.qty.x, "when": t.when} for t in tranches]
 
 
-def _zone_node(tree, prod, sec):
+def _verb_node(tree, prod, sec):
     """등급 동사 하나의 식(any 묶음) — 안 산다·산다만(그 밖은 None)."""
     return tree.tree.gate(prod, sec) if sec in GATES else None
 
 
 def _section_key(tree, prod, sec):
     """등급 동사 하나의 식 지문(정규화) — 동작 비교로 안 보이는 차이(수동·"?" 식)까지 드러낸다."""
-    return logic_key(_zone_node(tree, prod, sec))
+    return logic_key(_verb_node(tree, prod, sec))
 
 
 def _conditions(tree, prod):
-    """상품의 이름 달린 조건들 {지문: {"label", "zones", "expr"}} — 동사 어디든(분할·비중·판다 갈래 안 포함).
+    """상품의 이름 달린 조건들 {지문: {"label", "verbs", "expr"}} — 동사 어디든(분할·비중·판다 갈래 안 포함).
     같은 식이 여러 동사에 쓰이면 한 항목에 동사를 모은다."""
     out = {}
-    for z, _l, _r, node in tree.tree.expressions(prod):
+    for verb, _l, _r, node in tree.tree.expressions(prod):
         def walk(n):
             if isinstance(n, dict):
                 if n.get("label") and factorable(n):
                     k = logic_key(n)
-                    it = out.setdefault(k, {"label": n["label"], "zones": [], "expr": json.loads(k)})
-                    if z not in it["zones"]:
-                        it["zones"].append(z)
+                    it = out.setdefault(k, {"label": n["label"], "verbs": [], "expr": json.loads(k)})
+                    if verb not in it["verbs"]:
+                        it["verbs"].append(verb)
                 for v in n.values():
                     walk(v)
             elif isinstance(n, list):
@@ -206,7 +206,7 @@ def pair_conditions(ta, tb, prod, hist, years):
     실제 시세 3년치에서 판정이 한 번도 안 갈린 짝을 '동작 같음' 후보로 붙인다(식은 달라도 같은 뜻일 수 있다 —
     판단은 심판이 원문으로). 수동("?" 식·문장)은 기계가 값을 모르니 동작 근거가 없다."""
     ca, cb = _conditions(ta, prod), _conditions(tb, prod)
-    common = [{"a": ca[k]["label"], "b": cb[k]["label"], "zones": sorted(set(ca[k]["zones"]) | set(cb[k]["zones"]))}
+    common = [{"a": ca[k]["label"], "b": cb[k]["label"], "verbs": sorted(set(ca[k]["verbs"]) | set(cb[k]["verbs"]))}
               for k in ca if k in cb]
     only_a = {k: v for k, v in ca.items() if k not in cb}
     only_b = {k: v for k, v in cb.items() if k not in ca}
@@ -231,7 +231,7 @@ def pair_conditions(ta, tb, prod, hist, years):
         for k, v in items.items():
             same = [other[j]["label"] for j in theirs if mine[k] is not None and theirs[j] is not None
                     and mine[k] == theirs[j] and any(x is not None for x in mine[k])]
-            rows.append({"label": v["label"], "zones": v["zones"], "expr": v["expr"],
+            rows.append({"label": v["label"], "verbs": v["verbs"], "expr": v["expr"],
                          "manual": is_manual(v["expr"]), "same_behavior_as": same})
         return rows
     return {"common": common, "only_a": side(only_a, sa, sb, only_b), "only_b": side(only_b, sb, sa, only_a)}
@@ -373,12 +373,12 @@ def _rules_diff(ra, rb):
     return _align(ra or [], rb or [], walk)
 
 
-def zone_diff(ta, tb, prod, zone):
+def verb_diff(ta, tb, prod, verb):
     """상품 한 칸의 a·b 트리 모양 비교."""
-    xa, xb = _zone_node(ta, prod, zone), _zone_node(tb, prod, zone)
-    if zone in GATES:
+    xa, xb = _verb_node(ta, prod, verb), _verb_node(tb, prod, verb)
+    if verb in GATES:
         return tree_diff(xa, xb)
-    if zone == SELL:
+    if verb == SELL:
         return {"status": "same" if _ckey(xa) == _ckey(xb) else "diff", "rules": _rules_diff(xa, xb)}
     out = {"status": "same" if _ckey(xa) == _ckey(xb) else "diff"}            # weight(비중·분할)
     wa, wb = ta.tree.weight(prod).qty.x, tb.tree.weight(prod).qty.x
@@ -415,8 +415,8 @@ def render_diff(node, indent=0, out=None, head=""):
     return out
 
 
-def render_zone(zd):
-    """zone_diff 결과 한 칸 → 줄 목록."""
+def render_verb(zd):
+    """verb_diff 결과 동사 하나 → 줄 목록."""
     if "rules" in zd:
         out = []
         for r in zd["rules"]:
@@ -461,14 +461,14 @@ def dump_disagreements(slug, per, years):
                 for s in sorted(ta.tree.symbols([p]) | tb.tree.symbols([p])):
                     prices[s] = Judge.recent(hist, s, d, 25)
                 cases.append({"date": d, "a": r["_ia"][sec][i], "b": r["_ib"][sec][i],
-                              "a_explain": _zone_explain(pa, sec, i), "b_explain": _zone_explain(pb, sec, i),
+                              "a_explain": _verb_explain(pa, sec, i), "b_explain": _verb_explain(pb, sec, i),
                               "prices_last25[date,o,h,l,c,v]": prices})
             entry = {"agree": r["agree"], "diff_days": len(r["days"]), "expr_differs": sdiff,
-                     "a_tree": _zone_node(ta, p, sec), "b_tree": _zone_node(tb, p, sec), "cases": cases}
+                     "a_tree": _verb_node(ta, p, sec), "b_tree": _verb_node(tb, p, sec), "cases": cases}
             out["%s.%s" % (p, sec)] = entry
     path = book_log(slug, "disagree.json")
     pairing = {p: pair_conditions(ta, tb, p, hist, years) for p in ta.products() if tb.has(p)}
-    shape = {p: {z: zone_diff(ta, tb, p, z) for z in SHAPES} for p in ta.products() if tb.has(p)}
+    shape = {p: {v: verb_diff(ta, tb, p, v) for v in SHAPES} for p in ta.products() if tb.has(p)}
     rules = pair_rules(ta, tb)
     write_text(path, json.dumps({"rules": rules, "tree_diff": shape, "pairing": pairing,
                                  "sections": out}, ensure_ascii=False, indent=1, default=str))

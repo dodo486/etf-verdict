@@ -283,8 +283,8 @@ def m_amount_policy(src):
 # 수량 변환 — 정규화된 '얼마나'(출입구 Qty(of, x))를 물량으로 바꾸는 곳은 judge.to_units 하나(매수·매도·비중 모두).
 #   밖에서 basis(of)를 가르거나 수량(qty.x)으로 셈을 하면 종류별 해석이 다시 흩어진다.
 QTY_BASES = ("bought", "held", "budget")
-QTY_JS = (r"\.of\b|\b(?:frac|scale|weight)\b\s*\*(?!\s*100\b)"
-          r"|\*\s*(?:[\w$]+\.)*(?:frac|scale|weight)\b")
+QTY_JS = (r"\.of\b|\b(?:ratio|scale|weight)\b\s*\*(?!\s*100\b)"
+          r"|\*\s*(?:[\w$]+\.)*(?:ratio|scale|weight)\b")
 
 
 def _is_qty_x(n):
@@ -460,7 +460,7 @@ OWNERS = [
              ("judge/verify_eval.py", "raw_grade"): ({"rules"}, "등급 사다리 grade_rules.json(트리 아님)"),
              ("tree/verify_gateway.py", "t_gateway"): ({"rules", "products", "do", "then"}, "출입구 계약 검사 — 합성 트리 픽스처·출입구 답 모양을 보는 자리"),
              ("authoring/extract/verify_tree.py", "scenario_result"): ({"do"}, "사례 기대값 {do, pct}(scenarios.json — 트리 아님)"),
-             ("authoring/extract/compare.py", "render_zone"): ({"rules"}, "zone_diff 결과(심판 덤프) dict"),
+             ("authoring/extract/compare.py", "render_verb"): ({"rules"}, "verb_diff 결과(심판 덤프) dict"),
          }),
     dict(concept="책 산출물 경로", owners=("shared/paths.py",), match=m_book_paths,
          why="books/<slug>/ 아래 산출물 경로를 짓는 곳은 하나 — 옛 루트 산출물로 되돌아가지 않게",

@@ -11,7 +11,7 @@
             verbs = 동사 셋(정본 tree.gateway.VERBS — 화면 머리글) · grades = 등급 글자표(정본 judge.judge.GRADES)
   verdict : {prod, index, note, date, close, chg, key, grade, reason,
              gates{안 산다, 산다: view}, opt{..}, pes{..},     등급 동사 둘의 중첩 설명 + 낙관·비관 값
-             size{label, ref, weight, weight_range, units, tranches[{label, ref, frac, units, view?}]},   얼마나(산다 qty)
+             size{label, ref, weight, weight_range, units, tranches[{label, ref, ratio, units, view?}]},   얼마나(산다 qty)
                                                      units = 오늘 물량(시작자본 1.0 기준 — judge.to_units, 비중 모르면 None)
              sells[{label, ref, sell(문장 — judge.sell_text), note, view}], exit_policy("book"|"none" — judge.exit_policy),
              positions[{…, sells[], next_tranche}]}                  positions = 내 포지션(로컬 파일)이 있을 때만
@@ -75,7 +75,7 @@ def _rule_views(judge, a=None):
     return {"size": {"label": sz.label, "ref": sz.ref, "note": sz.note,
                      "weight": a and a.weight, "weight_range": a and a.weight_range, "weight_set": a and a.weight_set,
                      "units": a and live_units(a),            # 오늘 물량(시작자본 1.0 기준, 화면이 × 총 투자금)
-                     "tranches": [{"label": t.label, "ref": t.ref, "frac": t.qty.x,
+                     "tranches": [{"label": t.label, "ref": t.ref, "ratio": t.qty.x,
                                    "units": a and live_units(a, t.qty), "conditional": t.when is not None,
                                    "view": _describe(judge, t)} for t in judge.tranches()]},
             "sells": [{"label": r.label, "ref": r.ref, "allprod": r.allprod, "sell": sell_text(r.qty, r.repeat),
@@ -95,7 +95,7 @@ def product_verdict(judge, d, mine):
                     gates=gate_views(judge), opt={}, pes={}, **_rule_views(judge))
     reason = reason_of(d.key, d.top, d.manual)
     # 데이터 완전성 가드 — 지금 가진 확정 봉이 트리가 쓰는 가장 긴 창(필요 워밍업)보다 짧으면 등급은 ❔(불완전
-    #   데이터, 판정 보류)로 떨어져 있다(grade_key). 사유를 '모르고 매매 금지'로 분명히 적는다(✅/🚫 확신 금지).
+    #   데이터, 판정 보류)로 떨어져 있다(grade_key). 사유를 '모르고 매매 금지'로 분명히 적는다(✅/⛔ 확신 금지).
     if d.incomplete:
         reason = "불완전 데이터(판정 보류) — 확정 봉 %d개 < 필요 워밍업 %d개, 창이 덜 차 신뢰불가" % (d.confirmed, d.warmup)
     v = dict(base, date=d.date, close=d.close,
@@ -110,7 +110,7 @@ def product_verdict(judge, d, mine):
 
 
 def _holding_view(judge, day, hs):
-    """보유 하나(HoldingStatus) → {ret, days, sells:[{label, ref, sell, v, view}], next_tranche:{label, ref, frac, v, view}|None}.
+    """보유 하나(HoldingStatus) → {ret, days, sells:[{label, ref, sell, v, view}], next_tranche:{label, ref, ratio, v, view}|None}.
     갈래 설명의 값은 그 보유 문맥으로 판단자에게 묻는다(judge.value(노드, day, hs.holding))."""
     if hs.error:
         return {"error": hs.error}
@@ -120,7 +120,7 @@ def _holding_view(judge, day, hs):
                       "view": explain.view(r.when, val)} for r, v in hs.sells]}
     nt = hs.next_tranche
     out["next_tranche"] = None if nt is None else {
-        "label": nt[0].label, "ref": nt[0].ref, "frac": nt[0].qty.x, "v": nt[1], "view": explain.view(nt[0].when, val)}
+        "label": nt[0].label, "ref": nt[0].ref, "ratio": nt[0].qty.x, "v": nt[1], "view": explain.view(nt[0].when, val)}
     return out
 
 
