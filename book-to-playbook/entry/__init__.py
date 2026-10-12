@@ -7,5 +7,5 @@
 
 진입: `python -m entry.run <daily|verdict|watch|check>` · `python -m entry.serve`
 경계: entry 는 모든 층을 import 해도 된다 — 여기가 맨 위에서 아래를 실행만 한다. 아래 층은 entry 를 모른다.
-경계는 verify/code/rules.py 가 강제한다.
+경계는 verify/rules.py 가 강제한다.
 """

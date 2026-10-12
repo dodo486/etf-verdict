@@ -15,23 +15,23 @@
 ① 추출자 a·b(서브에이전트 둘, 서로 모름) — 프롬프트 = EXTRACTOR.md 전문 + 입력 경로(플레이북 · source_index · COND_DSL)
 ② 사례 작성자(서브에이전트) — 프롬프트 = SCENARIO.md 전문 + 원문 경로 · source_index        (①과 동시에 돌려도 된다)
 ③ 심판(서브에이전트) — ①② 가 끝난 뒤. 프롬프트 = JUDGE.md 전문 + 입력 경로. 최종 tree.json 을 쓰고
-   python -m verify.book.tree <slug> 정지 0 까지 반복
+   python -m authoring.checklist.score <slug> 정지 0 까지 반복
 ```
 
 ## 원칙
 
-- **최종 트리는 심판만 쓴다.** 코드는 비교(`authoring.checklist.compare`)와 채점(`verify.book.tree`)만 한다 — 트리를 만들거나 고치지 않는다.
+- **최종 트리는 심판만 쓴다.** 코드는 비교(`authoring.checklist.compare`)와 채점(`authoring.checklist.score`)만 한다 — 트리를 만들거나 고치지 않는다.
 - **책 데이터는 손으로 고치지 않는다.** 후보·사례·최종 트리를 진행자가 직접 고치지 않는다. 문제가 있으면 역할 문서·공통
   코드를 고친 뒤 그 역할을 다시 돌린다.
 - **독립성**: 추출·사례·심판은 서로 다른 서브에이전트가 한다(독립성이 검증의 근거다). 추출자에게는 상대 후보·최종 트리·
   사례를, 사례 작성자에게는 트리를 보지 못하게 한다(각 역할 문서에도 적혀 있다).
 - **트리 읽기는 출입구 하나**: `tree.json` 의 키 배치를 아는 코드는 `tree_gateway.py`(TreeGateway)뿐이다 — 판정·백테스트·
-  검사기는 거기에 묻는다(직접 접근은 `verify.code.rules` 주인 표 '트리 원본 키'가 막는다). 트리 형식을 바꾸면 그 파일과 문법(`dsl/tradeTool.py`)만 고친다.
+  검사기는 거기에 묻는다(직접 접근은 `verify.rules` 주인 표 '트리 원본 키'가 막는다). 트리 형식을 바꾸면 그 파일과 문법(`dsl/tradeTool.py`)만 고친다.
 - **기록**: 실행할 때 준 입력(지침 문서 판본·입력 파일)을 남긴다 — 결과가 나쁠 때 무엇을 받았는지 되짚을 수 있게.
 
 ## 실패했을 때
 
-- 트리 채점(`verify.book.tree`)의 정지는 심판이 `JUDGE.md` 5절대로 고친다.
+- 트리 채점(`authoring.checklist.score`)의 정지는 심판이 `JUDGE.md` 5절대로 고친다.
 - 심판이 "a·b 어디에도 고칠 재료가 없다"(미해결)고 보고하면 → `EXTRACTOR.md` 를 고치고 ①부터 다시.
 - 사례가 원문을 잘못 읽은 것이 반복되면 → `SCENARIO.md` 를 고치고 ②를 다시.
 

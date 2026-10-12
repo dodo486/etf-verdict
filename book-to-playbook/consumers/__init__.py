@@ -6,5 +6,5 @@
   · display/    엔진이 낸 판정 데이터를 화면 모양으로 빚는다(계산 안 함) · ui/ 화면 JS(SSOT)
 
 경계: consumers 는 shared · market · dsl · signal · feed 만 import 한다. entry/verify 만 consumers 를 부른다.
-경계는 verify/code/rules.py 가 강제한다.
+경계는 verify/rules.py 가 강제한다.
 """

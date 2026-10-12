@@ -18,7 +18,7 @@ homebrew·python.org·Microsoft Store 어느 설치본이든 그대로 동작한
   --no-verify-tree  CHECKS 의 "tree" 태그(트리 검수·원시함수·구간③·화면 설명) 생략 — 트리를
                     만들 때 한 번 검수하면 되는 것이라, 트리가 더 안 바뀌면 끈다("gate" 태그 — 코드 규칙·
                     본문 해시·책 계약·책 페이지 — 는 항상 돈다). 트리 완성 전에는 켜 두는 것이 안전하다.
-  --parity     (check 만) "opt" 태그 — 신호 패리티(verify.code.trading --parity)도 돈다(시세 필요).
+  --parity     (check 만) "opt" 태그 — 신호 패리티(verify.trading --parity)도 돈다(시세 필요).
 
 경로·크레덴셜은 shared/paths.py 규칙을 따른다. telegram.env · local.env 가 BASE에 있으면
 자동으로 환경변수에 주입한다(없으면 그냥 건너뜀). 스케줄러로 돌릴 때 jhts 시세 패키지 경로는
@@ -45,14 +45,15 @@ PY = sys.executable or "python3"
 #   warn2 종료코드 2 를 '경고(발행은 막지 않음)'로 보나. 아니면 0 외에는 전부 정지.
 Check = namedtuple("Check", "module args tag warn2 what")
 CHECKS = [
-    Check("verify.code.rules", (), "gate", False, "코드 규칙 — 폴더 경계·주인 표"),
-    Check("verify.book.source_integrity", (), "gate", False, "플레이북 본문 해시"),
-    Check("verify.book.contract", (), "gate", False, "책 계약 — 소절 인덱스·트리 문법·ref·책 페이지 구획·UI 사본"),
-    Check("verify.code.primitives", (), "tree", True, "원시함수 계산"),
-    Check("verify.code.trading", (), "tree", True, "거래 시뮬레이터·실전 경로"),
-    Check("verify.code.view", (), "tree", True, "화면 설명 구조"),
-    Check("verify.book.tree", (), "tree", True, "규칙 동작(트리 없음·미심판 불일치·원문 사례 불일치 등)"),
-    Check("verify.code.trading", ("--parity",), "opt", False, "신호 패리티 — 백테스트 == 실시간(일봉)"),
+    Check("verify.rules", (), "gate", False, "코드 규칙 — 폴더 경계·주인 표"),
+    Check("authoring.playbook.source_integrity", (), "gate", False, "플레이북 본문 해시"),
+    Check("authoring.checklist.score", ("--quick",), "gate", False, "트리 계약 — 소절 인덱스·트리 문법·ref"),
+    Check("consumers.display.book_page", (), "gate", False, "책 페이지 — 구획·UI 사본"),
+    Check("verify.primitives", (), "tree", True, "원시함수 계산"),
+    Check("verify.trading", (), "tree", True, "거래 시뮬레이터·실전 경로"),
+    Check("verify.view", (), "tree", True, "화면 설명 구조"),
+    Check("authoring.checklist.score", (), "tree", True, "규칙 동작(트리 없음·미심판 불일치·원문 사례 불일치 등)"),
+    Check("verify.trading", ("--parity",), "opt", False, "신호 패리티 — 백테스트 == 실시간(일봉)"),
 ]
 
 
@@ -161,8 +162,8 @@ def main(argv):
         return 2
 
     quiet = "--quiet" in argv
-    # 트리 검수(verify.book.tree)·원시함수 검사(verify.code.primitives) 등 "tree" 태그는 트리를 '만들 때' 한 번 하면
-    # 되는 것이라(python -m verify.book.tree <slug>), 트리가 더 안 바뀌면 daily 가 매번 다시 돌 필요가
+    # 트리 검수(authoring.checklist.score)·원시함수 검사(verify.primitives) 등 "tree" 태그는 트리를 '만들 때' 한 번 하면
+    # 되는 것이라(python -m authoring.checklist.score <slug>), 트리가 더 안 바뀌면 daily 가 매번 다시 돌 필요가
     # 없다. --no-verify-tree 로 끈다("gate" 태그 — 코드 규칙·본문 해시·책 계약·책 페이지 — 는 항상 돈다).
     no_verify_tree = "--no-verify-tree" in argv
 

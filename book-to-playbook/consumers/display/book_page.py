@@ -5,10 +5,14 @@
 
 정적 발행(파일로 굽기)은 폐지됐다 — 하루 지난 스냅샷이 매매를 오도하지 않게. assemble 은 파일을
 쓰지 않는 순수 조립 함수다(데이터는 호출자가 넘긴다 — 라이브 서버는 방금 계산한 라이브 판정을 준다).
+
+페이지 검사 — 조립이 기대는 골격이 원본에 있나: 라이브 책마다 #src · #verdict-data · #sheet-root 와 공유 UI 구획
+전부가 있고 사본이 consumers/display/ui/*.js 와 같은가(inject_ui.check). 실패 → 정지(exit 1).
+    python -m consumers.display.book_page [slug ...]
 """
-import os, re
+import os, re, sys
 import json
-from shared.paths import backtest_json, book_file, playbook_html, read_text, source_index_json
+from shared.paths import backtest_json, book_file, live_slugs, playbook_html, read_text, source_index_json
 
 VERDICT_RE = re.compile(
     r'(<script type="application/json" id="verdict-data">)(.*?)(</script>)', re.S)
@@ -92,3 +96,40 @@ def assemble(slug, data):
     return _inject_backtest(html, slug)
 
 
+# ------------------------------------------------------------------ 페이지 검사
+PAGE_IDS = ('id="src"', 'id="verdict-data"', 'id="sheet-root"')
+
+
+def page_contract(slug):
+    """라이브 책 하나의 페이지 구조 위반 목록."""
+    bad = []
+    try:
+        html = read_text(playbook_html(slug))
+        for pid in PAGE_IDS:
+            if pid not in html:
+                bad.append("책 페이지에 %s 가 없다" % pid)
+        from consumers.display.inject_ui import check as ui_check
+        ok, msg = ui_check(html)
+        if not ok:
+            bad.append("공유 UI 구획: %s" % msg.split("\n")[0])
+    except OSError as e:
+        bad.append("책 페이지 없음: %s" % e)
+    return bad
+
+
+def main(argv=()):
+    stop = []
+    for slug in [a for a in argv if not a.startswith("-")] or live_slugs():
+        bad = page_contract(slug)
+        print("  %s %-34s %s" % ("✅" if not bad else "❌", "책 페이지 " + slug, "; ".join(bad)[:300] or "통과"))
+        if bad:
+            stop.append("책 페이지 " + slug)
+    if stop:
+        print("책 페이지 정지 — %s" % ", ".join(stop))
+        return 1
+    print("책 페이지 통과 — 구획·UI 사본")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

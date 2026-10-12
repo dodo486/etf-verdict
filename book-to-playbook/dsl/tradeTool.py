@@ -27,7 +27,7 @@ TIMEFRAMES = ("1d", "1m", "5m")  # 봉 길이 — asof 축에서 자른다. 일�
                            # 마지막 분봉, 5분봉은 1분봉을 세션 안에서 5분 OHLC 로 집계한 뒤 asof 이하 마지막.
                            # 데이터가 없으면 None(모름).
 WINDOW = ("highest", "lowest", "sum")   # 창(n거래일) 집계 — 평균 등 지표는 전용 연산 없이 조합(COND_DSL 6절)
-GONE_OPS = ("ma", "ema", "stdev", "rsi", "pct", "count", "streak")   # 지운 전용 연산 — 조합으로 쓴다(verify.code.rules 주인 표가 되살림을 막는다)
+GONE_OPS = ("ma", "ema", "stdev", "rsi", "pct", "count", "streak")   # 지운 전용 연산 — 조합으로 쓴다(verify.rules 주인 표가 되살림을 막는다)
 CMP = ("gt", "ge", "lt", "le")
 STREAK_CAP = 400          # 연속·경과일을 거꾸로 셀 때의 상한(데이터 길이보다 길면 무의미)
 
@@ -859,7 +859,7 @@ GRADE_RULES = json.load(
     open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "grade_rules.json"), encoding="utf-8"))
 # 판정 전에 과거 시세를 며칠치(달력일) 미리 당겨올지 — '워밍업'. 트리가 쓰는 가장 긴 창
 # (예: 52주 신고가 = 252거래일 ≈ 달력 365일)이 첫날부터 제대로 서도록 넉넉히 둔다.
-# ★ 여기 한 곳이 정본이다 — 매일 판정(consumers/display/verdict_view)·백테스트(consumers/backtest)·검증(verify.book.tree)이
+# ★ 여기 한 곳이 정본이다 — 매일 판정(consumers/display/verdict_view)·백테스트(consumers/backtest)·검증(authoring.checklist.score)이
 #   모두 이 값을 가져다 쓴다. 과거엔 세 곳에 따로(500/400/500) 박혀 백테스트만 어긋났었다.
 WARMUP_DAYS = 500
 
@@ -1034,7 +1034,7 @@ class Cond:
 값
   모든 식은 '날짜별 시계열'(달력 길이의 리스트)이다. 숫자 시계열은 float|None,
   조건 시계열은 True|False|None. None = 데이터가 없어 모름 — 조용히 거짓으로 치지 않는다.
-  모든 연산은 인과적이다(그날까지의 값만 쓴다) — verify.code.primitives 가 강제한다.
+  모든 연산은 인과적이다(그날까지의 값만 쓴다) — verify.primitives 가 강제한다.
 
 관측 시점(asof)
   평가는 '사용자가 보는 그 순간(asof)' 기준이다. asof = 관측 시각(UTC datetime) — 라이브는 실제 지금
@@ -1161,10 +1161,10 @@ class Grade:
   sells    판다 — 보유분이 있을 때만 평가(구간③ trading)
 
 판정은 봉이 끝난 직후(그날까지의 봉)로 낸다 — cond 연산이 전부 인과적이라 전체 이력을 한 번 계산해
-날짜로 꺼내도 미래를 보지 않는다(verify.code.primitives 가 강제).
+날짜로 꺼내도 미래를 보지 않는다(verify.primitives 가 강제).
 
 트리는 원본 dict 가 아니라 TreeGateway(dsl/tree_gateway.py — 트리를 읽는 유일한 출입구)로 받는다.
-같은 뜻을 만드는 쪽(verify.book.tree 의 사례·authoring.checklist.compare 의 a/b 비교)과 읽는 쪽(구간③ 판정·백테스트)이 함께 쓴다 — 화면용 설명(view·
+같은 뜻을 만드는 쪽(authoring.checklist.score 의 사례·authoring.checklist.compare 의 a/b 비교)과 읽는 쪽(구간③ 판정·백테스트)이 함께 쓴다 — 화면용 설명(view·
 측정 증거)은 판단자(signals/judge·explain)가 이 평가 문맥으로 빚는다 — 화면은 그리기만."""
     GRADES = GRADES
     GRADE_RULES = GRADE_RULES

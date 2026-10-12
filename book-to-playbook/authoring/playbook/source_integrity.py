@@ -25,13 +25,13 @@
 
 책 페이지 HTML의 `#src` — 플레이북 마크다운(책 본문을 소절별로 정리한 저자의 말)을 해시로 고정한다.
 체크리스트는 조건 트리(books/<slug>/tree.json)라 저자 문구가 아니라 기계가 실행하는 규칙이다 —
-트리가 원문 뜻대로 옮겨졌는지는 글자 해시가 아니라 verify.book.tree 가 실행으로 검사한다.
+트리가 원문 뜻대로 옮겨졌는지는 글자 해시가 아니라 authoring.checklist.score 가 실행으로 검사한다.
 판정 수치(verdict-data)·UI 코드는 매일 바뀌므로 검사 대상이 아니다.
 
 ## 사용
 
-    python -m verify.book.source_integrity              # 검사 (다르면 종료코드 1)
-    python -m verify.book.source_integrity --accept --why "사유"  # 원문을 의도적으로 고쳤을 때 기준 갱신
+    python -m authoring.playbook.source_integrity              # 검사 (다르면 종료코드 1)
+    python -m authoring.playbook.source_integrity --accept --why "사유"  # 원문을 의도적으로 고쳤을 때 기준 갱신
 
 기준값은 `source_baseline.json`에 저장되며 **커밋 대상**이다.
 새 책을 추가하면 처음 한 번 `--accept --why "사유"` 로 기준을 등록한다.
@@ -97,7 +97,7 @@ def main(argv):
     # --accept 없이 --why 만 있는 건 허용(무해). --accept 와 함께 쓸 때만 필수.
     if accept and not why:
         print("오류: --accept 사용 시 --why \"<사유>\" 가 필요합니다.", file=sys.stderr)
-        print("  예) python -m verify.book.source_integrity --accept --why \"오탈자 수정\"", file=sys.stderr)
+        print("  예) python -m authoring.playbook.source_integrity --accept --why \"오탈자 수정\"", file=sys.stderr)
         print("사유 없는 기준 갱신은 거부됩니다 — 진짜 원문 수정과 실수를 구분할 수 없습니다.", file=sys.stderr)
         return 1
 

@@ -201,7 +201,7 @@ def build_text(top):
 
 
 # 알림 발신(send_telegram/send_desktop)은 소비층 consumers/notify 가 맡는다 —
-# 네트워크 코드(urllib)는 그 한 파일에만 허용된다(verify/code/rules.py ALLOW 의 명시 예외).
+# 네트워크 코드(urllib)는 그 한 파일에만 허용된다(verify/rules.py ALLOW 의 명시 예외).
 def _cli():
     argv = sys.argv[1:]
     slug = next((a for a in argv if not a.startswith("-")), None)

@@ -6,9 +6,9 @@
 (값은 서버가 낸다 — 서버 권위). 그 모양(논리 노드의 op·kids, 라벨 없는 잎의 hidden, "?" 창 설명)을 손으로 정한 답과
 대조한다.
 
-(책 페이지 구획·UI 사본은 verify/book/contract.py 가 본다.)
+(책 페이지 구획·UI 사본은 페이지를 조립하는 consumers/display/book_page.py 가 본다.)
 
-사용: python -m verify.code.view   (실패 있으면 exit 1)
+사용: python -m verify.view   (실패 있으면 exit 1)
 """
 import sys
 from collections import namedtuple
