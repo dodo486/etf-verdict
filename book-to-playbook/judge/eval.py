@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""계산기 — 판때기(트리 식)에 시세 값을 넣어 계산. 부르는 곳은 judge(판단자·설명)뿐.
+"""계산기 — 판때기(트리 식)에 시세 값을 넣어 계산. 부르는 곳은 judge(판단자)뿐.
 
 식의 뜻(값·관측 시점 asof·3값 논리·하한 AtLeast·수동·모르는 값 "?"·문법)은 tree/gateway.py docstring 이 정본이다.
-  · Ctx     평가 문맥(시세·달력·상품·수동 가정·asof 일봉 확정 경계·사람의 답)
-  · series  식 → 달력 길이 시계열(모든 연산은 인과적 — judge.verify_eval 이 강제)
+  · Ctx     평가 문맥(시세·달력·상품·수동 가정·asof 일봉 확정 경계·사람의 답·공유 값 기억)
+  · series  묶인 식(tree.gateway.Node — 판때기의 노드) → 달력 길이 시계열(모든 연산은 인과적 — judge.verify_eval 이 강제).
+            적힌(안 묶인) 식을 받으면 그 문맥의 상품으로 묶어(gateway.bind) 계산한다.
+값 기억: 문맥마다 노드 일련번호(nid)로 한 번만 계산한다. 수동·pos 가 없는 노드(Node.pure)의 값은 시세·달력·asof 로만
+정해지므로, 판단자가 같은 시세·달력·asof 의 문맥들에 같은 공유 기억(shared)을 주면 상품끼리(수동 가정 셋끼리도) 한 번만 계산한다.
 """
 import math
 
-from tree.gateway import (
-    answer_key, ARITH, AtLeast, CMP, CondError, is_unknown, labeled_all, _op_of, UNKNOWN, WINDOW)
+from tree.gateway import ARITH, AtLeast, bind, CMP, CondError, Node, _op_of, ROLES, UNKNOWN, WINDOW
 
 STREAK_CAP = 400          # 연속·경과일을 거꾸로 셀 때의 상한(데이터 길이보다 길면 무의미)
 
@@ -18,7 +20,7 @@ class Ctx:
     """평가 문맥. hist={심볼: [Candle(date,open,high,low,close,volume)]}, cal=날짜 목록."""
 
     def __init__(self, hist, cal, self_sym, index_sym=None, manual_as=None, pos=None, asof=None,
-                 session_close=None, answers=None):
+                 session_close=None, answers=None, shared=None, scope=None):
         """self_sym = 평가 중인 상품($self) · index_sym = 그 상품의 지수($index, 없으면 None).
         pos = (첫 매수일 인덱스, 평균 매입가 | 날짜별 평균 매입가 목록[, 장부]) — 판다·분할 갈래 평가 때만.
         장부 = {"filled": {규칙 이름 | None(전체): 날짜별 산 횟수}, "sold": 날짜별 판 비율} — 없으면 filled·sold 는 모름.
@@ -27,7 +29,10 @@ class Ctx:
           거래소 캘린더(md_feed.sessions)에서 캐려 밖(cond)에서 넣는다(평가기는 jhts 를 모른다). 장중 asof 에서
           '마감이 asof 이후'인 일봉은 아직 미확정이므로 None 으로 가린다(look-ahead 0). asof=None 이거나 캘린더가
           비면(미설치·조회 실패) 아무것도 가리지 않는다 — 없는 캘린더가 조용히 일봉을 전부 지우지 않게.
-        answers = {answer_key: True|False} — 사람이 답한 수동(없는 열쇠는 manual_as). None 이면 옛 동작 그대로."""
+        answers = {answer_key: True|False} — 사람이 답한 수동(없는 열쇠는 manual_as). None 이면 옛 동작 그대로.
+        shared = 공유 값 기억 {nid: 시계열} — 같은 시세·달력·asof 의 문맥끼리만 준다(판단자 몫). pure 노드만 넣고 꺼낸다.
+        scope = 이 문맥의 확정 경계(session_close)가 덮는 상품 심볼 집합 — 경계가 있으면 식의 심볼이 그 안일 때만 공유
+        (상품마다 경계가 그 상품 심볼로만 만들어지므로). None = 제한 없음."""
         self.pos = pos
         self.asof = asof          # 관측 시각(UTC datetime) — 일봉 확정 경계. None 이면 실제 지금
         self.hist = hist
@@ -37,10 +42,12 @@ class Ctx:
         self.manual_as = manual_as
         self.session_close = session_close or {}  # {심볼: {YYYYMMDD: 마감 UTC datetime}} — 일봉 확정 경계
         self._px = {}
-        self._memo = {}
+        self._memo = {}       # nid → 시계열(이 문맥에서 계산한 값)
+        self._bound = {}      # 적힌 식 → 묶인 식 캐시(gateway.bind 의 cache — 뒤집은 문맥과 공유)
         self._smap = {}       # 심볼 → settled_map 캐시(일봉축 마지막 확정 index 지도)
         self._flip = None
         self.answers = answers
+        self.shared, self.scope = shared, scope
 
     def flipped(self):
         """수동 가정을 뒤집은 문맥(not 아래 평가용). 시세 캐시는 공유한다. 사람의 답(answers)은 뒤집지 않는다."""
@@ -48,27 +55,23 @@ class Ctx:
             return self
         if self._flip is None:
             f = Ctx(self.hist, self.cal, self.self_sym, self.index_sym, not self.manual_as, self.pos,
-                    self.asof, self.session_close, self.answers)
-            f._px, f._smap, f._flip = self._px, self._smap, self
+                    self.asof, self.session_close, self.answers, self.shared, self.scope)
+            f._px, f._smap, f._bound, f._flip = self._px, self._smap, self._bound, self
             self._flip = f
         return self._flip
 
     def manual_value(self, node):
         """수동 잎 하나의 값 — 사람이 답했으면 그 답, 아니면 manual_as(극성 반영된 가정)."""
         if self.answers is not None:
-            a = self.answers.get(answer_key(node, self.self_sym))
+            a = self.answers.get(self.self_sym + "|" + node.mkey)   # = gateway.answer_key(적힌 잎, 상품)
             if a is not None:
                 return a
         return self.manual_as
 
-    def bind(self, sym):
-        """역할 → 실제 티커($self → 상품, $index → 그 상품의 지수). 구체 티커는 그대로."""
-        if sym == "$self":
-            return self.self_sym
-        if sym == "$index":
-            if not self.index_sym:
-                raise CondError("$index 가 정의되지 않은 상품: %s (products 에 index 가 없다)" % self.self_sym)
-            return self.index_sym
+    def _role(self, sym):
+        """묶이지 않은 역할이 남은 잎 — $index 인데 상품에 지수가 없을 때뿐(묶기가 그대로 둔다). 계산하는 순간 오류."""
+        if sym in ROLES:
+            raise CondError("$index 가 정의되지 않은 상품: %s (products 에 index 가 없다)" % self.self_sym)
         return sym
 
     def px(self, sym, field, tf="1d"):
@@ -173,31 +176,15 @@ def _or3(vals):
     return False
 
 
-# 일봉축 조회(asof 이하 마지막 확정봉) 대상이 아닌 잎 — 하나라도 있으면 그 식은 '1d-순수'가 아니다.
-#   · 일봉 아닌 px(tf 1m/5m)  : 일봉 확정 경계로 당기면 안 된다(값은 지금 전부 None — 모름).
-#   · manual/pos              : 일봉 봉이 아닌 값(수동·포지션).
-_NON_DAILY = ("manual", "pos")
-
-
 def _daily_axis(node, ctx):
-    """node 가 '1d-순수'(모든 px 잎이 tf=1d 이고 분봉·수동·pos 잎이 없음)면, 그 1d 심볼들의 settled_map 을
-    돌려준다(일봉축 '마지막 확정봉' 지도). 아니거나, 심볼들의 지도가 엇갈리거나, 지도가 no-op(asof 없음·캘린더 없음)이면
-    None — 그 경우 gather 를 건너뛴다(기존 동작 그대로). 같은 시장 심볼은 지도가 같으므로(세션 경계가 시장별) 한 지도로
-    모은다 — 서로 다른 시장이 한 1d-순수 식에 섞이면(지도 엇갈림) 당기지 않는다(조용히 잘못 당기느니 기존 masked-None)."""
-    syms = set()
-    for n in labeled_all(node):
-        if not isinstance(n, dict):
-            continue
-        op = _op_of(n)
-        if op == "px":
-            if n.get("tf", "1d") != "1d":
-                return None                 # 분봉/5분봉 잎 — 1d-순수 아님
-            syms.add(ctx.bind(n["sym"]))
-        elif op in _NON_DAILY or is_unknown(n):
-            return None                     # 수동("?" 식 포함)·포지션 — 1d-순수 아님
-    if not syms:
-        return None                         # px 잎이 없는 순수 숫자/비교식 — 당길 일봉축이 없음
-    maps = [ctx.settled_map(sym) for sym in syms]
+    """node 가 '1d-순수'(모든 px 잎이 tf=1d 이고 분봉·수동·pos 잎이 없음 — 묶을 때 정한 Node.axis)면, 그 1d 심볼들의
+    settled_map 을 돌려준다(일봉축 '마지막 확정봉' 지도). 아니거나(axis None·빈 집합), 심볼들의 지도가 엇갈리거나, 지도가
+    no-op(asof 없음·캘린더 없음)이면 None — 그 경우 gather 를 건너뛴다(기존 동작 그대로). 같은 시장 심볼은 지도가 같으므로
+    (세션 경계가 시장별) 한 지도로 모은다 — 서로 다른 시장이 한 1d-순수 식에 섞이면(지도 엇갈림) 당기지 않는다(조용히 잘못
+    당기느니 기존 masked-None). OFF 자식(노드 레벨 on 에 빠진 상품)도 적힌 식의 잎으로 센다(Node.axis 계약)."""
+    if not node.axis:
+        return None                         # 1d-순수 아님, 또는 px 잎이 없는 순수 숫자/비교식 — 당길 일봉축이 없음
+    maps = [ctx.settled_map(ctx._role(sym)) for sym in node.axis]
     first = maps[0]
     if first is None or any(m != first for m in maps[1:]):
         return None                         # no-op(asof 없음·캘린더 없음) 또는 시장별 지도 엇갈림 → 당기지 않음
@@ -205,7 +192,10 @@ def _daily_axis(node, ctx):
 
 
 def series(node, ctx):
-    """노드 → 달력 길이 시계열.
+    """노드 → 달력 길이 시계열. node = 묶인 식(Node) — 적힌 식이면 문맥의 상품으로 묶는다(gateway.bind).
+
+    노드 레벨 on: 묶을 때 평가 중 상품이 그 노드의 on 에 없으면 OFF 노드(값 '항상 참' — all/atleast 안에서 투명).
+    규칙은 공통으로 두고 한 상품에만 더 붙는 조건을 쪼개지 않고 단다. OFF 노드는 일봉축 당김을 하지 않는다.
 
     일봉축 재해석(장중 asof): 노드가 '1d-순수'면(모든 px 잎 tf=1d·분봉/수동/pos 없음), 평가 결과의 각 index i 를
     'asof 이하 마지막 확정 일봉' 값으로 당긴다(_daily_axis·settled_map). 장중 asof 면 오늘 봉은 미확정이라 m[i]=어제 →
@@ -213,22 +203,28 @@ def series(node, ctx):
     어떤 파생값에도 새지 않는다(look-ahead 0). 당김은 멱등(m[m[i]]==m[i])이라 잎·그 위 1d 노드 어디서 걸어도 결과가
     같다 — 그래서 '가장 바깥 1d 노드'를 따로 찾지 않고 모든 노드에서 한 번씩 안전하게 건다. EOD/장후 asof·asof None·캘린더
     없음에선 m[i]==i(또는 no-op)라 항등 → 일봉 파리티·기존 동작 그대로."""
-    key = (repr(node), ctx.manual_as)
-    if key in ctx._memo:
-        return ctx._memo[key]
-    # 노드 레벨 on: 평가 중 상품이 그 노드의 on 에 없으면 그 노드는 '항상 참'(제약 안 함 — all/atleast 안에서 투명).
-    #   규칙은 공통으로 두고 한 상품에만 더 붙는 조건을 쪼개지 않고 단다. on 이 없거나 상품이 들어 있으면 평소대로.
-    if isinstance(node, dict):
-        on = node.get("on")
-        if on and ctx.self_sym not in on:
+    if not isinstance(node, Node):
+        if not isinstance(node, dict):
+            return _series(node, ctx)       # 상수·"?" — 기억할 것 없음
+        node = bind(node, ctx.self_sym, ctx.index_sym, ctx._bound)
+    out = ctx._memo.get(node.nid)
+    if out is not None:
+        return out
+    shared = ctx.shared if (ctx.shared is not None and node.pure
+                            and (ctx.scope is None or node.syms <= ctx.scope)) else None
+    if shared is not None:
+        out = shared.get(node.nid)
+    if out is None:
+        if node.off:
             out = [True] * len(ctx.cal)
-            ctx._memo[key] = out
-            return out
-    out = _series(node, ctx)
-    m = _daily_axis(node, ctx)
-    if m is not None:
-        out = [out[m[i]] if m[i] is not None else None for i in range(len(out))]
-    ctx._memo[key] = out
+        else:
+            out = _series(node, ctx)
+            m = _daily_axis(node, ctx)
+            if m is not None:
+                out = [out[m[i]] if m[i] is not None else None for i in range(len(out))]
+        if shared is not None:
+            shared[node.nid] = out
+    ctx._memo[node.nid] = out
     return out
 
 
@@ -240,14 +236,14 @@ def _series(node, ctx):
         return [None] * L                    # 모르는 숫자 — 값은 모름(판단은 그것을 품은 노드가 수동으로)
     op = _op_of(node)
     v = node[op]
-    if is_unknown(node):
-        return [ctx.manual_value(node)] * L  # 저자가 숫자를 안 준 판단 — 사람이 정한다(수동과 같은 규칙)
+    if node.mkey is not None:
+        return [ctx.manual_value(node)] * L  # 수동 잎 — 문장 수동·저자가 숫자를 안 준 판단("?") 모두 사람이 정한다
     if op in WINDOW + ("lag",) and v[1] == UNKNOWN:
         return [None] * L                    # 기간을 모름 — 값도 모름
     S = lambda n: series(n, ctx)
 
     if op == "px":
-        return ctx.px(ctx.bind(node["sym"]), v, node.get("tf", "1d"))
+        return ctx.px(ctx._role(node["sym"]), v, node.get("tf", "1d"))
 
     if op in ARITH:
         a, b = S(v[0]), S(v[1])
@@ -377,9 +373,6 @@ def _series(node, ctx):
                 j -= 1
             out.append(val if seen is not None else None)
         return out
-
-    if op == "manual":
-        return [ctx.manual_value(node)] * L
 
     if op == "pos":
         if ctx.pos is None:

@@ -106,28 +106,45 @@ GRADE_RULES = json.load(
     open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "grade_rules.json"), encoding="utf-8"))
 
 
+_VALUES = (None, {})   # (시세 묶음, {(달력, asof): {nid: 시계열}}) — 가장 최근 시세 묶음 하나의 공유 값 기억
+
+
+def shared_values(prices, days, asof):
+    """같은 시세 묶음(객체 그대로)·달력·asof 의 문맥들이 같이 쓰는 값 기억 {nid: 시계열} — 수동·pos 없는 노드(Node.pure)의
+    값은 이 셋으로만 정해지므로 상품·책·수동 가정이 달라도 한 번만 계산한다(eval.series 가 pure 노드만 넣고 꺼낸다).
+    새 시세 묶음이 오면 통째로 새로 시작한다(지난 틱 값이 남지 않게 — 묶음 객체를 쥐고 있어 id 재사용도 없다)."""
+    global _VALUES
+    cur = _VALUES
+    if cur[0] is not prices:
+        cur = _VALUES = (prices, {})
+    return cur[1].setdefault((tuple(days), asof), {})
+
+
 class RuleSeries:
     """한 상품의 등급 동사(안 산다·산다)·비중을 전체 달력에 대해 한 번 계산해 둔다."""
 
     def __init__(self, tree, product, prices, days, asof=None, answers=None):
-        """tree = 트리 출입구(TreeGateway) · product = 판정할 상품 — 그 상품의 규칙을 골라 평가한다. asof = 관측 시각(UTC datetime) — 일 — 일봉은 asof 이하
+        """tree = 트리 출입구(TreeGateway) · product = 판정할 상품 — 그 상품의 판때기(tree.board)를 평가한다. asof = 관측 시각(UTC datetime) — 일봉은 asof 이하
         확정(settled) 봉만 본다(미확정 그날 일봉은 None). None 이면 실제 지금(일봉은 마지막 확정봉).
         answers = 사람이 답한 수동 {answer_key: 참/거짓} — 등급·금액·비중이 그 답으로 풀린다(서버 권위).
         None 이면 옛 동작 그대로."""
         self.tree, self.product, self.days, self.prices = tree, product, list(days), prices
-        self.index = tree.index(product)
-        sc = session_closes(tree.symbols([product]), list(days), asof)
-        mk = lambda m: Ctx(prices, days, product, self.index, manual_as=m, asof=asof, session_close=sc, answers=answers)
+        self.board = board = tree.board(product)
+        self.index = board.index
+        sc = session_closes(board.symbols, self.days, asof)
+        shared, scope = shared_values(prices, self.days, asof), (None if asof is None else board.symbols)
+        mk = lambda m: Ctx(prices, days, product, self.index, manual_as=m, asof=asof, session_close=sc, answers=answers,
+                           shared=shared, scope=scope)
         self.ctx = {True: mk(True), False: mk(False), None: mk(None)}
         s = lambda node, m: series(node, self.ctx[m])
-        self.opt = {do: s(tree.gate(product, do), BUY_SIDE[do]) for do in GATES}
-        self.pes = {do: s(tree.gate(product, do), not BUY_SIDE[do]) for do in GATES}
-        w = tree.weight(product).qty.x                # 비중 식(Qty "cash") — None = 저자 미명시
+        self.opt = {do: s(board.gates[do], BUY_SIDE[do]) for do in GATES}
+        self.pes = {do: s(board.gates[do], not BUY_SIDE[do]) for do in GATES}
+        w = board.weight                              # 비중 식(Qty "cash") — None = 저자 미명시
         self.weight = {m: (s(w, m) if w is not None else None) for m in (None, True, False)}
         # 데이터 완전성 가드 — 이 상품 등급이 실제로 쓰는 가장 긴 워밍업(트리에서 파생, 하드코딩 아님).
         #   그보다 '확정 봉'이 적은 초기 구간의 1d 신호는 창이 덜 차 조용히 None/틀릴 수 있어 신뢰불가다
         #   → grade_key 가 '불완전 데이터(❔ 보류)'로 표시한다(✅/🚫 확신 금지). WARMUP_DAYS(fetch 버퍼)와 무관.
-        self.warmup = tree.warmup(product)
+        self.warmup = board.warmup
         # 심볼 확정봉 지도 — asof 장중이면 오늘 미확정 봉을 뺀 '마지막 확정 index'(없으면 전부 확정 = 항등).
         #   여러 심볼을 보면 가장 적게 확정된 심볼(지연된 feed)이 기준이다 — 하나라도 모자라면 불완전.
         self._confirmed = self._confirmed_index_map()
@@ -137,7 +154,7 @@ class RuleSeries:
         아직 확정 못 했으면(지연된 feed·asof 장중 미확정) 그 심볼 기준으로 낮춘다. 확정봉이 하나도 없으면 -1.
         캘린더가 없거나 asof 가 없으면(라이브 지금) settled_map 이 no-op(None) → 날짜 index 그대로(항등)."""
         ctx = self.ctx[None]
-        syms = sorted(set(self.tree.symbols([self.product])) | {self.product})
+        syms = sorted(self.board.symbols)
         maps = [ctx.settled_map(s) for s in syms]
         out = []
         for day in range(len(self.days)):
@@ -454,7 +471,7 @@ class ProductJudge:
     def gate_value(self, do, day, view=None):
         """등급 동사 하나의 그날 값 — view None = 수동 모름 · "opt" = 수동이 유리하게 · "pes" = 불리하게(검사·사례 채점용)."""
         if view is None:
-            return series(self._tree.gate(self.product, do), self._series.ctx[None])[day]
+            return series(self._series.board.gates[do], self._series.ctx[None])[day]
         return (self._series.opt if view == "opt" else self._series.pes)[do][day]
 
     def weight_at(self, day):
@@ -490,7 +507,8 @@ class ProductJudge:
     def _context(self, holding, manual_as=None):
         pos = ((holding.entry_day, holding.cost) if holding.book is None
                else (holding.entry_day, holding.cost, holding.book))
-        return Ctx(self._prices, self.days, self.product, self.index, manual_as=manual_as, pos=pos)
+        return Ctx(self._prices, self.days, self.product, self.index, manual_as=manual_as, pos=pos,
+                   shared=shared_values(self._prices, self.days, None))
 
     def conditions(self, holding, sells, tranches, manual_as=False):
         """이 보유 상태로 판다 갈래·분할 차수 조건의 날짜별 값 — 백테스트 체결 워크가 체결을 정하는 데 쓴다.
@@ -528,6 +546,9 @@ class ProductJudge:
 
 
 # ================================================================ 책 하나
+_OPENED = {}   # (판단자 클래스, slug) → ((트리 경로, 수정 시각 ns, 크기), Judge) — Judge.open 의 컴파일 캐시
+
+
 class Judge:
     """책 하나의 판단자 — 트리 원본(TreeGateway)·시세 원본(history)을 쓰는 유일한 곳.
     Judge.open(slug) 으로 열고, prices() 로 시세를 받아(또는 여러 책 공유 조회를 넘겨받아) 판정을 낸다."""
@@ -541,9 +562,25 @@ class Judge:
     # ------------------------------------------------------------ 열기
     @classmethod
     def open(cls, slug):
-        """책의 최종 트리(books/<slug>/tree.json)를 열어 형식 검사까지. 없으면 None, 형식이 틀리면 CondError."""
+        """책의 최종 트리(books/<slug>/tree.json)를 열어 형식 검사까지. 없으면 None, 형식이 틀리면 CondError.
+        한 번 연 책은 트리 파일(경로·수정 시각·크기)이 그대로면 같은 판단자를 돌려준다 — 컴파일(판때기)은 트리가 바뀐
+        책만 다시(라이브가 틱마다 불러도 다시 읽지 않는다)."""
+        path = TreeGateway.path(slug)
+        try:
+            st = os.stat(path)
+        except OSError:
+            _OPENED.pop((cls, slug), None)
+            return None
+        stamp = (path, st.st_mtime_ns, st.st_size)
+        hit = _OPENED.get((cls, slug))
+        if hit is not None and hit[0] == stamp:
+            return hit[1]
         tree = TreeGateway.load(slug)
-        return None if tree is None else cls(slug, tree)
+        if tree is None:
+            return None
+        judge = cls(slug, tree)
+        _OPENED[(cls, slug)] = (stamp, judge)
+        return judge
 
     @classmethod
     def read(cls, slug, which=None):

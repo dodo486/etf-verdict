@@ -19,6 +19,8 @@
   6. 등급 — 비중 범위 · 데이터 완전성 가드(워밍업 부족 → ❔, 충분 구간은 원시 등급 사다리와 같음)
   7. 표현력 회귀 — 발견된 버그 유형을 트리로 적어 원문 뜻대로 나오는지
   8. 사람이 답한 수동(Ctx answers) — 답 열쇠 규칙·극성·등급까지(서버 권위의 바탕)
+  9. 값 기억·공유 — 묶은 식(판때기 노드)의 값 기억: $self 는 상품마다 · 노드 레벨 on(OFF)은 걸러내기 전과 같은 일봉축 ·
+     수동·pos 없는 노드만 문맥끼리 공유(한 번 계산) · 수동·pos 는 문맥마다 · 확정 경계 범위(scope) 밖 심볼은 공유 안 함
   (트리 문법·출입구 계약은 tree/verify_gateway.py, 체결 워크·실전 경로는 backtest/verify_trading.py,
    화면 설명 구조는 web/verify_view.py 가 본다)
 
@@ -621,6 +623,48 @@ def t_regress():
     check(series(four, make_ctx([1.0]))[0] is None, "4개 중 2개(1참·1거짓·2모름) → 모름")
 
 
+def t_memo():
+    """값 기억·공유 — 판때기 노드(gateway.bind)의 값 기억과 공유 값 기억(Ctx shared)이 값을 바꾸지 않는다."""
+    import datetime as dt
+    utc = dt.timezone.utc
+    cal = ["2026100%d" % d for d in range(1, 8)]
+    xs = [100.0, 101.0, 100.0, 102.0, 103.0, 101.0, 104.0]
+    hist = {s: [Candle(d, c * k, c * k, c * k, c * k, 1000) for d, c in zip(cal, xs)]
+            for s, k in (("A", 1.0), ("B", 2.0), ("N", 3.0))}
+    sc = {s: {d: dt.datetime(2026, 10, int(d[-1]), 20, 0, tzinfo=utc) for d in cal} for s in ("A", "B", "N")}
+    intraday = dt.datetime(2026, 10, 7, 13, 0, tzinfo=utc)
+    up = lambda sym: {"gt": [{"px": "close", "sym": sym}, {"lag": [{"px": "close", "sym": sym}, 1]}]}
+    # 노드 레벨 on(OFF) — 대상 밖 상품에선 '항상 참'이면서 부모의 일봉축 판정은 걸러내기 전과 같다(수동을 품었으면 안 당김)
+    ctx = lambda prod, **kw: Ctx(hist, cal, prod, asof=intraday, session_close=sc, **kw)
+    off = series({"barssince": {"all": [up("$self"), {"manual": "m", "on": ["Z"]}]}}, ctx("A"))
+    ref = series({"barssince": {"all": [up("$self"), {"manual": "m"}]}}, ctx("A", manual_as=True))
+    check(off == ref, "노드 레벨 on: 대상 밖 = 항상 참 + 일봉축은 걸러내기 전 식 기준 %r ≠ %r" % (off, ref))
+    check(series({"manual": "m", "on": ["Z"]}, ctx("A")) == [True] * len(cal), "노드 레벨 on: 대상 밖 노드 = 항상 참")
+    # $self 는 상품마다 다른 노드 — 같은 공유 기억이어도 값이 섞이지 않는다
+    shared = {}
+    ca, cb = Ctx(hist, cal, "A", shared=shared), Ctx(hist, cal, "B", shared=shared)
+    self_px = {"px": "close", "sym": "$self"}
+    check(series(self_px, ca)[0] == 100.0 and series(self_px, cb)[0] == 200.0, "$self 는 문맥의 상품으로 묶인다")
+    # 수동·pos 없는 노드(N 상승)는 공유 기억으로 한 번만 계산 — 두 상품이 같은 시계열 객체를 받는다
+    n0 = len(shared)
+    va = series(up("N"), ca)
+    check(series(dict(up("N"), label="딴 이름"), cb) is va and len(shared) > n0, "같은 식은 상품끼리 한 번 계산(공유)")
+    # 수동은 상품마다(답 열쇠가 상품별) — 공유 기억에 들어가지 않는다
+    ans = {answer_key({"manual": "m"}, "A"): True}
+    sa = Ctx(hist, cal, "A", shared=shared, answers=ans)
+    sb = Ctx(hist, cal, "B", shared=shared, answers=ans)
+    check(series({"manual": "m"}, sa)[0] is True and series({"manual": "m"}, sb)[0] is None,
+          "수동 답은 상품마다 — 공유되지 않는다")
+    # pos 는 그 문맥의 보유분 — 공유 기억에 들어가지 않는다
+    pa = Ctx(hist, cal, "A", pos=(0, 100.0), shared=shared)
+    pb = Ctx(hist, cal, "A", pos=(0, 50.0), shared=shared)
+    check(same(series({"pos": "ret"}, pa)[1], 1.0) and same(series({"pos": "ret"}, pb)[1], 102.0), "pos 는 문맥마다 — 공유되지 않는다")
+    # 확정 경계 범위(scope) 밖 심볼을 읽는 식은 공유 기억을 쓰지 않는다(그 문맥은 그 심볼의 경계를 모른다)
+    scoped = Ctx(hist, cal, "A", shared={}, scope=frozenset({"A"}))
+    series(up("N"), scoped)
+    check(not scoped.shared, "범위 밖 심볼 식은 공유 기억에 넣지 않는다")
+
+
 def main():
     rng = random.Random(20261001)     # 같은 씨앗 하나를 순서대로 나눠 쓴다(순서 = 옛 검사와 같음)
     for name, fn in (("수치 연산", lambda: t_numeric(rng)), ("3값 논리", t_logic),
@@ -629,7 +673,7 @@ def main():
                      ("혼합 tf·확정봉·look-ahead 0", t_settled_mtf),
                      ("등급·금액", t_grade), ("데이터 완전성 가드(워밍업)", t_warmup_guard),
                      ("표현력 회귀", t_regress),
-                     ("수동 답(answers)", t_answers)):
+                     ("수동 답(answers)", t_answers), ("값 기억·공유", t_memo)):
         before = len(FAILS)
         try:
             fn()
@@ -642,7 +686,7 @@ def main():
             print("    · " + f)
         print("계산기 검사 실패 %d건 — 정지" % len(FAILS))
         return 1
-    print("계산기 검사 통과 — 수치·3값·시간·인과·봉·등급·회귀·수동 답")
+    print("계산기 검사 통과 — 수치·3값·시간·인과·봉·등급·회귀·수동 답·값 기억")
     return 0
 
 

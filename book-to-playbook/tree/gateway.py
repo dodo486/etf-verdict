@@ -99,9 +99,21 @@ TreeGateway. 공개 이름은 모듈 수준 정의 그대로(from tree.gateway i
     · 규칙·노드 `on` = 저자가 상품을 이름으로 짚은 규칙의 대상 상품 필터(생략 = 전 상품)
   ($s·이름 심볼 names·across 는 폐지 — 여러 종목 중 N개는 atleast·of. 형식 검사가 거부한다.)
   `{"pos": "filled", "rule": 이름}`(그 규칙으로 산 횟수)은 그대로 건넨다 — 값은 체결 장부(trades)가 낸다.
+
+■ 판때기(Board) — 상품 하나의 컴파일 결과 (정적: 트리가 고정되면 판때기도 고정)
+  TreeGateway.board(상품) 이 상품마다 한 번 만든다(메모리에만 — 파일로 쓰지 않는다. 트리 파일 하나만 진실).
+    gates   {동사: 묶인 식} — 등급 동사(안 산다·산다)의 any 묶음 · weight = 비중 식(없으면 None)
+    tranches · sells = 분할 차수·판다 갈래의 when(묶인 식, 1차 분할은 None) · symbols = 필요 심볼 · warmup = 필요 워밍업
+  '묶기'(bind) = 펼친 식에서 $self·$index 를 실제 티커로 바꾸고, 노드 레벨 on 에 빠진 상품의 노드를 '항상 참'(OFF)으로
+  바꾸고, 메타(label·ref…)를 뗀 것. 묶인 노드(Node)는 노드 풀이 가진다 — 같은 식은 노드 하나(정규 열쇠로 intern):
+  여러 상품·여러 책이 보는 같은 식("NVDA 상승")은 한 번 계산된다. 수동("?" 식 포함)·pos 를 품은 식은 상품마다 값이
+  다르므로(사람의 답은 상품별·pos 는 그 상품 보유분) 열쇠에 상품을 넣어 상품끼리 공유하지 않는다.
+  계산기(judge/eval)는 묶인 노드만 계산한다 — 적힌(안 묶인) 식을 받으면 그 문맥의 상품으로 묶어서(bind) 계산한다.
 """
+import itertools
 import json
 import os
+import weakref
 from collections import namedtuple
 
 from shared.paths import book_file
@@ -453,6 +465,113 @@ def warmup_of(node):
     return 0
 
 
+# ------------------------------------------------------------------ 묶기(bind) · 노드 풀
+class Node(dict):
+    """묶인 노드 — 노드 풀이 가진 불변 식 하나(dict 모양 그대로: 연산 키만, 메타 없음, 자식도 Node).
+    같은 정규 열쇠(key)면 같은 객체다. 계산기가 쓰는 정적 성질을 묶을 때 한 번 정해 둔다:
+      nid   풀 안 일련번호(재사용 없음 — 계산기의 값 기억 열쇠)
+      pure  수동("?" 식 포함)·pos 가 계산되는 자리에 없다 — 값이 시세·달력·asof 로만 정해진다(상품끼리 값 공유 가능)
+      axis  일봉축 당김 대상 심볼(frozenset — px 잎이 없으면 빈 집합) · 수동·pos·분봉 잎이 있으면 None(당기지 않음).
+            OFF 노드(노드 레벨 on 에 빠진 상품)는 값은 '항상 참'이지만 적힌 식의 axis·syms 를 그대로 지닌다
+            (부모의 일봉축 판정이 on 걸러내기 전과 같게 — 계산기 series 계약)
+      syms  식이 읽는 심볼 전부(OFF 노드는 적힌 식의 심볼)
+      mkey  수동 잎의 답 열쇠 본체(manual_key — 적힌 식 기준: $self 그대로) · off = OFF 노드인가"""
+    __slots__ = ("nid", "key", "pure", "axis", "syms", "mkey", "off", "__weakref__")
+
+    def __setitem__(self, k, v):
+        raise TypeError("묶인 노드는 바꿀 수 없다")
+
+
+_POOL = weakref.WeakValueDictionary()   # 정규 열쇠 → Node (모든 책·상품 공용 — 노드는 불변이라 공유해도 안전)
+_NID = itertools.count(1)
+
+
+def _intern(key, items, pure, axis, syms, mkey=None, off=False):
+    n = _POOL.get(key)
+    if n is None:
+        n = Node(items)
+        n.nid, n.key, n.pure, n.mkey, n.off = next(_NID), key, pure, mkey, off
+        n.axis = None if axis is None else frozenset(axis)
+        n.syms = frozenset(syms)
+        _POOL[key] = n
+    return n
+
+
+def bind(node, prod, index=None, cache=None):
+    """적힌(펼친) 식 → 상품 prod 의 묶인 식(Node, 풀에서 intern). 숫자·"?"·None 은 그대로.
+    $self → prod · $index → index(없으면 "$index" 그대로 두고 계산기가 그 잎에서 오류를 낸다 — 계산되지 않는 자리면 무해)
+    · 노드 레벨 on 에 prod 가 없으면 OFF 노드('항상 참') · 메타는 뗀다(값과 무관). cache = {id(적힌 노드): (노드, Node)}
+    — 같은 적힌 객체를 여러 번 묶을 때(설명 화면이 노드마다 값을 묻는다) 다시 걷지 않게(호출자가 수명 동안 가진다)."""
+    if isinstance(node, Node) or not isinstance(node, (dict, list)):
+        return node
+    if cache is not None:
+        hit = cache.get(id(node))
+        if hit is not None and hit[0] is node:
+            return hit[1]
+    if isinstance(node, list):
+        out = [bind(x, prod, index, cache) for x in node]
+    else:
+        out = _bind_dict(node, prod, index, cache)
+        on = node.get("on")
+        if on and prod not in on:            # OFF — 값은 '항상 참'(빈 all), 부모를 위한 axis·syms 는 적힌 식 그대로
+            ax = None if out.axis is None else sorted(out.axis)
+            out = _intern("off|%s|%s" % (json.dumps(ax), json.dumps(sorted(out.syms), ensure_ascii=False)),
+                          {"all": []}, True, out.axis, out.syms, off=True)
+    if cache is not None:
+        cache[id(node)] = (node, out)
+    return out
+
+
+def _form(x):
+    """정규 열쇠용 모양 — 자식 Node 는 {"#": nid} 로(같은 자식 = 같은 nid 라 부모 열쇠도 정규)."""
+    if isinstance(x, Node):
+        return {"#": x.nid}
+    if isinstance(x, list):
+        return [_form(y) for y in x]
+    return x
+
+
+def _kids(x):
+    """묶인 값 안의 자식 Node 들(목록·case 의 [[c, v], …] 포함)."""
+    if isinstance(x, Node):
+        yield x
+    elif isinstance(x, list):
+        for y in x:
+            yield from _kids(y)
+
+
+def _bind_dict(node, prod, index, cache):
+    items, pure, axis, syms = {}, True, set(), set()
+    for k, v in node.items():
+        if k in META:
+            continue
+        b = items[k] = bind(v, prod, index, cache)
+        for c in _kids(b):
+            pure = pure and c.pure
+            syms |= c.syms
+            axis = None if (axis is None or c.axis is None) else axis | c.axis
+    mkey = None
+    if "px" in node:
+        sym = node.get("sym")
+        sym = prod if sym == "$self" else (index or sym) if sym == "$index" else sym
+        items["sym"] = sym
+        syms.add(sym)
+        axis = None if (axis is None or node.get("tf", "1d") != "1d") else axis | {sym}
+    if is_manual(node):                       # 수동 잎("?" 식 포함) — 답 열쇠는 적힌 식 그대로
+        mkey, pure, axis = manual_key(node), False, None
+    elif "pos" in node:
+        pure, axis = False, None
+    key = json.dumps(_form(items), ensure_ascii=False, sort_keys=True)
+    if not pure:                              # 상품마다 값이 다르다 — 상품끼리 공유하지 않는다
+        key = "%s|%s|%s" % (prod, mkey, key)
+    return _intern(key, items, pure, axis, syms, mkey)
+
+
+class Board(namedtuple("Board", "product index gates weight tranches sells symbols warmup")):
+    """판때기 — 상품 하나의 컴파일 결과(묶인 식 · 필요 심볼 · 워밍업). TreeGateway.board 가 만든다(위 '판때기' 절)."""
+    __slots__ = ()
+
+
 # 판정 전에 과거 시세를 며칠치(달력일) 미리 당겨올지 — '워밍업'. 트리가 쓰는 가장 긴 창
 # (예: 52주 신고가 = 252거래일 ≈ 달력 365일)이 첫날부터 제대로 서도록 넉넉히 둔다.
 # ★ 여기 한 곳이 정본이다 — 매일 판정(web/verdict_view)·백테스트(backtest)·검증(authoring.extract.verify_tree)이
@@ -538,6 +657,7 @@ class TreeGateway:
     def __init__(self, data):
         self._d = data or {}
         self._by_label = {r.get("label"): r for r in self._d.get("rules", []) if isinstance(r, dict)}
+        self._boards = {}                        # 상품 → Board (처음 물을 때 한 번 — 트리는 고정이라 판때기도 고정)
 
     def __bool__(self):
         return bool(self._d)
@@ -798,10 +918,23 @@ class TreeGateway:
             out.append((SELL, r.label, r.ref, r.when))
         return out
 
-    # ---------------------------------------------------------------- 트리 전체 훑기
-    def symbols(self, prods=None):
-        """트리가 참조하는 실제 심볼 전부 — 상품 · 그 상품의 지수 · 식의 구체 티커($self·$index 는 위 둘로 채워짐)."""
-        out = set()
+    # ---------------------------------------------------------------- 판때기(상품별 컴파일)
+    def board(self, prod):
+        """상품 하나의 판때기(Board) — 처음 물을 때 한 번 만들어 둔다(모듈 docstring '판때기' 절)."""
+        b = self._boards.get(prod)
+        if b is None:
+            ix = self.index(prod)
+            gates = {do: self.gate(prod, do) for do in GATES}
+            B = lambda n: bind(n, prod, ix)
+            b = self._boards[prod] = Board(
+                prod, ix, {do: B(g) for do, g in gates.items()}, B(self.weight(prod).qty.x),
+                [B(t.when) for t in self.tranches(prod)], [B(r.when) for r in self.sells(prod)],
+                frozenset(self._symbols(prod)), max([warmup_of(g) for g in gates.values()]))
+        return b
+
+    def _symbols(self, prod):
+        """상품 하나가 쓰는 실제 심볼 — 상품 · 그 지수 · 식의 구체 티커($self·$index 는 앞 둘)."""
+        out = {prod, self.index(prod)}
 
         def walk(n):
             if isinstance(n, dict):
@@ -814,21 +947,19 @@ class TreeGateway:
                 for x in n:
                     walk(x)
 
-        for p in (self._d["products"] if prods is None else prods):
-            out.add(p)
-            if self.index(p):
-                out.add(self.index(p))
-            for _z, _l, _r, node in self.expressions(p):
-                walk(node)
+        for _z, _l, _r, node in self.expressions(prod):
+            walk(node)
         out.discard(None)
         return out
 
+    # ---------------------------------------------------------------- 트리 전체 훑기
+    def symbols(self, prods=None):
+        """트리가 참조하는 실제 심볼 전부 — 상품들(생략 = 전부) 판때기의 필요 심볼 합집합."""
+        return set().union(*[self.board(p).symbols for p in (self._d["products"] if prods is None else prods)])
+
     def warmup(self, prod=None):
-        mx = 0
-        for p in [prod] if prod is not None else self._d["products"]:
-            for do in GATES:
-                mx = max(mx, warmup_of(self.gate(p, do)))
-        return mx
+        """필요 워밍업(거래일) — 상품 하나(생략 = 전 상품 중 최대)의 등급 식이 쓰는 가장 긴 lookback."""
+        return max([self.board(p).warmup for p in ([prod] if prod is not None else self._d["products"])] + [0])
 
     def refs(self):
         """트리가 근거로 단 원문 소절 전부 — 규칙·상품의 ref("·" 로 여럿)."""

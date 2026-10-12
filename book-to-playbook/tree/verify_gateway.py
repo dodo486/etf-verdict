@@ -6,6 +6,8 @@
   1. 문법 — 모르는 키·인자 수·빈 구역·지운 연산은 거부, 올바른 노드·v3 트리는 통과(tree.gateway.validate)
   2. 트리 출입구(TreeGateway) 계약 — 판정·백테스트·검사기가 트리에 묻는 질문의 답 모양,
      형식이 틀린(옛 양식·폐지 표기) 트리는 거부
+  3. 판때기(board)·노드 풀 — $self·$index → 티커 · 노드 레벨 on 걸러내기(OFF) · 필요 심볼·워밍업 ·
+     같은 식은 상품·책을 넘어 노드 하나 · 수동·pos 를 품은 식은 상품끼리 공유하지 않음
   (계산기·등급·워밍업 가드·수동 답은 judge/verify_eval.py, 체결 워크는 backtest/verify_trading.py,
    화면 설명 구조는 web/verify_view.py 가 본다)
 
@@ -17,7 +19,7 @@
 import sys
 
 from shared import paths  # noqa: F401  (UTF-8 출력)
-from tree.gateway import BLOCK, BUY, CondError, SELL, TreeGateway, rule, synthetic, validate
+from tree.gateway import BLOCK, BUY, CondError, Node, SELL, TreeGateway, bind, rule, synthetic, validate
 
 FAILS = []
 
@@ -190,8 +192,52 @@ def t_gateway():
             pass
 
 
+# ------------------------------------------------------------------ 3. 판때기·노드 풀
+def t_board():
+    P = lambda sym: {"px": "close", "sym": sym}
+    UPS = lambda sym: {"gt": [P(sym), {"lag": [P(sym), 1]}]}
+    only_b = dict(UPS("$self"), on=["B"], label="B 만")
+    data = synthetic({"A": "^IX", "B": None},
+                     rule("자기 상승", BUY, {"all": [UPS("$self"), only_b]}),
+                     rule("지수 하락", BLOCK, {"lt": [P("$index"), 0]}, on=["A"]),
+                     rule("엔비 상승", BUY, UPS("NVDA")),
+                     rule("확인", BUY, {"manual": "눈으로 확인"}),
+                     rule("비중", BUY, None, ("cash", {"sum": [P("$self"), 5]})),
+                     rule("손절", SELL, {"lt": [{"pos": "ret"}, -8]}, ("held", 1)))
+    g = TreeGateway.of(data)
+    a, b = g.board("A"), g.board("B")
+    check(g.board("A") is a, "판때기는 상품마다 한 번(같은 객체)")
+    gate_a = a.gates[BUY]["any"]
+    check(isinstance(a.gates[BUY], Node) and gate_a[0]["all"][0]["gt"][0] == {"px": "close", "sym": "A"},
+          "판때기: $self → 상품 티커")
+    check(a.gates[BLOCK]["any"][0]["lt"][0] == {"px": "close", "sym": "^IX"}, "판때기: $index → 그 상품 지수")
+    check(b.gates[BLOCK] == {"any": []}, "규칙 on: 대상 밖 상품의 판때기엔 그 갈래가 없다")
+    off = gate_a[0]["all"][1]
+    check(off.off and off == {"all": []} and off.syms == {"A"} and not b.gates[BUY]["any"][0]["all"][1].off,
+          "노드 레벨 on: 대상 밖 상품은 OFF('항상 참'), 대상 상품은 그대로")
+    check(all(k not in n for n in (a.gates[BUY], gate_a[0]) for k in ("label", "ref", "allprod", "on")),
+          "묶인 노드엔 메타가 없다")
+    check(a.symbols == {"A", "^IX", "NVDA"} and b.symbols == {"B", "NVDA"} and g.symbols() == {"A", "^IX", "B", "NVDA"},
+          "판때기 필요 심볼 = 자기 + 지수 + 구체 티커: %r %r" % (sorted(a.symbols), sorted(b.symbols)))
+    check(a.warmup == 1 and g.warmup() == 1, "판때기 워밍업 = 등급 식의 가장 긴 lookback")
+    check(a.weight == {"sum": [{"px": "close", "sym": "A"}, 5]} and len(a.sells) == 1 and a.tranches == [],
+          "판때기: 비중 식·판다 갈래 묶음")
+    # 노드 풀 — 같은 식 = 같은 노드(상품·책을 넘어), 수동·pos 를 품은 식은 상품마다
+    check(gate_a[1] is b.gates[BUY]["any"][1], "같은 식(NVDA 상승)은 상품끼리 노드 하나")
+    other = TreeGateway.of(synthetic(["NVDA"], rule("자기", BUY, dict(UPS("$self"), label="딴 이름"))))
+    check(other.board("NVDA").gates[BUY]["any"][0] is gate_a[1], "다른 책의 $self(NVDA) 상승 = 같은 노드(라벨 무관)")
+    check(gate_a[2] is not b.gates[BUY]["any"][2] and gate_a[2].mkey == "눈으로 확인",
+          "수동 잎은 상품끼리 공유하지 않는다(답이 상품별)")
+    check(a.sells[0] is not b.sells[0] and not a.sells[0].pure, "pos 식은 상품끼리 공유하지 않는다")
+    unk = {"ge": [P("$self"), "?"]}
+    concrete = bind({"ge": [P("A"), "?"]}, "A")
+    check("$self" in bind(unk, "A").mkey and bind(unk, "A") is not concrete and "$self" not in concrete.mkey,
+          "\"?\" 식의 답 열쇠는 적힌 식 그대로($self — 묶은 티커가 아님)")
+    check(bind(unk, "A") is bind(dict(unk), "A") and bind(unk, "A") is not bind(unk, "B"), "\"?\" 식: 같은 상품끼리만 같은 노드")
+
+
 def main():
-    for name, fn in (("문법", t_syntax), ("트리 출입구 계약", t_gateway)):
+    for name, fn in (("문법", t_syntax), ("트리 출입구 계약", t_gateway), ("판때기·노드 풀", t_board)):
         before = len(FAILS)
         try:
             fn()
@@ -204,7 +250,7 @@ def main():
             print("    · " + f)
         print("트리 언어 검사 실패 %d건 — 정지" % len(FAILS))
         return 1
-    print("트리 언어 검사 통과 — 문법·출입구")
+    print("트리 언어 검사 통과 — 문법·출입구·판때기")
     return 0
 
 
