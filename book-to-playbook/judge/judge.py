@@ -5,8 +5,8 @@
   · Judge         책 하나의 판단자 — 트리를 열고(TreeGateway 는 여기서만), 시세를 받고(history 는 여기서만 — 아래 '시세 받기' 절),
                   상품마다 ProductJudge 를 세운다. 라이브 판정(decisions)·백테스트 신호(signals)를 낸다.
   · ProductJudge  상품 하나의 판단자 — 트리에서 그 상품의 규칙만 골라 시세와 평가한다.
-                  등급(grade·latest)·그날 판정(decide → Decision)·조건 설명(views)·보유분 상태(status)·체결 워크가
-                  쓸 보유 조건 값(conditions)·가격(price — 체결가·수익률 계산용).
+                  등급(grade·latest)·그날 판정(decide → Decision)·노드 하나의 그날 값(value·blank_value — 화면 설명
+                  web/explain 의 값 함수)·보유분 상태(status)·체결 워크가 쓸 보유 조건 값(conditions)·가격(price — 체결가·수익률 계산용).
   · Holding       보유 하나의 상태(첫 매수 봉·평단·산 차수·체결 장부) — 값만. 평가는 ProductJudge 가 한다.
   · Decision · Amount · HoldingStatus   판정 사실을 담는 그릇(계산하지 않는다).
   · 시세 받기     history · history_back · session_closes(일봉 확정 경계) — 시세 원본을 받는 유일한 곳(market 은 트리를 모른다)
@@ -31,7 +31,6 @@ from shared.paths import positions_json
 from tree.gateway import (
     Branch, BUY_SIDE, CondError, GATES, labeled, manual_leaves, manual_text, Qty, SELL, TreeGateway, WARMUP_DAYS)
 from judge.eval import Ctx, series
-from judge import explain
 
 
 # ================================================================ 시세 받기 — 판단자만(market 은 트리를 모른다)
@@ -92,7 +91,7 @@ def session_closes(symbols, cal, asof):
 #
 #   트리는 원본 dict 가 아니라 TreeGateway(tree/gateway.py — 트리를 읽는 유일한 출입구)로 받는다.
 #   같은 뜻을 만드는 쪽(authoring.extract.verify_tree 의 사례·authoring.extract.compare 의 a/b 비교)과 읽는 쪽(구간③ 판정·백테스트)이 함께 쓴다 — 화면용 설명(view·
-#   측정 증거)은 판단자(judge/judge·explain)가 이 평가 문맥으로 빚는다 — 화면은 그리기만.
+#   측정 증거)은 화면(web/explain)이 판단자가 낸 노드 값(ProductJudge.value)으로 빚는다 — 화면은 계산하지 않는다.
 GRADES = {
     "buy": "✅ 산다",
     "confirm": "🟡 확인 대기",
@@ -111,7 +110,7 @@ class RuleSeries:
     """한 상품의 등급 동사(안 산다·산다)·비중을 전체 달력에 대해 한 번 계산해 둔다."""
 
     def __init__(self, tree, product, prices, days, asof=None, answers=None):
-        """tree = 트리 출입구(TreeGateway) · product = 판정할 상품 — 그 상품의 규칙을 골라 평가한다. asof = 관측 시각(UTC datetime) — 일봉은 asof 이하
+        """tree = 트리 출입구(TreeGateway) · product = 판정할 상품 — 그 상품의 규칙을 골라 평가한다. asof = 관측 시각(UTC datetime) — 일 — 일봉은 asof 이하
         확정(settled) 봉만 본다(미확정 그날 일봉은 None). None 이면 실제 지금(일봉은 마지막 확정봉).
         answers = 사람이 답한 수동 {answer_key: 참/거짓} — 등급·금액·비중이 그 답으로 풀린다(서버 권위).
         None 이면 옛 동작 그대로."""
@@ -222,12 +221,14 @@ class Amount:
 
 @dataclass
 class HoldingStatus:
-    """보유 하나의 그날 상태 — sells = [(Branch, 값, 설명)] 판다 갈래, next_tranche = (Branch, 값, 설명)|None. 시세가 없으면 error."""
+    """보유 하나의 그날 상태 — sells = [(Branch, 값)] 판다 갈래, next_tranche = (Branch, 값)|None. 시세가 없으면 error.
+    holding = 그 보유(Holding) — 화면이 갈래 설명의 값을 ProductJudge.value(노드, 날, holding)로 묻는다."""
     error: str = None
     ret: float = None
     days: float = None
     sells: list = field(default_factory=list)
     next_tranche: tuple = None
+    holding: object = None
 
 
 @dataclass
@@ -248,7 +249,6 @@ class Decision:
     amount: Amount = None            # 그날 '얼마나'(비중)
     opt: dict = None                 # 등급 동사의 낙관(수동 = 유리) 값
     pes: dict = None                 # 등급 동사의 비관(수동 = 불리) 값
-    views: dict = None               # 등급 동사별 조건 설명(그날 값·측정 증거) — 화면이 그대로 그린다
     holdings: list = None            # [HoldingStatus]
 
     @property
@@ -475,20 +475,16 @@ class ProductJudge:
             incomplete=s.incomplete(day), confirmed=s._confirmed[day] + 1, warmup=s.warmup,
             top=s.top(day), manual=s.manual_items(day), amount=self.amount(day),
             opt={do: s.opt[do][day] for do in GATES}, pes={do: s.pes[do][day] for do in GATES},
-            views={do: explain.view(self._tree.gate(self.product, do), s.ctx[None], day) for do in GATES},
             holdings=[self.status(h, day) for h in holdings])
 
-    def static_views(self):
-        """시세 없이 보이는 등급 조건 설명(값 없음) — 시세가 없는 상품의 체크리스트 구조."""
-        return {do: explain.static_view(self._tree.gate(self.product, do), self.index) for do in GATES}
+    def value(self, node, day, holding=None):
+        """트리에서 온 노드 하나의 그날 값(이 상품 문맥 — 수동은 모름, 사람이 답했으면 그 답) · holding = 보유(판다·분할 갈래의
+        pos 값). 화면 설명(web/explain)의 값 함수 — 화면은 계산하지 않고 이것만 묻는다."""
+        return self.evaluate(node, holding=holding)[day]
 
-    def describe(self, branch):
-        """갈래 하나(비중·분할·판다)의 값 없는 설명."""
-        return explain.static_view(branch.when, self.index)
-
-    def view(self, node, day):
-        """조건 하나의 그날 설명(값·측정 증거) — 수동은 모름."""
-        return explain.view(node, self._series.ctx[None], day)
+    def blank_value(self, node):
+        """시세·포지션 없이(빈 문맥 하루) 노드 하나의 값 — 값 없는 규칙 설명(web/explain.static_view)의 값 함수."""
+        return series(node, Ctx({}, ["0"], "$none", self.index, manual_as=None, pos=(0, 1.0)))[0]
 
     # ------------------------------------------------------------ 보유
     def _context(self, holding, manual_as=None):
@@ -512,9 +508,9 @@ class ProductJudge:
         trs = self.tranches()
         nt = trs[holding.filled] if 0 < holding.filled < len(trs) else None
         return HoldingStatus(
-            ret=series({"pos": "ret"}, ctx)[day], days=series({"pos": "days"}, ctx)[day],
-            sells=[(r, series(r.when, ctx)[day], explain.view(r.when, ctx, day)) for r in self.sells()],
-            next_tranche=None if nt is None else (nt, series(nt.when, ctx)[day], explain.view(nt.when, ctx, day)))
+            holding=holding, ret=series({"pos": "ret"}, ctx)[day], days=series({"pos": "days"}, ctx)[day],
+            sells=[(r, series(r.when, ctx)[day]) for r in self.sells()],
+            next_tranche=None if nt is None else (nt, series(nt.when, ctx)[day]))
 
     # ------------------------------------------------------------ 검사기용(구간② — 조건 하나를 이 상품 시세로)
     def evaluate(self, node, manual_as=None, holding=None):

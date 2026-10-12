@@ -7,7 +7,7 @@
   2. 트리 출입구(TreeGateway) 계약 — 판정·백테스트·검사기가 트리에 묻는 질문의 답 모양,
      형식이 틀린(옛 양식·폐지 표기) 트리는 거부
   (계산기·등급·워밍업 가드·수동 답은 judge/verify_eval.py, 체결 워크는 backtest/verify_trading.py,
-   화면 설명 구조는 judge/verify_view.py 가 본다)
+   화면 설명 구조는 web/verify_view.py 가 본다)
 
 언제 돌리나: 트리 문법(tree/gateway.py 의 validate·이름표)이나 TreeGateway 를 바꿨을 때 —
   보통은 `python -m entry.run check` 가 함께 돌린다.

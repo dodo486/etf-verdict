@@ -8,23 +8,15 @@
   소절(ref)마다 그대로 보여준다(플레이북 소절 헤딩의 '🌲 규칙' 토글).
 
   트리는 판단자에게 묻는다 — judge.tree.cards()(출입구 TreeGateway.cards 의 규칙 카드: 적힌 그대로). 파일 키를 직접 만지지 않는다.
-  식 → 글 규칙(종가·k일 전·모두{}·«이름» 등)은 여기 한 곳."""
+  식 → 글 문장 모양(모두{}·«이름»·(k일 전) 등)은 여기, 낱말·표(종가·보유일·≥ 등)는 web/text 한 곳."""
 import re
 
-from tree.gateway import CondError, META, _op_of, UNKNOWN
-
-PX = {"open": "시가", "high": "고가", "low": "저가", "close": "종가", "volume": "거래량"}
-POS = {"ret": "보유수익률%", "days": "보유일", "maxret": "최고수익%", "minret": "최저수익%",
-       "filled": "산 횟수", "sold": "판 비율"}
-CMP = {"gt": ">", "ge": "≥", "lt": "<", "le": "≤"}
+from tree.gateway import CondError, META, _op_of
+from web import text
 
 
 def _esc(s):
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-
-
-def _num(x):
-    return "?(미명시)" if x == UNKNOWN else str(x)
 
 
 def _e(n):
@@ -32,7 +24,7 @@ def _e(n):
     if isinstance(n, bool):
         return str(n)
     if not isinstance(n, dict):
-        return _num(n)
+        return text.prose_n(n)
     if set(n) - set(META) == {"rule"}:
         return "«%s»" % n["rule"]
     try:
@@ -43,37 +35,36 @@ def _e(n):
     if op == "manual":
         return "✋" + str(v)
     if op == "px":
-        pre = "장중 " if n.get("tf") in ("1m", "5m") else ""
-        return pre + "%s %s" % (n.get("sym", "(티커 없음)"), PX.get(v, v))
+        return text.intraday(n) + "%s %s" % (n.get("sym", "(티커 없음)"), text.px_name(v))
     if op == "lag":
-        return e(v[0]) + "(%s일 전)" % _num(v[1])
+        return e(v[0]) + "(%s)" % text.ago(text.prose_n(v[1]))
     if op == "abs":
         return "|" + e(v) + "|"
-    if op in ("add", "sub", "mul", "div"):
-        return "(" + e(v[0]) + {"add": " + ", "sub": " − ", "mul": " × ", "div": " ÷ "}[op] + e(v[1]) + ")"
-    if op in ("max", "min"):
-        return ("최대" if op == "max" else "최소") + "(" + e(v[0]) + ", " + e(v[1]) + ")"
-    if op in ("highest", "lowest", "sum"):
-        return "%s일%s(" % (_num(v[1]), {"highest": "최고", "lowest": "최저", "sum": "합계"}[op]) + e(v[0]) + ")"
+    if op in text.ARITH_SYM:
+        return "(" + e(v[0]) + text.ARITH_SYM[op] + e(v[1]) + ")"
+    if op in text.EXTREME:
+        return text.EXTREME[op] + "(" + e(v[0]) + ", " + e(v[1]) + ")"
+    if op in text.WINDOW:
+        return "%s일%s(" % (text.prose_n(v[1]), text.WINDOW[op]) + e(v[0]) + ")"
     if op == "barssince":
         return "마지막참이후일수[" + e(v) + "]"
     if op == "valuewhen":
         return "[" + e(v[0]) + "] 마지막 참인 날의 " + e(v[1])
     if op in ("minsince", "maxsince"):
-        return "[" + e(v[0]) + "] 이후 " + ("최저" if op == "minsince" else "최고") + "(" + e(v[1]) + ")"
+        return "[" + e(v[0]) + "] 이후 " + text.SINCE[op] + "(" + e(v[1]) + ")"
     if op == "case":
         parts = ["%s이면 %s" % (e(c), e(x)) for c, x in v] + ["아니면 " + e(n["else"])]
         return "조건별{ " + " · ".join(parts) + " }"
     if op == "pos":
-        return POS.get(v, v) + ("(%s)" % n["rule"] if n.get("rule") else "")
-    if op in CMP:
-        return e(v[0]) + " " + CMP[op] + " " + e(v[1])
+        return text.pos_prose(v) + text.pos_rule(n)
+    if op in text.CMP_SYM:
+        return e(v[0]) + " " + text.CMP_SYM[op] + " " + e(v[1])
     if op == "all":
         return "모두{ " + " · ".join(e(x) for x in v) + " }"
     if op == "any":
         return "하나이상{ " + " · ".join(e(x) for x in v) + " }"
     if op == "atleast":
-        return "%s개이상{ " % _num(v) + " · ".join(e(x) for x in n["of"]) + " }"
+        return "%s개이상{ " % text.prose_n(v) + " · ".join(e(x) for x in n["of"]) + " }"
     if op == "not":
         return "아님(" + e(v) + ")"
     return "(알 수 없는 연산 %s)" % op          # 지운 연산 등 — 숨기지 않고 드러낸다

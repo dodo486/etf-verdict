@@ -156,8 +156,8 @@ sumsince(세션 시작, 거래량) · 당일 고·저 = maxsince/minsince(세션
 첫 N분 고가 = valuewhen(세션 시작 후 N번째 봉, maxsince(세션 시작, 고가)) · 첫 눌림 저점 = valuewhen(첫 반등, minsince(세션 시작, 저가)).
 
 **지울 흔적(5번 작업 때 전부)**: `tree/gateway.py`(문법 목록·워밍업) · `judge/eval.py`(계산) · `authoring/extract/COND_DSL.md`(문법·조합 표) ·
-`authoring/extract/EXTRACTOR.md`(예시) · `judge/verify_eval.py`(테스트) · `judge/explain.py`(설명 문구 "20일선"·"RSI14"·
-"k일 전 대비 변화율") · `judge/verify_view.py` · `books/*/tree_candidates/`(run3 로 대체). `judge/`·`backtest/` 에는 없음.
+`authoring/extract/EXTRACTOR.md`(예시) · `judge/verify_eval.py`(테스트) · `web/explain.py`·`web/text.py`(설명 문구 "20일선"·"RSI14"·
+"k일 전 대비 변화율") · `web/verify_view.py` · `books/*/tree_candidates/`(run3 로 대체). `judge/`·`backtest/` 에는 없음.
 주인 표(entry.verify_rules)에 "지운 연산 이름이 어디든 나오면 정지" 줄을 넣어 남김 없이.
 
 **구현은 pandas 로** — 지금 judge/eval.py 계산기는 순수 파이썬 반복문. 기본 부품은 pandas 에 1:1(lag=`shift` · sum/highest/lowest=`rolling` ·

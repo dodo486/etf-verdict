@@ -80,7 +80,7 @@ python -m entry.serve                                           # 로컬 실시�
 | `authoring/extract/COND_DSL.md` | 트리 문법(트리를 쓰는 추출자·심판의 참고서) |
 | `authoring/extract/verify_tree.py` | 트리 채점(트리를 만들지 않음) · `--quick` 트리 계약(소절·트리 문법·ref) |
 | `authoring/extract/compare.py` | 심판 비교 도구(a·b 덤프) · '같은 뜻' 잣대(채점기도 이것으로) |
-| 각 층의 `verify_*.py` | 검사 — 검사하는 대상 옆에 둔다(`tree/verify_gateway` · `judge/verify_eval` · `judge/verify_view` · `backtest/verify_trading` · `web/verify_page` · `entry/verify_rules` 등). 전부 한 번에 `python -m entry.run check` |
+| 각 층의 `verify_*.py` | 검사 — 검사하는 대상 옆에 둔다(`tree/verify_gateway` · `judge/verify_eval` · `web/verify_view` · `backtest/verify_trading` · `web/verify_page` · `entry/verify_rules` 등). 전부 한 번에 `python -m entry.run check` |
 | `web/ui/*.js` · `web/inject_ui.py` | 화면 JS(책 무관 공유) · 페이지 주입 |
 | `tree/gateway.py` | 구간② 공개 DSL — 트리 언어(문법 validate·동사 VERBS·워밍업·공통 직렬화) · 트리 출입구(TreeGateway) |
 | `judge/eval.py` · `judge/judge.py` | 계산기(Ctx·series — 트리 식에 시세를 넣어 계산) · 등급의 뜻(RuleSeries — 등급·금액·비중·워밍업 가드, +`grade_rules.json`) · 시세 받기(history) |

@@ -20,7 +20,7 @@
   7. 표현력 회귀 — 발견된 버그 유형을 트리로 적어 원문 뜻대로 나오는지
   8. 사람이 답한 수동(Ctx answers) — 답 열쇠 규칙·극성·등급까지(서버 권위의 바탕)
   (트리 문법·출입구 계약은 tree/verify_gateway.py, 체결 워크·실전 경로는 backtest/verify_trading.py,
-   화면 설명 구조는 judge/verify_view.py 가 본다)
+   화면 설명 구조는 web/verify_view.py 가 본다)
 
 언제 돌리나: 계산기(judge/eval.py)·등급(judge/judge.py·grade_rules.json)을 바꿨을 때 —
   보통은 `python -m entry.run check` 가 함께 돌린다.
@@ -477,7 +477,7 @@ def t_settled_mtf():
 
 
 def t_grade():
-    """비중(산다 qty cash) — 수동 때문에 모르면 범위(화면 설명 구조는 judge/verify_view.py)."""
+    """비중(산다 qty cash) — 수동 때문에 모르면 범위(화면 설명 구조는 web/verify_view.py)."""
     xs = [100.0] * 30 + [130.0]
     cal = ["2022%04d" % i for i in range(len(xs))]
     hist = {"X": [Candle(d, c, c, c, c, 1000) for d, c in zip(cal, xs)]}

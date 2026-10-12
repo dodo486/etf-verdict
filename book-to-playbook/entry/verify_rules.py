@@ -412,6 +412,19 @@ def m_labels(src):
             + [(ln, f, "grade_rules.json") for ln, f, v in lits if "grade_rules.json" in v])
 
 
+# 식 → 글 낱말 — 시세 필드·포지션 값 이름(정본 web/text 의 PX·POS). 다른 곳에 같은 낱말 문자열이 있으면 두 벌.
+def _words():
+    """식 → 글 낱말 — 정본(web.text.PX · POS)에서 읽는다(여기 다시 적지 않는다)."""
+    from web import text
+    return set(text.PX.values()) | {w for row in text.POS.values() for w in row[:2]}
+
+
+def m_expr_words(src):
+    words = _words()
+    lits = _py_strs(src) if src.kind == "py" else [(ln, None, v) for ln, v in src.lits]
+    return [(ln, f, v) for ln, f, v in lits if v in words]
+
+
 # 등급 사다리 — 날짜별 등급을 내는 함수(정본 judge.judge.RuleSeries.grade_key).
 LADDER_PY = {"grade_key"}
 LADDER_JS = (r"\bfunction\s+(?:gradeKey|and3|or3|ev)\s*\("
@@ -471,10 +484,10 @@ OWNERS = [
          hint="judge.judge.Judge(책)·ProductJudge(상품)에 물을 것",
          allow={("tree/verify_gateway.py", None): (None, "도구 단위 검사 — 출입구 자체의 계약을 시험한다"),
                 ("judge/verify_eval.py", None): (None, "도구 단위 검사 — 합성 트리를 출입구로 열어 계산기·등급을 시험한다")}),
-    dict(concept="조건 평가(판단)", owners=("judge/eval.py", "judge/judge.py", "judge/explain.py", "tree/gateway.py"),
+    dict(concept="조건 평가(판단)", owners=("judge/eval.py", "judge/judge.py", "tree/gateway.py"),
          match=m_evaluate,
          why="책의 내용대로 시세를 판단하는 곳은 판단자 하나 — 체결 워크·화면·검사기는 판단자가 낸 값만 쓴다",
-         hint="ProductJudge.decide·conditions·evaluate·view 로",
+         hint="ProductJudge.decide·conditions·evaluate·value 로",
          allow={("judge/verify_eval.py", None): (None, "도구 단위 검사 — 계산기 자체를 시험한다"),
                 ("tree/verify_gateway.py", None): (None, "도구 단위 검사 — 문법 검사에 계산기를 곁들인다")}),
     dict(concept="시세 원본", owners=("judge/judge.py", "judge/eval.py", "market/md_feed.py", "market/_dev_cache.py"),
@@ -498,6 +511,10 @@ OWNERS = [
     dict(concept="동사·등급 이름표", owners=("tree/gateway.py", "judge/judge.py"), match=m_labels,
          why="tree.gateway.VERBS(안 산다·산다·판다) · judge.judge.GRADES · grade_rules.json 이 정본 — 화면은 판정 JSON(verbs·grades)으로 받는다",
          hint="파이썬은 tree.gateway 의 BLOCK·BUY·SELL·VERBS · judge.judge 의 GRADES, 화면은 판정 JSON 의 verbs·grades 로", allow={}),
+    dict(concept="식 → 글 낱말", owners=("web/text.py",), match=m_expr_words,
+         why="트리 식을 사람 말로 옮기는 낱말(종가·보유일·수익률(%) 등)은 web/text 한 곳 — 조건 설명(web/explain)과 "
+             "원시 트리 보기(web/raw_tree)가 같은 낱말을 쓴다",
+         hint="web.text 의 PX·POS·WINDOW·CMP_SYM … 과 px_name·pos_short·pos_prose 로", allow={}),
     dict(concept="등급 사다리", owners=("judge/judge.py",), match=m_grade_ladder,
          why="날짜별 등급을 내는 곳은 judge.judge.RuleSeries.grade_key 하나 — 두 벌이면 엔진과 화면 등급이 갈라진다",
          hint="판정 JSON 의 key 를 그대로(수동 답은 POST /api/verdict — 서버가 judge.eval.Ctx answers 로 낸다)", allow={}),

@@ -16,15 +16,17 @@
                                                      units = 오늘 물량(시작자본 1.0 기준 — judge.to_units, 비중 모르면 None)
              sells[{label, ref, sell(문장 — judge.sell_text), note, view}], exit_policy("book"|"none" — judge.exit_policy),
              positions[{…, sells[], next_tranche}]}                  positions = 내 포지션(로컬 파일)이 있을 때만
-view 는 노드 하나당 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, hidden?} (판단자 설명 judge/explain.view)
+view 는 노드 하나당 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, hidden?, detail?} (web/explain.view —
+값은 판단자 ProductJudge.value 가 낸다, 값 없는 규칙 설명은 web/explain.static_view + ProductJudge.blank_value)
 — 수동은 '모름'(사람이 답했으면 그 답 — render(answers=))으로 둔 그날 값. 화면은 다시 계산하지 않고 그대로 그린다.
 """
 from datetime import datetime, timedelta, timezone
 
 from shared.paths import book_meta
 from market import md_feed
-from tree.gateway import BLOCK, BUY, VERBS
+from tree.gateway import BLOCK, BUY, GATES, VERBS
 from judge.judge import GRADES, NO_EXIT_NOTE, Judge, exit_policy, live_units, sell_text
+from web import explain
 
 SOURCE = "jhts 시세팀(일봉)"
 
@@ -55,8 +57,20 @@ def reason_of(key, ex, manual):
     return "데이터 부족으로 판정 불가"
 
 
+def gate_views(judge, day=None):
+    """등급 동사별 조건 설명 {동사: view} — day None 이면 값 없는 설명(시세 없는 상품의 체크리스트 구조)."""
+    if day is None:
+        return {do: explain.static_view(judge.gate(do), judge.blank_value) for do in GATES}
+    return {do: explain.view(judge.gate(do), lambda n: judge.value(n, day)) for do in GATES}
+
+
+def _describe(judge, branch):
+    """갈래 하나(비중·분할·판다)의 값 없는 설명."""
+    return explain.static_view(branch.when, judge.blank_value)
+
+
 def _rule_views(judge, a=None):
-    """얼마나(비중·분할)·판다 규칙의 화면 모양 — 시세가 있든 없든 같은 모양(규칙 설명은 판단자가 낸 값 없는 설명).
+    """얼마나(비중·분할)·판다 규칙의 화면 모양 — 시세가 있든 없든 같은 모양(규칙 설명은 값 없는 설명).
     a = 그날 Amount(judge.amount) — 없으면(시세 없음) 비중·물량은 None."""
     sz = judge.weight()
     return {"size": {"label": sz.label, "ref": sz.ref, "note": sz.note,
@@ -64,14 +78,14 @@ def _rule_views(judge, a=None):
                      "units": a and live_units(a),            # 오늘 물량(시작자본 1.0 기준, 화면이 × 총 투자금)
                      "tranches": [{"label": t.label, "ref": t.ref, "frac": t.qty.x,
                                    "units": a and live_units(a, t.qty), "conditional": t.when is not None,
-                                   "view": judge.describe(t)} for t in judge.tranches()]},
+                                   "view": _describe(judge, t)} for t in judge.tranches()]},
             "sells": [{"label": r.label, "ref": r.ref, "allprod": r.allprod, "sell": sell_text(r.qty, r.repeat),
-                       "note": r.note, "view": judge.describe(r)} for r in judge.sells()],
+                       "note": r.note, "view": _describe(judge, r)} for r in judge.sells()],
             "exit_policy": exit_policy(judge.sells())}
 
 
 def product_verdict(judge, d, mine):
-    """상품 하나의 판정 JSON — 판정(Decision d)과 설명은 판단자(judge/judge)가 내고, 여기는 화면 모양으로 빚기만 한다.
+    """상품 하나의 판정 JSON — 판정(Decision d)과 노드 값은 판단자(judge/judge)가 내고, 여기는 설명(web/explain)·화면 모양으로 빚기만 한다.
     mine = 이 상품의 내 포지션(로컬 파일)."""
     base = {"prod": judge.product, "index": judge.index, "note": judge.note}
     if not d.has_data:
@@ -79,7 +93,7 @@ def product_verdict(judge, d, mine):
         req = md_feed.requested().get(judge.product, "-")
         return dict(base, key="unknown", grade=GRADES["unknown"], date="", close=None, chg=None,
                     reason="%s 시세 없음(수집 요청 %s) — 아래는 판정 전 체크리스트 구조" % (judge.product, req),
-                    gates=judge.static_views(), opt={}, pes={}, **_rule_views(judge))
+                    gates=gate_views(judge), opt={}, pes={}, **_rule_views(judge))
     reason = reason_of(d.key, d.top, d.manual)
     # 데이터 완전성 가드 — 지금 가진 확정 봉이 트리가 쓰는 가장 긴 창(필요 워밍업)보다 짧으면 등급은 ❔(불완전
     #   데이터, 판정 보류)로 떨어져 있다(grade_key). 사유를 '모르고 매매 금지'로 분명히 적는다(✅/🚫 확신 금지).
@@ -87,25 +101,27 @@ def product_verdict(judge, d, mine):
         reason = "불완전 데이터(판정 보류) — 확정 봉 %d개 < 필요 워밍업 %d개, 창이 덜 차 신뢰불가" % (d.confirmed, d.warmup)
     v = dict(base, date=d.date, close=d.close,
              chg=(d.close / d.prev_close - 1) * 100 if d.prev_close else None,
-             key=d.key, grade=d.grade, reason=reason, gates=d.views,
+             key=d.key, grade=d.grade, reason=reason, gates=gate_views(judge, d.day),
              opt=d.opt, pes=d.pes, **_rule_views(judge, d.amount))
-    pos = [dict(_holding_view(hs), entry_date=x["entry_date"], entry_px=x["entry_px"], filled=x.get("filled", 1))
+    pos = [dict(_holding_view(judge, d.day, hs), entry_date=x["entry_date"], entry_px=x["entry_px"], filled=x.get("filled", 1))
            for hs, x in zip(d.holdings, mine)]
     if pos:
         v["positions"] = pos
     return v
 
 
-def _holding_view(hs):
-    """보유 하나(HoldingStatus) → {ret, days, sells:[{label, ref, sell, v, view}], next_tranche:{label, ref, frac, v, view}|None}."""
+def _holding_view(judge, day, hs):
+    """보유 하나(HoldingStatus) → {ret, days, sells:[{label, ref, sell, v, view}], next_tranche:{label, ref, frac, v, view}|None}.
+    갈래 설명의 값은 그 보유 문맥으로 판단자에게 묻는다(judge.value(노드, day, hs.holding))."""
     if hs.error:
         return {"error": hs.error}
+    val = lambda n: judge.value(n, day, hs.holding)      # noqa: E731
     out = {"ret": hs.ret, "days": hs.days,
-           "sells": [{"label": r.label, "ref": r.ref, "sell": sell_text(r.qty, r.repeat), "v": v, "view": view}
-                     for r, v, view in hs.sells]}
+           "sells": [{"label": r.label, "ref": r.ref, "sell": sell_text(r.qty, r.repeat), "v": v,
+                      "view": explain.view(r.when, val)} for r, v in hs.sells]}
     nt = hs.next_tranche
     out["next_tranche"] = None if nt is None else {
-        "label": nt[0].label, "ref": nt[0].ref, "frac": nt[0].qty.x, "v": nt[1], "view": nt[2]}
+        "label": nt[0].label, "ref": nt[0].ref, "frac": nt[0].qty.x, "v": nt[1], "view": explain.view(nt[0].when, val)}
     return out
 
 

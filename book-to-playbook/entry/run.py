@@ -48,7 +48,7 @@ CHECKS = [
     Check("tree.verify_gateway", (), False, True, "트리 언어·출입구"),
     Check("judge.verify_eval", (), False, True, "계산기·등급"),
     Check("backtest.verify_trading", (), False, True, "거래 시뮬레이터·실전 경로"),
-    Check("judge.verify_view", (), False, True, "화면 설명 구조"),
+    Check("web.verify_view", (), False, True, "화면 설명 구조"),
     Check("authoring.extract.verify_tree", (), False, True, "규칙 동작(트리 없음·미심판 불일치·원문 사례 불일치 등)"),
     Check("backtest.verify_trading", ("--parity",), True, False, "신호 패리티 — 백테스트 == 실시간(일봉)"),
 ]
