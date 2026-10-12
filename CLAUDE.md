@@ -4,7 +4,7 @@
 
 - **구조·원칙의 정본**: `book-to-playbook/docs/ARCHITECTURE.md` — 작업 전에 읽는다.
 - **할 일의 정본**: `book-to-playbook/docs/HANDOFF.md` 한 곳(다른 곳에 TODO 를 만들지 않는다).
-- **검사**: `python -m entry.run check` (book-to-playbook 에서). 실행 환경: `PYTHONPATH=<jhts 경로>`(jhts-marketdata 미설치 시 시세가 빈다), `PYTHONIOENCODING=utf-8`.
+- **검사**: `python -m entry.run check` (book-to-playbook 에서) — 매일 돌지 않는다. **무언가 바꿨으면 커밋 전에 돌린다**(엔진 코드 dsl·signals 를 바꿔도 트리 검사까지 다시). 실행 환경: `PYTHONPATH=<jhts 경로>`(jhts-marketdata 미설치 시 시세가 빈다), `PYTHONIOENCODING=utf-8`.
 
 ## 꼭 지킬 것
 

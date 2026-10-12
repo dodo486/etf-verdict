@@ -343,7 +343,7 @@ def main(argv):
     if FAILS:
         for f in FAILS[:30]:
             print("    · " + f)
-        print("구간③ 검사 실패 %d건 — 발행 정지" % len(FAILS))
+        print("구간③ 검사 실패 %d건 — 정지" % len(FAILS))
         return 1
     print("구간③ 검사 통과 — 거래 시뮬레이터·실전 경로")
     return 0

@@ -42,7 +42,7 @@
    → 심판(`authoring/checklist/JUDGE.md`)이 비교 도구(`python -m authoring.checklist.compare <slug>`)로 다른 곳을 보고 원문과 대조해 최종 `tree.json`(규칙마다 `why`)을 직접 쓴다
    → `python -m authoring.checklist.score <slug>` 통과.
 4. **페이지**: `books/trend/playbook.html` 을 베이스로 `#src` 와 머리말만 교체(시트 패널은 `#verdict-data` + `#sheet-root` 골격 그대로).
-5. **등록**: `books.json` 에 항목(slug/title/tickers/desc/live/engine). `python -m entry.run check --no-verify-tree`(코드 규칙·본문 해시·책 계약·책 페이지)가 통과해야 한다.
+5. **등록**: `books.json` 에 항목(slug/title/tickers/desc/live/engine). `python -m entry.run check` 가 통과해야 한다.
 6. **배포**: `python -m entry.run daily`.
 
 수집 요청서는 없다 — 트리가 쓰는 심볼이 곧 수집 목록이고, jhts 에 없는 심볼은 수집 요청이 자동으로 남는다.
@@ -50,8 +50,8 @@
 ## 실행
 
 ```
-python -m entry.run daily        # 판정 → 백테스트 탭 데이터 → 검사
-python -m entry.run check [--no-verify-tree] [--parity]   # 검사만 전부(CHECKS) — 요약 + 종료코드
+python -m entry.run daily        # 판정 → 백테스트 탭 데이터 (검사는 돌지 않는다)
+python -m entry.run check [--parity]   # 검사 전부(CHECKS) — 무언가 바꿨을 때(커밋 전). 요약 + 종료코드
 python -m entry.run watch [--every N] # asof=지금 기준 N분(기본 5)마다 재판정(백테스트 제외) — 장중 조건은 분봉이 연결되면 살아난다
 python -m consumers.display.verdict_view <slug> [--json] [--no-send]       # 오늘 판정(판정 JSON·알림)
 python -m consumers.backtest.runner <slug> [--days 365]   # 백테스트(로그·JSON)

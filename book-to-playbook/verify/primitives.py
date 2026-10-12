@@ -831,7 +831,7 @@ def main():
     if FAILS:
         for f in FAILS[:30]:
             print("    · " + f)
-        print("원시함수 검사 실패 %d건 — 발행 정지" % len(FAILS))
+        print("원시함수 검사 실패 %d건 — 정지" % len(FAILS))
         return 1
     print("원시함수 검사 통과 — 수치·3값·시간·인과·문법·회귀·출입구")
     return 0

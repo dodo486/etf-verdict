@@ -58,7 +58,7 @@ def main(argv=()):
     if FAILS:
         for f in FAILS[:30]:
             print("    · " + f)
-        print("화면층 검사 실패 %d건 — 발행 정지" % len(FAILS))
+        print("화면층 검사 실패 %d건 — 정지" % len(FAILS))
         return 1
     print("화면층 검사 통과 — 화면 설명 구조")
     return 0

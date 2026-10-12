@@ -118,17 +118,19 @@ feed.price_bus (1개) ──틱 {ts, trees, hist}── fan-out ─┬───�
 ## 5. 검사
 
 `python -m entry.run check` 하나로 전부. 목록은 `entry/run.py` 의 `CHECKS` 한 곳.
-태그: gate = 항상(daily·verdict 포함) · tree = `--no-verify-tree` 면 생략 · opt = `run check --parity` 일 때만.
+검사는 **대상이 바뀔 때** 돈다(코드·트리·원문·페이지를 바꾼 뒤, 커밋 전) — 매일 돌지 않는다(daily·verdict·watch 에는 없음).
+트리 검사는 트리뿐 아니라 트리를 실행하는 엔진 코드(dsl·signals)가 바뀌어도 다시 돌아야 해서 목록을 나누지 않고 전부 돈다.
+선택(opt) = `run check --parity` 일 때만.
 
-| 검사 | 태그 | 보는 것 |
-|---|---|---|
-| `verify.rules` | gate | 폴더 경계(import 방향·jhts 단일 창구·자가수집 0) + 주인 표 |
-| `authoring.playbook.source_integrity` | gate | 플레이북 본문(`#src`) 해시 |
-| `authoring.checklist.score --quick` | gate | 트리 계약 — 소절 인덱스 · 트리 문법 · ref 가 실제 소절 |
-| `consumers.display.book_page` | gate | 책 페이지 구획 · UI 사본 == `consumers/display/ui/*.js` |
-| `verify.primitives` | tree | 원시 연산·등급·금액·수동 답(pandas 기준값·손계산) · 3값 논리 · 인과성 · 문법 · 출입구 계약 |
-| `verify.trading` | tree | 체결 워크·수량 변환·금액·매도 정책 · 실전 경로. `--parity` = 판정 == 백테스트(opt) |
-| `verify.view` | tree | 화면 설명 구조 |
-| `authoring.checklist.score` | tree | 체크리스트가 원문 뜻대로 동작하나 — a·b 비교(식) · 원문 사례 · 심판 기록 · 발화 통계 |
+| 검사 | 보는 것 |
+|---|---|
+| `verify.rules` | 폴더 경계(import 방향·jhts 단일 창구·자가수집 0) + 주인 표 |
+| `authoring.playbook.source_integrity` | 플레이북 본문(`#src`) 해시 |
+| `authoring.checklist.score --quick` | 트리 계약 — 소절 인덱스 · 트리 문법 · ref 가 실제 소절 |
+| `consumers.display.book_page` | 책 페이지 구획 · UI 사본 == `consumers/display/ui/*.js` |
+| `verify.primitives` | 원시 연산·등급·금액·수동 답(pandas 기준값·손계산) · 3값 논리 · 인과성 · 문법 · 출입구 계약 |
+| `verify.trading` | 체결 워크·수량 변환·금액·매도 정책 · 실전 경로. `--parity` = 판정 == 백테스트(opt) |
+| `verify.view` | 화면 설명 구조 |
+| `authoring.checklist.score` | 체크리스트가 원문 뜻대로 동작하나 — a·b 비교(식) · 원문 사례 · 심판 기록 · 발화 통계 |
 
 검사는 전부 **실행**으로 본다(글자 대조 검사는 의미를 판정하지 못해 없앴다).

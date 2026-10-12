@@ -8,17 +8,15 @@ homebrew·python.org·Microsoft Store 어느 설치본이든 그대로 동작한
 
 사용법
   python -m entry.run daily        # 판정(체크리스트 = 조건 트리) → 알림 → 백테스트 (장 마감 후). 화면은 라이브 서버가 맡는다.
+                                   #   검사는 돌지 않는다 — 검사 대상(코드·트리·원문·페이지)은 매일 바뀌지 않는다.
   python -m entry.run watch [--every N]  # asof=지금 기준으로 N분(기본 5)마다 재판정(백테스트 제외).
                              #   장중 조건은 asof(관측 시점) 기준 분봉을 본다 — 분봉이 연결되면 그대로 살아난다.
-  python -m entry.run check [--no-verify-tree] [--parity]  # 검사만 전부(CHECKS 한 목록) — 요약 + 종료코드
+  python -m entry.run check [--parity]  # 검사 전부(CHECKS 한 목록) — 요약 + 종료코드. 무언가 바꿨을 때(커밋 전) 돌린다
   python -m entry.serve        # 화면 보기 — 셸(책목록)+모든 책을 실시간 서빙(정적 스냅샷 폐지)
 
 옵션
   --quiet      콘솔 출력 최소화(로그 파일에는 그대로 남음)
-  --no-verify-tree  CHECKS 의 "tree" 태그(트리 검수·원시함수·구간③·화면 설명) 생략 — 트리를
-                    만들 때 한 번 검수하면 되는 것이라, 트리가 더 안 바뀌면 끈다("gate" 태그 — 코드 규칙·
-                    본문 해시·책 계약·책 페이지 — 는 항상 돈다). 트리 완성 전에는 켜 두는 것이 안전하다.
-  --parity     (check 만) "opt" 태그 — 신호 패리티(verify.trading --parity)도 돈다(시세 필요).
+  --parity     (check 만) 선택 검사(opt) — 신호 패리티(verify.trading --parity)도 돈다(시세 필요).
 
 경로·크레덴셜은 shared/paths.py 규칙을 따른다. telegram.env · local.env 가 BASE에 있으면
 자동으로 환경변수에 주입한다(없으면 그냥 건너뜀). 스케줄러로 돌릴 때 jhts 시세 패키지 경로는
@@ -38,29 +36,28 @@ from shared.paths import BASE, LOGS, ensure_dir, load_env_file, write_text
 
 PY = sys.executable or "python3"
 
-# ---- 검사 목록 — 한 곳. 모든 모드(daily·verdict·check)가 여기서 태그로 고른다(모드마다 목록을 복붙하지 않는다).
-#   tag   "gate" 트리와 무관한 코드·발행물 점검 — 항상 돈다
-#         "tree" 트리 검수·원시 연산·구간③·화면 설명 — --no-verify-tree 면 건너뛴다
-#         "opt"  시세로 오래 도는 선택 검사 — run check --parity 일 때만
-#   warn2 종료코드 2 를 '경고(발행은 막지 않음)'로 보나. 아니면 0 외에는 전부 정지.
-Check = namedtuple("Check", "module args tag warn2 what")
+# ---- 검사 목록 — 한 곳(run check 가 돈다). 검사는 대상이 바뀔 때 돈다 — 매일 돌지 않는다(daily·verdict·watch 에는 없음).
+#   트리 검사는 트리가 바뀔 때만이 아니라 트리를 실행하는 엔진 코드(dsl·signals)가 바뀔 때도 다시 돌아야 해서
+#   목록을 나누지 않고 한 번에 전부 돈다.
+#   opt   시세로 오래 도는 선택 검사 — run check --parity 일 때만
+#   warn2 종료코드 2 를 '경고(정지 아님)'로 보나. 아니면 0 외에는 전부 정지.
+Check = namedtuple("Check", "module args opt warn2 what")
 CHECKS = [
-    Check("verify.rules", (), "gate", False, "코드 규칙 — 폴더 경계·주인 표"),
-    Check("authoring.playbook.source_integrity", (), "gate", False, "플레이북 본문 해시"),
-    Check("authoring.checklist.score", ("--quick",), "gate", False, "트리 계약 — 소절 인덱스·트리 문법·ref"),
-    Check("consumers.display.book_page", (), "gate", False, "책 페이지 — 구획·UI 사본"),
-    Check("verify.primitives", (), "tree", True, "원시함수 계산"),
-    Check("verify.trading", (), "tree", True, "거래 시뮬레이터·실전 경로"),
-    Check("verify.view", (), "tree", True, "화면 설명 구조"),
-    Check("authoring.checklist.score", (), "tree", True, "규칙 동작(트리 없음·미심판 불일치·원문 사례 불일치 등)"),
-    Check("verify.trading", ("--parity",), "opt", False, "신호 패리티 — 백테스트 == 실시간(일봉)"),
+    Check("verify.rules", (), False, False, "코드 규칙 — 폴더 경계·주인 표"),
+    Check("authoring.playbook.source_integrity", (), False, False, "플레이북 본문 해시"),
+    Check("authoring.checklist.score", ("--quick",), False, False, "트리 계약 — 소절 인덱스·트리 문법·ref"),
+    Check("consumers.display.book_page", (), False, False, "책 페이지 — 구획·UI 사본"),
+    Check("verify.primitives", (), False, True, "원시함수 계산"),
+    Check("verify.trading", (), False, True, "거래 시뮬레이터·실전 경로"),
+    Check("verify.view", (), False, True, "화면 설명 구조"),
+    Check("authoring.checklist.score", (), False, True, "규칙 동작(트리 없음·미심판 불일치·원문 사례 불일치 등)"),
+    Check("verify.trading", ("--parity",), True, False, "신호 패리티 — 백테스트 == 실시간(일봉)"),
 ]
 
 
-def select_checks(no_tree=False, opt=False):
-    """태그로 고른 CHECKS 부분집합(순서 그대로)."""
-    tags = {"gate"} | (set() if no_tree else {"tree"}) | ({"opt"} if opt else set())
-    return [c for c in CHECKS if c.tag in tags]
+def select_checks(opt=False):
+    """CHECKS 부분집합(순서 그대로) — 선택 검사(opt)는 opt=True 일 때만."""
+    return [c for c in CHECKS if opt or not c.opt]
 
 
 def check_name(c):
@@ -162,10 +159,6 @@ def main(argv):
         return 2
 
     quiet = "--quiet" in argv
-    # 트리 검수(authoring.checklist.score)·원시함수 검사(verify.primitives) 등 "tree" 태그는 트리를 '만들 때' 한 번 하면
-    # 되는 것이라(python -m authoring.checklist.score <slug>), 트리가 더 안 바뀌면 daily 가 매번 다시 돌 필요가
-    # 없다. --no-verify-tree 로 끈다("gate" 태그 — 코드 규칙·본문 해시·책 계약·책 페이지 — 는 항상 돈다).
-    no_verify_tree = "--no-verify-tree" in argv
 
     # telegram.env(알림 크레덴셜) · local.env(이 컴퓨터 설정 — 예: PYTHONPATH=<jhts 경로>). 둘 다 커밋하지 않는다.
     for envfile in ("telegram.env", "local.env"):
@@ -193,30 +186,6 @@ def main(argv):
     # 정적 발행(GitHub Pages)은 폐지됐다 — 화면은 라이브 서버(entry.serve)가 매 요청 엔진을
     # 새로 돌려 그린다(오래된 값이 '지금 값'처럼 안 보이게). 파일로 굽지도, 레포에 push 하지도 않는다.
 
-    # ---- 검사 — 판정·백테스트 뒤에 돈다. 목록은 CHECKS 한 곳(태그로 고름).
-    if no_verify_tree:
-        r.say("--no-verify-tree: 트리 검수·원시함수 검사 생략(트리 생성 단계에서 이미 검수한 것으로 봄)")
-    blocking = []
-    for c in select_checks(no_tree=no_verify_tree):
-        name = check_name(c)
-        code, out, err = run_check(c)
-        for t in out.strip().splitlines()[-6:]:
-            r.say("  [%s] %s" % (name, t))
-        if err.strip():
-            r.say("  [%s] stderr: %s" % (name, err.strip()[:400]))
-        r.say("  [%s] 종료코드 %d" % (name, code))
-        g = grade_of(c, code)
-        if g == "warn":
-            r.say("!! %s: 경고 — 발행은 막지 않음" % name)
-        elif g == "stop":
-            blocking.append("%s — %s" % (name, c.what) if code in (1, 2) else "%s — 비정상 종료(%d)" % (name, code))
-
-    if blocking:
-        r.say("=== 발행 정지 — 아래 검사가 실패했습니다:")
-        for b in blocking:
-            r.say("    - %s" % b)
-        r.failed.extend(blocking)
-
     if r.failed:
         r.say("=== 실패 단계: %s" % ", ".join(r.failed))
         return 1
@@ -225,10 +194,10 @@ def main(argv):
 
 
 def check_main(argv):
-    """검사만 전부 — CHECKS 에서 태그로 고르고 한 줄씩 요약. 정지 있으면 1, 경고만이면 0(daily 와 같은 등급)."""
+    """검사 전부 — CHECKS 를 한 줄씩 요약. 정지 있으면 1, 경고만이면 0."""
     for envfile in ("telegram.env", "local.env"):
         load_env_file(os.path.join(BASE, envfile))
-    chosen = select_checks(no_tree="--no-verify-tree" in argv, opt="--parity" in argv)
+    chosen = select_checks(opt="--parity" in argv)
     cnt = {"pass": 0, "warn": 0, "stop": 0}
     mark = {"pass": "✅", "warn": "⚠", "stop": "❌"}
     for c in chosen:
