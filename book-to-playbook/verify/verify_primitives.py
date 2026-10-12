@@ -784,6 +784,18 @@ def t_gateway():
     check(g.skips() == [{"rule": "못 옮김", "ref": "9-9", "reason": "데이터 없음: x"}], "skip 규칙")
     check(g.whole() is data and not TreeGateway({}) and bool(g) and TreeGateway.load("__없는책__") is None,
           "원본·빈·없는 트리")
+    # 규칙 단위 질문(구간② 검사기) — 이름 목록 · 뜻(펼침/그대로) · 측정 · why · 이름 심볼 · 옛 양식 키
+    check(g.labels()[:2] == ["20일선 위", "선물 양"] and g.body("없음") is None, "labels/body 없는 이름")
+    b2 = g.body("선물 양")
+    check(b2["products"] == ["A"] and b2["branches"][0]["do"] == Cond.BUY
+          and b2["branches"][0]["when"]["all"][0] == dict(W, label="20일선 위", ref="1-1")
+          and g.body("선물 양", expand=False)["branches"][0]["when"]["all"][0] == {"rule": "20일선 위"},
+          "body 펼침/그대로 %r" % b2)
+    check(g.value("20일선 위") == W and g.value("선물 양") is None and g.why("선물 양") is None
+          and TreeGateway.of(dict(data, rules=data["rules"] + [dict(rule("w", Cond.BUY), why="원문 3-1")])).why("w") == "원문 3-1",
+          "value/why")
+    check(g.name_symbols() == {"$묶음": ["N1", "N2"]} and g.legacy_keys() == []
+          and TreeGateway.of(dict(data, review={})).legacy_keys() == ["review"], "name_symbols/legacy_keys")
     bad = dict(data, rules=data["rules"] + [rule("x", Cond.BUY, {"rule": "없는 이름"})])
     check(TreeGateway.of(bad).gate("A", Cond.BUY)["any"][-1].get("manual", "").startswith("연산 없음: 미해결 참조"),
           "없는 이름 참조는 수동(연산 없음)으로 드러낸다")

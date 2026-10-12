@@ -7,7 +7,7 @@
 |---|---|---|
 | 추출자 a·b | `EXTRACTOR.md` (+ 트리 문법 `COND_DSL.md`) | `tree_candidates/<a|b>.rules.json`, `<a|b>.json` |
 | 사례 작성자 | `SCENARIO.md` | `scenarios.json` |
-| 심판 | `JUDGE.md` (+ `COND_DSL.md`) | `tree.json`(트리 + `review`) |
+| 심판 | `JUDGE.md` (+ `COND_DSL.md`) | `tree.json`(규칙마다 `why`) |
 
 ## 절차
 
@@ -37,6 +37,6 @@
 
 ## 판례 (관례 승격)
 
-심판이 **판례**(원문이 안 정한 갈림을 관례로 정한 것 — `review.precedents`)를 보고하면 → **사용자 승인 후** 그 관례를
+심판이 **판례**(원문이 안 정한 갈림을 관례로 정한 것 — 그 규칙 `why` 의 "판례:")를 보고하면 → **사용자 승인 후** 그 관례를
 해당 지침(`EXTRACTOR.md`/`COND_DSL.md`)에 올린다. 그 뒤 모든 책이 그 관례를 따른다(다음부터 a·b 가 그 지점에서 안 갈린다).
 승격 전까지는 그 책의 심판 결정으로만 남는다.

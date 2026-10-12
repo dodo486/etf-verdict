@@ -361,21 +361,42 @@ class TreeGateway:
                 out.update(rf)
         return out
 
-    # ---------------------------------------------------------------- 심판 기록(review) — 구간② 검사기만
-    def _review(self):
-        return self._d.get("review") or {}
+    # ---------------------------------------------------------------- 규칙 단위(구간② 검사기 — a·b 비교·심판 채점)
+    def labels(self):
+        """규칙 이름 목록(파일 순서)."""
+        return [r.get("label") for r in self._d.get("rules", [])]
 
-    def review_sections(self):
-        return self._review().get("sections") or {}
+    def body(self, label, expand=True):
+        """규칙 하나의 '뜻'(이름·출처·메모·why 를 뺀 것) — {products, value, branches[{do, when, qty}], skip}.
+        expand=True 면 {"rule"}·이름 심볼을 펼친 식(a·b 가 이름을 달리 지어도 뜻이 같으면 같다), False 면 적힌 그대로
+        (같은 측정을 참조 없이 두 번 쓴 '두 벌'을 가린다). 같은 뜻인지 가리는 비교용(구간② 검사기). 없는 이름이면 None."""
+        r = self._by_label.get(label)
+        if r is None:
+            return None
+        ex = self._expand if expand else (lambda n: n)
+        return {"products": sorted(r.get("on") or []), "value": ex(r["value"]) if "value" in r else None,
+                "branches": [{"do": t.get("do"), "when": (self._when_of(r, t) if expand else t.get("when")),
+                              "qty": t.get("qty")} for t in r.get("then", [])],
+                "skip": r.get("skip")}
 
-    def review_exits(self):
-        return self._review().get("exits") or {}
+    def value(self, label, expand=True):
+        """규칙의 측정(value) — 없으면 None. expand=False 면 적힌 그대로({"rule"} 참조를 펼치지 않음)."""
+        r = self._by_label.get(label) or {}
+        if "value" not in r:
+            return None
+        return self._expand(r["value"]) if expand else r["value"]
 
-    def scenario_overrides(self):
-        return self._review().get("scenario_overrides") or {}
+    def why(self, label):
+        """심판이 그 규칙을 a·b 중 고른 이유(최종 트리만) — 없으면 None."""
+        return (self._by_label.get(label) or {}).get("why")
 
-    def fire_ack(self):
-        return self._review().get("fire_ack") or {}
+    def name_symbols(self):
+        """이름 심볼 {이름: [종목…]} (펼치기 전 원본 — 검사기가 "?" 남음을 본다)."""
+        return {k: list((v or {}).get("syms") or []) for k, v in self._names.items()}
+
+    def legacy_keys(self):
+        """v3 에 없는 맨 위 키(옛 양식 잔재 — 예: review). 런타임은 무시하고 검사기가 정지시킨다."""
+        return sorted(set(self._d) - {"version", "products", "names", "rules", "note"})
 
     # ---------------------------------------------------------------- 원본 그대로(검사기의 전체 훑기 전용)
     def whole(self):
