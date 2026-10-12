@@ -15,7 +15,7 @@
 
 - 입력: **원문**(책 소스) · `books/<slug>/source_index.json`(ref 키) · 이 문서.
   플레이북·후보 트리·최종 트리·`logs/`·`books/<slug>/logs/`·git 기록은 보지 않는다.
-- 산출물: `books/<slug>/scenarios.json` → 쓴 뒤 `python -m tree.tradeTool fmt <파일>` 로 공통 형식으로 다시 쓴다
+- 산출물: `books/<slug>/scenarios.json` → 쓴 뒤 `python -m tree.gateway fmt <파일>` 로 공통 형식으로 다시 쓴다
   (줄 수를 부풀리는 들여쓰기 금지 — 형식이 다르면 검사기가 정지한다).
 
 **결과의 뜻**(정답을 정할 때):

@@ -3,21 +3,22 @@
 """판단 근거 설명(구간③ 판단자의 일부) — 조건 노드 하나 → 그날 값·측정 증거가 달린 설명 항목(책 무관).
 
 조건을 시세로 평가하는 일이라 판단자(judge/judge)만 부른다 — 화면(web)은 판단자가 낸 설명을
-그리기만 한다(표시는 판단하지 않는다). 평가 문맥(tradeTool.Ctx)은 판단자가 만든다.
+그리기만 한다(표시는 판단하지 않는다). 평가 문맥(judge.eval.Ctx)은 판단자가 만든다.
   · view         노드 하나 → 설명 항목 하나(중첩 설명 + 그날 값 + 측정 증거)
   · static_view  값 없는 규칙 설명(시세·포지션 없이)
   · _measure 외  '무엇을 재서 얼마였나'(측정 증거)
 """
-from tree.tradeTool import (
-    ARITH, CMP, CondError, Ctx, is_manual, is_unknown, manual_key, META, _op_of, product_specific, ROLES, series,
-    UNKNOWN, UNKNOWN_REASON)
+from tree.gateway import (
+    ARITH, CMP, CondError, is_manual, is_unknown, manual_key, META, _op_of, product_specific, ROLES, UNKNOWN,
+    UNKNOWN_REASON)
+from judge.eval import Ctx, series
 
 LOGICAL = ("all", "any", "atleast", "not")
 
 
 # ------------------------------------------------------------------ 측정 증거(실제 값)
 # 조건의 ●/○ 밑에 '무엇을 재서 그 값이 얼마였나'를 실어보낸다 — 사용자가 판정을 검증·신뢰할 수 있게.
-# 엔진은 어차피 비교 양쪽 값을 계산해 참/거짓을 낸다(tradeTool.series). 그 값을 버리지 않고 뷰에 담는 것뿐이다.
+# 엔진은 어차피 비교 양쪽 값을 계산해 참/거짓을 낸다(judge.eval.series). 그 값을 버리지 않고 뷰에 담는 것뿐이다.
 _PXF = {"close": "종가", "open": "시가", "high": "고가", "low": "저가", "volume": "거래량"}
 
 

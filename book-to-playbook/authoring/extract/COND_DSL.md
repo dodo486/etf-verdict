@@ -5,7 +5,7 @@
 트리를 쓰지 않는 사례 작성자는 이 문서를 읽지 않는다(`SCENARIO.md` 만).
 흔히 쓰는 식을 어떤 모양으로 조합하는가는 문법 사용법이라 맨 끝 6절에 조합 패턴 예시로 둔다.
 
-평가기·등급·사유는 `tree/tradeTool.py`(문법 정본 = 그 파일 docstring · 등급 = RuleSeries), 물량 규약은
+문법은 `tree/gateway.py`(문법 정본 = 그 파일 docstring), 계산은 `judge/eval.py`(series), 등급은 `judge/judge.py`(RuleSeries), 물량 규약은
 `judge/judge.py`(to_units·size_of) — 만드는 쪽의 검사와 읽는 쪽의 판정이 **같은 코드**를 쓴다. 문법 밖의 키는 오류로 거부된다.
 트리를 만드는 곳은 구간② 하나, 읽는 곳은 구간③(판정 엔진·백테스트) 하나다. 화면은 ③의 판정 결과만 그린다.
 트리 파일의 키 배치를 아는 코드는 `tree/gateway.py`(TreeGateway — 파일 형식 검사·탐색) 하나다 — 판정·백테스트·
@@ -211,7 +211,7 @@ caution/sizing/exit)은 폐지됐다. 행동은 **동사 셋**으로 말한다.
 - `version` 은 `3`. 시세 잎의 `sym` 에 `"?"` 가 남으면 검사기가 정지한다(사용자 확인).
 - 최종 트리(심판)만 규칙에 `why` 를 단다. 추출자 트리에는 `why` 가 없다.
 
-**직렬화**: 트리 파일을 쓴 뒤 반드시 `python -m tree.tradeTool fmt <파일>` 로 공통 형식(`cond.compact_json` —
+**직렬화**: 트리 파일을 쓴 뒤 반드시 `python -m tree.gateway fmt <파일>` 로 공통 형식(`tree.gateway.compact_json` —
 한 줄에 들어가는 노드는 한 줄, 숫자 목록은 이어 붙임)으로 다시 쓴다. 들여쓰기로 줄 수를 부풀리지 않는다 —
 형식이 다르면 `authoring.extract.verify_tree` 가 정지한다.
 

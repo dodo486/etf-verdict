@@ -11,8 +11,7 @@ import sys
 from datetime import datetime
 
 from shared.paths import backtest_json, write_text
-from tree.tradeTool import GRADES
-from judge.judge import NO_EXIT_NOTE, Judge
+from judge.judge import GRADES, NO_EXIT_NOTE, Judge
 from backtest import portfolio
 from backtest.runner import BUY_OR_CONFIRM, HORIZONS, run
 

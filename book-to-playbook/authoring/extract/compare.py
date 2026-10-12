@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 
 from shared import paths  # noqa: F401  (UTF-8 출력)
 from shared.paths import book_log, write_text
-from tree.tradeTool import CMP, CondError, GATES, is_manual, META, _op_of, SELL
+from tree.gateway import CMP, CondError, GATES, is_manual, META, _op_of, SELL
 from judge.judge import Judge
 
 COMPARED = GATES + ("weight",)                   # 날마다 비교하는 것(등급 동사 둘 + 비중 — 분할·판다는 거래로)

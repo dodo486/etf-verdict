@@ -8,8 +8,8 @@
 갈라지는" 사고로 돌아간다. 그래서 무엇을 import 해도 되는지를 층마다 한 줄로 정해 둔다(IMPORTS). 층은 아래에서 위로:
   · shared/      경로(paths)·인코딩·책 레지스트리 — 뜻은 두지 않는다
   · market/      시세 창구(md_feed)·개발 캐시·틱 버스(bus) — jhts 는 여기서만
-  · tree/        조건 트리(tree.json)의 언어 — 출입구(gateway)·문법/등급(tradeTool)
-  · judge/       tree+시세 → 판정 데이터(Judge)
+  · tree/        조건 트리(tree.json)의 언어 — 문법·동사·직렬화·출입구(gateway)
+  · judge/       tree+시세 → 판정 데이터(Judge) — 계산기(eval)·등급·시세 받기(judge)
   · backtest/    판정을 받아 과거를 시뮬레이션 — 체결·돈·러너
   · web/         화면 모양(판정 JSON·책 페이지·UI JS) — 판정 안 함
   · entry/       진입점 — run(스케줄 러너·check)·serve(로컬 서버)·live(라이브 버스 조립)·notify(알림) · verify_rules(이 검사 — 전 층을 보므로 여기)
@@ -32,7 +32,7 @@
             web       → web · shared · market · tree · judge · backtest
             entry     → 전부
             authoring → authoring · shared · market · tree · judge(심판 비교 도구가 후보 트리를 판단자로 평가)
-          tree 는 gateway·tradeTool 둘뿐이고 둘 다 공개다 — 다른 층이 직접 import 해도 된다(별도 제약 없음).
+          tree 는 gateway 하나뿐이고 공개다 — 다른 층이 직접 import 해도 된다(별도 제약 없음).
   규칙 2  `import jhts` 는 **market/md_feed.py 하나**에서만 허용된다 — 파이프라인의 시세는 jhts 창구로만 들어온다.
   규칙 3  네트워크 모듈(urllib·http·requests·socket·aiohttp·httpx) import 금지 — 시세 자가수집이 다시 자라나는
           길목을 막는다. 명시 예외(ALLOW)만: 알림 송신 entry/notify.py, 로컬 서빙 entry/serve.py.
@@ -307,9 +307,9 @@ def m_qty_convert(src):
 
 
 def m_gone_ops(src):
-    """어디서든(주인 포함) — 지운 전용 지표 연산(tradeTool.GONE_OPS: ma·ema·stdev·rsi)을 연산 이름으로 다시 쓰는 자리.
+    """어디서든(주인 포함) — 지운 전용 지표 연산(tree.gateway.GONE_OPS: ma·ema·stdev·rsi)을 연산 이름으로 다시 쓰는 자리.
     dict 키·비교·튜플 원소로 쓴 문자열 상수를 본다(조합으로 쓴다 — COND_DSL 6절)."""
-    from tree.tradeTool import GONE_OPS
+    from tree.gateway import GONE_OPS
     if src.kind != "py":
         return []
     out = []
@@ -328,8 +328,8 @@ def m_gone_ops(src):
 
 # 판단자 — 트리 원본·시세 원본·조건 평가를 쓰는 곳은 판단자(judge/judge) 하나와 그 도구(tree)뿐.
 GATEWAY_NAMES = {"TreeGateway"}
-EVAL_NAMES = {"series", "Ctx", "RuleSeries"}                       # tree.tradeTool 의 평가 이름
-FETCH_NAMES = {"history", "history_back"}                            # tree.tradeTool 의 시세 받기
+EVAL_NAMES = {"judge.eval": {"series", "Ctx"}, "judge.judge": {"RuleSeries"}}              # 평가 이름 {모듈: 이름}
+FETCH_NAMES = {"judge.judge": {"history", "history_back", "session_closes"}}                # 시세 받기 {모듈: 이름}
 FETCH_ATTRS = {"histories", "minutes", "sessions"}                    # md_feed. 시세 받기
 BAR_FIELDS = {"open", "high", "low", "close", "volume"}               # 캔들(시세 원본) 필드
 
@@ -338,23 +338,27 @@ def _call_funcs(tree):
     return {id(n.func) for n in ast.walk(tree) if isinstance(n, ast.Call)}
 
 
-def _tradetool_uses(src, names):
-    """tree.tradeTool 의 이름(names) 을 쓰는 자리 [(노드, 함수, 원래 이름)] — `from tree.tradeTool import x [as y]` 로
-    가져와 부르는 y, 또는 `import tree.tradeTool as t` 의 t.x. (import 줄 자체는 세지 않는다 — 쓰는 자리만.)"""
-    local, mods = {}, set()
+def _module_uses(src, by_module):
+    """모듈의 이름을 쓰는 자리 [(노드, 함수, 원래 이름)] — by_module = {"pkg.mod": {이름}}. `from pkg.mod import x [as y]`
+    로 가져와 부르는 y, 또는 `from pkg import mod [as m]`·`import pkg.mod as m` 의 m.x.
+    (import 줄 자체는 세지 않는다 — 쓰는 자리만.)"""
+    local, mods = {}, {}                     # 지역 이름 → 원래 이름 · 모듈 별칭 → 그 모듈의 이름 묶음
     for n in ast.walk(src.tree):
-        if isinstance(n, ast.ImportFrom) and n.module == "tree.tradeTool":
-            local.update({(a.asname or a.name): a.name for a in n.names if a.name in names})
-        elif isinstance(n, ast.ImportFrom) and n.module == "tree" and any(a.name == "tradeTool" for a in n.names):
-            mods.update(a.asname or a.name for a in n.names if a.name == "tradeTool")
+        if isinstance(n, ast.ImportFrom) and n.module in by_module:
+            local.update({(a.asname or a.name): a.name for a in n.names if a.name in by_module[n.module]})
+        elif isinstance(n, ast.ImportFrom) and n.module:
+            for a in n.names:
+                full = "%s.%s" % (n.module, a.name)
+                if full in by_module:
+                    mods[a.asname or a.name] = by_module[full]
         elif isinstance(n, ast.Import):
-            mods.update(a.asname for a in n.names if a.name == "tree.tradeTool" and a.asname)
+            mods.update({a.asname: by_module[a.name] for a in n.names if a.name in by_module and a.asname})
     out = []
     for n, fn in _py_nodes(src.tree):
         if isinstance(n, ast.Name) and n.id in local:
             out.append((n, fn, local[n.id]))
-        elif (isinstance(n, ast.Attribute) and n.attr in names and isinstance(n.value, ast.Name)
-              and n.value.id in mods):
+        elif (isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name) and n.value.id in mods
+              and n.attr in mods[n.value.id]):
             out.append((n, fn, n.attr))
     return out
 
@@ -371,19 +375,19 @@ def m_gateway_use(src):
 
 
 def m_evaluate(src):
-    """조건을 직접 평가하는 자리 — tradeTool 의 series·Ctx·RuleSeries."""
+    """조건을 직접 평가하는 자리 — 계산기(judge.eval)의 series·Ctx · 판단자(judge.judge)의 RuleSeries."""
     if src.kind != "py":
         return []
-    return [(n.lineno, fn, name) for n, fn, name in _tradetool_uses(src, EVAL_NAMES)]
+    return [(n.lineno, fn, name) for n, fn, name in _module_uses(src, EVAL_NAMES)]
 
 
 def m_raw_prices(src):
-    """시세 원본을 만지는 자리 — 시세 받기(tradeTool.history…·md_feed.histories…)와 캔들 필드(.open·.close…) 읽기.
+    """시세 원본을 만지는 자리 — 시세 받기(judge.judge.history…·md_feed.histories…)와 캔들 필드(.open·.close…) 읽기.
     (메서드 호출 f.close() 처럼 호출되는 속성은 뺀다.)"""
     if src.kind != "py":
         return []
     calls = _call_funcs(src.tree)
-    out = [(n.lineno, fn, name) for n, fn, name in _tradetool_uses(src, FETCH_NAMES)]
+    out = [(n.lineno, fn, name) for n, fn, name in _module_uses(src, FETCH_NAMES)]
     for n, fn in _py_nodes(src.tree):
         if not isinstance(n, ast.Attribute) or not isinstance(n.ctx, ast.Load):
             continue
@@ -395,8 +399,9 @@ def m_raw_prices(src):
 
 
 def _labels():
-    """동사·등급 이름표 글자 — 정본(tradeTool.VERBS · GRADES)에서 읽는다(여기 다시 적지 않는다)."""
-    from tree.tradeTool import GRADES, VERBS
+    """동사·등급 이름표 글자 — 정본(tree.gateway.VERBS · judge.judge.GRADES)에서 읽는다(여기 다시 적지 않는다)."""
+    from tree.gateway import VERBS
+    from judge.judge import GRADES
     return set(VERBS) | set(GRADES.values())
 
 
@@ -407,7 +412,7 @@ def m_labels(src):
             + [(ln, f, "grade_rules.json") for ln, f, v in lits if "grade_rules.json" in v])
 
 
-# 등급 사다리 — 날짜별 등급을 내는 함수(정본 grade.RuleSeries.grade_key).
+# 등급 사다리 — 날짜별 등급을 내는 함수(정본 judge.judge.RuleSeries.grade_key).
 LADDER_PY = {"grade_key"}
 LADDER_JS = (r"\bfunction\s+(?:gradeKey|and3|or3|ev)\s*\("
              r"|\b(?:const|let|var)\s+(?:gradeKey|and3|or3|ev)\s*=")
@@ -438,9 +443,9 @@ OWNERS = [
          hint="TreeGateway 에 물어볼 것",
          allow={   # 같은 이름 키를 쓰는 '트리 아닌' dict
              ("backtest/verify_trading.py", "parity_text"): ({"products"}, "파리티 보고 dict"),
-             ("tree/tradeTool.py", "grade_key"): ({"rules"}, "등급 사다리 grade_rules.json(트리 아님)"),
-             ("tree/verify_primitives.py", "raw_grade"): ({"rules"}, "등급 사다리 grade_rules.json(트리 아님)"),
-             ("tree/verify_primitives.py", "t_gateway"): ({"rules", "products", "do", "then"}, "출입구 계약 검사 — 합성 트리 픽스처·출입구 답 모양을 보는 자리"),
+             ("judge/judge.py", "grade_key"): ({"rules"}, "등급 사다리 grade_rules.json(트리 아님)"),
+             ("judge/verify_eval.py", "raw_grade"): ({"rules"}, "등급 사다리 grade_rules.json(트리 아님)"),
+             ("tree/verify_gateway.py", "t_gateway"): ({"rules", "products", "do", "then"}, "출입구 계약 검사 — 합성 트리 픽스처·출입구 답 모양을 보는 자리"),
              ("authoring/extract/verify_tree.py", "scenario_result"): ({"do"}, "사례 기대값 {do, pct}(scenarios.json — 트리 아님)"),
              ("authoring/extract/compare.py", "render_zone"): ({"rules"}, "zone_diff 결과(심판 덤프) dict"),
          }),
@@ -454,44 +459,48 @@ OWNERS = [
     dict(concept="금액 정책", owners=("judge/judge.py",), match=m_amount_policy,
          why="매수 크기(비중 × 분할)와 모름(비중 미명시·모름)을 어떻게 셀지는 judge.size_of 하나 — "
              "그 사실은 Judge.amount 한 경로로만(라이브 화면 = 백테스트)",
-         hint="Judge.amount 로 사실을, judge.size_of 로 크기를", allow={}),
+         hint="Judge.amount 로 사실을, judge.size_of 로 크기를",
+         allow={("judge/verify_eval.py", "t_grade"): ({"weight_of"}, "도구 단위 검사 — 등급 계산(RuleSeries)의 비중 사실을 직접 시험한다")}),
     dict(concept="수량 변환", owners=("judge/judge.py",), match=m_qty_convert,
          why="'얼마나'(Qty: cash·budget·bought·held)를 물량으로 바꾸는 곳은 judge.to_units 하나 — 매수(분할)·매도·"
              "비중이 같은 변환을 지난다. 밖은 Qty 를 건네기만 하고 basis 를 가르거나 셈하지 않는다",
          hint="judge.to_units(Qty, Ledger) · 화면은 엔진이 낸 units·sell 문장으로", allow={}),
-    dict(concept="트리 출입구 사용", owners=("tree/gateway.py", "tree/tradeTool.py", "judge/judge.py"),
+    dict(concept="트리 출입구 사용", owners=("tree/gateway.py", "judge/judge.py"),
          match=m_gateway_use,
          why="트리 원본을 쓰는 곳은 판단자(judge/judge) 하나 — 다른 층(체결·화면·라이브·검사)은 판단자에게 묻는다",
          hint="judge.judge.Judge(책)·ProductJudge(상품)에 물을 것",
-         allow={("tree/verify_primitives.py", None): (None, "도구 단위 검사 — 출입구 자체의 계약을 시험한다")}),
-    dict(concept="조건 평가(판단)", owners=("tree/tradeTool.py", "tree/gateway.py", "judge/judge.py", "judge/explain.py"),
+         allow={("tree/verify_gateway.py", None): (None, "도구 단위 검사 — 출입구 자체의 계약을 시험한다"),
+                ("judge/verify_eval.py", None): (None, "도구 단위 검사 — 합성 트리를 출입구로 열어 계산기·등급을 시험한다")}),
+    dict(concept="조건 평가(판단)", owners=("judge/eval.py", "judge/judge.py", "judge/explain.py", "tree/gateway.py"),
          match=m_evaluate,
          why="책의 내용대로 시세를 판단하는 곳은 판단자 하나 — 체결 워크·화면·검사기는 판단자가 낸 값만 쓴다",
          hint="ProductJudge.decide·conditions·evaluate·view 로",
-         allow={("tree/verify_primitives.py", None): (None, "도구 단위 검사 — 평가기 자체를 시험한다")}),
-    dict(concept="시세 원본", owners=("tree/tradeTool.py", "judge/judge.py", "market/md_feed.py", "market/_dev_cache.py"),
+         allow={("judge/verify_eval.py", None): (None, "도구 단위 검사 — 계산기 자체를 시험한다"),
+                ("tree/verify_gateway.py", None): (None, "도구 단위 검사 — 문법 검사에 계산기를 곁들인다")}),
+    dict(concept="시세 원본", owners=("judge/judge.py", "judge/eval.py", "market/md_feed.py", "market/_dev_cache.py"),
          match=m_raw_prices,
-         why="시세 원본(받기·캔들 필드)을 만지는 곳은 판단자 하나(+ 도구 평가기·시세 창구) — 다른 층은 판단자의 가격·판정만",
+         why="시세 원본(받기·캔들 필드)을 만지는 곳은 판단자 하나(+ 계산기·시세 창구) — 다른 층은 판단자의 가격·판정만",
          hint="Judge.prices·shared_prices·recent, ProductJudge.price·days 로",
-         allow={("tree/verify_primitives.py", None): (None, "도구 단위 검사 — 평가기에 넣을 합성 캔들을 만든다"),
+         allow={("judge/verify_eval.py", None): (None, "도구 단위 검사 — 계산기에 넣을 합성 캔들을 만든다"),
+                ("tree/verify_gateway.py", None): (None, "도구 단위 검사 — 합성 캔들을 만든다"),
                 ("web/verdict_view.py", None): ({".close"}, "판단자가 낸 Decision.close(가공된 종가)"),
                 ("authoring/transcribe/book_source.py", None): (None, "원문 파일 읽기(시세 아님)")}),
     dict(concept="지운 연산", owners=(), match=lambda src: [], everywhere=m_gone_ops,
          why="전용 연산(ma·ema·stdev·rsi·pct·count·streak·across)은 지웠다 — 기본 부품(sum·lag·case·atleast…) 조합으로 쓴다. "
-             "정본 목록 tradeTool.GONE_OPS",
+             "정본 목록 tree.gateway.GONE_OPS",
          hint="COND_DSL 6절 조합 예시로(평균 = sum ÷ n · 여러 종목 중 N개 = atleast·of)",
-         allow={("tree/tradeTool.py", None): (None, "지운 연산 목록 정본(GONE_OPS)"),
-                ("tree/verify_primitives.py", "t_syntax"): ({"ma", "across"}, "지운 연산이 문법에서 거부되는지 보는 자리"),
-                ("tree/verify_primitives.py", "t_gateway"): ({"across"}, "폐지된 across 트리를 출입구가 거부하는지 보는 자리")}),
+         allow={("tree/gateway.py", None): (None, "지운 연산 목록 정본(GONE_OPS)"),
+                ("tree/verify_gateway.py", "t_syntax"): ({"ma", "across"}, "지운 연산이 문법에서 거부되는지 보는 자리"),
+                ("tree/verify_gateway.py", "t_gateway"): ({"across"}, "폐지된 across 트리를 출입구가 거부하는지 보는 자리")}),
     dict(concept="소절 키 규칙", owners=("shared/sections.py",), match=m_section_keys,
          why="소절 키를 알아보는 정규식은 shared/sections 하나 — 전사(원문 인덱스)와 화면(원문 탭)이 같은 키를 본다",
          hint="shared.sections 의 KEY·MARK_*·PB_HEAD·marks 로", allow={}),
-    dict(concept="동사·등급 이름표", owners=("tree/tradeTool.py",), match=m_labels,
-         why="tradeTool.VERBS(안 산다·산다·판다) · GRADES · grade_rules.json 이 정본 — 화면은 판정 JSON(verbs·grades)으로 받는다",
-         hint="파이썬은 tradeTool 의 BLOCK·BUY·SELL·VERBS, 화면은 판정 JSON 의 verbs·grades 로", allow={}),
-    dict(concept="등급 사다리", owners=("tree/tradeTool.py",), match=m_grade_ladder,
-         why="날짜별 등급을 내는 곳은 tradeTool.RuleSeries.grade_key 하나 — 두 벌이면 엔진과 화면 등급이 갈라진다",
-         hint="판정 JSON 의 key 를 그대로(수동 답은 POST /api/verdict — 서버가 tradeTool.Ctx answers 로 낸다)", allow={}),
+    dict(concept="동사·등급 이름표", owners=("tree/gateway.py", "judge/judge.py"), match=m_labels,
+         why="tree.gateway.VERBS(안 산다·산다·판다) · judge.judge.GRADES · grade_rules.json 이 정본 — 화면은 판정 JSON(verbs·grades)으로 받는다",
+         hint="파이썬은 tree.gateway 의 BLOCK·BUY·SELL·VERBS · judge.judge 의 GRADES, 화면은 판정 JSON 의 verbs·grades 로", allow={}),
+    dict(concept="등급 사다리", owners=("judge/judge.py",), match=m_grade_ladder,
+         why="날짜별 등급을 내는 곳은 judge.judge.RuleSeries.grade_key 하나 — 두 벌이면 엔진과 화면 등급이 갈라진다",
+         hint="판정 JSON 의 key 를 그대로(수동 답은 POST /api/verdict — 서버가 judge.eval.Ctx answers 로 낸다)", allow={}),
 ]
 SELF = "entry/verify_rules.py"      # 표 자신(금지 표식 목록을 들고 있다) — 표식 검사에서 뺀다
 

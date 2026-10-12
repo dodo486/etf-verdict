@@ -19,13 +19,14 @@
 authoring/   books/<slug>/tree.json 을 만들고 검증한다(전사·추출 a·b·심판 · 본문 해시·채점) — 런타임과 분리, 명령으로만 돈다
   │ 산출물 books/<slug>/*.json
   ▼
-tree/         조건 트리의 언어(공개 토대) — gateway(읽는 유일 출입구) · tradeTool(문법/계산 validate·Ctx·series · 등급 수학 RuleSeries, 일봉 확정·asof)
+tree/         조건 트리의 언어(공개 토대) — gateway(문법 validate·동사 VERBS·워밍업·공통 직렬화 + 읽는 유일 출입구 TreeGateway)
   ▼
 market/      시세 조달 — md_feed(jhts 어댑터, 유일한 시세 창구) · _dev_cache
   ▼
 market/        라이브 틱 피더(pub-sub) — ① price_bus(시세 틱) · ② verdict_bus(판정) 두 단 버스. 시세를 '모름'(가격 아님, 트리거)
   ▼                               틱마다 전 책 심볼 합집합을 market 에서 '한 번' 조회해 fan-out(공유 시세·중복 조회 0)
 judge/     ① 판단층 — 판단자 Judge(책)·ProductJudge(상품): 트리·시세 원본의 유일한 사용자 → Decision  (돈·잔고·화면 모름)
+             · 계산기 eval(Ctx·series, 일봉 확정·asof) · 등급 RuleSeries · 시세 받기 history
   │
   ├─▶ backtest   Judge.signals × 체결(판단자가 낸 조건 값·가격으로) × 성적(돈·vectorbt)
   ├─▶ entry/notify.py     텔레그램·데스크톱 알림
@@ -34,7 +35,7 @@ judge/     ① 판단층 — 판단자 Judge(책)·ProductJudge(상품): 트리�
 shared/   경로(paths)·인코딩·책 레지스트리(books.json) · 소절 키 규칙(sections) — 그 밖의 뜻은 두지 않는다
 entry/    진입점 — serve(로컬 서버: 피더 구동 + SSE) · run(스케줄 daily·check) · live(2단 pub-sub 조립 뿌리)
 검사      대상 옆 verify_*.py — 원문 authoring/transcribe/verify_source · 트리 authoring/extract/verify_tree · 페이지 web/verify_page
-          · 연산 tree/verify_primitives · 설명 judge/verify_view · 체결 backtest/verify_trading · 코드 규칙 entry/verify_rules
+          · 문법 tree/verify_gateway · 연산 judge/verify_eval · 설명 judge/verify_view · 체결 backtest/verify_trading · 코드 규칙 entry/verify_rules
 books/<slug>/  책 하나의 산출물 전부(playbook.html · source · source_index · tree.json · 후보 · 사례 · 결과 · 로그)
 ```
 
@@ -42,8 +43,8 @@ books/<slug>/  책 하나의 산출물 전부(playbook.html · source · source_
 |---|---|---|
 | `shared/` | 경로·인코딩·책 레지스트리 · 소절 키 규칙 | `paths.py`(book_dir·book_file·books.json 레지스트리·live_slugs) · `sections.py`(원문·플레이북의 장/소절 표지 정규식 · marks) |
 | `market/` | 시세 조달 — jhts 는 여기서만 · 틱 배달(시세 모르는 순수 부품) | `md_feed.py`(histories·minutes·sessions) · `_dev_cache.py` · `bus.py`(`Bus` 구독/발행 · `Poller` 틱 구동) · `feed.py`(`Feed`=Bus+run · `watch` 장중 루프) |
-| `tree/` | 조건 트리(tree.json)의 언어 — **DSL 의 주인** | `gateway.py`(출입구) · `tradeTool.py`(문법·평가·RuleSeries·history — 모듈 수준 이름을 직접 import, +`grade_rules.json`) |
-| `judge/` | 판단자 — 트리·시세 원본의 유일한 사용자 → 판정 데이터 (돈·화면 모름) | `judge.py`(**Judge** 책 하나: 트리 열기·시세 받기·라이브 decisions·백테스트 signals · `judge.tree`(비교·채점·원시 트리 보기가 출입구에 묻는 단 하나의 문) · **ProductJudge** 상품 하나: 등급·decide·설명·보유 status·체결용 conditions·price · Holding · Decision 그릇 · '얼마나' 절: 매도 정책 exit_policy·수량 변환 to_units·금액 정책 size_of — 라이브 화면·백테스트 공용) · `explain.py`(판단 근거 설명 — judge 만 부름) |
+| `tree/` | 조건 트리(tree.json)의 언어 — **DSL 의 주인** | `gateway.py`(문법 validate·동사 VERBS·워밍업 warmup_of·공통 직렬화 `fmt` + 출입구 TreeGateway — 모듈 수준 이름을 직접 import) |
+| `judge/` | 판단자 — 트리·시세 원본의 유일한 사용자 → 판정 데이터 (돈·화면 모름) | `judge.py`(**Judge** 책 하나: 트리 열기·시세 받기·라이브 decisions·백테스트 signals · `judge.tree`(비교·채점·원시 트리 보기가 출입구에 묻는 단 하나의 문) · **ProductJudge** 상품 하나: 등급·decide·설명·보유 status·체결용 conditions·price · Holding · Decision 그릇 · '얼마나' 절: 매도 정책 exit_policy·수량 변환 to_units·금액 정책 size_of — 라이브 화면·백테스트 공용 · 시세 받기 history·history_back·session_closes · 등급 RuleSeries·GRADES, +`grade_rules.json`) · `eval.py`(계산기 — 트리 식에 시세 값을 넣어 계산: Ctx·series) · `explain.py`(판단 근거 설명 — judge 만 부름) |
 | `backtest/` | 판정을 받아 과거 시뮬레이션 | `{trades,portfolio,runner}.py`(체결 · 돈·수수료 · 러너, +`market_config.json`) · `verify_trading.py`(검사) |
 | `web/` | 화면 모양(판정 안 함) | `verdict_view.py`(판정→화면 JSON·사유 문장) · `backtest_page.py` · `book_page.py` · `build_home.py` · `inject_*.py` · `raw_tree.py`(원시 트리 보기 — 소절마다 뽑힌 규칙 1:1, `Judge.cards`) · `ui/*.js` · `verify_page.py`(검사) |
 | `entry/` | 진입점 | `serve.py`(로컬 서버·SSE) · `run.py`(스케줄 러너·CHECKS) · `live.py`(`LiveHub` — 2단 버스 조립) · `notify.py`(알림 — 텔레그램·데스크톱, books.json engine.daily) · `verify_rules.py`(코드 규칙 검사 — 전 층을 보므로 entry) |
@@ -102,7 +103,7 @@ market.bus price_bus (1개) ──틱 {ts, trees, hist}── fan-out ─┬─�
         └▶ entry/notify.py   알림
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  코드 검사 — 코드를 바꿀 때, 각 층 옆 verify_*.py              가짜 트리(synthetic)만
-   tree/verify_primitives · judge/verify_view · backtest/verify_trading · entry/verify_rules
+   tree/verify_gateway · judge/verify_eval · judge/verify_view · backtest/verify_trading · entry/verify_rules
  전부 한 번에: python -m entry.run check  (무언가 바꿨으면 커밋 전 — 엔진 tree·judge 를 바꿔도 트리 검사까지)
 ```
 
@@ -131,7 +132,7 @@ market.bus price_bus (1개) ──틱 {ts, trees, hist}── fan-out ─┬─�
 | 10 | **데이터는 한 곳** — 책 산출물은 `books/<slug>/`, 경로는 `shared/paths.py` 하나 | 주인 표: 책 산출물 경로 |
 | 11 | **기본 계산은 검증된 라이브러리(pandas), 도메인 뜻만 직접** | — |
 | 12 | **특정 책에 맞추지 않는다** — 버그를 만나면 "공통 코드가 왜 이 책에선 안 먹히나"로 상위 로직을 고친다 | 리뷰 |
-| 13 | **트리·시세 원본의 사용자는 판단자 하나** — 출입구(TreeGateway)·시세 받기·조건 평가는 `judge/judge`(+ 도구 tree)만 쓴다. 체결·화면·라이브·검사는 판단자에게 묻고 받은 값(판정·가격·조건 값·설명)만 쓴다(도구 단위 검사 tree.verify_primitives 만 예외) | 주인 표: 트리 출입구 사용·조건 평가·시세 원본 |
+| 13 | **트리·시세 원본의 사용자는 판단자 하나** — 출입구(TreeGateway)·시세 받기·조건 평가는 `judge/judge`(+ 도구 tree)만 쓴다. 체결·화면·라이브·검사는 판단자에게 묻고 받은 값(판정·가격·조건 값·설명)만 쓴다(도구 단위 검사 tree.verify_gateway·judge.verify_eval 만 예외) | 주인 표: 트리 출입구 사용·조건 평가·시세 원본 |
 
 ## 3. 변경 규율
 
@@ -140,7 +141,7 @@ market.bus price_bus (1개) ──틱 {ts, trees, hist}── fan-out ─┬─�
 - **동작 변경은 따로 커밋**하고 전후 수치를 보고한다.
 - **쓸모없어진 것(죽은 코드·옛 문서·옛 산출물)은 같은 작업에서 지운다.** 호환용 별칭을 남기지 않는다.
 - **책 데이터(후보·tree.json)는 손으로 고치지 않는다** — 공통 로직을 고친 뒤 다시 뽑는다. 심판 몫은 심판이.
-- 트리 JSON 은 `python -m tree.tradeTool fmt <파일>` 압축 형식.
+- 트리 JSON 은 `python -m tree.gateway fmt <파일>` 압축 형식.
 
 ## 4. 주인 표 (`entry/verify_rules.py` OWNERS — 주인 밖에 보이면 정지)
 
@@ -151,12 +152,12 @@ market.bus price_bus (1개) ──틱 {ts, trees, hist}── fan-out ─┬─�
 | 매도 정책(책에 매도 규칙이 없을 때 = 매수 신호만 평가) | `judge/judge.py` `exit_policy` |
 | 금액 정책(비중 × 분할, 모름 처리) | `judge/judge.py` `size_of` (사실은 `ProductJudge.amount` 한 경로) |
 | 수량 변환('얼마나' → 물량, 매수·매도 공통) | `judge/judge.py` `to_units` |
-| 동사·등급 이름표(안 산다·산다·판다 · 등급 글자) | `tree/tradeTool.py`(VERBS·GRADES) · `grade_rules.json` |
-| 등급 사다리(날짜별 등급 계산) | `tree/tradeTool.py`(RuleSeries.grade_key) — 화면은 다시 계산하지 않음(수동 답은 `POST /api/verdict`) |
+| 동사·등급 이름표(안 산다·산다·판다 · 등급 글자) | `tree/gateway.py`(VERBS) · `judge/judge.py`(GRADES) · `judge/grade_rules.json` |
+| 등급 사다리(날짜별 등급 계산) | `judge/judge.py`(RuleSeries.grade_key) — 화면은 다시 계산하지 않음(수동 답은 `POST /api/verdict`) |
 | 트리 출입구 사용(TreeGateway) | `judge/judge.py` (+ 도구 `tree/`) |
-| 조건 평가(series·Ctx·RuleSeries — 책 내용대로 판단) | `judge/judge.py` · `judge/explain.py` (+ 도구 `tree/`) |
-| 시세 원본(받기·캔들 필드) | `judge/judge.py` (+ 도구 `tree/tradeTool.py` · 창구 `market/`) |
-| 지운 연산(ma·ema·stdev·rsi·pct·count·streak — `tradeTool.GONE_OPS`) | 어디서도 쓰지 않는다 |
+| 조건 평가(series·Ctx·RuleSeries — 책 내용대로 판단) | `judge/judge.py` · `judge/explain.py` · 계산기 `judge/eval.py` (+ 문법 `tree/gateway.py`) |
+| 시세 원본(받기·캔들 필드) | `judge/judge.py` (+ 계산기 `judge/eval.py` · 창구 `market/`) |
+| 지운 연산(ma·ema·stdev·rsi·pct·count·streak — `tree.gateway.GONE_OPS`) | 어디서도 쓰지 않는다 |
 | 할 일 목록 | `docs/HANDOFF.md` (다른 곳에 TODO 파일 금지) |
 
 새로 '한 곳에서만 정할 것'이 생기면 여기와 OWNERS 에 한 줄씩.
@@ -174,7 +175,8 @@ market.bus price_bus (1개) ──틱 {ts, trees, hist}── fan-out ─┬─�
 | `authoring.transcribe.verify_source` | 플레이북 본문(`#src`) 해시 |
 | `authoring.extract.verify_tree --quick` | 트리 계약 — 소절 인덱스 · 트리 문법 · ref 가 실제 소절 |
 | `web.verify_page` | 책 페이지 구획 · UI 사본 == `web/ui/*.js` |
-| `tree.verify_primitives` | 원시 연산·등급·금액·수동 답(pandas 기준값·손계산) · 3값 논리 · 인과성 · 문법 · 출입구 계약 |
+| `tree.verify_gateway` | 트리 문법 · 출입구 계약 |
+| `judge.verify_eval` | 원시 연산·등급·금액·수동 답(pandas 기준값·손계산) · 3값 논리 · 인과성 · 확정봉 |
 | `backtest.verify_trading` | 체결 워크·수량 변환·금액·매도 정책 · 실전 경로. `--parity` = 판정 == 백테스트(opt) |
 | `judge.verify_view` | 화면 설명 구조 |
 | `authoring.extract.verify_tree` | 체크리스트가 원문 뜻대로 동작하나 — a·b 비교(식) · 원문 사례 · 심판 기록 · 발화 통계 |

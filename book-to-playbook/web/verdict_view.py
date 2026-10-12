@@ -9,7 +9,7 @@
 
 출력 계약(알림 · 화면 · /api/verdict 가 소비):
   top     : {slug, title, ts, date, source, cash, verbs[], grades{}, verdicts[], missing{}, positions_note}
-            verbs = 동사 셋(정본 tradeTool.VERBS — 화면 머리글) · grades = 등급 글자표(정본 tradeTool.GRADES)
+            verbs = 동사 셋(정본 tree.gateway.VERBS — 화면 머리글) · grades = 등급 글자표(정본 judge.judge.GRADES)
   verdict : {prod, index, note, date, close, chg, key, grade, reason,
              gates{안 산다, 산다: view}, opt{..}, pes{..},     등급 동사 둘의 중첩 설명 + 낙관·비관 값
              size{label, ref, weight, weight_range, units, tranches[{label, ref, frac, units, view?}]},   얼마나(산다 qty)
@@ -23,8 +23,8 @@ from datetime import datetime, timedelta, timezone
 
 from shared.paths import book_meta
 from market import md_feed
-from tree.tradeTool import BLOCK, BUY, GRADES, VERBS
-from judge.judge import NO_EXIT_NOTE, Judge, exit_policy, live_units, sell_text
+from tree.gateway import BLOCK, BUY, VERBS
+from judge.judge import GRADES, NO_EXIT_NOTE, Judge, exit_policy, live_units, sell_text
 
 SOURCE = "jhts 시세팀(일봉)"
 
@@ -112,7 +112,7 @@ def _holding_view(hs):
 # ------------------------------------------------------------------ 책 하나
 def render(slug, asof=None, answers=None):
     """asof = 관측 시각(UTC datetime). None 이면 지금 — 장중(tf="1m") 조건을 이 시점 이하로 자른다.
-    answers = 화면에서 사람이 답한 수동 {tradeTool.answer_key: 참/거짓} — 판단자가 그 답으로 등급·조건 값·금액을 낸다
+    answers = 화면에서 사람이 답한 수동 {tree.gateway.answer_key: 참/거짓} — 판단자가 그 답으로 등급·조건 값·금액을 낸다
     (서버 권위 — 화면은 다시 계산하지 않는다). None 이면 답 없는 판정, 주면 top["answers"] 로 되돌려 준다.
 
     판정(Judge.decisions)과 모양 빚기(_format)를 쪼개 둔다 — 라이브 2단 pub-sub(entry/live)에서 신호
@@ -132,7 +132,7 @@ def _format(slug, book, prices, decisions, answers=None):
            "verdicts": [], "missing": {}, "cash": None,
            # 등급 글자표(키→라벨)를 실어보낸다 — 화면이 따로 복붙하지 않고 이걸 받아 쓴다(단일 출처).
            "grades": GRADES,
-           # 동사 셋(화면 머리글·판정 JSON 키) — tradeTool.VERBS 가 정본이다. 화면은 복붙하지 않고 이걸 받아 쓴다.
+           # 동사 셋(화면 머리글·판정 JSON 키) — tree.gateway.VERBS 가 정본이다. 화면은 복붙하지 않고 이걸 받아 쓴다.
            "verbs": list(VERBS),
            # 매도 정책 "none"(책에 매도 규칙 없음) 문구 — 정본 judge/judge.NO_EXIT_NOTE(화면이 받아 쓴다).
            "no_exit_note": NO_EXIT_NOTE}

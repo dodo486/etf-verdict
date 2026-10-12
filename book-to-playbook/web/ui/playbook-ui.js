@@ -10,7 +10,7 @@
   const esc = window.BP.esc;            // 공용 부품(shared-ui) — 고치는 곳은 거기 하나
   const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
   const REFS = (function(){ try { return JSON.parse(document.getElementById('verdict-data').textContent).refs || {}; } catch(e){ return {}; } })();
-  // 소절이 든 동사(안 산다·산다·판다)는 엔진이 refs[소절].verbs 로 실어보낸 글자 그대로(정본 tree/tradeTool.VERBS).
+  // 소절이 든 동사(안 산다·산다·판다)는 엔진이 refs[소절].verbs 로 실어보낸 글자 그대로(정본 tree/gateway.VERBS).
   function refBadge(headText){
     const m = headText.match(window.BP.REF_RE); if(!m) return '';
     const r = REFS[m[1]];

@@ -1,26 +1,31 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""조건 트리 원시함수 검사 (책 무관 · 크기 고정).
+"""계산기·등급 검사 (책 무관 · 크기 고정).
 
 왜 있나
   옛 검증층은 전부 '글자 대조'였다 — 라벨·원문·판정식의 숫자/단어가 서로 나오는지만 봤고,
   계산이 실제로 맞는지는 아무도 실행해 보지 않았다. 그래서 '2거래일 유지'가 1일로 판정되고
   ('2' 라는 글자는 있으니 통과), '전고점 유지'가 연속 신고가를 세도 통과했다.
-  규칙은 이제 cond.py 의 원시함수 조합뿐이므로, 원시함수만 실행으로 철저히 검증하면
+  규칙은 원시함수 조합뿐이므로, 계산기(judge/eval.py)를 실행으로 철저히 검증하면
   어떤 책의 어떤 조건이든 계산 버그가 들어올 자리가 없다. 책이 늘어도 이 검사는 늘지 않는다.
 
-무엇을 하나 (기준은 전부 cond.py 와 독립적으로 구한다)
+무엇을 하나 (기준은 전부 계산기와 독립적으로 구한다)
   1. 수치 연산 — pandas rolling/shift 로 계산한 값과 무작위 시계열(결측 포함)에서 대조
   2. 3값 논리 — '모름' 자리에 참/거짓을 전부 넣어 본 결과로 정답을 정의해 전수 대조
   3. 시간 연산(barssince·valuewhen, 조합: 최근 참 일수·연속 참 일수 · 여러 종목 중 N개 = atleast·of) — 단순 반복 구현과 대조
+     · 하한(AtLeast) 비교 · 포지션 값(pos)
   4. 인과성 — 미래 데이터를 잘라도 과거 날짜 값이 같아야 한다(미래 참조 금지)
-  5. 문법 — 모르는 키·인자 수·빈 구역은 거부, 올바른 트리는 통과
-  6. 표현력 회귀 — 이번에 발견된 버그 유형을 트리로 적어 원문 뜻대로 나오는지
-  7. 트리 출입구(TreeGateway) 계약 — 판정·백테스트·검사기가 트리에 묻는 질문의 답 모양
-  8. 사람이 답한 수동(Ctx answers) — 답 열쇠 규칙·극성·공통 정의·등급까지(서버 권위의 바탕)
-  (체결 워크·실전 경로는 backtest/verify_trading.py, 화면 설명 구조는 judge/verify_view.py 가 본다)
+  5. 봉(tf) — 일봉 아닌 봉은 모름(None) · 혼합 tf·'오늘 미확정' 확정봉 규칙·look-ahead 0
+  6. 등급 — 비중 범위 · 데이터 완전성 가드(워밍업 부족 → ❔, 충분 구간은 원시 등급 사다리와 같음)
+  7. 표현력 회귀 — 발견된 버그 유형을 트리로 적어 원문 뜻대로 나오는지
+  8. 사람이 답한 수동(Ctx answers) — 답 열쇠 규칙·극성·등급까지(서버 권위의 바탕)
+  (트리 문법·출입구 계약은 tree/verify_gateway.py, 체결 워크·실전 경로는 backtest/verify_trading.py,
+   화면 설명 구조는 judge/verify_view.py 가 본다)
 
-사용: python -m tree.verify_primitives   (실패 있으면 exit 1)
+언제 돌리나: 계산기(judge/eval.py)·등급(judge/judge.py·grade_rules.json)을 바꿨을 때 —
+  보통은 `python -m entry.run check` 가 함께 돌린다.
+
+사용: python -m judge.verify_eval   (실패 있으면 exit 1)
 """
 import itertools
 import json
@@ -32,10 +37,11 @@ from collections import namedtuple
 import pandas as pd
 
 from shared import paths  # noqa: F401  (UTF-8 출력)
-from tree.tradeTool import (
-    answer_key, AtLeast, BLOCK, BUY, _cmp, CondError, Ctx, GONE_OPS, GRADE_RULES, _op_of, POS_FIELDS, RuleSeries,
-    SELL, series, validate, warmup_of)
-from tree.gateway import TreeGateway, rule, synthetic   # 합성 트리는 출입구로 만든다(entry.verify_rules 명시 예외)
+from judge.eval import _cmp, Ctx, series
+from judge.judge import GRADE_RULES, RuleSeries
+from tree.gateway import (
+    answer_key, AtLeast, BLOCK, BUY, CondError, GONE_OPS, _op_of, POS_FIELDS, TreeGateway, rule, synthetic, validate,
+    warmup_of)   # 합성 트리는 출입구로 만든다(entry.verify_rules 명시 예외)
 
 Candle = namedtuple("Candle", "date open high low close volume")
 FAILS = []
@@ -358,43 +364,6 @@ def t_causal(rng):
                 check(same(ps[t], fs[t], 1e-9), "미래 참조: %s @%d" % (_op_of(node), t))
 
 
-# ------------------------------------------------------------------ 5. 문법
-def t_syntax():
-    bad = [
-        {"gt": [C]}, {"sum": [C, 0]}, {"sum": [C, 2.5]}, {"ma": [C, 20]}, {"px": "price"}, {"foo": 1},
-        {"gt": [C, 1], "lt": [C, 2]}, True, {"atleast": 2}, {"def": "없음"},
-        {"across": {"syms": ["A"], "cond": C}}, {"manual": ""}, {"gt": [C, 1], "op": "above"},
-        {"px": "close", "sym": "X", "tf": "1h"}, {"px": "close"}, {"px": "close", "sym": "$s"},
-        {"px": "close", "sym": "$빅테크"}, {"abs": [C, 1]}, {"case": [[C, 1]]}, {"case": [C, 1], "else": 0},
-        {"max": [C]},
-    ]
-    for b in bad:
-        try:
-            validate(b)
-            FAILS.append("거부해야 할 노드가 통과: %r" % (b,))
-        except CondError:
-            pass
-    good = {"all": [{"gt": [C, AVG(C, 20)], "label": "20일선 위", "ref": "3-2"},
-                    {"atleast": 2, "of": [{"manual": "장중"}, {"ge": [{"px": "volume", "sym": "X"}, 1]}]}]}
-    try:
-        validate(good)
-    except CondError as e:
-        FAILS.append("올바른 노드가 거부: %s" % e)
-    try:
-        validate({"case": [[{"gt": [C, 1]}, 2]], "else": {"px": "close", "sym": "X", "tf": "1d"}})
-    except CondError as e:
-        FAILS.append("올바른 case·tf 가 거부: %s" % e)
-    W = {"gt": [C, 1]}
-    good = synthetic(["X"], rule("비중", BUY, None, ("cash", {"case": [[W, 14]], "else": 34})),
-                     rule("1차", BUY, None, ("budget", 0.25)),
-                     rule("2차", BUY, {"ge": [{"pos": "ret"}, 3]}, ("budget", 0.75)),
-                     rule("모름", BUY, {"manual": "저자 미명시: x"}, ("budget", "?")))
-    try:
-        TreeGateway.of(good)
-    except CondError as e:
-        FAILS.append("올바른 v3 트리가 거부: %s" % e)
-
-
 def t_tf():
     """봉(tf) — 문법은 "1d"/"1m"/"5m" 만 받고, 일봉 아닌 봉(1m·5m)은 시세 경로가 없어 값이 전부 None(모름)."""
     import datetime as dt
@@ -546,7 +515,7 @@ def t_answers():
     check(got == ["confirm", "buy", "wait"], "등급까지 답으로 풀린다(확인 대기 → 매수 후보·관망) %r" % got)
 
 
-# ------------------------------------------------------------------ 데이터 완전성 가드(워밍업 부족 → 불완전)
+# ------------------------------------------------------------------ 6. 데이터 완전성 가드(워밍업 부족 → 불완전)
 def t_warmup_guard():
     """★ 실제 발견된 버그 방지(영구): 시세가 rate-limit 로 잘려(워밍업 부족) 와도 엔진이 그 불완전 데이터로
     조용히 ✅/🚫 확신을 내면 모르고 매매하게 된다. 가드는 트리가 쓰는 가장 긴 lookback(워밍업)을 트리에서
@@ -621,7 +590,7 @@ def t_warmup_guard():
           "같은 마지막 날: 긴 이력=완전(신호 OK) · 잘린 이력=불완전(판정 보류) — 조용한 오판 차단")
 
 
-# ------------------------------------------------------------------ 6. 표현력 회귀(이번 버그 유형)
+# ------------------------------------------------------------------ 7. 표현력 회귀(이번 버그 유형)
 def t_regress():
     # (a) '20일선 회복 후 2거래일 유지' — 1일만 위면 거짓, 회복일+2일이면 참
     hold = {"ge": [STREAK({"gt": [C, AVG(C, 20)]}), 3]}
@@ -652,134 +621,14 @@ def t_regress():
     check(series(four, make_ctx([1.0]))[0] is None, "4개 중 2개(1참·1거짓·2모름) → 모름")
 
 
-# ------------------------------------------------------------------ 7. 트리 출입구(TreeGateway) 계약
-def t_gateway():
-    """판정·백테스트·검사기가 트리(v3 규칙 목록)에 묻는 질문의 답 모양 — {"rule"} 은 펼쳐서 건넨다.
-    상품마다 달라지는 것은 해석기가 채운다($self·$index = products 의 index) — 폐지된 표기($s·names·across)는 거부."""
-    W = {"gt": [C, AVG(C, 20)]}
-    M = {"gt": [{"px": "close", "sym": "NQ=F", "tf": "1m"}, 0]}
-    UP = lambda t: {"gt": [{"px": "close", "sym": t}, 0]}
-    data = {
-        "version": 3,
-        "products": {"A": {"index": "^NDX", "note": "a 노트", "ref": "0-1"}, "B": {"index": "^SOX"}},
-        "rules": [
-            {"label": "20일선 위", "ref": "1-1", "value": W},
-            {"label": "선물 양", "ref": "1-2", "on": ["A"],
-             "then": [{"when": {"all": [{"rule": "20일선 위"}, M]}, "do": BUY}]},
-            {"label": "지수 음", "ref": "2-1",
-             "then": [{"when": {"lt": [{"px": "close", "sym": "$index"}, 0]}, "do": BLOCK}]},
-            {"label": "비중", "ref": "4-1", "then": [{"do": BUY, "qty": {"of": "cash", "x": 30}}]},
-            {"label": "1차", "ref": "4-2", "on": ["A"], "then": [{"do": BUY, "qty": {"of": "budget", "x": 0.5}}]},
-            {"label": "2차", "on": ["A"], "then": [{"when": {"ge": [{"pos": "filled", "rule": "1차"}, 1]},
-                                                   "do": BUY, "qty": {"of": "budget", "x": 0.5}}]},
-            {"label": "익절", "ref": "5-1",
-             "then": [{"when": {"ge": [{"pos": "ret"}, 9]}, "do": SELL, "qty": {"of": "held", "x": 1}}]},
-            {"label": "묶음 상승", "ref": "6-1", "on": ["A"],
-             "then": [{"when": {"atleast": 1, "of": [UP("N1"), UP("N2")]}, "do": BUY}]},
-            {"label": "못 옮김", "ref": "9-9", "skip": "데이터 없음: x"}]}
-    g = TreeGateway.of(data)
-    check(g.products() == ["A", "B"] and g.has("A") and not g.has("Z"), "products/has")
-    check(g.index("A") == "^NDX" and g.index("B") == "^SOX" and g.note("A") == "a 노트", "index/note")
-    ent = g.gate("A", BUY)["any"]
-    check([n["label"] for n in ent] == ["선물 양", "묶음 상승"] and g.gate("B", BUY) == {"any": []},
-          "gate(산다) = 산다 갈래(포지션·조건 없는 갈래 제외, on 반영) %r" % ent)
-    check(ent and ent[0]["all"][0] == dict(W, label="20일선 위", ref="1-1") and ent[0]["allprod"] is False,
-          "{rule} 는 그 규칙 value 로 펼치고 이름·소절을 싣는다 %r" % (ent[:1],))
-    check(len(ent) > 1 and ent[1]["of"] == [UP("N1"), UP("N2")], "여러 종목 = atleast·of 그대로(각 잎 구체 티커)")
-    av = g.gate("A", BLOCK)["any"]
-    check([(n["label"], n["allprod"]) for n in av] == [("지수 음", True)], "gate(안 산다) %r" % av)
-    try:
-        g.gate("A", SELL)
-        FAILS.append("판다는 등급 동사가 아닌데 gate 가 받음")
-    except CondError:
-        pass
-    sz = g.weight("A")
-    check((sz.label, sz.ref, sz.qty) == ("비중", "4-1", ("cash", 30)), "weight = 산다 qty cash")
-    trs = g.tranches("A")
-    check([(t.label, t.qty, t.when) for t in trs] == [("1차", ("budget", 0.5), None),
-                                                       ("2차", ("budget", 0.5), {"ge": [{"pos": "filled", "rule": "1차"}, 1]})]
-          and g.tranches("B") == [], "tranches = 산다 qty budget(pos filled 의 rule = 장부 열쇠로 남김) %r"
-          % [(t.label, t.when) for t in trs])
-    e = g.sells("A")
-    check([(r.label, r.qty) for r in e] == [("익절", ("held", 1))], "sells = 판다 %r" % [(r.label, r.qty) for r in e])
-    check(g.symbols() == {"A", "B", "X", "^NDX", "^SOX", "NQ=F", "N1", "N2"} and g.symbols(["B"]) == {"B", "^SOX"},
-          "symbols = 상품 + 식의 sym %r · %r" % (g.symbols(), g.symbols(["B"])))
-    check(g.warmup("A") == 19 and g.warmup("B") == 0 and g.warmup() == 19, "warmup")
-    check(g.refs() == {"0-1", "1-1", "1-2", "2-1", "4-1", "4-2", "5-1", "6-1", "9-9"}, "refs %r" % g.refs())
-    check(g.skips() == [{"rule": "못 옮김", "ref": "9-9", "reason": "데이터 없음: x"}], "skip 규칙")
-    check(not TreeGateway({}) and bool(g) and TreeGateway.load("__없는책__") is None, "빈·없는 트리")
-    check(W in g.conditions() and {"all": [{"rule": "20일선 위"}, M]} in g.conditions(), "conditions = 적힌 그대로의 조건식")
-    cd = {c.label: c for c in g.cards()}
-    check(list(cd) == g.labels() and cd["20일선 위"].value == W and cd["20일선 위"].branches == []
-          and cd["선물 양"].on == ["A"] and cd["선물 양"].branches[0].when == {"all": [{"rule": "20일선 위"}, M]}
-          and cd["1차"].branches[0].qty == ("budget", 0.5) and cd["1차"].branches[0].when is None
-          and cd["못 옮김"].skip == "데이터 없음: x" and cd["익절"].ref == "5-1",
-          "cards = 규칙 카드(적힌 그대로 — 참조 안 펼침)")
-    # on 은 상품만 · qty 식의 {"rule"} 은 펼친다 · 규칙 note 는 갈래까지
-    g2 = TreeGateway.of(dict(data, rules=data["rules"] + [rule("A 전용 익절", SELL, W, ("held", 0.5), on=["A"], note="메모"),
-                                                          rule("식 비중", BUY, None, ("cash", {"rule": "20일선 위"}))]))
-    s2 = [r for r in g2.sells("A") if r.label == "A 전용 익절"]
-    check(s2 and s2[0].note == "메모" and not [r for r in g2.sells("B") if r.label == "A 전용 익절"],
-          "on 반영 · note 전달")
-    check(TreeGateway.of(dict(data, rules=[rule("식", BUY, None, ("cash", {"rule": "w"})),
-                                           {"label": "w", "value": W}])).weight("A").qty.x == dict(W, label="w"),
-          "qty 식의 {rule} 펼침")
-    check(g.refs() >= {"0-1"}, "refs 에 상품 ref 포함")
-    # 규칙 단위 질문(구간② 검사기) — 이름 목록 · 뜻(펼침/그대로) · 측정 · why · 옛 양식 키
-    check(g.labels()[:2] == ["20일선 위", "선물 양"] and g.body("없음") is None, "labels/body 없는 이름")
-    b2 = g.body("선물 양")
-    check(b2["products"] == ["A"] and b2["branches"][0]["do"] == BUY
-          and b2["branches"][0]["when"]["all"][0] == dict(W, label="20일선 위", ref="1-1")
-          and g.body("선물 양", expand=False)["branches"][0]["when"]["all"][0] == {"rule": "20일선 위"},
-          "body 펼침/그대로 %r" % b2)
-    check(g.value("20일선 위") == W and g.value("선물 양") is None and g.why("선물 양") is None
-          and TreeGateway.of(dict(data, rules=data["rules"] + [dict(rule("w", BUY, W), why="원문 3-1")])).why("w") == "원문 3-1",
-          "value/why")
-    bad = dict(data, rules=data["rules"] + [rule("x", BUY, {"rule": "없는 이름"})])
-    check(TreeGateway.of(bad).gate("A", BUY)["any"][-1].get("manual", "").startswith("연산 없음: 미해결 참조"),
-          "없는 이름 참조는 수동(연산 없음)으로 드러낸다")
-    R0 = {"label": "r", "then": [{"when": W, "do": SELL}]}
-    old_sym = lambda sym: dict(data, rules=[{"label": "r", "then": [{"when": {"lt": [{"px": "close", "sym": sym}, 0]},
-                                                                      "do": BLOCK}]}])
-    for broken in (dict(data, version=2), dict(data, products={}), dict(data, rules=[]),
-                   dict(data, rules=data["rules"] + [data["rules"][0]]),
-                   dict(data, rules=data["rules"] + [rule("y", "쉰다", {"all": []})]),
-                   dict(data, review={}),                                         # 옛 양식 키
-                   dict(data, products={"A": {"ref": "0-1", "exit_note": "x"}}),
-                   dict(data, names={"$묶음": {"syms": ["N1"]}}),                    # 폐지: 이름 심볼
-                   old_sym("$s"), old_sym("$빅테크"),                                 # 폐지: $s·이름 심볼
-                   dict(data, products={"A": {"index": "^NDX"}, "B": {}}),                  # $index 인데 상품 B 에 index 없음
-                   dict(data, rules=[{"label": "r", "then": [{"when": {"lt": [{"px": "close"}, 0]}, "do": BLOCK}]}]),  # sym 생략
-                   dict(data, rules=[{"label": "r", "then": [{"when": {"ge": [{"across": {"syms": ["N1"], "cond": UP("N1")}}, 1]},
-                                                              "do": BUY}]}]),     # 폐지: across
-                   dict(data, rules=[dict(R0, scale=0.5)]),                         # 규칙에 모르는 키
-                   dict(data, rules=[{"label": "r", "then": [{"when": W, "do": SELL, "sell": "all"}]}]),
-                   dict(data, rules=[{"label": "r", "then": [{"when": W, "do": SELL, "qty": {"of": "cash", "x": 1}}]}]),
-                   dict(data, rules=[{"label": "r", "then": [{"when": W, "do": BLOCK, "qty": {"of": "held", "x": 1}}]}]),
-                   dict(data, rules=[{"label": "r", "then": [{"when": W, "do": BUY, "repeat": True}]}]),
-                   dict(data, rules=[dict(R0, skip="연산 없음: x")]),                  # then 과 skip 같이
-                   dict(data, rules=[{"label": "r", "note": "식 없음"}]),               # then·value·skip 다 없음
-                   dict(data, rules=[dict(R0, on=["Z"])]),                            # on 이 없는 종목
-                   dict(data, rules=[{"then": R0["then"]}]),                         # label 없음
-                   dict(data, rules=[{"label": "r", "then": [{"do": SELL}]}]),     # 판다인데 when 없음
-                   dict(data, rules=[{"label": "r", "value": {"foo": 1}}])):           # 참조 안 된 이름 조건도 문법 검사
-        try:
-            TreeGateway.of(broken)
-            FAILS.append("형식이 틀린 트리가 통과: %r" % sorted(broken))
-        except CondError:
-            pass
-
-
 def main():
-    rng = random.Random(20261001)
+    rng = random.Random(20261001)     # 같은 씨앗 하나를 순서대로 나눠 쓴다(순서 = 옛 검사와 같음)
     for name, fn in (("수치 연산", lambda: t_numeric(rng)), ("3값 논리", t_logic),
                      ("시간 연산", lambda: t_time(rng)), ("하한", t_bounds), ("포지션", lambda: t_pos(rng)),
-                     ("인과성", lambda: t_causal(rng)),
-                     ("문법", t_syntax), ("봉(tf)", t_tf),
+                     ("인과성", lambda: t_causal(rng)), ("봉(tf)", t_tf),
                      ("혼합 tf·확정봉·look-ahead 0", t_settled_mtf),
                      ("등급·금액", t_grade), ("데이터 완전성 가드(워밍업)", t_warmup_guard),
                      ("표현력 회귀", t_regress),
-                     ("트리 출입구 계약", t_gateway),
                      ("수동 답(answers)", t_answers)):
         before = len(FAILS)
         try:
@@ -791,9 +640,9 @@ def main():
     if FAILS:
         for f in FAILS[:30]:
             print("    · " + f)
-        print("원시함수 검사 실패 %d건 — 정지" % len(FAILS))
+        print("계산기 검사 실패 %d건 — 정지" % len(FAILS))
         return 1
-    print("원시함수 검사 통과 — 수치·3값·시간·인과·문법·회귀·출입구")
+    print("계산기 검사 통과 — 수치·3값·시간·인과·봉·등급·회귀·수동 답")
     return 0
 
 

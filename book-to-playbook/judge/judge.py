@@ -2,13 +2,16 @@
 # -*- coding: utf-8 -*-
 """판단자(구간③) — 트리 원본과 시세 원본을 쓰는 유일한 곳. 책의 내용대로 판단하는 일은 여기 한 곳에서만 한다.
 
-  · Judge         책 하나의 판단자 — 트리를 열고(TreeGateway 는 여기서만), 시세를 받고(tradeTool.history 는 여기서만),
+  · Judge         책 하나의 판단자 — 트리를 열고(TreeGateway 는 여기서만), 시세를 받고(history 는 여기서만 — 아래 '시세 받기' 절),
                   상품마다 ProductJudge 를 세운다. 라이브 판정(decisions)·백테스트 신호(signals)를 낸다.
   · ProductJudge  상품 하나의 판단자 — 트리에서 그 상품의 규칙만 골라 시세와 평가한다.
                   등급(grade·latest)·그날 판정(decide → Decision)·조건 설명(views)·보유분 상태(status)·체결 워크가
                   쓸 보유 조건 값(conditions)·가격(price — 체결가·수익률 계산용).
   · Holding       보유 하나의 상태(첫 매수 봉·평단·산 차수·체결 장부) — 값만. 평가는 ProductJudge 가 한다.
   · Decision · Amount · HoldingStatus   판정 사실을 담는 그릇(계산하지 않는다).
+  · 시세 받기     history · history_back · session_closes(일봉 확정 경계) — 시세 원본을 받는 유일한 곳(market 은 트리를 모른다)
+  · 등급         RuleSeries(날짜별 등급·금액·비중·워밍업 가드) · GRADES · GRADE_RULES(grade_rules.json 사다리)
+                 — 식 계산은 계산기 judge/eval(Ctx·series), 문법은 tree/gateway
   · 얼마나(판정의 '얼마나' — 라이브 화면·백테스트가 같이 쓴다, 아래 '얼마나' 절)
       exit_policy · NO_EXIT_NOTE   매도 정책(entry.verify_rules 주인 표 '매도 정책')
       to_units · Ledger · live_units   수량 변환(주인 표 '수량 변환')
@@ -21,11 +24,190 @@ import json
 import os
 from collections import namedtuple
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 
+from market import md_feed
 from shared.paths import positions_json
-from tree.tradeTool import CondError, Ctx, GATES, GRADES, history_back, RuleSeries, series
-from tree.gateway import Branch, Qty, TreeGateway
+from tree.gateway import (
+    Branch, BUY_SIDE, CondError, GATES, labeled, manual_leaves, manual_text, Qty, SELL, TreeGateway, WARMUP_DAYS)
+from judge.eval import Ctx, series
 from judge import explain
+
+
+# ================================================================ 시세 받기 — 판단자만(market 은 트리를 모른다)
+def history(trees, start):
+    """트리(들 — TreeGateway)가 쓰는 모든 심볼의 일봉 {심볼: 일봉} — 수집 단계(md_feed) 하나로 받는다.
+    jhts 는 md_feed 에서만 만진다(팀 경계). 일봉 아닌 봉(tf 1m·5m)은 받지 않는다 — 그 조건은 모름(None)."""
+    syms = set()
+    for t in trees if isinstance(trees, list) else [trees]:
+        syms |= t.symbols()
+    return md_feed.histories(syms, start)
+
+
+def history_back(trees, extra_days=0):
+    """history 를 '지금부터 extra_days + 워밍업(WARMUP_DAYS)일 과거'부터 받는다 — 수집 시작일을 세는 한 곳.
+    백테스트(days)·라이브/재생(0)·검사(365*년 등)가 다 이걸로 부른다(각자 날짜 계산을 복붙하지 않는다)."""
+    start = (datetime.now() - timedelta(days=extra_days + WARMUP_DAYS)).strftime("%Y%m%d")
+    return history(trees, start)
+
+
+def session_closes(symbols, cal, asof):
+    """일봉 확정(settled) 경계 — {심볼: {YYYYMMDD: 그날 정규장 마감(UTC datetime)}}. Ctx 가 장중 asof 에서
+    '마감이 asof 이후'인 일봉(아직 미확정)을 가리는 데 쓴다. 경계는 하드코딩이 아니라 거래소 캘린더
+    (md_feed.sessions)에서 읽는다. asof 가 없으면(라이브 '지금' = 늘 마지막 확정봉) 가릴 것이 없으므로 빈 dict.
+    캘린더가 비면(jhts 미설치·조회 실패) 해당 심볼은 빠진다 → cond 가 '가리지 않음'으로 떨어진다(캘린더 없다고
+    일봉을 조용히 전부 지우지 않게). 시장(US/KR)이 같은 심볼은 캘린더를 한 번만 조회해 공유한다."""
+    import datetime as _dt
+    if asof is None or not cal:
+        return {}
+    start, end = min(cal), max(cal)
+    by_market = {}      # market → {YYYYMMDD: 마감 UTC}
+    out = {}
+    for sym in sorted(set(symbols)):
+        mkt = md_feed.market_of(sym)
+        if mkt is None:
+            continue
+        if mkt not in by_market:
+            by_market[mkt] = {s.date: s.close.astimezone(_dt.timezone.utc)
+                              for s in md_feed.sessions(mkt, start, end) if s.close is not None}
+        closes = by_market[mkt]
+        if closes:
+            out[sym] = closes
+    return out
+
+
+# ================================================================ 등급 — 등급의 뜻(트리 → 날짜별 등급·금액·비중)
+# 트리의 '뜻'을 날짜별 등급으로 내는 곳은 여기 한 벌뿐이다.
+#   등급 (동사 둘 — 사다리는 grade_rules.json):
+#     안 산다 갈래 하나라도 참 → ⛔ 안 산다 · 산다 갈래 하나라도 참 → ✅ 산다 · 둘 다 아님 → ⚪ 관망
+#   수동(manual) 조건은 '확인됨/안 됨' 두 번 평가한다:
+#     안 돼도 산다(비관) → ✅ · 확인돼야 산다(낙관만) → 🟡 확인 대기 · 데이터 부족으로 못 정함 → ❔ 판정 불가
+#     비관 = 산다의 수동은 거짓, 안 산다의 수동은 참 / 낙관 = 그 반대(BUY_SIDE).
+#   얼마나·판다:
+#     weight   산다 qty cash = 총 투자금 대비 비중(%) · tranches = 산다 qty budget 분할(2차 이후는 포지션 값으로)
+#     sells    판다 — 보유분이 있을 때만 평가(구간③ trading)
+#
+#   판정은 봉이 끝난 직후(그날까지의 봉)로 낸다 — cond 연산이 전부 인과적이라 전체 이력을 한 번 계산해
+#   날짜로 꺼내도 미래를 보지 않는다(judge.verify_eval 이 강제).
+#
+#   트리는 원본 dict 가 아니라 TreeGateway(tree/gateway.py — 트리를 읽는 유일한 출입구)로 받는다.
+#   같은 뜻을 만드는 쪽(authoring.extract.verify_tree 의 사례·authoring.extract.compare 의 a/b 비교)과 읽는 쪽(구간③ 판정·백테스트)이 함께 쓴다 — 화면용 설명(view·
+#   측정 증거)은 판단자(judge/judge·explain)가 이 평가 문맥으로 빚는다 — 화면은 그리기만.
+GRADES = {
+    "buy": "✅ 산다",
+    "confirm": "🟡 확인 대기",
+    "avoid": "⛔ 안 산다",
+    "wait": "⚪ 관망",
+    "unknown": "❔ 판정 불가",
+}
+# 등급 판정 사다리의 '뜻'은 코드가 아니라 데이터(judge/grade_rules.json)에 있다 — 규칙을 바꾸면
+# 거기 한 곳만 고친다. 등급을 내는 곳은 grade_key 하나 — 화면은 판정 JSON 의 key 를 그대로 그린다(서버 권위:
+# 사람이 답한 수동도 서버가 Ctx answers 로 풀어 등급을 다시 낸다).
+GRADE_RULES = json.load(
+    open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "grade_rules.json"), encoding="utf-8"))
+
+
+class RuleSeries:
+    """한 상품의 등급 동사(안 산다·산다)·비중을 전체 달력에 대해 한 번 계산해 둔다."""
+
+    def __init__(self, tree, product, prices, days, asof=None, answers=None):
+        """tree = 트리 출입구(TreeGateway) · product = 판정할 상품 — 그 상품의 규칙을 골라 평가한다. asof = 관측 시각(UTC datetime) — 일봉은 asof 이하
+        확정(settled) 봉만 본다(미확정 그날 일봉은 None). None 이면 실제 지금(일봉은 마지막 확정봉).
+        answers = 사람이 답한 수동 {answer_key: 참/거짓} — 등급·금액·비중이 그 답으로 풀린다(서버 권위).
+        None 이면 옛 동작 그대로."""
+        self.tree, self.product, self.days, self.prices = tree, product, list(days), prices
+        self.index = tree.index(product)
+        sc = session_closes(tree.symbols([product]), list(days), asof)
+        mk = lambda m: Ctx(prices, days, product, self.index, manual_as=m, asof=asof, session_close=sc, answers=answers)
+        self.ctx = {True: mk(True), False: mk(False), None: mk(None)}
+        s = lambda node, m: series(node, self.ctx[m])
+        self.opt = {do: s(tree.gate(product, do), BUY_SIDE[do]) for do in GATES}
+        self.pes = {do: s(tree.gate(product, do), not BUY_SIDE[do]) for do in GATES}
+        w = tree.weight(product).qty.x                # 비중 식(Qty "cash") — None = 저자 미명시
+        self.weight = {m: (s(w, m) if w is not None else None) for m in (None, True, False)}
+        # 데이터 완전성 가드 — 이 상품 등급이 실제로 쓰는 가장 긴 워밍업(트리에서 파생, 하드코딩 아님).
+        #   그보다 '확정 봉'이 적은 초기 구간의 1d 신호는 창이 덜 차 조용히 None/틀릴 수 있어 신뢰불가다
+        #   → grade_key 가 '불완전 데이터(❔ 보류)'로 표시한다(✅/🚫 확신 금지). WARMUP_DAYS(fetch 버퍼)와 무관.
+        self.warmup = tree.warmup(product)
+        # 심볼 확정봉 지도 — asof 장중이면 오늘 미확정 봉을 뺀 '마지막 확정 index'(없으면 전부 확정 = 항등).
+        #   여러 심볼을 보면 가장 적게 확정된 심볼(지연된 feed)이 기준이다 — 하나라도 모자라면 불완전.
+        self._confirmed = self._confirmed_index_map()
+
+    def _confirmed_index_map(self):
+        """날짜별 '이 상품 등급이 쓰는 모든 심볼이 확정한 봉 수 − 1'(= 확정 index). 어떤 심볼이 그 index 를
+        아직 확정 못 했으면(지연된 feed·asof 장중 미확정) 그 심볼 기준으로 낮춘다. 확정봉이 하나도 없으면 -1.
+        캘린더가 없거나 asof 가 없으면(라이브 지금) settled_map 이 no-op(None) → 날짜 index 그대로(항등)."""
+        ctx = self.ctx[None]
+        syms = sorted(set(self.tree.symbols([self.product])) | {self.product})
+        maps = [ctx.settled_map(s) for s in syms]
+        out = []
+        for day in range(len(self.days)):
+            idxs = []
+            for m in maps:
+                idxs.append(day if m is None else m[day])   # None map = 가리지 않음(항등)
+            out.append(-1 if any(x is None for x in idxs) else min(idxs))
+        return out
+
+    def incomplete(self, day):
+        """그날(day) 1d 등급이 '불완전 데이터'인가 — 확정 봉이 필요 워밍업보다 적으면 True.
+        확정 index(가장 늦은 심볼 기준)가 warmup 미만이면 가장 긴 창이 덜 차 신호가 신뢰불가다."""
+        return self._confirmed[day] < self.warmup
+
+    # ---------------------------------------------------------------- 등급
+    def grade_key(self, day):
+        # 데이터 완전성 가드 — 워밍업이 모자란 봉은 확신 판정을 내지 않고 '판정 불가(불완전 데이터)'로 둔다.
+        #   (조용히 None 이 섞인 opt/pes 로 ✅/🚫 를 내면 모르고 매매하게 된다 — 정직성 원칙.)
+        if self.incomplete(day):
+            return "unknown"
+        # grade_rules.json 을 위에서 아래로 본다 — when 의 모든 동사가 맞는 첫 규칙이 이긴다.
+        # 값은 3값(True/False/None) — 'is' 로 정확히 맞춘다(None 은 True·False 어디에도 안 맞는다).
+        views = {"opt": self.opt, "pes": self.pes}
+        for rule in GRADE_RULES["rules"]:
+            view = views[rule["view"]]
+            if all(view[do][day] is want for do, want in rule["when"].items()):
+                return rule["key"]
+        return GRADE_RULES["default"]
+
+    # ---------------------------------------------------------------- 비중
+    def weight_of(self, day):
+        """그날 비중(%) — 수동 때문에 모르면 (None, [가능한 값들]) 로 범위를 함께 돌려준다."""
+        if self.weight[None] is None:
+            return None, None
+        v = self.weight[None][day]
+        if v is not None:
+            return v, None
+        alt = sorted({x for x in (self.weight[True][day], self.weight[False][day]) if x is not None})
+        return None, alt or None
+
+    # ---------------------------------------------------------------- 설명
+    def explain(self, day):
+        """라벨 달린 노드의 그날 값 — 수동은 '모름'(None)으로 둔 평가. {동사: [(label, ref, 값)]}"""
+        return {do: [(n.get("label"), n.get("ref"), series(n, self.ctx[None])[day])
+                     for n in labeled(self.tree.gate(self.product, do))] for do in GATES}
+
+    def top(self, day):
+        """동사마다 맨 위 라벨 노드들의 그날 값(사유 문장용 — 안쪽 노드까지 늘어놓으면
+        not 아래의 '거짓 = 정상' 노드가 '미충족'으로 읽힌다). 수동은 모름(None)."""
+        return {do: [(n.get("label"), n.get("ref"), series(n, self.ctx[None])[day])
+                     for n in _top_labeled(self.tree.gate(self.product, do))] for do in GATES}
+
+    def manual_items(self, day=None):
+        """사람 확인이 필요한 조건 [(동사, 라벨, ref)] — 판다(보유분)는 뺀다."""
+        return [(z, n.get("label") or manual_text(n), n.get("ref"))
+                for z, _l, _r, node in self.tree.expressions(self.product) if z != SELL for n in manual_leaves(node)]
+
+
+def _top_labeled(node):
+    """라벨 달린 가장 바깥 노드들. all/any/atleast 는 펼치고, not 아래는 들어가지 않는다."""
+    if not isinstance(node, dict):
+        return []
+    if node.get("label"):
+        return [node]
+    kids = node.get("all") or node.get("any") or (node.get("of") if "atleast" in node else None) or []
+    out = []
+    for k in kids:
+        out.extend(_top_labeled(k))
+    return out
 
 
 # ================================================================ 결과 그릇
@@ -200,9 +382,9 @@ def size_notes(counts):
 
 # ================================================================ 상품 하나
 class ProductJudge:
-    """상품 하나의 판단자 — 생성 때 그 상품 규칙을 달력 전체로 한 번 계산해 둔다(tradeTool.RuleSeries).
+    """상품 하나의 판단자 — 생성 때 그 상품 규칙을 달력 전체로 한 번 계산해 둔다(RuleSeries).
     tree = 트리 출입구 · product = 상품 · prices = 시세 묶음(Judge 가 받은 것) · days = 판정 달력(생략 = 이 상품 봉 날짜)
-    · asof = 관측 시각(UTC datetime, None 이면 지금) · answers = 사람이 답한 수동 {tradeTool.answer_key: 참/거짓}."""
+    · asof = 관측 시각(UTC datetime, None 이면 지금) · answers = 사람이 답한 수동 {tree.gateway.answer_key: 참/거짓}."""
 
     def __init__(self, tree, product, prices, days=None, asof=None, answers=None):
         self._tree, self.product = tree, product
@@ -351,7 +533,7 @@ class ProductJudge:
 
 # ================================================================ 책 하나
 class Judge:
-    """책 하나의 판단자 — 트리 원본(TreeGateway)·시세 원본(tradeTool.history)을 쓰는 유일한 곳.
+    """책 하나의 판단자 — 트리 원본(TreeGateway)·시세 원본(history)을 쓰는 유일한 곳.
     Judge.open(slug) 으로 열고, prices() 로 시세를 받아(또는 여러 책 공유 조회를 넘겨받아) 판정을 낸다."""
 
     def __init__(self, slug, tree):

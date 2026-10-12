@@ -47,9 +47,10 @@ from collections import namedtuple
 
 from shared import paths  # noqa: F401  (UTF-8 출력)
 from shared.paths import book_file, live_slugs, source_index_json
-from tree.tradeTool import (
-    BLOCK, BUY, CondError, GATES, is_compact, is_manual, labeled, manual_leaves, manual_text, META, SELL,
-    _top_labeled, UNKNOWN, VERBS)
+from tree.gateway import (
+    BLOCK, BUY, CondError, GATES, is_compact, is_manual, labeled, manual_leaves, manual_text, META, SELL, UNKNOWN,
+    VERBS)
+from judge.judge import _top_labeled
 from market import md_feed
 from judge.judge import Holding, Judge
 from authoring.extract.compare import (COMPARED, compare, evaluate, factorable, history, logic_key,
@@ -397,13 +398,13 @@ def check_book(slug, years):
     if tree is None:
         print("  ❌ tree.json 없음 — 라이브 책은 조건 트리로만 판정한다")
         return ["%s 트리 없음" % slug], []
-    # 00. 직렬화 형식 정지 — 구간② 파일은 공통 직렬화(tradeTool.compact_json)로만 쓴다(줄 수를 부풀리지 않게)
+    # 00. 직렬화 형식 정지 — 구간② 파일은 공통 직렬화(tree.gateway.compact_json)로만 쓴다(줄 수를 부풀리지 않게)
     loose = [n for n in ("tree.json", "tree_candidates/a.json", "tree_candidates/b.json", "tree_candidates/a.rules.json",
                          "tree_candidates/b.rules.json", "scenarios.json")
              if os.path.exists(book_file(slug, n)) and not is_compact(book_file(slug, n))]
     if loose:
         stop.append("%s 공통 직렬화 아님 %d개" % (slug, len(loose)))
-        print("  ❌ 공통 직렬화가 아닌 파일 %s — 쓴 사람이 python -m tree.tradeTool fmt <파일> 로 다시 쓴다" % loose)
+        print("  ❌ 공통 직렬화가 아닌 파일 %s — 쓴 사람이 python -m tree.gateway fmt <파일> 로 다시 쓴다" % loose)
     # 0. 이름 없는 수동 조건 정지 — 체크리스트가 조용히 사라지거나 '수동 확인'으로만 뜨면 안 된다
     nameless = _nameless_manual(tree.tree.conditions())
     if nameless:

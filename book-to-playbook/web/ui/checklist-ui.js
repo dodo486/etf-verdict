@@ -3,10 +3,10 @@
   /* ============================================================
      실전 체크리스트 — 조건 트리 판정 결과(#verdict-data)만 그린다 (책 무관 · 종목 하드코딩 없음)
      · 트리를 직접 읽지 않는다. 판정 화면 데이터(web/verdict_view)가 낸 동사별 설명(view)을 그대로 그린다.
-     · 머리글은 동사 셋(VD.verbs = ① 안 산다 ② 산다 ③ 판다, 정본 tree/tradeTool.VERBS) + ④ 얼마나(비중·분할).
+     · 머리글은 동사 셋(VD.verbs = ① 안 산다 ② 산다 ③ 판다, 정본 tree/gateway.VERBS) + ④ 얼마나(비중·분할).
      · 사람이 체크하는 건 수동(✋) 조건뿐이다. 체크하면 그 답을 서버(POST /api/verdict)에 보내고, 서버가 답까지
        반영해 낸 판정(등급·동사 값·금액)을 그대로 다시 그린다 — 서버 권위. 화면은 등급·3값 논리를 계산하지 않는다
-       (평가기는 tree/tradeTool.py 한 벌). 서버 없이 열면 체크는 저장되지만 판정은 바뀌지 않는다(그렇다고 알린다).
+       (계산기는 judge/eval.py 한 벌). 서버 없이 열면 체크는 저장되지만 판정은 바뀌지 않는다(그렇다고 알린다).
      ============================================================ */
 
   /* ---- 탭 전환 ---- */
@@ -32,10 +32,10 @@
   // 수동 조건 답은 그날(판정일) 것만 쓴다 — 어제 체크가 오늘 판정에 섞이지 않게.
   function answers(){ const k = (VD && VD.slug || '') + ':' + (VD && VD.date || ''); store.ans = store.ans || {}; store.ans[k] = store.ans[k] || {}; return store.ans[k]; }
 
-  // 수동 답 열쇠 — 서버(tree/tradeTool.answer_key)와 같은 규칙: 상품(path 앞머리) + '|' + 본체. 본체는 "?" 식이면
+  // 수동 답 열쇠 — 서버(tree/gateway.answer_key)와 같은 규칙: 상품(path 앞머리) + '|' + 본체. 본체는 "?" 식이면
   //   엔진이 준 식 열쇠(it.mkey), 문장 수동은 그 문장. 화면은 이 열쇠로 답을 모아 보낼 뿐 — 값 계산은 서버다.
   function mkey(it, path){ return path.split('.')[0] + '|' + (it.mkey || it.manual); }
-  // 등급 글자표는 엔진이 판정 JSON(VD.grades, = tree/tradeTool.GRADES)에 실어보낸다 — 화면은 받아 쓴다.
+  // 등급 글자표는 엔진이 판정 JSON(VD.grades, = judge/judge.GRADES)에 실어보낸다 — 화면은 받아 쓴다.
   // 고치는 곳은 파이썬 한 곳. 혹시 없으면 키 그대로 보여 깨지지 않게.
   const GR = k => ((VD && VD.grades) || {})[k] || k;
   const GCLS = {buy:'go', confirm:'small', unknown:'small', avoid:'no', wait:''};

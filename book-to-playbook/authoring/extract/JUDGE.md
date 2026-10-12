@@ -19,7 +19,7 @@
 
 - 입력: **원문**(책 소스) · 플레이북 · 후보 `tree_candidates/<a|b>.json` · 규칙 목록 `tree_candidates/<a|b>.rules.json`
   (규칙·`source_text`·`note`) · `scenarios.json`(채점용 정답지) · `COND_DSL.md` · 이 문서.
-- 산출물: `books/<slug>/tree.json` 하나(규칙마다 `why`) → `python -m tree.tradeTool fmt <파일>`. `version` 은 3.
+- 산출물: `books/<slug>/tree.json` 하나(규칙마다 `why`) → `python -m tree.gateway fmt <파일>`. `version` 은 3.
 - a·b·사례·코드·문서는 고치지 않는다. git 기록은 보지 않는다.
 
 ## 2. 비교 도구 — 무엇이 다른지 본다(도구는 계산만, 판단은 너)
@@ -70,7 +70,7 @@ a·b 둘 다 원문에 어긋나진 않는데 갈린 경우(원문이 그 선택
 
 | 정지 | 뜻 | 고칠 곳 |
 |---|---|---|
-| 공통 직렬화 아님 | `fmt` 를 안 거침 | `python -m tree.tradeTool fmt <파일>` |
+| 공통 직렬화 아님 | `fmt` 를 안 거침 | `python -m tree.gateway fmt <파일>` |
 | 미심판 불일치 | 식이나 판정이 다른 규칙(수동 차이 포함)에 `why` 없음 | 그 규칙에 원문 근거로 `why` |
 | 같은 식 두 벌 | 같은 측정이 두 규칙에 각자(값이 같음) | 이름 하나로, 다른 규칙은 `{"rule"}` 참조 |
 | 같은 이름 다른 식 | 다른 두 측정이 한 이름 | a·b 의 이름 중 서로 다른 것으로 가른다 |

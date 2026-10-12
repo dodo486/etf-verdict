@@ -11,7 +11,7 @@
   식 → 글 규칙(종가·k일 전·모두{}·«이름» 등)은 여기 한 곳."""
 import re
 
-from tree.tradeTool import CondError, META, _op_of, UNKNOWN
+from tree.gateway import CondError, META, _op_of, UNKNOWN
 
 PX = {"open": "시가", "high": "고가", "low": "저가", "close": "종가", "volume": "거래량"}
 POS = {"ret": "보유수익률%", "days": "보유일", "maxret": "최고수익%", "minret": "최저수익%",

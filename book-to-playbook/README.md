@@ -24,7 +24,7 @@
 | `산다` | 살 자리인가 · 얼마나(`qty` cash = 비중 % · budget = 분할 비율) | 참 → ✅ 산다 · 둘 다 아님 → ⚪ 관망 |
 | `판다` | 보유분을 언제 얼마나 팔까(`qty` bought·held) | 걸리면 다음 봉 시가 매도 · 내 포지션(로컬 파일) 기준 판정 |
 
-수동 조건 때문에 정해지지 않으면 🟡 확인 대기, 데이터가 모자라면 ❔ 판정 불가(사다리 정본 `tree/grade_rules.json`).
+수동 조건 때문에 정해지지 않으면 🟡 확인 대기, 데이터가 모자라면 ❔ 판정 불가(사다리 정본 `judge/grade_rules.json`).
 여러 규칙이 같이 보는 측정(장전 점수·모드 등)은 **이름 하나로** 두고 `{"rule": 이름}` 으로 참조한다(화면은 on 없는 규칙을
 '공통 시장 신호'로 한 번 모은다). 조건의 신원은 식이다 — 저자가 숫자를 안 준 조건도 식으로 쓰고 그 숫자 자리만
 `"?"`(사람이 판단 — 🟡). 식으로 쓸 수 없는 것만 문장 수동: `저자 미명시: …(정성)` · `데이터 없음:`(수집·연결 과제) ·
@@ -80,9 +80,10 @@ python -m entry.serve                                           # 로컬 실시�
 | `authoring/extract/COND_DSL.md` | 트리 문법(트리를 쓰는 추출자·심판의 참고서) |
 | `authoring/extract/verify_tree.py` | 트리 채점(트리를 만들지 않음) · `--quick` 트리 계약(소절·트리 문법·ref) |
 | `authoring/extract/compare.py` | 심판 비교 도구(a·b 덤프) · '같은 뜻' 잣대(채점기도 이것으로) |
-| 각 층의 `verify_*.py` | 검사 — 검사하는 대상 옆에 둔다(`tree/verify_primitives` · `judge/verify_view` · `backtest/verify_trading` · `web/verify_page` · `entry/verify_rules` 등). 전부 한 번에 `python -m entry.run check` |
+| 각 층의 `verify_*.py` | 검사 — 검사하는 대상 옆에 둔다(`tree/verify_gateway` · `judge/verify_eval` · `judge/verify_view` · `backtest/verify_trading` · `web/verify_page` · `entry/verify_rules` 등). 전부 한 번에 `python -m entry.run check` |
 | `web/ui/*.js` · `web/inject_ui.py` | 화면 JS(책 무관 공유) · 페이지 주입 |
-| `tree/gateway.py` · `tradeTool.py` | 구간② 공개 DSL — 트리 출입구 · 문법·평가기(validate·series) · 등급의 뜻(RuleSeries — 등급·금액·비중·워밍업) · 시세 조달(history) |
+| `tree/gateway.py` | 구간② 공개 DSL — 트리 언어(문법 validate·동사 VERBS·워밍업·공통 직렬화) · 트리 출입구(TreeGateway) |
+| `judge/eval.py` · `judge/judge.py` | 계산기(Ctx·series — 트리 식에 시세를 넣어 계산) · 등급의 뜻(RuleSeries — 등급·금액·비중·워밍업 가드, +`grade_rules.json`) · 시세 받기(history) |
 | `judge/judge.py` · `entry/live.py` · `backtest/{trades,portfolio,runner}.py` · `entry/notify.py{telegram,desktop}.py` | ① 신호(판단자 Judge · 라이브 버스 조립) · ② 백테스트 소비(체결·vectorbt 돈·러너) · ② 알림 소비 |
 | `market/md_feed.py` | **jhts 시세 창구 — 유일한 수집 입구**(없으면 수집 요청) |
 | `web/verdict_view.py` · `entry/notify.py{telegram,desktop}.py` | 판정 JSON·알림 문장(books.json engine.daily) · 알림 송신(텔레그램·데스크톱) |

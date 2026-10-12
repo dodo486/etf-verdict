@@ -61,7 +61,7 @@
 - 산출물 둘(`books/<slug>/tree_candidates/`, 둘 다 v3):
   1. **규칙 목록** `<a|b>.rules.json` — 원문 판단 → 규칙의 상하위를 사람이 읽게 적은 것(3.1절). 먼저 쓴다.
   2. **트리** `<a|b>.json` — 규칙 목록을 `COND_DSL.md` 1·5절 문법으로 옮긴 것. 규칙 목록과 1:1.
-- 둘 다 쓴 뒤 `python -m tree.tradeTool fmt <파일>`(`COND_DSL.md` 5절).
+- 둘 다 쓴 뒤 `python -m tree.gateway fmt <파일>`(`COND_DSL.md` 5절).
 
 ### 3.1 규칙 목록 형식 (`<a|b>.rules.json`)
 
