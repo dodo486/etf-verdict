@@ -8,7 +8,7 @@
 """
 import os, re
 import json
-from shared.paths import BASE, backtest_json, book_file, playbook_html, read_text, source_index_json
+from shared.paths import backtest_json, book_file, playbook_html, read_text, source_index_json
 
 VERDICT_RE = re.compile(
     r'(<script type="application/json" id="verdict-data">)(.*?)(</script>)', re.S)
@@ -62,7 +62,7 @@ def _inject_backtest(html, slug):
     데이터가 없는 책은 탭을 만들지 않는다(빈 탭을 보이지 않는다). 다시 발행하면 이전 주입분을 갈아끼운다."""
     html = re.sub(re.escape(BACKTEST_BEGIN) + r".*?" + re.escape(BACKTEST_END) + r"\n?", "", html, flags=re.S)
     data_p = backtest_json(slug)
-    ui_p = os.path.join(BASE, "web", "ui", "backtest-ui.js")
+    ui_p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui", "backtest-ui.js")   # 공유 UI 와 같은 폴더
     if not (os.path.exists(data_p) and os.path.exists(ui_p)):
         return html
     body = read_text(data_p).replace("</", "<\\/")
