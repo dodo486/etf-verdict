@@ -94,13 +94,16 @@ def to_units(q, led):
             "bought": lambda: q.x * led.bought, "held": lambda: q.x * led.held}[q.of]()
 
 
-def sell_text(q):
-    """매도 수량(Qty)의 사람 문장 — 화면이 basis 를 다시 해석하지 않게 여기서 빚는다."""
+def sell_text(q, repeat=False):
+    """매도 수량(Qty)의 사람 문장 — 화면이 basis 를 다시 해석하지 않게 여기서 빚는다. repeat = 다시 맞을 때마다."""
+    again = " · 다시 맞을 때마다" if repeat else ""
     if q.x is None:
-        return ("산 물량의 " if q.of == "bought" else "남은 물량의 ") + "? (비율 저자 미명시)"
+        return ("산 물량의 " if q.of == "bought" else "남은 물량의 ") + "? (비율 저자 미명시)" + again
     if q.of == "held" and q.x == 1:
-        return "남은 전량"
-    return ("산 물량의 " if q.of == "bought" else "남은 물량의 ") + "%d%%" % round(q.x * 100)
+        return "남은 전량" + again
+    if not isinstance(q.x, (int, float)):
+        return ("산 물량의 " if q.of == "bought" else "남은 물량의 ") + "식으로 정한 비율" + again
+    return ("산 물량의 " if q.of == "bought" else "남은 물량의 ") + "%d%%" % round(q.x * 100) + again
 
 
 def live_units(a, q=None):

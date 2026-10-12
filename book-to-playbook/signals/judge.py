@@ -113,7 +113,7 @@ class Judge:
     def amount(self, i):
         """i 번째 봉의 Amount — 라이브 Decision 과 백테스트 매수 크기가 같이 쓰는 단 하나의 '얼마나' 경로."""
         w, alt = self.pe.weight_of(i)
-        return Amount(w, alt, self.gw.weight(self.prod).qty.x is not None)
+        return Amount(w, alt, self.pe.weight[None] is not None)   # 비중 식이 있나 — 평가기가 이미 세운 값으로(트리를 다시 묻지 않는다)
 
     def latest(self):
         """(등급 키, 종가) — 달력 마지막 봉(라이브 '지금'). 시세가 없으면 ("unknown", None)."""

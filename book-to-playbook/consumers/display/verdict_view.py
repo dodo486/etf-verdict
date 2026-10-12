@@ -90,7 +90,7 @@ def _rule_views(gw, p, a=None):
                        "tranches": [{"label": t.label, "ref": t.ref, "frac": t.qty.x,
                                      "units": a and live_units(a, t.qty), "conditional": t.when is not None,
                                      "view": _static_view(t.when, index)} for t in gw.tranches(p)]},
-            "sells": [{"label": r.label, "ref": r.ref, "allprod": r.allprod, "sell": sell_text(r.qty),
+            "sells": [{"label": r.label, "ref": r.ref, "allprod": r.allprod, "sell": sell_text(r.qty, r.repeat),
                        "note": r.note, "view": _static_view(r.when, index)} for r in gw.sells(p)],
             "exit_policy": exit_policy(gw, p)}
 
@@ -129,7 +129,7 @@ def _holding_view(hs, i):
     if hs.error:
         return {"error": hs.error}
     out = {"ret": hs.ret, "days": hs.days,
-           "sells": [{"label": r.label, "ref": r.ref, "sell": sell_text(r.qty), "v": v, "view": cv._view(r.when, hs.ctx, i)}
+           "sells": [{"label": r.label, "ref": r.ref, "sell": sell_text(r.qty, r.repeat), "v": v, "view": cv._view(r.when, hs.ctx, i)}
                      for r, v in hs.sells]}
     nt = hs.next_tranche
     out["next_tranche"] = None if nt is None else {

@@ -65,8 +65,9 @@ def _describe_operand(e):
     if op == "barssince":
         return "마지막 참 이후 일수"
     if op == "pos":
-        return {"ret": "수익률(%)", "days": "보유일", "maxret": "최고수익(%)",
-                "minret": "최저수익(%)"}.get(e["pos"], "포지션")
+        return {"ret": "수익률(%)", "days": "보유일", "maxret": "최고수익(%)", "minret": "최저수익(%)",
+                "filled": "산 횟수" + ("(%s)" % e["rule"] if e.get("rule") else ""),
+                "sold": "판 비율"}.get(e["pos"], "포지션")
     if op == "valuewhen":                        # 그 조건이 마지막으로 참이던 날의 값
         return _describe_operand(e["valuewhen"][1]) + "(최근 신호일)"
     if op in ("minsince", "maxsince"):           # 신호 이후 최저/최고
@@ -87,7 +88,7 @@ def _unit_of(e):
     if op == "div":
         return "배"
     if op == "pos":
-        return "일" if e["pos"] == "days" else "%"
+        return {"days": "일", "filled": "회", "sold": ""}.get(e["pos"], "%")
     return ""
 
 

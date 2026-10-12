@@ -73,9 +73,9 @@ def _num(x):
     return None if x in ("?", None) else x
 
 
-def _qty(q, default=None):
-    """트리 qty {of, x} → Qty(of, x) — x "?" 는 None. qty 가 없으면 default."""
-    return Qty(q.get("of"), _num(q.get("x"))) if q else default
+def _qty(q, default=None, expand=lambda x: x):
+    """트리 qty {of, x} → Qty(of, x) — x "?" 는 None, 식이면 펼친 식(expand). qty 가 없으면 default."""
+    return Qty(q.get("of"), _num(expand(q.get("x")))) if q else default
 
 
 class TreeGateway:
@@ -180,6 +180,25 @@ class TreeGateway:
             return {k: (v if k in Cond.META else self._sub_value(v, val)) for k, v in node.items()}
         return node
 
+    def _x_of(self, r):
+        """규칙 r 의 qty.x 를 평가기가 먹을 모양으로 — 식이면 {"rule"}·이름 심볼을 펼치고 "$value" 를 r 의 value 로."""
+        def ex(x):
+            if not isinstance(x, (dict, list)):
+                return x
+            x = self._expand(x)
+            return self._sub_value(x, self._expand(r["value"])) if "value" in r else x
+        return ex
+
+    def _on(self, r):
+        """규칙의 대상 상품 — on 의 이름 심볼은 실제 종목으로 펼친다(생략 = None → 전부)."""
+        on = r.get("on")
+        if not on:
+            return None
+        out = set()
+        for x in on:
+            out.update(self._syms_of(x) if x in self._names else [x])
+        return out
+
     def _when_of(self, r, t):
         """규칙 r 의 갈래 t 의 when 을 평가기가 먹을 모양으로 — {"rule"}·이름심볼 펼치고 `"$value"` 를 r 의 value 로 치환."""
         w = t.get("when")
@@ -195,8 +214,8 @@ class TreeGateway:
         for r in self._d.get("rules", []):
             if "then" not in r:
                 continue
-            on = r.get("on")
-            if not on or prod in on:
+            on = self._on(r)
+            if on is None or prod in on:
                 yield r
 
     # ---------------------------------------------------------------- 형식 검사 (v3, 느슨)
@@ -256,12 +275,16 @@ class TreeGateway:
                 raise Cond.CondError("규칙 %r: on 의 %s 가 products·names 에 없다" % (lab, bad_on))
             if "then" in r and not (isinstance(r["then"], list) and r["then"]):
                 raise Cond.CondError("규칙 %r: then 은 갈래 목록이어야 한다" % lab)
+            if "value" in r:                       # 이름 조건은 참조되지 않아도 문법을 본다
+                Cond.validate(self._expand(r["value"]), "규칙 %r value" % lab)
             for k, t in enumerate(r.get("then") or []):
                 where = "규칙 %r 갈래 %d" % (lab, k)
                 self._keys(t, BRANCH_KEYS, where)
                 do = t.get("do")
                 if do not in Cond.VERBS:
                     raise Cond.CondError("%s: 모르는 동사 %r (허용 %s)" % (where, do, " · ".join(Cond.VERBS)))
+                if "when" not in t and not (do == BUY and t.get("qty")):
+                    raise Cond.CondError("%s: when(조건)이 필요하다(조건 없는 갈래는 산다의 비중·1차 분할뿐)" % where)
                 if "repeat" in t and (t["repeat"] is not True or do != SELL):
                     raise Cond.CondError("%s: repeat 은 판다 갈래에 true 로만(산다·안 산다의 반복은 연산 없음)" % where)
                 q = t.get("qty")
@@ -270,7 +293,7 @@ class TreeGateway:
                     if q.get("of") not in QTY_OF.get(do, ()):
                         raise Cond.CondError("%s: %s 갈래의 qty 종류는 %s (받은 값 %r)"
                                              % (where, do, " · ".join(QTY_OF.get(do, ())) or "없음", q.get("of")))
-                    Cond.validate(q.get("x"), where + " qty.x")
+                    Cond.validate(self._x_of(r)(q.get("x")), where + " qty.x")
 
     # ---------------------------------------------------------------- 책·상품
     def _p(self, prod):
@@ -287,9 +310,6 @@ class TreeGateway:
 
     def note(self, prod):
         return self._p(prod).get("note")
-
-    def book(self, default=None):
-        return default
 
     def skips(self):
         """못 옮긴 규칙(skip) [{rule, ref, reason}]."""
@@ -323,18 +343,20 @@ class TreeGateway:
     def weight(self, prod):
         """비중 — 산다 갈래 중 qty cash 의 첫 갈래(Qty cash). 없으면 qty.x None 인 빈 Rule."""
         for r, t in self._qty_branches(prod, BUY, "cash"):
-            return Rule(r.get("label"), r.get("ref"), qty=_qty(t["qty"]))
+            return Rule(r.get("label"), r.get("ref"), r.get("note"), qty=_qty(t["qty"], expand=self._x_of(r)))
         return Rule(qty=Qty("cash", None))
 
     def tranches(self, prod):
         """분할 차수 — 산다 갈래 중 qty budget. 1차(산횟수 조건 없는 것)는 when None."""
-        return [Rule(r.get("label"), r.get("ref"), when=self._when_of(r, t), qty=_qty(t["qty"]), allprod=not r.get("on"))
+        return [Rule(r.get("label"), r.get("ref"), r.get("note"), when=self._when_of(r, t),
+                     qty=_qty(t["qty"], expand=self._x_of(r)), allprod=not r.get("on"))
                 for r, t in self._qty_branches(prod, BUY, "budget")]
 
     def sells(self, prod):
         """판다 갈래 [Rule(when, qty bought/held)] — qty 없으면 남은 전량. 없으면 [](trades.exit_policy 가 정책을 정한다)."""
-        return [Rule(r.get("label"), r.get("ref"), when=self._when_of(r, t), qty=_qty(t.get("qty"), Qty("held", 1.0)),
-                     allprod=not r.get("on"), repeat=bool(t.get("repeat")))
+        return [Rule(r.get("label"), r.get("ref"), r.get("note"), when=self._when_of(r, t),
+                     qty=_qty(t.get("qty"), Qty("held", 1.0), self._x_of(r)), allprod=not r.get("on"),
+                     repeat=bool(t.get("repeat")))
                 for r, t in self._qty_branches(prod, SELL)]
 
     def expressions(self, prod):
@@ -411,8 +433,10 @@ class TreeGateway:
         return mx
 
     def refs(self):
+        """트리가 근거로 단 원문 소절 전부 — 규칙·상품·이름 심볼의 ref("·" 로 여럿)."""
         out = set()
-        for r in self._d.get("rules", []):
+        items = list(self._d.get("rules", [])) + list(self._d["products"].values()) + list(self._names.values())
+        for r in items:
             rf = r.get("ref")
             if isinstance(rf, str):
                 out.update(x.strip() for x in rf.replace(",", "·").split("·") if x.strip())
@@ -453,6 +477,16 @@ class TreeGateway:
         """이름 심볼 {이름: [종목…]} (펼치기 전 원본 — 검사기가 "?" 남음을 본다)."""
         return {k: list((v or {}).get("syms") or []) for k, v in self._names.items()}
 
-    # ---------------------------------------------------------------- 원본 그대로(검사기의 전체 훑기 전용)
-    def whole(self):
-        return self._d
+    def conditions(self):
+        """트리에 적힌 조건식 전부(펼치기 전, 적힌 그대로) — 규칙의 value·갈래 when·qty 식. 검사기가 수동 잎의
+        이름·사유를 훑는 용도(파일 키는 모른 채 조건 문법만 본다)."""
+        out = []
+        for r in self._d.get("rules", []):
+            if "value" in r:
+                out.append(r["value"])
+            for t in r.get("then", []):
+                if "when" in t:
+                    out.append(t["when"])
+                if isinstance((t.get("qty") or {}).get("x"), dict):
+                    out.append(t["qty"]["x"])
+        return out

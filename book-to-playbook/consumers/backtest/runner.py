@@ -31,7 +31,7 @@ import statistics
 import sys
 from datetime import datetime, timedelta
 
-from shared.paths import book_log, write_text
+from shared.paths import book_log, book_meta, write_text
 from consumers.backtest import trades
 from signals.judge import signal_series
 from signals.engine import open_history
@@ -131,7 +131,7 @@ def run(slug, days=365, hist=None, tree=None):
         manual[p] = [{"do": do, "rule": l, "ref": r} for do, l, r in j.manual_items()]
         if prow and period is None:
             period = [prow[0]["date"], prow[-1]["date"], len(prow)]
-    return {"slug": slug, "title": tree.book(slug),
+    return {"slug": slug, "title": book_meta(slug).get("title") or slug,
             "period": period[:2] if period else None, "trading_days": period[2] if period else 0,
             "horizons": list(HORIZONS), "missing_symbols": missing, "incomplete_warmup": incomplete, "manual": manual,
             "summary": summary, "trades": trade_res, "daily": rows, "generated": today.isoformat(timespec="seconds")}

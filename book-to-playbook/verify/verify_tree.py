@@ -857,12 +857,12 @@ def check_book(slug, years):
         stop.append("%s 공통 직렬화 아님 %d개" % (slug, len(loose)))
         print("  ❌ 공통 직렬화가 아닌 파일 %s — 쓴 사람이 python -m dsl.tradeTool fmt <파일> 로 다시 쓴다" % loose)
     # 0. 이름 없는 수동 조건 정지 — 체크리스트가 조용히 사라지거나 '수동 확인'으로만 뜨면 안 된다
-    nameless = _nameless_manual(tree.whole())
+    nameless = _nameless_manual(tree.conditions())
     if nameless:
         stop.append("%s 이름 없는 수동 조건 %d개" % (slug, len(nameless)))
         print("  ❌ label 없는 수동 잎 %d개 — 화면에 '수동 확인'으로 샌다: %s" % (len(nameless), nameless[:3]))
     # 0b. 식 없는 수동 정지 — '저자 미명시' 는 수치로 정할 수 있으면 "?" 식, 순수 주관이면 '(정성)' 문장
-    unclassified = _unclassified_numeric_manual(tree.whole())
+    unclassified = _unclassified_numeric_manual(tree.conditions())
     if unclassified:
         stop.append("%s 식 없는 수동 조건 %d개" % (slug, len(unclassified)))
         print("  ❌ '(정성)' 아닌 문장 수동 %d개 — 수치로 정할 수 있으면 식으로 쓰고 숫자 자리를 \"?\" 로: %s"

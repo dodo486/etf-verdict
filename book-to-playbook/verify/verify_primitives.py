@@ -757,10 +757,21 @@ def t_gateway():
     check(g.symbols() == {"A", "B", "^NDX", "NQ=F", "N1", "N2"} and g.symbols(["B"]) == {"B"}, "symbols %r" % g.symbols())
     check(g.minute_symbols() == {"NQ=F"} and g.timeframes() == {"1d", "1m"}, "minute_symbols/timeframes")
     check(g.warmup("A") == 19 and g.warmup("B") == 0 and g.warmup() == 19, "warmup")
-    check(g.refs() == {"1-1", "1-2", "2-1", "4-1", "4-2", "5-1", "6-1", "9-9"}, "refs %r" % g.refs())
+    check(g.refs() == {"0-1", "0-2", "1-1", "1-2", "2-1", "4-1", "4-2", "5-1", "6-1", "9-9"}, "refs %r" % g.refs())
     check(g.skips() == [{"rule": "못 옮김", "ref": "9-9", "reason": "데이터 없음: x"}], "skip 규칙")
-    check(g.whole() is data and not TreeGateway({}) and bool(g) and TreeGateway.load("__없는책__") is None,
-          "원본·빈·없는 트리")
+    check(not TreeGateway({}) and bool(g) and TreeGateway.load("__없는책__") is None, "빈·없는 트리")
+    check(W in g.conditions() and {"all": [{"rule": "20일선 위"}, M]} in g.conditions(), "conditions = 적힌 그대로의 조건식")
+    # on 의 이름 심볼은 실제 종목으로 · qty 식의 {"rule"} 은 펼친다 · 규칙 note 는 갈래까지
+    g2 = TreeGateway.of(dict(data, names={"$묶음": {"syms": ["N1", "N2"], "ref": "0-2"}, "$A": {"syms": ["A"]}},
+                             rules=data["rules"] + [rule("A 전용 익절", Cond.SELL, W, ("held", 0.5), on=["$A"], note="메모"),
+                                                    rule("식 비중", Cond.BUY, None, ("cash", {"rule": "20일선 위"}))]))
+    s2 = [r for r in g2.sells("A") if r.label == "A 전용 익절"]
+    check(s2 and s2[0].note == "메모" and not [r for r in g2.sells("B") if r.label == "A 전용 익절"],
+          "on 이름 심볼 펼침 · note 전달")
+    check(TreeGateway.of(dict(data, rules=[rule("식", Cond.BUY, None, ("cash", {"rule": "w"})),
+                                           {"label": "w", "value": W}])).weight("A").qty.x == dict(W, label="w"),
+          "qty 식의 {rule} 펼침")
+    check(g.refs() >= {"0-1", "0-2"}, "refs 에 상품·이름 심볼 ref 포함")
     # 규칙 단위 질문(구간② 검사기) — 이름 목록 · 뜻(펼침/그대로) · 측정 · why · 이름 심볼 · 옛 양식 키
     check(g.labels()[:2] == ["20일선 위", "선물 양"] and g.body("없음") is None, "labels/body 없는 이름")
     b2 = g.body("선물 양")
@@ -769,7 +780,7 @@ def t_gateway():
           and g.body("선물 양", expand=False)["branches"][0]["when"]["all"][0] == {"rule": "20일선 위"},
           "body 펼침/그대로 %r" % b2)
     check(g.value("20일선 위") == W and g.value("선물 양") is None and g.why("선물 양") is None
-          and TreeGateway.of(dict(data, rules=data["rules"] + [dict(rule("w", Cond.BUY), why="원문 3-1")])).why("w") == "원문 3-1",
+          and TreeGateway.of(dict(data, rules=data["rules"] + [dict(rule("w", Cond.BUY, W), why="원문 3-1")])).why("w") == "원문 3-1",
           "value/why")
     check(g.name_symbols() == {"$묶음": ["N1", "N2"]}, "name_symbols")
     bad = dict(data, rules=data["rules"] + [rule("x", Cond.BUY, {"rule": "없는 이름"})])
@@ -789,7 +800,9 @@ def t_gateway():
                    dict(data, rules=[dict(R0, skip="연산 없음: x")]),                  # then 과 skip 같이
                    dict(data, rules=[{"label": "r", "note": "식 없음"}]),               # then·value·skip 다 없음
                    dict(data, rules=[dict(R0, on=["Z"])]),                            # on 이 없는 종목
-                   dict(data, rules=[{"then": R0["then"]}])):                         # label 없음
+                   dict(data, rules=[{"then": R0["then"]}]),                         # label 없음
+                   dict(data, rules=[{"label": "r", "then": [{"do": Cond.SELL}]}]),     # 판다인데 when 없음
+                   dict(data, rules=[{"label": "r", "value": {"foo": 1}}])):           # 참조 안 된 이름 조건도 문법 검사
         try:
             TreeGateway.of(broken)
             FAILS.append("형식이 틀린 트리가 통과: %r" % sorted(broken))
