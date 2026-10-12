@@ -21,7 +21,7 @@
  tree/     정적 — 트리의 언어 + 출입구 gateway: 열기 · 문법 검사 · 판때기 만들기(1-1)
            트리가 확정되면 결과도 고정 — 매일 돌지 않는다
  ═════════════════════════════│═════════ 여기부터 런타임(매일·틱마다) ═════════
- market/   시세 — md_feed(jhts 유일 창구) · bus(틱 배달)
+ market/   시세 — md_feed(jhts 유일 창구) · store(시세 칸 + 확정 표시) · bus(틱 배달)
     │ 값
     ▼
  judge/    판정 — eval(계산기) · judge(판때기 채우기 → 등급 · '얼마나' · 시세 받기)
@@ -40,23 +40,23 @@
 | 폴더(층) | 하는 일 | 주요 파일 |
 |---|---|---|
 | `shared/` | 경로·인코딩·책 레지스트리 · 소절 키 규칙 | `paths.py`(book_dir·book_file·books.json 레지스트리·live_slugs) · `sections.py`(원문·플레이북의 장/소절 표지 정규식 · marks) |
-| `market/` | 시세 조달 — jhts 는 여기서만 · 틱 배달(시세 모르는 순수 부품) | `md_feed.py`(histories·minutes·sessions) · `_dev_cache.py` · `bus.py`(`Bus` 구독/발행 · `Poller` 틱 구동) · `feed.py`(`Feed`=Bus+run · `watch` 장중 루프) |
+| `market/` | 시세 조달 — jhts 는 여기서만 · 시세 칸 · 틱 배달 | `md_feed.py`(histories·minutes·sessions) · `_dev_cache.py` · `store.py`(**Store** 시세 칸: need·load·refresh·prices·confirmed · 봉 확정 규칙 session_closes·settled_dates 한 곳) · `bus.py`(`Bus` 구독/발행 · `Poller` 틱 구동) · `verify_store.py`(검사) |
 | `tree/` | 조건 트리(tree.json)의 언어 — **DSL 의 주인** | `gateway.py`(문법 validate·동사 VERBS·워밍업 warmup_of·공통 직렬화 `fmt` + 출입구 TreeGateway — 모듈 수준 이름을 직접 import) |
 | `judge/` | 판단자 — 트리·시세 원본의 유일한 사용자 → 판정 데이터 (돈·화면 모름) | `judge.py`(**Judge** 책 하나: 트리 열기·시세 받기·라이브 decisions·백테스트 signals · `judge.tree`(비교·채점·원시 트리 보기가 출입구에 묻는 단 하나의 문) · **ProductJudge** 상품 하나: 등급·decide·설명·보유 status·체결용 conditions·price · Holding · Decision 그릇 · '얼마나' 절: 매도 정책 exit_policy·수량 변환 to_units·금액 정책 size_of — 라이브 화면·백테스트 공용 · 시세 받기 history·history_back·session_closes · 등급 RuleSeries·GRADES, +`grade_rules.json`) · `eval.py`(계산기 — 트리 식에 시세 값을 넣어 계산: Ctx·series) |
 | `backtest/` | 판정을 받아 과거 시뮬레이션 | `{trades,portfolio,runner}.py`(체결 · 돈·수수료 · 러너, +`market_config.json`) · `verify_trading.py`(검사) |
 | `web/` | 화면 모양(판정 안 함) | `verdict_view.py`(판정→화면 JSON·사유 문장) · `backtest_page.py` · `book_page.py` · `build_home.py` · `inject_*.py` · `explain.py`(판단 근거 설명 — 판단자의 값 함수 `ProductJudge.value`·`blank_value` 로만 값을 받는다, 계산 안 함) · `text.py`(식 → 글 낱말 한 벌 — explain·raw_tree 공용) · `raw_tree.py`(원시 트리 보기 — 소절마다 뽑힌 규칙 1:1, `Judge.cards`) · `ui/*.js` · `verify_page.py`(검사) |
-| `entry/` | 진입점 | `serve.py`(로컬 서버·SSE) · `run.py`(스케줄 러너·CHECKS) · `live.py`(`LiveHub` — 2단 버스 조립) · `notify.py`(알림 — 텔레그램·데스크톱, books.json engine.daily) · `verify_rules.py`(코드 규칙 검사 — 전 층을 보므로 entry) |
+| `entry/` | 진입점 | `serve.py`(로컬 서버·SSE — 판정은 허브 것을 그대로) · `run.py`(일일 배치 daily·검사 check · CHECKS) · `live.py`(**LiveHub** — 판단자·시세 칸·구독표를 엮어 바뀐 상품만 판정 → verdict_bus) · `notify.py`(알림 — 텔레그램·데스크톱, daily 가 책마다 부른다) · `verify_live.py`(라이브 허브 검사) · `verify_rules.py`(코드 규칙 검사 — 전 층을 보므로 entry) |
 | `authoring/` | 책 → 전사 → 트리를 **만드는** 쪽(런타임과 분리) · 두 단계는 서로 import 안 함 | **transcribe**(① 책 → 전사) `book_source.py` · `pages.py` · `verify_source.py`(본문 해시 검사) · `PLAYBOOK.md` · `book_sources.json` · `source_baseline.json` · **extract**(② 전사 → 트리) 지침 md(COND_DSL·EXTRACTOR·SCENARIO·JUDGE·README) · `compare.py`(심판 비교 도구 · '같은 뜻' 잣대) · `verify_tree.py`(트리 채점 · `--quick` 트리 계약) |
 
 ### 1-1. 판정 엔진 — 시세 칸 → 노드 → 판때기
 
-> 상태: ✅ 있음 · ⏳ 3단계(시세 저장소·구독). 아직 없는 것을 있는 것처럼 쓰지 않는다 — 단계가 끝나면 표시를 고친다.
+> 상태: ✅ 있음 · ⏳ 아직 없음. 아직 없는 것을 있는 것처럼 쓰지 않는다 — 단계가 끝나면 표시를 고친다.
 
 판정 엔진은 세 가지로 이루어진다. **시세는 왼쪽에서 들어오고 등급은 오른쪽으로 나간다.**
 
 | 무엇 | 몇 개 | 하는 일 | 어디 | 상태 |
 |---|---|---|---|---|
-| **시세 칸** | 심볼 × 봉 길이마다 1개 (TQQQ 일봉 · NVDA 일봉 …) | 과거 봉과 오늘 봉을 든다. 봉마다 `확정/진행 중` 표시. 같은 심볼은 어느 책이 쓰든 한 칸 | `market/store` | ⏳ (지금은 판단자가 틱마다 `history` 로 다시 받음) |
+| **시세 칸** | 심볼 × 봉 길이마다 1개 (TQQQ 일봉 · NVDA 일봉 …) | 과거 봉과 오늘 봉을 든다. 봉마다 `확정/진행 중` 표시. 같은 심볼은 어느 책이 쓰든 한 칸 | `market/store`(Store) | ✅ |
 | **노드** | 서로 다른 식마다 1개 | 식 하나(예: `TQQQ 종가 > 20일 전`). 시세 칸에서 값을 읽어 계산. **같은 식은 노드 하나를 공유**(상품·책이 달라도 — 노드 풀이 정규 열쇠로 intern). 수동·`?`·pos 를 품은 노드는 상품마다 따로 | 모양 `tree/gateway`(Node·bind·노드 풀) · 계산 `judge/eval`(노드 id 로 값 기억) | ✅ |
 | **판때기** | 책 × 상품마다 1개 | 그 상품의 동사(안 산다·산다·판다)와 '얼마나'(비중·분할) 식을 노드로 이은 배선도. 노드 값을 모아 **등급**을 낸다. 모양 `Board(product, index, gates{동사: 노드}, weight, tranches, sells, symbols, warmup)` | 만들기 `TreeGateway.board(상품)` · 채우기 `judge/judge`(RuleSeries) | ✅ |
 
@@ -95,14 +95,16 @@
  │ SOXL 일봉 │──────────▶ n2 · n6 ─────────────────────────▲
  │ ^SOX 일봉 │──────────▶ n4 ──────────────────────────────┘
  └───────────┘
-   구독표 ⏳: 심볼 → 노드 → 판때기  (NVDA → n5 → [A×TQQQ, A×SOXL])
+   구독표 ✅: 심볼 → (책, 상품)  (NVDA → [A×TQQQ, A×SOXL]) — entry/live 가 Judge.subscriptions 로 짓는다
 ```
 
-**한 틱의 흐름** ⏳ — 예: NVDA 만 새 값이 왔다.
+**한 틱의 흐름** ✅ — 예: NVDA 만 새 값이 왔다.
 
 1. 시세 칸 NVDA 의 오늘 봉만 바꾼다.
-2. 구독표로 NVDA 를 보는 노드(n5)만 찾아 **오늘 칸만 한 번** 계산한다(과거 칸은 기억해 둔 값).
-3. n5 를 쓰는 판때기 둘만 등급을 다시 내 판정 버스(verdict_bus)에 올린다. n1~n4 는 다시 계산하지 않는다.
+2. 구독표로 NVDA 를 보는 판때기(A×TQQQ · A×SOXL)만 깨운다 — 한 틱에 NVDA·AAPL 이 같이 바뀌어도 한 번.
+   그 안에서 n5 는 두 판때기가 같이 쓰므로 한 번만 계산한다(노드 공유). 다른 책·상품은 손대지 않는다.
+3. 깨운 판때기의 등급을 책마다 **이벤트 하나**로 판정 버스(verdict_bus)에 올린다. 바뀐 게 없는 틱은 계산도 발행도 없다.
+   (⏳ 깨운 판때기는 아직 전 기간을 다시 계산한다 — '오늘 칸만'은 아래 표의 남은 일)
 4. 화면·알림·(나중) 주문은 버스에서 받기만 한다.
 
 **흐름 보장**
@@ -111,42 +113,46 @@
 |---|---|---|
 | 판때기는 최초 1회 | `TreeGateway.board` 가 상품마다 한 번 만들어 둔다. `Judge.open` 은 트리 파일(경로·수정 시각·크기)이 그대로면 같은 판단자를 돌려준다 — 바뀐 책·새 책만 다시. 파일로 저장하지 않는다(진실은 tree.json 하나) | ✅ |
 | 중복 계산 없음 | 같은 식은 노드 하나(규칙 엔진 Rete 의 노드 공유). 같은 시세 묶음·달력·asof 에서 수동·pos 없는 노드 값은 상품·책·수동 가정이 달라도 한 번 계산(`judge.shared_values`) | ✅ |
-| 내 시세 + 프록시 시세 | 판때기의 필요 시세 = 자기($self) + 지수($index) + 트리에 적힌 티커(`Board.symbols`). 아직 안 온 시세는 그 칸의 마지막 확정 봉 | ✅ 목록 · ⏳ 구독 |
-| 틱당 한 번만 깨움 | 한 틱에 바뀐 심볼을 모아 판때기를 한 번만 깨운다 | ⏳ |
-| 과거 재계산 없음 | 노드가 과거 칸 결과를 기억 — 오늘 칸만 계산 | ⏳ |
-| 서로 참조 없음 · 한 방향 | 판때기끼리 부르지 않는다(rule 참조는 컴파일 때 펼쳐 끝). 시세 → 노드 → 판때기 → 버스 → 소비자. 사람이 답한 수동 조건·내 포지션도 아래쪽 입력으로 넣는다(화면이 판정을 거꾸로 부르지 않는다) | ✅ 층 규칙 · ⏳ 입력 |
+| 내 시세 + 프록시 시세 | 판때기의 필요 시세 = 자기($self) + 지수($index) + 트리에 적힌 티커(`Board.symbols`) — 전부 구독표에 오른다. 아직 안 온 시세는 그 칸의 마지막 확정 봉 | ✅ |
+| 틱당 한 번만 깨움 | `store.refresh()` 가 이번 틱에 바뀐 심볼 집합을 돌려주고, 허브가 그걸 보는 상품을 모아 한 번만 판정 · 책마다 발행 하나 (`entry/verify_live` 가 증명) | ✅ |
+| 과거 재계산 없음 | 노드가 과거 칸 결과를 기억 — 오늘 칸만 계산. 지금은 깨운 판때기만 전 기간을 다시 계산한다(일봉 기준 수 ms) | ⏳ |
+| 서로 참조 없음 · 한 방향 | 판때기끼리 부르지 않는다(rule 참조는 컴파일 때 펼쳐 끝). 시세 → 노드 → 판때기 → 버스 → 소비자. 사람이 답한 수동 조건·내 포지션도 아래쪽 입력으로 넣는다(화면이 판정을 거꾸로 부르지 않는다) | ✅ (수동 답 = `LiveHub.judge_with` · 포지션 = 파일 표식이 바뀌면 다시) |
 | 백테스트 = 라이브 | 같은 판때기에 과거 봉을 하루씩 흘린다(버스 안 거침). 포지션은 그날 체결 결과를 다음 날 입력으로 | ✅ 같은 판단자 |
+
+봉의 확정 표시는 `market/store` 의 한 규칙(`session_closes`·`settled_dates`) — 판단자의 장중 asof 재현도 같은 함수를 쓴다.
 
 업계 대응: 시세 칸·구독표 = LEAN SubscriptionManager · Nautilus Cache+MessageBus / 판때기 컴파일 = Backtrader `__init__` 지표 그래프 ·
 Pine 스크립트 컴파일 / 노드 공유 = Rete / 봉의 확정 표시 = Pine `barstate.isconfirmed`.
 
-### 1-2. 라이브 2단 pub-sub — 책 N개가 시세 하나를 나눠 쓴다
+### 1-2. 라이브 — 시세 칸 하나를 책 N개가 나눠 쓴다
 
 ```
-market (jhts, pull)
-   ▲ 틱마다 전 live 책 심볼 '합집합'을 한 번만 조회 (md_feed.histories 1회 — 공유 심볼 중복 0)
-   │
-market.bus price_bus (1개) ──틱 {ts, trees, hist}── fan-out ─┬──────────────┬──────────────┐
-                                                      ▼              ▼              ▼
-                                           signal(책A)     signal(책B)     signal(책N…)   (pricing 미래)
-                                           = 구독+발행      = 구독+발행      = 구독+발행
-                                                │ 판정 사실       │              │
-                                                ▼ publish         ▼              ▼
-                                           verdict_bus[책] (책마다 1개)
-                                                ├──▶ web(화면 SSE push)
-                                                └──▶ notify(알림) · (주문 미래)
+ [서버 켤 때 한 번]  entry/live.LiveHub
+   books.json(live:true) ─▶ Judge.open(책) ─▶ 판때기(상품마다, 1-1)
+                          └▶ 구독표 {심볼 → (책, 상품)} ─▶ store.need(전 심볼) ─▶ store.load() (과거 봉 한 번)
+
+ [틱] Poller(interval 초)
+   store.refresh() ─▶ 바뀐 심볼 ─▶ 구독표 ─▶ 그 심볼을 보는 상품만 Judge.decisions(products=…)
+                                              │ 책마다 이벤트 하나 (바뀐 게 없으면 없음)
+                                              ▼
+                                       verdict_bus[책] ──▶ 화면 소비자(_format → 최신 top) ──▶ serve (GET · SSE push)
+ [아래쪽 입력]  수동 답 POST ─▶ LiveHub.judge_with(책, 답)  (허브의 판단자 + 저장소 시세 — 다시 받지 않음)
+              내 포지션(positions.json) ─▶ 파일이 바뀌면 그 책 전 상품 다시
 ```
 
-- **책 추가 = `books.json` 한 줄 + `books/<slug>/tree.json`.** `entry/live.LiveHub._sync()` 가 live 책을 `price_bus` 구독자로 자동 등록한다(서버 재시작 불필요) — "책 등록 = 구독". signal 은 **코드 하나, 인스턴스 N개**(책마다 파일 안 만듦 — 원칙 12).
-- **시세는 한 번**: 피더가 틱마다 전 책의 심볼 합집합을 `Judge.shared_prices([판단자들])` 로 1회 조회해 틱에 싣는다(피더는 시세 묶음을 열지 않고 넘기기만). 각 책 판단자는 그 공유 시세에서 자기 심볼만 읽어 혼자 받던 때와 **같은 판정**을 낸다(중복 조회 제거 — `verify`/A·B 로 동작 불변 증명).
-- **버스는 가격을 모른다**(market/bus — 다른 층 import 0) — '언제 다시 판정하나'(트리거)만. '무엇을 계산할지'는 구독자(judge·web)가 정한다. 그래서 백테스트(과거 배치)는 버스를 안 거치고 같은 판단자 코드를 직접 돌린다(구독 밖).
-- **의존성 주입**: judge·web 은 버스를 import 하지 않는다. 둘을 엮는 유일한 자리는 `entry/live.py`(조립 뿌리, entry 는 전 층 import 허용).
-- **오늘 판정 = asof=now 한 점(Judge.decisions) · 백테스트 = 전 날짜(Judge.signals)** — 같은 판단자를 쓰임만 달리(원칙 5).
+- **책 추가 = `books.json` 한 줄 + `books/<slug>/tree.json`.** 허브가 틱마다 `_sync` 로 맞춘다 — 새 책·트리가 바뀐 책만 다시
+  열고(컴파일 캐시) 구독표를 다시 짓는다(서버 재시작 불필요). 판정 코드는 **하나, 인스턴스 N개**(책마다 파일 안 만듦 — 원칙 12).
+- **시세는 한 번**: 같은 심볼은 책이 몇 권이든 시세 칸 하나. 적재는 시작 때 한 번, 틱마다는 최근 창만 다시 받아 합친다.
+- **버스는 가격을 모른다**(market/bus — 다른 층 import 0) — '언제'(Poller)와 '누구에게'(verdict_bus)만. 판단자·화면은 버스를
+  import 하지 않는다. 엮는 유일한 자리는 `entry/live.py`(조립 뿌리, entry 는 전 층 import 허용).
+- **일일 배치**(`run daily`)는 허브 없이 책마다 `entry.notify`(판정 한 번 → 알림) + `web.backtest_page` 를 돈다.
+- **오늘 판정 = 마지막 봉 한 점(Judge.decisions) · 백테스트 = 전 날짜(Judge.signals)** — 같은 판단자·같은 판때기(원칙 5).
+  틱을 하루씩 흘린 판정 == 일괄 판정 · 재생 == 신호는 `entry/verify_live` 가 증명한다.
 
 ### 1-3. 작업 순서와 트리를 읽는 길 — 만드는 곳 = 검증하는 곳
 
 세로는 **작업 순서**, 오른쪽은 그 단계가 **트리를 읽는 길**. 검증은 그것을 만드는 단계 안에 있고(폴더도 같다),
-검사는 **대상이 바뀔 때만** 돈다 — 매일 돌지 않는다(daily·verdict·watch 에 검사 없음).
+검사는 **대상이 바뀔 때만** 돈다 — 매일 돌지 않는다(daily 에 검사 없음).
 
 ```
  작업 순서(위 → 아래)                                              트리를 읽는 길
@@ -166,7 +172,7 @@ market.bus price_bus (1개) ──틱 {ts, trees, hist}── fan-out ─┬─�
     playbook.html 골격 · verify_page(구획·UI 사본 검사)                  트리 안 읽음
 ──────────────────────────────────────────────────────────────────────────────────
  3. 사용 (구간③, 런타임) — 매일·장중, 검사 없음
-    entry/run daily·verdict · entry/live(watch·serve)                   Judge.open
+    entry/run daily(notify) · entry/serve → entry/live(허브)             Judge.open
       → judge/judge  Judge·ProductJudge (판정·백테스트 신호)
         ├▶ web  verdict_view · backtest_page (화면)
         ├▶ backtest runner · trades (체결·수익)
@@ -237,7 +243,7 @@ market.bus price_bus (1개) ──틱 {ts, trees, hist}── fan-out ─┬─�
 ## 5. 검사
 
 `python -m entry.run check` 하나로 전부. 목록은 `entry/run.py` 의 `CHECKS` 한 곳.
-검사는 **대상이 바뀔 때** 돈다(코드·트리·원문·페이지를 바꾼 뒤, 커밋 전) — 매일 돌지 않는다(daily·verdict·watch 에는 없음).
+검사는 **대상이 바뀔 때** 돈다(코드·트리·원문·페이지를 바꾼 뒤, 커밋 전) — 매일 돌지 않는다(daily 에는 없음).
 트리 검사는 트리뿐 아니라 트리를 실행하는 엔진 코드(tree·judge)가 바뀌어도 다시 돌아야 해서 목록을 나누지 않고 전부 돈다.
 선택(opt) = `run check --parity` 일 때만.
 
@@ -251,6 +257,8 @@ market.bus price_bus (1개) ──틱 {ts, trees, hist}── fan-out ─┬─�
 | `judge.verify_eval` | 원시 연산·등급·금액·수동 답(pandas 기준값·손계산) · 3값 논리 · 인과성 · 확정봉 |
 | `backtest.verify_trading` | 체결 워크·수량 변환·금액·매도 정책 · 실전 경로. `--parity` = 판정 == 백테스트(opt) |
 | `web.verify_view` | 화면 설명 구조 |
+| `market.verify_store` | 시세 칸 — 한 번 적재 · 바뀐 심볼만 · 스냅샷 동일성 · 확정 표시(가짜 시세·캘린더) |
+| `entry.verify_live` | 라이브 허브 — 하루씩 흘린 틱 판정 == 일괄 판정 · 바뀐 상품만 · 무변화 무발행 · 책마다 발행 하나 · 재생 == 신호 |
 | `authoring.extract.verify_tree` | 체크리스트가 원문 뜻대로 동작하나 — a·b 비교(식) · 원문 사례 · 심판 기록 · 발화 통계 |
 
 검사는 전부 **실행**으로 본다(글자 대조 검사는 의미를 판정하지 못해 없앴다).

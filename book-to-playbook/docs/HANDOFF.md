@@ -7,20 +7,30 @@
 ## 0. 다음에 할 일 (한 줄)
 
 **run3 — moneycopy 트리·사례를 v3 로 다시 뽑기(키스톤).** 코드는 3동사·조합 문법으로 바뀌었고, 지금 moneycopy
-tree.json 은 지운 연산(pct·count·streak)·옛 `review` 키·옛 종목 모델(`$self`·`$index`·`names`·`across`) 때문에 **문법 검사에서 멈춘다 — 판정 화면·백테스트도 run3 전까지 안 돈다**
+tree.json 은 지운 연산(pct·count·streak)·옛 `review` 키·옛 종목 모델(`names`·`across`) 때문에 **문법 검사에서 멈춘다 — 판정 화면·백테스트도 run3 전까지 안 돈다**
 (사용자 확정: 트리는 다시 뽑는다). 종목 모델은 **트리 공통 + 해석기가 `$self`·`$index`(products.index) 채움**, `on` 은 저자가 상품을 짚은 규칙만(EXTRACTOR §2.5) — 이 모델로 뽑는다. 남은 v3 코드 일(새 기본 부품 등)은 3절.
 
 ## 1. 지금 상태
 
-- `python -m entry.run check` — 정지 2건이 정상: `authoring.extract.verify_tree --quick`(trend 에 tree.json 없음 · moneycopy 트리 문법) ·
-  `authoring.extract.verify_tree`(같은 이유 — run3 에서 사라진다). 나머지 6개 통과.
+- `python -m entry.run check` — 검사 11개 · 정지 2건이 정상: `authoring.extract.verify_tree --quick`(trend 에 tree.json 없음 ·
+  moneycopy 트리 문법) · `authoring.extract.verify_tree`(같은 이유 — run3 에서 사라진다). 나머지 9개 통과.
+- 판정 엔진(ARCHITECTURE 1-1·1-2): 판때기(책×상품, 컴파일 1회) · 노드 풀(같은 식 하나) · 시세 칸(market/store) · 구독표 —
+  라이브는 바뀐 심볼을 보는 상품만 다시 판정. 진짜 책은 트리가 옛 형식이라(run3 전) 서버가 오류 판정 JSON 을 낸다(화면은 안 그림).
 - 화면 머리글 ①안 산다 ②산다 ③판다 ④얼마나(트리가 다시 생기면 그대로 그린다).
 - 전후 비교: 시세를 `ETF_DEV_CACHE=<캐시 폴더>` 로 고정하고 판정 JSON(`verdict_view.render`)·백테스트(`runner.run`)를 떠서 diff.
+  진짜 책 트리가 돌지 않는 동안은 합성 트리(on·$self·$index·atleast·비중·분할·매도)로 판정·비중·백테스트 거래를 떠서 바이트 비교했다.
 
 ## 2. 2026-10-12 해결된 것 (main 에 합침)
 
 | 커밋 | 내용 |
 |---|---|
+| `3fa0ca4` | **폴더를 역할대로** — dsl→tree · signals→judge · feed→market · consumers/{backtest,display}→backtest·web · notify→entry/notify · authoring/{playbook,checklist}→transcribe·extract |
+| `392724e` | '얼마나'(물량·사이징·매도 문장)는 판단자(judge/judge)로 · 소절 키 규칙은 `shared/sections` 한 벌 |
+| `7882f2f`·`6812b14` | 분봉 전용 경로·Cond/Grade 별칭 삭제 · 원문 탭 소절 자르기 버그(trend 12→14소절) |
+| `a3dad47` | **tradeTool 해체** — 문법 `tree/gateway` · 계산기 `judge/eval` · 등급·시세 받기 `judge/judge` · 검사 둘로 |
+| `0b4f220` | 판단 설명은 화면으로(`web/explain` 은 판단자가 낸 값만) · 식→글 낱말 `web/text` 한 벌 |
+| `3c54e0e` | **판때기** — 상품마다 한 번 컴파일 · 노드 풀(같은 식 하나) · 값 공유 · 바뀐 트리만 다시(open+decisions 54→18ms) |
+| `62dde45` | **시세 칸 + 구독** — `market/store` · LiveHub 가 바뀐 심볼을 보는 상품만 판정 · 옛 라이브 경로(run watch·verdict, feed, 서버 서브프로세스·TTL, engine.daily, 매 틱 재조회) 삭제 |
 | 종목 모델 정정 | **`products.index` + `$self`·`$index` 되살림** — on+sym 반영(2c9a90e)이 상품마다 달라지는 대상을 구체 티커로만 쓰게 해 같은 판단이 상품 수만큼 복제됨(후보 a 규칙 142개·이름 조건 73개). 트리는 공통 한 번, 상품은 해석기가 `products` 를 돌며 채움. `$s`·`names`·`across` 폐지는 유지(atleast·of). 동치 확인: 공통 규칙 하나 == 옛 기준 날마다 동일 |
 | 판단자 정리 | **판단자 층 정리**(동작 불변 — 합성 트리 3년 판정·비중·거래 동일) — `ProductRules`·`TreeGateway.product` 삭제(`ProductJudge`·`RuleSeries` 가 트리+상품으로 출입구에 직접), `Judge` 의 트리 질문 전달 15개 → `judge.tree` 하나. **소절 반영 배지(coverage) 삭제**(기능 제거 — 원시 트리 보기가 대신) |
 | 원시 트리 | **원시 트리 보기**(브랜치에서 옮김) — 플레이북 소절 헤딩의 '🌲 규칙' 토글로 그 소절에서 뽑힌 규칙을 판정 로직 없이 1:1(`web/raw_tree.py`). 트리는 판단자에게 묻는다 — 출입구 질문 `cards()`(규칙 카드, 적힌 그대로) 추가(브랜치의 뒷문 `whole()`·원본 키 직접 접근은 쓰지 않음) |
@@ -62,6 +72,14 @@ tree.json 은 지운 연산(pct·count·streak)·옛 `review` 키·옛 종목 �
 - 초안 문서는 위가 끝나면 지침(`COND_DSL`·`EXTRACTOR`·`JUDGE`·`SCENARIO`)으로 옮기고 지운다(초안 머리말 규칙).
 
 ### 그 뒤
+- **판정 엔진 '오늘 칸만'**(ARCHITECTURE 1-1 ⏳) — 깨운 판때기는 아직 전 기간을 다시 계산한다(일봉이라 수 ms). 분봉 구독을
+  붙이거나 책·상품이 많아지면 노드가 과거 칸을 기억하고 오늘 칸만 계산하게(링 버퍼 증분).
+- **분봉 구독** — `market/store` 의 열쇠는 이미 (심볼, 봉)이다. `md_feed.minutes` 로 (심볼, 1m) 칸을 채우고, 판단자의 장중 asof
+  재현(`Ctx.settled_map`·`RuleSeries._confirmed_index_map`)을 저장소의 확정 표시로 갈아끼우면 남은 장중 장치가 사라진다.
+- **화면 신선도 라벨** — 라이브는 판정이 바뀔 때만 push 한다(무변화면 45초 ping). 장이 쉬면 top 의 `ts` 가 마지막 변경 시각에
+  멈춘다 — '마지막 확인 시각'을 따로 보이려면 허브가 틱 시각을 함께 실어 보낼 것.
+- **책 페이지 검사의 빈틈** — `web.verify_page` 는 `web/book_page.py` 를 불러오지 않아 그 파일이 깨져도 통과한다. assemble 한 번
+  돌려 보는 줄을 검사에.
 - **화면 JS 의 소절 키 정규식 사본** — `web/ui/shared-ui.js` REF_RE·REF_HEAD_RE 가 `shared/sections` 와 같은 키를 따로 적는다
   (JS 라 import 불가). 서버가 판정 JSON 에 키 패턴을 실어 보내면 한 벌.
 - **트리 출입구 강제의 빈틈** — 주인 표 '트리 원본 키'는 `r["rules"]`·`.get("then")` 꼴만 잡는다. `"then" in r`·흔한 키

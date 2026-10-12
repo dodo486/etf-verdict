@@ -583,7 +583,7 @@ class Judge:
 
     @staticmethod
     def shared_prices(judges, extra_days=0):
-        """여러 책이 같이 쓰는 시세를 한 번에(심볼 합집합 1회 조회) — 라이브 버스의 공유 시세."""
+        """여러 책이 같이 쓰는 시세를 한 번에(심볼 합집합 1회 조회) — 배치용(심판 비교 등). 라이브는 시세 칸(market/store)을 쓴다."""
         judges = [j for j in judges if j]
         return history_back([j._tree for j in judges], extra_days) if judges else {}
 
