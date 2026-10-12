@@ -2,7 +2,7 @@
 
 > 할 일은 이 파일에만 적는다(다른 곳에 TODO 파일을 만들지 않는다 — `verify_code` 가 막는다).
 > 구조·원칙은 `docs/ARCHITECTURE.md`, 세션 규칙은 레포 맨 위 `CLAUDE.md`.
-> 마지막 갱신 2026-10-12 · 작업 브랜치 `work/v3-verbs`(origin 푸시됨, `main` 에는 아직 안 합침).
+> 마지막 갱신 2026-10-12 · `main` 에 합침(작업 브랜치 work/v3-verbs 는 정리함).
 
 ## 0. 다음에 할 일 (한 줄)
 
@@ -17,7 +17,7 @@ tree.json 은 지운 연산(pct·count·streak)·옛 `review` 키 때문에 **�
 - 화면 머리글 ①안 산다 ②산다 ③판다 ④얼마나(트리가 다시 생기면 그대로 그린다).
 - 전후 비교: 시세를 `ETF_DEV_CACHE=<캐시 폴더>` 로 고정하고 판정 JSON(`verdict_view.render`)·백테스트(`runner.run`)를 떠서 diff.
 
-## 2. 2026-10-12 해결된 것 (브랜치 `work/v3-verbs`)
+## 2. 2026-10-12 해결된 것 (main 에 합침)
 
 | 커밋 | 내용 |
 |---|---|
@@ -39,7 +39,7 @@ tree.json 은 지운 연산(pct·count·streak)·옛 `review` 키 때문에 **�
   기대값 = 그날 결과) → 심판(`JUDGE.md` — 규칙마다 `why`, `review` 없음) → `python -m verify.verify_tree <slug>` exit 0.
   옛 후보·`scenarios.json`·`tree.json` 의 `review` 는 다시 뽑으면 없어진다(손으로 고치지 않는다).
 - 원문 위치 `authoring/playbook/book_sources.json`(trend = `books/trend/source.md`, moneycopy = `~/jhts/hypotheses/sources/미국-돈복사-ETF-투자방법.md`).
-- 끝나면 `main` 에 합치기(사용자 승인).
+- 끝나면 사용자 승인 후 `main` 에 합치기.
 
 ### 5-남음. 트리 v3 코드 반영의 나머지 (초안 `docs/action-grammar-draft.md` 9절·5절)
 - **새 기본 부품**: 세션 시작 · `sumsince` · `smooth`(EMA 2/(n+1)·Wilder 1/n) · `sqrt` · 순위(후보 종목 중) — 후보: 세션 경과
