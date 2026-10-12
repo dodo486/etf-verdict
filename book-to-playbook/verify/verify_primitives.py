@@ -368,7 +368,7 @@ def t_syntax():
 
 def t_asof():
     """장중(tf="1m") 값 — asof(관측 시점) 이하 그날 마지막 분봉. asof 이후 분봉·다른 날 분봉은 안 쓴다.
-    분봉 데이터가 없으면 None(장중 observe → manual). 분봉 키는 UTC(YYYYMMDDHHMM)."""
+    분봉 데이터가 없으면 None(모름). 분봉 키는 UTC(YYYYMMDDHHMM)."""
     import datetime as dt
     utc = dt.timezone.utc
     cal = ["20261001", "20261002"]
@@ -382,7 +382,7 @@ def t_asof():
     check(early == [2.0, None], "asof 전 분봉은 쓰지 않는다(그날 None) %r" % early)
     # 그날 분봉이 아예 없으면 None(다른 날 분봉으로 넘어가지 않는다)
     check(Cond.minute_series({"202610011950": 1.0}, cal, "close", asof) == [1.0, None], "그날 분봉 없으면 None")
-    check(Cond.minute_series({}, cal, "close", asof) == [None, None], "분봉 전무 → 전부 None(장중 observe → manual)")
+    check(Cond.minute_series({}, cal, "close", asof) == [None, None], "분봉 전무 → 전부 None(모름)")
     # OHLCV dict 봉도 받는다(목표 분봉 구조)
     md = {"202610021320": {"open": 10, "high": 12, "low": 9, "close": 11, "volume": 500}}
     check(Cond.minute_series(md, cal, "high", asof) == [None, 12.0], "dict 분봉 필드 선택")
@@ -404,26 +404,9 @@ def t_asof():
     ctx = Cond.Ctx(H(hist), cal, "X", asof=asof)
     v = Cond.series({"gt": [{"px": "close", "sym": "X", "tf": "1m"}, {"px": "close"}]}, ctx)
     check(v == [None, True], "장중 분봉 값 > 전일 종가(그날만 분봉 있음) %r" % v)
-    # observe — 관측되면 그 값, 관측값이 없으면 수동처럼(manual_as, not 아래 극성 포함)
-    obs = {"observe": {"gt": [{"px": "close", "sym": "X", "tf": "1m"}, {"px": "close"}]}, "manual": "데이터 없음: x"}
-    for mas in (True, False, None):
-        c2 = Cond.Ctx(H(hist), cal, "X", asof=asof, manual_as=mas)
-        check(Cond.series(obs, c2) == [mas, True], "observe manual_as=%r" % mas)
-        check(Cond.series({"not": obs}, c2)[0] == (None if mas is None else mas), "not observe 극성 manual_as=%r" % mas)
-    # 제외 모드(백테스트) — 관측값 없는 observe(0일째: 분봉 없음)는 묶음에서 빠진다.
-    ex = Cond.Ctx(H(hist), cal, "X", asof=asof, unobserved="exclude")
-    T_, F_ = {"gt": [1, 0]}, {"gt": [0, 1]}
-    cases = [({"all": [obs, T_]}, [True, True]), ({"all": [obs, F_]}, [False, False]),
-             ({"any": [obs, F_]}, [False, True]), ({"atleast": 2, "of": [obs, T_, T_]}, [True, True]),
-             ({"atleast": 2, "of": [obs, T_, F_]}, [False, True]), ({"not": obs}, [Cond.EXCLUDED, False]),
-             ({"all": [obs]}, [Cond.EXCLUDED, True])]
-    for node, want in cases:
-        got = Cond.series(node, ex)
-        check(got == want, "제외 모드 %s → %r (기대 %r)" % (list(node)[0], got, want))
-    check(Cond.series({"gt": [{"case": [[obs, 1]], "else": 0}, 0]}, ex)[0] is None, "제외 표지는 다른 연산엔 모름으로")
     try:
-        Cond.validate({"observe": {"gt": [C, 1]}})
-        FAILS.append("사유 없는 observe 통과")
+        Cond.validate({"observe": {"gt": [C, 1]}, "manual": "데이터 없음: x"})
+        FAILS.append("지운 observe 노드가 문법을 통과")
     except Cond.CondError:
         pass
 
@@ -582,8 +565,6 @@ def t_answers():
         check(v({"not": m}, ma, {}) is ma and v({"not": m}, ma, None) is ma, "답 없으면 극성 규칙 그대로(%r)" % ma)
     check(v(m, None, {"B|실적 좋음": True}) is None, "다른 상품의 답은 안 먹는다")
     check(v(unk, True, {k(unk, "A"): False}) is False, "\"?\" 식도 답으로 풀린다")
-    obs = {"observe": {"gt": [C, 0]}, "manual": "장중"}
-    check(v(obs, None, {"A|장중": False}) is True, "관측된 observe 는 답보다 관측값")
     tree = TreeGateway.of(synthetic({"A": None}, rule("실적", Cond.BUY, {"all": [m]})))
     got = [Grade.ProductEval(tree, "A", hist, cal, answers=a).grade_key(2)
            for a in (None, {"A|실적 좋음": True}, {"A|실적 좋음": False})]
@@ -697,37 +678,6 @@ def t_regress():
     check(Cond.series(four, make_ctx([1.0]))[0] is None, "4개 중 2개(1참·1거짓·2모름) → 모름")
 
 
-def t_no_excluded_live():
-    """불변식(화면 Fix #1): 실전 판정이 쓰는 문맥(unobserved != "exclude")에서는 EXCLUDED 가 절대 나오지 않는다.
-    EXCLUDED 는 '관측 못 한 조건을 빼고 판단'(백테스트 전용)이라, 실전 판정·화면(#verdict-data — 서버가 사람이 답한
-    수동까지 반영해 내는 판정)에 섞이면 라이브가 백테스트 규칙으로 판정하게 된다. 그 입력이 애초에 실전 경로로 올 수
-    없음을 여기서 강제한다.
-
-    여기서는 기본/실전 문맥에서 관측값 없는 observe·수동·그 논리 묶음(전부 제외가 될 법한 묶음)조차 EXCLUDED 를
-    내지 않고 true/false/None 만 냄을 실행으로 확인한다. 실전 판정 경로가 unobserved="exclude" 를 쓰지 않는지는
-    구간③ 검사(verify/verify_trading.py)가 소스로 확인한다.
-    """
-    import datetime as dt
-    # 기본/낙관/비관 문맥 어디서도 EXCLUDED 가 안 나와야 한다 — 관측 없는 observe 와 그 논리 묶음까지.
-    # (EXCLUDED 는 cond.py 에서 ctx.unobserved=="exclude" 일 때만 난다 — 실전은 그 모드가 아니다.)
-    cal = ["20261001", "20261002"]
-    hist = {"X": [Candle(d, 100, 100, 100, 100, 1000) for d in cal]}
-    asof = dt.datetime(2026, 10, 2, 20, 0, tzinfo=dt.timezone.utc)
-
-    class H(dict):
-        minutes = {"X": {}}          # 분봉 없음 → observe 는 관측값이 없다(실전에서 흔함)
-
-    obs = {"observe": {"gt": [{"px": "close", "sym": "X", "tf": "1m"}, {"px": "close"}]}, "manual": "데이터 없음: x"}
-    nodes = [obs, {"manual": "y"}, {"all": [obs]}, {"any": [obs]}, {"not": obs},
-             {"all": [obs, {"manual": "z"}]}, {"atleast": 1, "of": [obs, {"manual": "w"}]}]
-    for manual_as in (None, True, False):
-        ctx = Cond.Ctx(H(hist), cal, "X", asof=asof, manual_as=manual_as)   # 실전 기본: unobserved 미지정
-        for node in nodes:
-            got = Cond.series(node, ctx)
-            bad = [x for x in got if x is Cond.EXCLUDED]
-            check(not bad, "실전 문맥(manual_as=%r) %s 가 EXCLUDED 를 냄 %r" % (manual_as, list(node)[0], got))
-
-
 # ------------------------------------------------------------------ 7. 트리 출입구(TreeGateway) 계약
 def t_gateway():
     """판정·백테스트·검사기가 트리(v3 규칙 목록)에 묻는 질문의 답 모양 — {"rule"}·이름 심볼은 펼쳐서 건넨다."""
@@ -818,7 +768,7 @@ def main():
                      ("혼합 tf·확정봉·look-ahead 0", t_settled_mtf),
                      ("등급·금액", t_grade), ("데이터 완전성 가드(워밍업)", t_warmup_guard),
                      ("표현력 회귀", t_regress),
-                     ("EXCLUDED 실전 불변식", t_no_excluded_live), ("트리 출입구 계약", t_gateway),
+                     ("트리 출입구 계약", t_gateway),
                      ("수동 답(answers)", t_answers)):
         before = len(FAILS)
         try:

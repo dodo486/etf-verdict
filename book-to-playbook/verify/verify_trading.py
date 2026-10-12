@@ -5,7 +5,6 @@
 조건 트리 원시함수·등급 검사는 구간② verify/verify_primitives.py 가 하고, 여기는 그 위에서 도는 구간③ 코드만 본다.
   1. 거래 시뮬레이터 — 손으로 답을 셀 수 있는 시세로 진입·분할 매도·동시 발동·미청산·보유 중 신호 건너뛰기
      · 매도 정책 — 책에 매도 규칙이 없으면 거래 없이 매수 신호 뒤 N거래일 보유만(대체 매도 규칙을 지어내지 않는다)
-  2. 실전 판정 경로는 unobserved="exclude"(백테스트 전용)를 쓰지 않는다 — 소스로 확인
   3. (--parity) 신호 패리티 — "백테스트 신호 == 실시간 신호"를 **실제 진입점으로 돌려** 증명한다(라이브 책의 tree.json·시세 필요).
 
 ## 신호 패리티(--parity) — 왜 남아 있나
@@ -22,7 +21,7 @@
                     asof 는 그날 마감 시점(UTC).
   전 상품 × 창(데이터 있는 최근 WINDOW 거래일) 전부에서 두 경로의 (key, grade) 가 **일치**하는지. 불일치가 하나라도
   있으면 (상품·날짜·백테스트·실시간) 을 전부 나열한다 — 숨기지 않는다.
-  분봉 데이터가 없으면 장중(tf="1m") observe 조건은 두 경로 모두 None→manual 로 떨어진다(의도된 동작). 따라서
+  분봉 데이터가 없으면 장중(tf="1m") 조건은 두 경로 모두 모름(None)이다. 따라서
   **일봉 신호**의 패리티를 증명한다. 분봉이 연결되면 같은 코드가 그 축도 덮는다(asof 를 분봉 범위로 주면 된다).
 
 사용:
@@ -231,18 +230,6 @@ def t_sizing():
     check({"budget", "cash", "bought", "held"} <= set(seen), "매수·매도·비중이 to_units 하나로 %r" % seen)
 
 
-def t_live_path():
-    """실전 판정 경로가 cond.Ctx 를 unobserved="exclude"(관측 못 한 조건 빼기 — 백테스트 전용)로 만들지 않는다 —
-    라이브 판정·화면(#verdict-data)이 백테스트 규칙으로 판정하지 않게(verify.verify_primitives 의 실행 불변식과 짝)."""
-    from signals import judge
-    # 실전 경로 = 판정기(signals/judge) + 그 Decision 을 판정 JSON 으로 빚는 consumers/display/verdict_view
-    #   (소스 글자로 읽는다 — unobserved=exclude 가 실전 경로에 없어야 한다).
-    for name, src in (("signals/judge.py", inspect.getsource(judge)),
-                      ("consumers/display/verdict_view.py", read_text(os.path.join(BASE, "consumers", "display", "verdict_view.py")))):
-        check('unobserved="exclude"' not in src and "unobserved='exclude'" not in src,
-              "%s 실전 경로가 unobserved=exclude 를 쓰지 않아야(백테스트 전용)" % name)
-
-
 # ------------------------------------------------------------------ 3. 신호 패리티(--parity)
 WINDOW = 120            # 비교할 최근 거래일 수(상품마다 데이터 있는 범위 안에서)
 CLOSE_HHMM_UTC = 21     # 미 증시 마감 ≈ 21:00 UTC(서머타임 20:00·표준 21:00) — asof 를 '그날 마감 시점'으로
@@ -331,8 +318,7 @@ def parity_main(argv):
 def main(argv):
     if "--parity" in argv:
         return parity_main(argv)
-    for name, fn in (("거래 시뮬레이터", t_trades), ("매도 정책(규칙 없음)", t_no_exit), ("금액 정책", t_sizing),
-                     ("실전 경로 unobserved", t_live_path)):
+    for name, fn in (("거래 시뮬레이터", t_trades), ("매도 정책(규칙 없음)", t_no_exit), ("금액 정책", t_sizing)):
         before = len(FAILS)
         try:
             fn()

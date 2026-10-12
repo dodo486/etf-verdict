@@ -226,14 +226,8 @@ def _has_manual(n):
 
 
 def _stat_nodes(tree, prod):
-    """통계 대상 라벨 노드 [(동사, 노드)] — 등급 동사(안 산다·산다).
-    장중 관측(observe) 안쪽은 뺀다 — asof 기준 분봉이 없는 날은 판정 불가가 정상이다(그날은 수동으로 푼다)."""
-    out = [(do, n) for do in Cond.GATES for n in Cond.labeled(tree.gate(prod, do))]
-    inside = set()
-    for _sec, n in out:
-        if "observe" in n:
-            inside.update(id(x) for x in Cond.labeled_all(n["observe"]))
-    return [(sec, n) for sec, n in out if id(n) not in inside]
+    """통계 대상 라벨 노드 [(동사, 노드)] — 등급 동사(안 산다·산다)."""
+    return [(do, n) for do in Cond.GATES for n in Cond.labeled(tree.gate(prod, do))]
 
 
 def fire_stats(tree, hist, years):

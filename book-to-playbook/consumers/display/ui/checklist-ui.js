@@ -105,10 +105,10 @@
       return it.op ? '<div class="ck-grp">'+(gop?'<div class="ck-op">'+esc(gop)+'</div>':'')+kids+'</div>' : kids;
     }
     if(dup) return '';   // 같은 조건을 이미 보여줬다 — 한 번만
-    const isM = it.manual !== undefined && !(it.observed && it.v !== null && it.v !== undefined);
+    const isM = it.manual !== undefined;
     const a = isM ? ans[mkey(it, path)] : undefined;
     const val = it.v === undefined ? null : it.v;
-    const kidsHtml = (it.observed && isM) ? '' : kids;
+    const kidsHtml = kids;
     let ctl;
     if(isM){
       // 수동 조건 = 참/거짓 둘 중 하나를 고르는 것(체크박스 아님). 하나로 붙은 토글(세그먼트)로.
@@ -119,7 +119,7 @@
           + '</span>';
     } else ctl = MARK(val);
     const num = (!isM && typeof it.v === 'number') ? ' <span class="dataval">'+fmtV(it.v)+'</span>' : '';
-    const why = isM ? '<div class="ck-why">✋ '+esc(it.manual)+'</div>' : (it.note ? '<div class="ck-why">'+esc(it.note)+'</div>' : (it.observed ? '<div class="ck-why">저자가 말한 시각의 값으로 자동 판정</div>' : ''));
+    const why = isM ? '<div class="ck-why">✋ '+esc(it.manual)+'</div>' : (it.note ? '<div class="ck-why">'+esc(it.note)+'</div>' : '');
     const opw = OPW(it); const opl = opw ? ' <span class="ck-opl">'+esc(opw)+'</span>' : '';
     return '<div class="ck-row'+(isM?' man':' auto')+'" '+(it.ref?'data-ref="'+esc(it.ref)+'"':'')+'>'
       + '<div class="ck-line">'+ctl+'<span class="ck-t">'+esc(it.label || '수동 확인')+opl+num+refChip(it.ref)+'</span></div>'

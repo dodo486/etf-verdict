@@ -85,14 +85,14 @@ class Decision:
 
 class Judge:
     """한 상품 판정기 — 생성 때 Grade.ProductEval 을 전체 달력에 한 번 세운다.
-    asof = 관측 시각(UTC datetime, None 이면 지금) · unobserved 가 "exclude" 면 관측 못 한 장중 조건을 빼고 판단(백테스트 전용)
+    asof = 관측 시각(UTC datetime, None 이면 지금)
     · answers = 사람이 답한 수동 {Cond.answer_key: 참/거짓}(라이브 화면의 수동 체크 — 서버가 그 답으로 등급을 낸다)."""
 
-    def __init__(self, gw, prod, hist, cal=None, asof=None, unobserved=None, answers=None):
+    def __init__(self, gw, prod, hist, cal=None, asof=None, answers=None):
         self.gw, self.prod, self.hist = gw, prod, hist
         self.cs = hist.get(prod) or []
         self.cal = [c.date for c in self.cs] if cal is None else cal
-        self.pe = Grade.ProductEval(gw, prod, hist, self.cal, unobserved, asof, answers)
+        self.pe = Grade.ProductEval(gw, prod, hist, self.cal, asof, answers)
 
     @property
     def warmup(self):
@@ -146,7 +146,7 @@ class Judge:
                             next_tranche=None if nt is None else (nt, Cond.series(nt.when, ctx)[i]), ctx=ctx)
 
 
-def signal_series(gw, hist, start=None, unobserved=None, prods=None):
+def signal_series(gw, hist, start=None, prods=None):
     """전 상품·전 시점 신호 — 상품마다 Judge 를 전체 달력에 한 번 세우고 grade(i)/incomplete(i) 를 뽑는다
     (일봉 벡터 1회계산 — 라이브 latest() 와 같은 Judge.grade 경로). 백테스트가 이 신호 뒤에 집계·계산기를 붙인다.
     트리 연산은 전부 인과적이라(그날까지의 값만 씀) 전체 이력을 한 번 계산해 날짜로 꺼낸다. start(YYYYMMDD)을
@@ -156,7 +156,7 @@ def signal_series(gw, hist, start=None, unobserved=None, prods=None):
     for p in prods:
         cs = hist.get(p) or []
         cal = [c.date for c in cs]
-        j = Judge(gw, p, hist, cal, unobserved=unobserved)
+        j = Judge(gw, p, hist, cal)
         pts = []
         for i, d in enumerate(cal):
             if start is not None and d < start:

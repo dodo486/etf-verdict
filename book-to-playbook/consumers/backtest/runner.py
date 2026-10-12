@@ -84,9 +84,8 @@ def _summarize(prod_rows, cs):
 
 
 # ------------------------------------------------------------------ 실행
-def run(slug, days=365, hist=None, tree=None, unobserved=None):
-    """hist 를 주면 시세를 다시 받지 않는다(여러 기간을 한 번에 돌릴 때).
-    unobserved="exclude" = 분봉이 없어 관측 못 한 장중 조건(asof observe — 개장 전 선물 등)을 빼고 판단한다."""
+def run(slug, days=365, hist=None, tree=None):
+    """hist 를 주면 시세를 다시 받지 않는다(여러 기간을 한 번에 돌릴 때)."""
     tree, hist = open_history(slug, days, tree, hist)
     today = datetime.now()
     start = (today - timedelta(days=days)).strftime("%Y%m%d")
@@ -94,7 +93,7 @@ def run(slug, days=365, hist=None, tree=None, unobserved=None):
 
     # 신호 = judge.signal_series(일봉 벡터 1회계산 — 라이브 latest() 와 같은 Judge.grade). 백테스트는 그 신호 뒤에
     #   집계·계산기를 붙인다(판단/계산 분리 — 여기선 판정기가 낸 신호를 '받아쓰기'만 한다). judges=Judge(워밍업·수동조건).
-    sig = signal_series(tree, hist, start=start, unobserved=unobserved)
+    sig = signal_series(tree, hist, start=start)
 
     rows, summary, manual, period, trade_res, incomplete = [], {}, {}, None, {}, {}
     for p in tree.products():
@@ -146,9 +145,7 @@ def _cli():
         print("사용법: python -m consumers.backtest.runner <slug> [--days 365]", file=sys.stderr)
         sys.exit(2)
     days = int(argv[argv.index("--days") + 1]) if "--days" in argv else 365
-    unobserved = "exclude" if "--exclude-unobserved" in argv else None
-    res = run(slug, days, unobserved=unobserved)
-    res["unobserved"] = "제외하고 판단" if "--exclude-unobserved" in argv else "수동(🟡)으로 둠"
+    res = run(slug, days)
     write_text(book_log(slug, "backtest.json"), json.dumps(res, ensure_ascii=False, indent=1))
     print(json.dumps({k: v for k, v in res.items() if k != "daily"}, ensure_ascii=False, indent=2))
 

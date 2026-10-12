@@ -53,8 +53,6 @@ def _op_of(node):
         keys = [k for k in keys if k not in ("sym", "tf")]
     if node.get("case") is not None:
         keys = [k for k in keys if k != "else"]
-    if node.get("observe") is not None:
-        keys = [k for k in keys if k != "manual"]
     if len(keys) != 1:
         raise CondError("노드에 연산이 정확히 하나여야 한다: %r" % sorted(node))
     return keys[0]
@@ -86,7 +84,7 @@ def is_unknown(node):
 
 
 def is_manual(node):
-    """사람이 참/거짓을 정하는 잎 — 문장 수동({"manual"}·observe) 또는 "?" 를 품은 식."""
+    """사람이 참/거짓을 정하는 잎 — 문장 수동({"manual"}) 또는 "?" 를 품은 식."""
     return isinstance(node, dict) and ("manual" in node or is_unknown(node))
 
 
@@ -105,7 +103,7 @@ def strip_meta(node):
 
 
 def manual_key(node):
-    """수동 잎의 답 열쇠 본체 — 문장 수동(manual·observe)은 그 문장, "?" 식은 "?" + 식(META 뗀 JSON)."""
+    """수동 잎의 답 열쇠 본체 — 문장 수동은 그 문장, "?" 식은 "?" + 식(META 뗀 JSON)."""
     if "manual" in node:
         return node["manual"]
     return "?" + json.dumps(strip_meta(node), ensure_ascii=False, sort_keys=True)
@@ -210,10 +208,6 @@ def validate(node, path="$"):
     elif op == "manual":
         if not (isinstance(v, str) and v.strip()):
             raise CondError("%s.manual: 사유 문자열이 필요하다" % path)
-    elif op == "observe":
-        validate(v, path + ".observe")
-        if not (isinstance(node.get("manual"), str) and node["manual"].strip()):
-            raise CondError("%s.observe: 관측값이 없을 때의 수동 사유(manual)가 필요하다" % path)
     elif op == "pos":
         if v not in POS_FIELDS:
             raise CondError("%s.pos: 모르는 포지션 값 %r (허용 %s)" % (path, v, "/".join(POS_FIELDS)))
@@ -226,7 +220,7 @@ class Ctx:
     """평가 문맥. hist={심볼: [Candle(date,open,high,low,close,volume)]}, cal=날짜 목록."""
 
     def __init__(self, hist, cal, self_sym, index_sym=None, manual_as=None, pos=None, asof=None,
-                 unobserved=None, session_close=None, answers=None):
+                 session_close=None, answers=None):
         """pos = (첫 매수일 인덱스, 평균 매입가 | 날짜별 평균 매입가 목록) — 매도·분할 규칙 평가 때만.
         asof = 관측 시각(UTC datetime) — 분봉(tf="1m"/"5m") 필드를 이 시각 이하로 자른다. None 이면 실제 지금.
         session_close = {심볼: {YYYYMMDD: 그날 정규장 마감(UTC datetime, tz-aware)}} — 일봉 확정(settled) 경계.
@@ -236,7 +230,6 @@ class Ctx:
         answers = {answer_key: True|False} — 사람이 답한 수동(없는 열쇠는 manual_as). None 이면 옛 동작 그대로."""
         self.pos = pos
         self.asof = asof          # 관측 시각(UTC datetime) — 분봉 조회를 이 시각 이하로 자른다. None 이면 실제 지금
-        self.unobserved = unobserved  # None = 관측값 없는 observe 는 수동처럼 · "exclude" = 그 조건을 빼고 판단(백테스트)
         self.hist = hist
         self.cal = list(cal)
         self.self_sym = self_sym
@@ -255,7 +248,7 @@ class Ctx:
             return self
         if self._flip is None:
             f = Ctx(self.hist, self.cal, self.self_sym, self.index_sym, not self.manual_as, self.pos,
-                    self.asof, self.unobserved, self.session_close, self.answers)
+                    self.asof, self.session_close, self.answers)
             f._px, f._smap, f._flip = self._px, self._smap, self
             self._flip = f
         return self._flip
@@ -281,7 +274,7 @@ class Ctx:
         """심볼·필드의 asof 축 시계열(달력 길이). 일봉(tf="1d")은 날짜별 '확정(settled)' 일봉(장중 asof 면 아직
         마감 안 된 그날 일봉은 None 으로 가림 — look-ahead 0), 분봉(tf="1m")은 그날 asof 이하 마지막 분봉 값,
         5분봉(tf="5m")은 세션 안 1분봉→5분 OHLC 집계의 그날 asof 이하 마지막 5분봉 값
-        (분봉/5분봉 데이터가 없으면 전부 None — 장중 observe → manual)."""
+        (분봉/5분봉 데이터가 없으면 전부 None — 모름)."""
         key = (sym, field, tf)
         if key not in self._px:
             if tf == "1d":
@@ -333,7 +326,7 @@ class Ctx:
 # ------------------------------------------------------------------ 분봉(asof 축)
 def minute_series(minutes, cal, field, asof=None):
     """날짜별 'asof 이하 마지막 분봉'의 필드 값. minutes = {YYYYMMDDHHMM(UTC): {open,high,low,close,volume} 또는 종가}.
-    분봉 데이터가 asof 이하 그날 범위에 없으면 None(모름 — 장중 observe 가 manual 로 떨어진다).
+    분봉 데이터가 asof 이하 그날 범위에 없으면 None(모름).
     분봉 다축 달력(그날의 분봉 구간)은 후속 범위다 — 데이터가 연결되면 여기만 채운다.
 
     계산: asof 이하 분봉 키를 한 번만 오름차순으로 훑어 '날짜 → 그날 마지막(가장 늦은) 키' 인덱스를 만들고
@@ -439,22 +432,11 @@ def _or3(vals):
     return False
 
 
-class _Excluded:
-    """'이 조건은 빼고 판단' 표지 — unobserved="exclude" 문맥에서 관측값이 없는 observe 가 낸다. 논리 묶음은 이 값을
-    후보에서 빼고 계산한다(all·any 는 그 칸만, atleast 는 N 을 그대로 두고 후보에서만). 그 밖의 연산에는 모름(None)으로 간다."""
-
-    def __repr__(self):
-        return "EXCLUDED"
-
-
-EXCLUDED = _Excluded()
-
-
 # 일봉축 조회(asof 이하 마지막 확정봉) 대상이 아닌 잎 — 하나라도 있으면 그 식은 '1d-순수'가 아니다.
 #   · 분봉/5분봉 px(tf 1m/5m) : asof 이하 '살아 있는' 축(오늘 재생) — 일봉 확정 경계로 당기면 안 된다.
-#   · manual/observe/pos      : 일봉 봉이 아닌 값(수동·포지션).
+#   · manual/pos              : 일봉 봉이 아닌 값(수동·포지션).
 #   · across                  : $s 가 across 안에서만 풀려(심볼이 확정되지 않음) — 안전하게 비-1d 로 둔다.
-_NON_DAILY = ("manual", "observe", "pos", "across")
+_NON_DAILY = ("manual", "pos", "across")
 
 
 def _daily_axis(node, ctx, s_sym):
@@ -525,8 +507,7 @@ def _series(node, ctx, s_sym):
         return [ctx.manual_value(node)] * L  # 저자가 숫자를 안 준 판단 — 사람이 정한다(수동과 같은 규칙)
     if op in WINDOW + ("lag", "pct", "count") and v[1] == UNKNOWN:
         return [None] * L                    # 기간을 모름 — 값도 모름
-    R = lambda n: series(n, ctx, s_sym)                                   # 논리 묶음용(제외 표지 그대로)
-    S = lambda n: [None if x is EXCLUDED else x for x in series(n, ctx, s_sym)]   # 그 밖의 연산용
+    S = lambda n: series(n, ctx, s_sym)
 
     if op == "px":
         sym = node.get("sym", "$self")
@@ -607,29 +588,22 @@ def _series(node, ctx, s_sym):
         return out
 
     if op in ("all", "any"):
-        cols = [R(c) for c in v]
+        cols = [S(c) for c in v]
         f = _and3 if op == "all" else _or3
-        out = []
-        for i in range(L):
-            vals = [c[i] for c in cols if c[i] is not EXCLUDED]
-            out.append(EXCLUDED if cols and not vals else f(vals))
-        return out
+        return [f([c[i] for c in cols]) for i in range(L)]
 
     if op == "atleast":
-        cols = [R(c) for c in node["of"]]
+        cols = [S(c) for c in node["of"]]
         out = []
         for i in range(L):
-            vals = [c[i] for c in cols if c[i] is not EXCLUDED]
-            if cols and not vals:
-                out.append(EXCLUDED)
-                continue
+            vals = [c[i] for c in cols]
             t = sum(1 for x in vals if x is True)
             u = sum(1 for x in vals if x is None)
             out.append(True if t >= v else (False if t + u < v else None))
         return out
 
     if op == "not":
-        return [x if x is None or x is EXCLUDED else (not x) for x in series(v, ctx.flipped(), s_sym)]
+        return [x if x is None else (not x) for x in series(v, ctx.flipped(), s_sym)]
 
     if op == "count":
         c, n = S(v[0]), v[1]
@@ -719,10 +693,6 @@ def _series(node, ctx, s_sym):
 
     if op == "manual":
         return [ctx.manual_value(node)] * L
-
-    if op == "observe":
-        miss = EXCLUDED if ctx.unobserved == "exclude" else ctx.manual_value(node)
-        return [miss if x is None else x for x in S(v)]
 
     if op == "pos":
         if ctx.pos is None:
@@ -906,8 +876,6 @@ def warmup_of(node):
         return w(v)
     if op == "across":
         return w(v["cond"])
-    if op == "observe":
-        return w(node["observe"])
     # manual · pos — lookback 없음
     return 0
 
@@ -939,7 +907,7 @@ class History(dict):
 def history(trees, start):
     """트리(들 — TreeGateway)가 쓰는 모든 심볼의 일봉(+ 장중(tf="1m") 값에 쓰는 심볼의 분봉) — 수집 단계(md_feed)
     하나로 받는다. jhts 는 md_feed 에서만 만진다(팀 경계). 분봉이 연결되기 전에는 minutes 가 비어 있고
-    장중 observe 조건은 None→manual 로 떨어진다(의도된 동작)."""
+    장중 조건은 모름(None)이다."""
     syms, msyms = set(), set()
     for t in trees if isinstance(trees, list) else [trees]:
         syms |= t.symbols()
@@ -984,25 +952,19 @@ def session_closes(symbols, cal, asof):
 class ProductEval:
     """한 상품의 등급 동사(안 산다·산다)·비중을 전체 달력에 대해 한 번 계산해 둔다."""
 
-    def __init__(self, gw, prod, hist, cal, unobserved=None, asof=None, answers=None):
-        """gw = TreeGateway. unobserved="exclude" = 관측값이 없는 장중 조건(observe)을 빼고 판단한다(백테스트 비교용).
-        asof = 관측 시각(UTC datetime) — 장중(tf="1m"/"5m") 조건을 이 시점 이하로 자르고, 일봉은 asof 이하
+    def __init__(self, gw, prod, hist, cal, asof=None, answers=None):
+        """gw = TreeGateway. asof = 관측 시각(UTC datetime) — 장중(tf="1m"/"5m") 조건을 이 시점 이하로 자르고, 일봉은 asof 이하
         확정(settled) 봉만 본다(미확정 그날 일봉은 None). None 이면 실제 지금(일봉은 마지막 확정봉).
         answers = 사람이 답한 수동 {answer_key: 참/거짓} — 등급·금액·비중이 그 답으로 풀린다(서버 권위).
         None 이면 옛 동작 그대로."""
         index = gw.index(prod)
         self.gw, self.prod, self.index, self.cal, self.hist = gw, prod, index, list(cal), hist
         sc = session_closes(gw.symbols(), list(cal), asof)
-        mk = lambda m: Ctx(hist, cal, prod, index, manual_as=m, unobserved=unobserved,
-                           asof=asof, session_close=sc, answers=answers)
+        mk = lambda m: Ctx(hist, cal, prod, index, manual_as=m, asof=asof, session_close=sc, answers=answers)
         self.ctx = {True: mk(True), False: mk(False), None: mk(None)}
-
-        def s(node, m, do=None):
-            out = series(node, self.ctx[m])
-            # 묶음 전체가 빠지면(EXCLUDED) 그 동사는 제약 없음 — 매수 쪽 값(FAVOR)
-            return [(None if do is None else FAVOR[do]) if x is EXCLUDED else x for x in out]
-        self.opt = {do: s(gw.gate(prod, do), FAVOR[do], do) for do in GATES}
-        self.pes = {do: s(gw.gate(prod, do), not FAVOR[do], do) for do in GATES}
+        s = lambda node, m: series(node, self.ctx[m])
+        self.opt = {do: s(gw.gate(prod, do), FAVOR[do]) for do in GATES}
+        self.pes = {do: s(gw.gate(prod, do), not FAVOR[do]) for do in GATES}
         w = gw.weight(prod).qty.x                # 비중 식(Qty "cash") — None = 저자 미명시
         self.weight = {m: (s(w, m) if w is not None else None) for m in (None, True, False)}
         # 데이터 완전성 가드 — 이 상품 등급이 실제로 쓰는 가장 긴 워밍업(트리에서 파생, 하드코딩 아님).
@@ -1074,16 +1036,9 @@ class ProductEval:
                      for n in _top_labeled(self.gw.gate(self.prod, do))] for do in GATES}
 
     def manual_items(self, i=None):
-        """사람 확인이 필요한 조건 [(동사, 라벨, ref)] — 판다(보유분)는 뺀다. i 를 주면 그날 관측된 observe 조건은 뺀다."""
-        out = []
-        for z, _l, _r, node in self.gw.expressions(self.prod):
-            if z == SELL:
-                continue
-            for n in manual_leaves(node):
-                if i is not None and "observe" in n and series(n["observe"], self.ctx[None])[i] is not None:
-                    continue
-                out.append((z, n.get("label") or manual_text(n), n.get("ref")))
-        return out
+        """사람 확인이 필요한 조건 [(동사, 라벨, ref)] — 판다(보유분)는 뺀다."""
+        return [(z, n.get("label") or manual_text(n), n.get("ref"))
+                for z, _l, _r, node in self.gw.expressions(self.prod) if z != SELL for n in manual_leaves(node)]
 
 
 def _top_labeled(node):
@@ -1171,8 +1126,6 @@ class Cond:
                 {"minsince"|"maxsince": [c, s]}  c 가 마지막으로 참이었던 날부터 오늘까지 s 의 최저/최고
   여러 종목     {"across": {"syms": [...], "cond": c}}   c 가 참인 종목 수(c 안에서 "$s" = 그 종목)
   수동          {"manual": "사유"}
-  관측·수동     {"observe": c, "manual": "사유"}   c 를 계산할 수 있으면 그 값, 모름이면 수동처럼(manual_as) 푼다
-                (평가기 기능 — 작성 규칙은 역할 문서. 추출 지침은 이 노드를 쓰라고 하지 않는다).
   포지션        {"pos": "ret"|"days"|"maxret"|"minret"|"filled"|"sold"}   판다·2차 이후 분할(산다) 갈래 안에서만.
                 ret = 평균 매입가 대비 오늘 종가 수익률(%), days = 첫 매수일부터 지난 봉(첫 매수일 0),
                 maxret/minret = 첫 매수일~오늘 종가 수익률의 최고/최저. 매수 전 날은 None.
@@ -1211,8 +1164,6 @@ class Cond:
     _window = _window
     _and3 = _and3
     _or3 = _or3
-    _Excluded = _Excluded
-    EXCLUDED = EXCLUDED
     _NON_DAILY = _NON_DAILY
     _daily_axis = _daily_axis
     series = series

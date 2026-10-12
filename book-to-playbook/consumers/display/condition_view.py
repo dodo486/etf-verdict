@@ -141,7 +141,7 @@ def _measure(node, ctx, i, top=True):
     하위에 라벨 달린 조건이 있으면 멈춘다(그 조건이 자기 증거를 따로 보여준다)."""
     if not isinstance(node, dict):
         return []
-    if not top and (node.get("label") or Cond.is_manual(node) or "observe" in node):
+    if not top and (node.get("label") or Cond.is_manual(node)):
         return []
     try:
         op = Cond._op_of(node)
@@ -166,8 +166,6 @@ def _measure(node, ctx, i, top=True):
         kids = node[op]
     elif op == "atleast":
         kids = node["of"]
-    elif op == "observe":
-        kids = [node["observe"]]
     else:
         return []
     facts = []
@@ -184,7 +182,7 @@ def _view(node, ctx, i):
     · 그 밖의 노드는 그날 값(v)이 고정된 잎이다. 라벨이 없으면 hidden(화면에 안 보이지만 계산엔 쓴다),
       안쪽에 라벨 달린 노드가 있으면 참고용 kids(op 없음 — 다시 계산하지 않는다)로 붙인다.
     v 는 수동 = 모름(None)으로 둔 그날 값이다."""
-    skip = ("of", "sym", "tf", "else") + (("manual",) if "observe" in node else ())
+    skip = ("of", "sym", "tf", "else")
     op = next((k for k in node if k not in Cond.META and k not in skip), None)
     item = {"v": Cond.series(node, ctx)[i]}
     for k in ("label", "ref", "note"):
@@ -212,11 +210,8 @@ def _view(node, ctx, i):
         # 저자가 숫자를 안 준 식("?") — 사람이 정하는 수동 잎. 답을 묶는 열쇠는 식(문장 아님 — 같은 식 = 같은 질문).
         item["manual"] = Cond.UNKNOWN_REASON
         item["mkey"] = Cond.manual_key(node)
-    elif op in ("manual", "observe"):
+    elif op == "manual":
         item["manual"] = node["manual"]
-        if op == "observe":
-            item["observed"] = True              # v 가 있으면 관측값(자동), 없으면 사람 확인
-            item["kids"] = [_view(node["observe"], ctx, i)]
     else:
         inner = [_view(k, ctx, i) for k in _labeled_inside(node)]
         if inner:
@@ -225,7 +220,7 @@ def _view(node, ctx, i):
             item["hidden"] = True
     # 측정 증거 — 화면에 보이는 조건(라벨/수동/관측)에 그날 실제 값을 붙인다. "?" 식이면 알려진 쪽 값이
     #   근거 숫자다(기준은 저자가 안 줬으니 사람이 그 숫자를 보고 참/거짓을 고른다 — 깜깜이 판단 방지).
-    if node.get("label") or Cond.is_manual(node) or "observe" in node:
+    if node.get("label") or Cond.is_manual(node):
         facts = _measure(node, ctx, i)
         if facts:
             item["detail"] = facts
