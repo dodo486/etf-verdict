@@ -6,14 +6,15 @@
 
 ## 0. 다음에 할 일 (한 줄)
 
-**run3 — moneycopy 의 심판·사례를 v3 로 다시 뽑기(키스톤).** 코드는 3동사(안 산다·산다·판다)로 바뀌었고, 남은 정지는
-옛 데이터(칸 단위 `review`·옛 칸 사례·규칙 `why` 없음)뿐이다. 남은 v3 코드 일(새 기본 부품 등)은 3절.
+**run3 — moneycopy 트리·사례를 v3 로 다시 뽑기(키스톤).** 코드는 3동사·조합 문법으로 바뀌었고, 지금 moneycopy
+tree.json 은 지운 연산(pct·count·streak)·옛 `review` 키 때문에 **문법 검사에서 멈춘다 — 판정 화면·백테스트도 run3 전까지 안 돈다**
+(사용자 확정: 트리는 다시 뽑는다). 남은 v3 코드 일(새 기본 부품 등)은 3절.
 
 ## 1. 지금 상태
 
-- `python -m entry.run check` — 정지 2건이 정상: `verify_tree --contract`(trend 에 tree.json 없음) · `verify_tree`(moneycopy:
-  맨 위 `review` 키 · 옛 칸 사례 29건 · a·b 합의 안 한 규칙의 `why` 없음 등 — run3 에서 사라진다). 나머지 6개 통과.
-- 판정 화면·백테스트는 moneycopy `tree.json`(v3)으로 돈다. 화면 머리글 ①안 산다 ②산다 ③판다 ④얼마나.
+- `python -m entry.run check` — 정지 2건이 정상: `verify_tree --contract`(trend 에 tree.json 없음 · moneycopy 트리 문법) ·
+  `verify_tree`(같은 이유 — run3 에서 사라진다). 나머지 6개 통과.
+- 화면 머리글 ①안 산다 ②산다 ③판다 ④얼마나(트리가 다시 생기면 그대로 그린다).
 - 전후 비교: 시세를 `ETF_DEV_CACHE=<캐시 폴더>` 로 고정하고 판정 JSON(`verdict_view.render`)·백테스트(`runner.run`)를 떠서 diff.
 
 ## 2. 2026-10-12 해결된 것 (브랜치 `work/v3-verbs`)
@@ -27,6 +28,9 @@
 | `3ca66ed` | 지운 전용 지표 연산(ma·ema·stdev·rsi) 흔적 삭제 + 주인 표 '지운 연산'(되살림 정지) |
 | `03c6ac7` | 책 페이지 백테스트 탭이 옛 `web/ui/` 경로 때문에 영영 안 붙던 버그 — 총수익·MDD·샤프·자산곡선이 이제 보인다 |
 | `9781828` | `observe` 레거시(관측·수동 노드·백테스트 제외 모드 EXCLUDED) 삭제 |
+| `f24c4c1` | 전용 연산 `pct`·`count`·`streak` 삭제 → 조합(변화율 = (s÷lag−1)×100 · sum(case) · barssince(not c)) — 지침 갱신 |
+| `7090c7b` | 트리 형식 검사 강화(모르는 키·옛 키·동사별 qty 종류 거부) + 판다 `repeat` 구현 |
+| `9865ddd` | **`pos filled`·`sold` 가 minret 으로 계산되던 조용한 버그** — 백테스트 체결 장부로 구현 |
 
 ## 3. 남은 일 (순서대로)
 
@@ -40,11 +44,10 @@
 ### 5-남음. 트리 v3 코드 반영의 나머지 (초안 `docs/action-grammar-draft.md` 9절·5절)
 - **새 기본 부품**: 세션 시작 · `sumsince` · `smooth`(EMA 2/(n+1)·Wilder 1/n) · `sqrt` · 순위(후보 종목 중) — 후보: 세션 경과
   시간(개장 캘린더 `md_feed.sessions().open`). **pandas 로 다시 구현**(지금 Cond 는 순수 파이썬 반복문).
-- `pct`·`count`·`streak` 정리 여부 — 초안 9절은 삭제지만 지금 트리(moneycopy)가 쓰고 `COND_DSL` 6절이 조합 예시로 둔다.
-  새 부품이 들어온 뒤 지침과 같이 정한다(사용자 결정). 지우면 `Cond.GONE_OPS` 에 넣는다.
 - 검사기 남은 것(JUDGE 5절 중 기계로 아직 못 보는 것): 판정 같은 조건의 포함관계(시세 없이 논리로) · 효과 없는 규칙(결과를
   바꾼 날 0일) · 원문 소절 누락(어느 규칙 ref 에도 없는 판단 소절) · 충실성(식 되는데 skip) · 결정 쪼개짐/흩어짐 · `ref` 형식(`·`).
-  qty 형식 검사(`of` ∈ cash·budget·bought·held, 판다는 bought·held)도 출입구 validate 에.
+- 산다(분할)의 `repeat`("~할 때마다 더 산다")는 연산 없음으로 거부 중 — 원문이 요구하면 체결 워크에 구현.
+- 라이브 보유 화면의 `pos filled`·`sold` 는 모름(positions.json 에 차수별 체결 기록이 없다) — 필요하면 positions.json 형식 확장.
 - 장중 데이터가 없을 때 조건은 모름(None)이다 — 분봉 없음을 자동으로 수동(🟡)/백테스트 제외로 돌리는 처리가 필요하면 새 기능으로
   (옛 `observe` 는 지웠다).
 - 초안 문서는 위가 끝나면 지침(`COND_DSL`·`EXTRACTOR`·`JUDGE`·`SCENARIO`)으로 옮기고 지운다(초안 머리말 규칙).
