@@ -50,7 +50,7 @@ from shared.paths import book_file, live_slugs, source_index_json
 from dsl.tradeTool import Cond, Grade
 from market import md_feed
 from signals.judge import Holding, Judge
-from authoring.checklist.compare import (COMPARED, compare, evaluate, factorable, history, load_tree, logic_key,
+from authoring.checklist.compare import (COMPARED, compare, evaluate, factorable, history, logic_key,
                                          rule_keys, window)
 
 Candle = namedtuple("Candle", "date open high low close volume")
@@ -425,7 +425,7 @@ def check_book(slug, years):
     if gaps:
         stop.append("%s 티커 \"?\" 남음 %d개" % (slug, len(gaps)))
         print("  ❌ 시세 잎 티커(sym)에 \"?\" 남음(사용자 확인): %s" % gaps[:5])
-    ta, tb = load_tree(slug, "tree_candidates/a.json"), load_tree(slug, "tree_candidates/b.json")
+    ta, tb = Judge.read(slug, "a"), Judge.read(slug, "b")
     for t in (ta, tb):
         if t:
             try:
@@ -521,7 +521,7 @@ def contract(slug):
         bad.append("source_index.json 없음/깨짐: %s" % e)
         keys = set()
     try:
-        tree = Judge.read(slug, "tree.json")
+        tree = Judge.read(slug)
         if not tree:
             raise ValueError("tree.json 없음")
         tree.validate()

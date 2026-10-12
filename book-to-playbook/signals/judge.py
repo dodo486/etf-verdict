@@ -251,9 +251,9 @@ class Judge:
         return None if tree is None else cls(slug, tree)
 
     @classmethod
-    def read(cls, slug, name):
-        """책 폴더의 다른 트리(후보 tree_candidates/a.json 등)를 검사 없이 연다. 없으면 빈 판단자(거짓)."""
-        return cls(slug, TreeGateway.read(slug, name))
+    def read(cls, slug, which=None):
+        """책의 트리를 형식 검사 없이 연다 — which = None(최종) · "a"·"b"(추출자 후보). 없으면 빈 판단자(거짓)."""
+        return cls(slug, TreeGateway.read(slug, which))
 
     @classmethod
     def of(cls, data, slug="합성"):

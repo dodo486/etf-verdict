@@ -62,7 +62,7 @@ tree.json 은 지운 연산(pct·count·streak)·옛 `review` 키·옛 종목 �
 ### 그 뒤
 - **트리 출입구 강제의 빈틈** — 주인 표 '트리 원본 키'는 `r["rules"]`·`.get("then")` 꼴만 잡는다. `"then" in r`·흔한 키
   (`when`·`qty`)·`book_file(slug, "tree.json")` 직접 열기는 안 잡힌다(지금 위반은 0). 출입구 밖에서 `"tree.json"`·`"tree_candidates"`
-  를 파일 열기에 넘기면 정지하는 줄을 주인 표에 · 후보 파일 이름(`tree_candidates/a.json`…)이 compare·verify_tree 에 흩어진 것을 출입구로.
+  를 파일 열기에 넘기면 정지하는 줄을 주인 표에. (후보 파일 이름은 출입구 `tree_gateway.FILES` 한 곳으로 모음 — `Judge.read(slug, "a")`)
 - **백테스트 계산기 버그** — `portfolio` 가 1 unit = 시작자본 고정이라 손실 뒤 다음 진입이 남은 현금보다 클 수 있다
   (옛 표준 매도 사본에서 SOXL −162% 관측). 잔고 기준 사이징으로.
 - **장중 손익 백테스트**(분봉 ~7일뿐이라 보류 — 되살릴 땐 통일 신호 경로 위에 재구현) · tree 재생성 뒤
@@ -89,5 +89,6 @@ python -m authoring.checklist.verify_tree <slug>        # 트리 채점
 python -m authoring.checklist.verify_tree --quick   # 트리 계약(소절·트리 문법·ref)
 python -m consumers.display.verify_page         # 책 페이지 구획·UI 사본
 python -m authoring.checklist.compare <slug> 6   # 심판 비교 도구(a·b 덤프)
+python -m entry.serve  → http://localhost:8799/<slug>/?tree=a   # 소절별 원시 트리(🌲 규칙)를 후보 a(·b)로 보기
 python -m consumers.backtest.verify_trading --parity     # 판정 = 백테스트 일치(시세 필요)
 ```

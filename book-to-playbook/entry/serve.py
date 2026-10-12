@@ -9,6 +9,7 @@
 엔드포인트
   GET /                셸(책 선택) — 좌측 책목록 + 본문 iframe. 책을 눌러도 셸은 그대로, 본문만 바뀐다.
   GET /<slug>/         그 책 페이지 — 요청 시점 라이브 판정을 구워 넣는다(assemble).
+  GET /<slug>/?tree=a  같은 페이지인데 소절별 원시 트리(🌲 규칙)만 추출자 후보 a(·b)로 — 심판 전 후보 확인용.
   GET /api/verdict?slug=<책>  판정 JSON(라이브). 엔진(books.json engine.daily) --json 재사용 + 짧은
                      TTL 캐시(기본 8초, 책별)로 잦은 폴링이 시세 창구를 안 두드리게. CORS 허용.
   POST /api/verdict   body {slug, answers:{답 열쇠: true|false}} — 화면에서 사람이 답한 수동 조건까지 반영한 판정
@@ -121,15 +122,15 @@ def _answers_of(body):
     return req.get("slug"), ans
 
 
-def render_page(slug):
+def render_page(slug, tree=None):
     """책 slug 페이지 HTML — 요청 시점의 라이브 판정(내 포지션 포함)을 구워 넣는다. 조립은 assemble 하나로.
-    판정 계산이 실패해도 페이지는 내보낸다(프런트가 폴링으로 재시도)."""
+    판정 계산이 실패해도 페이지는 내보낸다(프런트가 폴링으로 재시도). tree = 원시 트리 보기에 쓸 후보("a"·"b", ?tree=)."""
     from consumers.display.book_page import assemble
     try:
         data, _ = compute_verdict(slug)
     except Exception:
         data = None
-    return assemble(slug, data).encode("utf-8")
+    return assemble(slug, data, tree).encode("utf-8")
 
 
 def render_shell():
@@ -181,7 +182,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._serve_shell()
         m = re.match(r"^/([^/]+)/(?:index\.html)?$", route)
         if m and m.group(1) in _slugs():
-            return self._serve_page(m.group(1))
+            tree = (urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("tree") or [None])[0]
+            return self._serve_page(m.group(1), tree if tree in ("a", "b") else None)
         return super().do_GET()
 
     def do_POST(self):
@@ -208,9 +210,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._send(("셸 렌더 실패: %s" % ex).encode("utf-8"), "text/plain; charset=utf-8", 500)
         self._send(body, "text/html; charset=utf-8")
 
-    def _serve_page(self, slug):
+    def _serve_page(self, slug, tree=None):
         try:
-            body = render_page(slug)
+            body = render_page(slug, tree)
         except Exception as ex:
             body = ("페이지 렌더 실패: %s" % ex).encode("utf-8")
             return self._send(body, "text/plain; charset=utf-8", 500)

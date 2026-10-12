@@ -23,11 +23,6 @@ COMPARED = Cond.GATES + ("weight",)                   # 날마다 비교하는 �
 SHAPES = COMPARED + (Cond.SELL,)                       # 모양(식)을 비교하는 것
 
 
-def load_tree(slug, name):
-    """후보 트리(검사 전) — 트리·시세는 판단자(Judge) 하나로. 없으면 빈 판단자(거짓)."""
-    return Judge.read(slug, name)
-
-
 # ------------------------------------------------------------------ 실제 시세 평가
 def history(books, years):
     return Judge.shared_prices([b for b in books if b], int(365 * years))
@@ -441,7 +436,7 @@ def render_zone(zd):
 
 
 def dump_disagreements(slug, per, years):
-    ta, tb = load_tree(slug, "tree_candidates/a.json"), load_tree(slug, "tree_candidates/b.json")
+    ta, tb = Judge.read(slug, "a"), Judge.read(slug, "b")
     ta.validate()
     tb.validate()
     hist = history([ta, tb], years)

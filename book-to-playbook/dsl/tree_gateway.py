@@ -27,6 +27,8 @@ BLOCK, BUY, SELL = Cond.BLOCK, Cond.BUY, Cond.SELL
 # 트리 v3 파일 형식(COND_DSL 1·5절) — 여기 밖의 키는 거부한다(옛 양식·오타를 조용히 무시하지 않는다).
 TOP_KEYS = ("version", "products", "rules", "note")
 PRODUCT_KEYS = ("ref", "note")
+# 책 폴더 안의 트리 파일 — 어느 트리(최종 None · 추출자 후보 "a"·"b")가 어느 파일인지는 여기 한 곳.
+FILES = {None: "tree.json", "a": "tree_candidates/a.json", "b": "tree_candidates/b.json"}
 RULE_KEYS = ("label", "ref", "note", "on", "value", "then", "skip", "why")
 BRANCH_KEYS = ("when", "do", "qty", "repeat")
 QTY_OF = {BUY: ("cash", "budget"), SELL: ("bought", "held")}   # 동사마다 쓸 수 있는 qty 종류(안 산다는 qty 없음)
@@ -136,21 +138,24 @@ class TreeGateway:
 
     # ---------------------------------------------------------------- 읽기
     @staticmethod
-    def path(slug, name="tree.json"):
-        return book_file(slug, name)
+    def path(slug, which=None):
+        """트리 파일 경로 — which = None(최종 tree.json) · "a"·"b"(추출자 후보). 모르는 이름이면 CondError."""
+        if which not in FILES:
+            raise Cond.CondError("모르는 트리 %r (허용 %s)" % (which, " · ".join(str(k) for k in FILES)))
+        return book_file(slug, FILES[which])
 
     @classmethod
     def open(cls, path):
         return cls(json.load(open(path, encoding="utf-8")))
 
     @classmethod
-    def read(cls, slug, name="tree.json"):
-        p = cls.path(slug, name)
+    def read(cls, slug, which=None):
+        p = cls.path(slug, which)
         return cls.open(p) if os.path.exists(p) else None
 
     @classmethod
-    def load(cls, slug, name="tree.json"):
-        t = cls.read(slug, name)
+    def load(cls, slug, which=None):
+        t = cls.read(slug, which)
         if t is not None:
             t.validate()
         return t
