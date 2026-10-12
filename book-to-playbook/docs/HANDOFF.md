@@ -2,68 +2,58 @@
 
 > 할 일은 이 파일에만 적는다(다른 곳에 TODO 파일을 만들지 않는다 — `verify_code` 가 막는다).
 > 구조·원칙은 `docs/ARCHITECTURE.md`, 세션 규칙은 레포 맨 위 `CLAUDE.md`.
-> 마지막 갱신 2026-10-08 · 작업 브랜치 `work/pre-run3`(origin 푸시됨, `main` 에는 아직 안 합침).
+> 마지막 갱신 2026-10-12 · 작업 브랜치 `work/v3-verbs`(origin 푸시됨, `main` 에는 아직 안 합침).
 
 ## 0. 다음에 할 일 (한 줄)
 
-**트리 v3 모양 확정됨(2026-10-09) → 코드 반영(5) → run3(6).** 스펙 = `docs/action-grammar-draft.md`(모양 잠김: 규칙·동사 셋·
-`cond`·충실성 원칙·`ma` 삭제, UPRO 소절 시험 추출로 검증). 세부(qty 종류·부품 집합·상대 사이징)는 run3 에서 기운다.
+**run3 — moneycopy 의 심판·사례를 v3 로 다시 뽑기(키스톤).** 코드는 3동사(안 산다·산다·판다)로 바뀌었고, 남은 정지는
+옛 데이터(칸 단위 `review`·옛 칸 사례·규칙 `why` 없음)뿐이다. 남은 v3 코드 일(새 기본 부품 등)은 3절.
 
 ## 1. 지금 상태
 
-- tree.json 이 없다 → 판정 화면·백테스트는 tree 가 생겨야 돈다. `python -m entry.run check` 는 이 2건
-  (`verify_tree --contract`·`verify_tree` 의 "tree.json 없음")만 정지하고 나머지 6개 통과가 정상.
-- 검증용 픽스처: run2 후보 `books/moneycopy/tree_candidates/a.json` 을 잠깐 `tree.json` 으로 복사해 돌린다(커밋 금지).
-  시세는 `ETF_DEV_CACHE=<캐시 폴더>` 로 고정하면 전후 비교가 같은 값으로 된다.
+- `python -m entry.run check` — 정지 2건이 정상: `verify_tree --contract`(trend 에 tree.json 없음) · `verify_tree`(moneycopy:
+  맨 위 `review` 키 · 옛 칸 사례 29건 · a·b 합의 안 한 규칙의 `why` 없음 등 — run3 에서 사라진다). 나머지 6개 통과.
+- 판정 화면·백테스트는 moneycopy `tree.json`(v3)으로 돈다. 화면 머리글 ①안 산다 ②산다 ③판다 ④얼마나.
+- 전후 비교: 시세를 `ETF_DEV_CACHE=<캐시 폴더>` 로 고정하고 판정 JSON(`verdict_view.render`)·백테스트(`runner.run`)를 떠서 diff.
 
-## 2. 2026-10-08 해결된 것
+## 2. 2026-10-12 해결된 것 (브랜치 `work/v3-verbs`)
 
 | 커밋 | 내용 |
 |---|---|
-| `9a1dedc` | **TreeGateway** — tree.json 을 읽는 유일한 출입구(`checklist/tree_gateway.py`) |
-| `fdbc361` | 창 길이·lag 가 `"?"` 인 식에서 판정 화면이 죽던 버그 |
-| `005355b` | shared 분리 — DSL(문법·등급)은 `checklist/`, shared 는 시세 창구·경로만 |
-| `423cbdc` | 구간② a·b 비교는 규칙 식으로만(매매 시뮬레이션 비교 제거) |
-| `5caf628` | **trading/**(판정·백테스트·장중: Judge·Decision·Holding·Timeline) + **web/**(화면 가공 전부) |
-| `feadb10` | 책 산출물을 `books/<slug>/` 한 곳으로 |
-| `5fb6577` | 검사 정리 — `verify_code`(폴더 경계 + 주인 표) · `run check` 하나 |
-| `091fb09` | 지표별 전용 연산 계획(ATR·VWAP) 폐기 — 기본 부품 + 조합 예시로 |
-| `fa1c4e6` | `CLAUDE.md` · `docs/ARCHITECTURE.md` · 트리 v3 초안 |
-| `9df494a` | **표준 매도 폐지** — 매도 규칙 없는 책은 매수 신호 후 N일 보유 수익률로만(`trades.exit_policy`) |
-| `ea289b5` | **백테스트가 '얼마나' 반영** — 비중 × 분할 × 조심 배수, 수량 변환은 `trades.to_units` 하나(매수·매도 공통). 모름은 ×1·예산 100% + 횟수 표시 |
-| `a09b200` | **서버 권위** — 화면 JS 등급 재계산 삭제, 수동 체크는 `POST /api/verdict` 로 서버가 판정 |
-| 마지막 커밋 | 할 일 문서 통합(이 파일) — `checklist/TODO.md`·`trading/TODO.md`·`docs/web-consolidation-plan.md` 흡수·삭제 |
+| `d9b5d63` | 검사 픽스처를 v3 규칙 트리로(출입구 `rule`·`synthetic`) — 깨져 있던 원시함수·거래·화면 검사 복구 |
+| `40deda9` | **6칸 잔재의 꼬인 참조 정리**(판정·백테스트 불변) — v3→v2→Qty 왕복 번역·뒷문(raw_*)·조심/defs 경로 삭제, 칸 극성 표 하나 |
+| `b78fdb0` | **6칸 → 3동사** — 평가기·출입구(gate·weight·sells·skips)·판정 JSON(gates·size·sells·verbs)·화면·등급 글자(✅ 산다·⛔ 안 산다), 🚫·`grade_rules` 출력 삭제 |
+| `195187c` | **verify_tree v3** — 규칙 단위 a·b 비교 + `why`, 사례 = 그날 결과, 같은 식 두 벌·같은 이름 다른 식·skip 머리·"?" 심볼·옛 키 정지 |
+| `3ca66ed` | 지운 전용 지표 연산(ma·ema·stdev·rsi) 흔적 삭제 + 주인 표 '지운 연산'(되살림 정지) |
+| `03c6ac7` | 책 페이지 백테스트 탭이 옛 `web/ui/` 경로 때문에 영영 안 붙던 버그 — 총수익·MDD·샤프·자산곡선이 이제 보인다 |
+| `9781828` | `observe` 레거시(관측·수동 노드·백테스트 제외 모드 EXCLUDED) 삭제 |
 
 ## 3. 남은 일 (순서대로)
 
-### 5. 트리 v3 코드 반영 — 초안 `docs/action-grammar-draft.md` 확정 뒤
-- 칸 6개 → `rules` 하나(동사 안 산다·산다·판다, `qty {of, x}`, `"?"` 통일, `{"rule": 이름}`, 갈래, `skip`·`why`).
-  바꿀 곳은 `TreeGateway` 와 DSL(`checklist/`) 안 — 소비자는 이미 출입구 API·`Qty`·`to_units` 를 쓴다.
-- **계산기 부품 정리(초안 9절)**: `pct`·`rsi`·`count`·`streak`(·`ma` 검토) 삭제, `ema`→`smooth`, `stdev`→`sqrt`,
-  새 기본 부품(세션 시작·`sumsince`·`smooth`·`sqrt`·순위, 후보: 세션 경과 시간 — 개장 캘린더 `md_feed.sessions().open`).
-  **pandas 로 다시 구현.** 지울 흔적 목록은 초안 9절. 주인 표에 '지운 연산 이름 금지' 줄 추가.
-- 검사기 추가: 같은 식 두 벌 · 같은 값 다른 규칙 · 매일 결과 같음 · 효과 없는 규칙 · 원문 소절 누락 · `ref` 형식(`·`).
-- 지침 갱신: `COND_DSL`·`EXTRACTOR`(산출물 한 파일 — `--lint` 불필요)·`JUDGE`(판례 = 갈린 곳 → 사용자 승인 후 지침)·`SCENARIO`(기대값 = 그날 결과).
-- 옛 TODO 가 여기로 모였다: 매도 비율 `"?"`(③) · 이름 심볼 `names`(⑥) · 판례(⑧) · 누적 상한(`pos sold`) ·
-  규칙 목록 형식(`not`·항목 참조 = `{"rule"}`) · 세션 연산(기본 부품 조합) · verify_tree 읽기 쉬운 보기(v3 로 불필요해질 것).
-
 ### 6. run3 — tree.json 다시 만들기 (키스톤)
-- 순서: 구간① 전사 → 구간② 추출 a·b(서로·최종·사례 안 봄, 각자 다른 서브에이전트) → 사례 작성자(트리 안 봄) → 심판 →
-  `python -m verify.verify_tree <slug>` exit 0. 옛 후보·`scenarios.json` 은 폐기하고 새로.
-- 절차 정본 `authoring/checklist/README.md`, 역할 지침 `authoring/playbook/PLAYBOOK.md` · `authoring/checklist/EXTRACTOR.md` · `SCENARIO.md` · `JUDGE.md`.
+- 순서: 구간① 전사 → 구간② 추출 a·b(서로·최종·사례 안 봄, 각자 다른 서브에이전트) → 사례 작성자(트리 안 봄, `SCENARIO.md` —
+  기대값 = 그날 결과) → 심판(`JUDGE.md` — 규칙마다 `why`, `review` 없음) → `python -m verify.verify_tree <slug>` exit 0.
+  옛 후보·`scenarios.json`·`tree.json` 의 `review` 는 다시 뽑으면 없어진다(손으로 고치지 않는다).
 - 원문 위치 `authoring/playbook/book_sources.json`(trend = `books/trend/source.md`, moneycopy = `~/jhts/hypotheses/sources/미국-돈복사-ETF-투자방법.md`).
 - 끝나면 `main` 에 합치기(사용자 승인).
 
+### 5-남음. 트리 v3 코드 반영의 나머지 (초안 `docs/action-grammar-draft.md` 9절·5절)
+- **새 기본 부품**: 세션 시작 · `sumsince` · `smooth`(EMA 2/(n+1)·Wilder 1/n) · `sqrt` · 순위(후보 종목 중) — 후보: 세션 경과
+  시간(개장 캘린더 `md_feed.sessions().open`). **pandas 로 다시 구현**(지금 Cond 는 순수 파이썬 반복문).
+- `pct`·`count`·`streak` 정리 여부 — 초안 9절은 삭제지만 지금 트리(moneycopy)가 쓰고 `COND_DSL` 6절이 조합 예시로 둔다.
+  새 부품이 들어온 뒤 지침과 같이 정한다(사용자 결정). 지우면 `Cond.GONE_OPS` 에 넣는다.
+- 검사기 남은 것(JUDGE 5절 중 기계로 아직 못 보는 것): 판정 같은 조건의 포함관계(시세 없이 논리로) · 효과 없는 규칙(결과를
+  바꾼 날 0일) · 원문 소절 누락(어느 규칙 ref 에도 없는 판단 소절) · 충실성(식 되는데 skip) · 결정 쪼개짐/흩어짐 · `ref` 형식(`·`).
+  qty 형식 검사(`of` ∈ cash·budget·bought·held, 판다는 bought·held)도 출입구 validate 에.
+- 장중 데이터가 없을 때 조건은 모름(None)이다 — 분봉 없음을 자동으로 수동(🟡)/백테스트 제외로 돌리는 처리가 필요하면 새 기능으로
+  (옛 `observe` 는 지웠다).
+- 초안 문서는 위가 끝나면 지침(`COND_DSL`·`EXTRACTOR`·`JUDGE`·`SCENARIO`)으로 옮기고 지운다(초안 머리말 규칙).
+
 ### 그 뒤
-- **`observe` 레거시 제거** — 엔진(`dsl/tradeTool.py`)에만 남은 옛 포장재. 제대로 지우려면 "장중 데이터 없음 None →
-  실전 🟡 / 백테스트 EXCLUDED" 자동 처리를 먼저 깔아야 한다(워밍업 None 과 구별하는 표식 필요). tree 생긴 뒤 파리티로 증명.
-  영향: `dsl/tradeTool.py`(Cond·Grade) · `verify/verify_primitives` · `verify/verify_tree` · `consumers/backtest` · `authoring/checklist/COND_DSL.md`.
 - **백테스트 계산기 버그** — `portfolio` 가 1 unit = 시작자본 고정이라 손실 뒤 다음 진입이 남은 현금보다 클 수 있다
   (옛 표준 매도 사본에서 SOXL −162% 관측). 잔고 기준 사이징으로.
-- **판정 JSON 의 `grade_rules` 빼기** — 서버 권위 뒤 화면이 안 쓴다(다음 출력 변경 때).
-- **웹 백테스트 탭 지표 채우기**(총수익·MDD·샤프·자산곡선 — 표시 코드는 있음) · **장중 손익 백테스트**(분봉 ~7일뿐이라 보류 —
-  옛 CLI `replay`·`backtest.run_intraday` 는 `work/trading-cleanup` 정리에서 삭제했다. 되살릴 땐 통일 신호 경로 위에
-  재구현한다) · tree 재생성 뒤 `python -m verify.verify_trading --parity` 실측.
+- **장중 손익 백테스트**(분봉 ~7일뿐이라 보류 — 되살릴 땐 통일 신호 경로 위에 재구현) · tree 재생성 뒤
+  `python -m verify.verify_trading --parity` 실측.
 - **무인 판정을 막는 수동 조건** — (가) 연산으로 풀 것 = v3 기본 부품 조합 · (나) 데이터가 없는 것 = 실적 캘린더 · 뉴스 시각 ·
   지수 구성종목 등락(breadth) · 개인 매매 기록 — 외부 소스 생기기 전엔 서버 권위 수동 답으로 '1회 답'까지 · (다) 정성 판단 = 수동 답.
 - **이번 범위 밖**(트리 v3 에서 `skip` "연산 없음"으로 드러남): 계좌 전체 기준 · 종목 간 돈 이동 · 지난 매매 이력.
@@ -73,7 +63,7 @@
 | 문서 | 내용 |
 |---|---|
 | `docs/ARCHITECTURE.md` | 구조·원칙 12개·변경 규율·검사 |
-| `docs/action-grammar-draft.md` | 트리 v3 초안(미확정) |
+| `docs/action-grammar-draft.md` | 트리 v3 설계(모양 확정 — 남은 세부는 3절 5-남음) |
 | `authoring/checklist/README.md` 외 지침 | 구간② 절차·역할 |
 | `market/md_feed.py` docstring | jhts 일봉·분봉 계약(어댑터가 기대하는 것·반환 계약) |
 
@@ -82,6 +72,6 @@
 ```
 python -m entry.run check            # 전부(CHECKS 한 목록) — 요약 + 종료코드
 python -m verify.verify_code           # 코드 규칙 — 폴더 경계 + 주인 표
-python -m verify.verify_tree <slug>        # 트리 동작 (--contract = 책 계약)
+python -m verify.verify_tree <slug>        # 트리 동작 (--contract = 책 계약, --dump N = 심판 비교 도구)
 python -m verify.verify_trading --parity     # 판정 = 백테스트 일치(시세 필요)
 ```
