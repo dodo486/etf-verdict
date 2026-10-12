@@ -87,7 +87,7 @@ class Holding:
 
 # ================================================================ 상품 하나
 class ProductJudge:
-    """상품 하나의 판단자 — 생성 때 그 상품 규칙을 달력 전체로 한 번 계산해 둔다(Grade.ProductEval).
+    """상품 하나의 판단자 — 생성 때 그 상품 규칙을 달력 전체로 한 번 계산해 둔다(Grade.RuleSeries).
     rules = ProductRules(TreeGateway.product) · prices = 시세 묶음(Judge 가 받은 것) · days = 판정 달력(생략 = 이 상품 봉 날짜)
     · asof = 관측 시각(UTC datetime, None 이면 지금) · answers = 사람이 답한 수동 {Cond.answer_key: 참/거짓}."""
 
@@ -96,7 +96,7 @@ class ProductJudge:
         self._prices = prices
         self._bars = prices.get(self.product) or []
         self.days = [c.date for c in self._bars] if days is None else list(days)
-        self._series = Grade.ProductEval(rules, prices, self.days, asof, answers)
+        self._series = Grade.RuleSeries(rules, prices, self.days, asof, answers)
 
     # ------------------------------------------------------------ 상품·가격
     @property

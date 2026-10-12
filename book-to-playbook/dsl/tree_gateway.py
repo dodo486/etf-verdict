@@ -57,7 +57,7 @@ class Qty(namedtuple("Qty", "of x")):
     __slots__ = ()
 
 
-class Rule:
+class Branch:
     """갈래 하나(분할 차수·매도·비중)의 읽기 전용 값. 없는 필드는 None. qty = Qty(얼마나).
     repeat = 조건이 다시 맞을 때마다(판다 갈래만 — 기본은 한 번)."""
     __slots__ = ("label", "ref", "note", "when", "qty", "allprod", "repeat")
@@ -384,20 +384,20 @@ class TreeGateway:
                 if t.get("do") == do and (of is None or (t.get("qty") or {}).get("of") == of)]
 
     def weight(self, prod):
-        """비중 — 산다 갈래 중 qty cash 의 첫 갈래(Qty cash). 없으면 qty.x None 인 빈 Rule."""
+        """비중 — 산다 갈래 중 qty cash 의 첫 갈래(Qty cash). 없으면 qty.x None 인 빈 Branch."""
         for r, t in self._qty_branches(prod, BUY, "cash"):
-            return Rule(r.get("label"), r.get("ref"), r.get("note"), qty=_qty(t["qty"], expand=self._x_of(r)))
-        return Rule(qty=Qty("cash", None))
+            return Branch(r.get("label"), r.get("ref"), r.get("note"), qty=_qty(t["qty"], expand=self._x_of(r)))
+        return Branch(qty=Qty("cash", None))
 
     def tranches(self, prod):
         """분할 차수 — 산다 갈래 중 qty budget. 1차(산횟수 조건 없는 것)는 when None."""
-        return [Rule(r.get("label"), r.get("ref"), r.get("note"), when=self._when_of(r, t),
+        return [Branch(r.get("label"), r.get("ref"), r.get("note"), when=self._when_of(r, t),
                      qty=_qty(t["qty"], expand=self._x_of(r)), allprod=not r.get("on"))
                 for r, t in self._qty_branches(prod, BUY, "budget")]
 
     def sells(self, prod):
-        """판다 갈래 [Rule(when, qty bought/held)] — qty 없으면 남은 전량. 없으면 [](trades.exit_policy 가 정책을 정한다)."""
-        return [Rule(r.get("label"), r.get("ref"), r.get("note"), when=self._when_of(r, t),
+        """판다 갈래 [Branch(when, qty bought/held)] — qty 없으면 남은 전량. 없으면 [](trades.exit_policy 가 정책을 정한다)."""
+        return [Branch(r.get("label"), r.get("ref"), r.get("note"), when=self._when_of(r, t),
                      qty=_qty(t.get("qty"), Qty("held", 1.0), self._x_of(r)), allprod=not r.get("on"),
                      repeat=bool(t.get("repeat")))
                 for r, t in self._qty_branches(prod, SELL)]

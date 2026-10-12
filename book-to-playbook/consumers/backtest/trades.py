@@ -40,10 +40,10 @@ build_trades 결과(체결 일정)를 받아서 낸다. 매도 정책(책에 매
 import statistics
 from collections import namedtuple
 
-from dsl.tree_gateway import Qty, Rule
+from dsl.tree_gateway import Branch, Qty
 from signals.judge import Holding
 
-FULL = [Rule("전량", qty=Qty("budget", 1.0))]    # 한 번에 전량 — 분할이 없거나 비율 미명시일 때
+FULL = [Branch("전량", qty=Qty("budget", 1.0))]    # 한 번에 전량 — 분할이 없거나 비율 미명시일 때
 NO_EXIT_NOTE = "책에 매도 규칙 없음 — 매수 신호만 평가"   # 매도 정책 "none" 의 표시 문구(백테스트 탭·판정 화면이 받아 쓴다)
 
 

@@ -330,7 +330,7 @@ def m_gone_ops(src):
 
 # 판단자 — 트리 원본·시세 원본·조건 평가를 쓰는 곳은 판단자(signals/judge) 하나와 그 도구(dsl)뿐.
 GATEWAY_NAMES = {"TreeGateway", "ProductRules"}
-EVAL_ATTRS = {"series", "Ctx", "ProductEval"}                       # Cond.series·Cond.Ctx·Grade.ProductEval
+EVAL_ATTRS = {"series", "Ctx", "RuleSeries"}                       # Cond.series·Cond.Ctx·Grade.RuleSeries
 FETCH_ATTRS = {"history", "history_back", "History", "histories", "minutes", "sessions"}   # Grade.·md_feed. 시세 받기
 BAR_FIELDS = {"open", "high", "low", "close", "volume"}               # 캔들(시세 원본) 필드
 
@@ -351,7 +351,7 @@ def m_gateway_use(src):
 
 
 def m_evaluate(src):
-    """조건을 직접 평가하는 자리 — Cond.series·Cond.Ctx·Grade.ProductEval."""
+    """조건을 직접 평가하는 자리 — Cond.series·Cond.Ctx·Grade.RuleSeries."""
     if src.kind != "py":
         return []
     return [(n.lineno, fn, "%s.%s" % (n.value.id, n.attr)) for n, fn in _py_nodes(src.tree)
@@ -389,7 +389,7 @@ def m_labels(src):
             + [(ln, f, "grade_rules.json") for ln, f, v in lits if "grade_rules.json" in v])
 
 
-# 등급 사다리 — 날짜별 등급을 내는 함수(정본 grade.ProductEval.grade_key).
+# 등급 사다리 — 날짜별 등급을 내는 함수(정본 grade.RuleSeries.grade_key).
 LADDER_PY = {"grade_key"}
 LADDER_JS = (r"\bfunction\s+(?:gradeKey|and3|or3|ev)\s*\("
              r"|\b(?:const|let|var)\s+(?:gradeKey|and3|or3|ev)\s*=")

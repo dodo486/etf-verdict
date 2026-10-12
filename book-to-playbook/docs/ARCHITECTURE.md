@@ -16,7 +16,7 @@
 authoring/   books/<slug>/tree.json 을 만든다(전사·추출 a·b·심판) — 런타임과 분리, 명령으로만 돈다
   │ 산출물 books/<slug>/*.json
   ▼
-dsl/         조건 트리의 언어(공개 토대) — tree_gateway(읽는 유일 출입구) · tradeTool(Cond=문법/계산 · Grade·ProductEval=등급 수학, tf중립·asof)
+dsl/         조건 트리의 언어(공개 토대) — tree_gateway(읽는 유일 출입구) · tradeTool(Cond=문법/계산 · Grade·RuleSeries=등급 수학, tf중립·asof)
   ▼
 market/      시세 조달 — md_feed(jhts 어댑터, 유일한 시세 창구) · _dev_cache
   ▼
@@ -38,7 +38,7 @@ books/<slug>/  책 하나의 산출물 전부(playbook.html · source · source_
 |---|---|---|
 | `shared/` | 경로·인코딩·책 레지스트리 | `paths.py`(book_dir·book_file·books.json 레지스트리·live_slugs) |
 | `market/` | 시세 조달 — jhts 는 여기서만 | `md_feed.py`(histories·minutes·sessions) · `_dev_cache.py` |
-| `dsl/` | 조건 트리(tree.json)의 언어 — **DSL 의 주인** | `tree_gateway.py`(출입구) · `tradeTool.py`(Cond·Grade·ProductEval·History, +`grade_rules.json`) |
+| `dsl/` | 조건 트리(tree.json)의 언어 — **DSL 의 주인** | `tree_gateway.py`(출입구) · `tradeTool.py`(Cond·Grade·RuleSeries·History, +`grade_rules.json`) |
 | `feed/` | 라이브 틱 피더(pub-sub 버스) — 시세 모름 | `bus.py`(`Bus` 구독/발행 · `Poller` 틱 구동) · `feed.py`(`Feed`=Bus+run · `watch` 장중 루프) |
 | `signals/` | 판단자 — 트리·시세 원본의 유일한 사용자 → 판정 데이터 (돈·화면 모름) | `judge.py`(**Judge** 책 하나: 트리 열기·시세 받기·라이브 decisions·백테스트 signals·소절 반영 coverage·검사기 질문 · **ProductJudge** 상품 하나: 등급·decide·설명·보유 status·체결용 conditions·price · Holding · Decision 그릇) · `explain.py`(판단 근거 설명 — judge 만 부름) |
 | `consumers/` | 신호를 받아 쓰는 소비자(서브폴더로 구분) | **backtest** `{trades,portfolio,runner}.py`(체결·매도 정책 · 돈·수수료 · 러너, +`market_config.json`) · **notify** `{telegram,desktop}.py` · **display** `verdict_view.py`(판정→화면 JSON·사유 문장) · `backtest_page.py` · `book_page.py` · `build_home.py` · `inject_*.py` · `ui/*.js` |
@@ -108,7 +108,7 @@ feed.price_bus (1개) ──틱 {ts, trees, hist}── fan-out ─┬───�
 | 동사·등급 이름표(안 산다·산다·판다 · 등급 글자) | `dsl/tradeTool.py`(Cond.VERBS·Grade.GRADES) · `grade_rules.json` |
 | 등급 사다리(날짜별 등급 계산) | `dsl/tradeTool.py`(Grade) — 화면은 다시 계산하지 않음(수동 답은 `POST /api/verdict`) |
 | 트리 출입구 사용(TreeGateway·ProductRules) | `signals/judge.py` (+ 도구 `dsl/`) |
-| 조건 평가(Cond.series·Ctx·ProductEval — 책 내용대로 판단) | `signals/judge.py` · `signals/explain.py` (+ 도구 `dsl/`) |
+| 조건 평가(Cond.series·Ctx·RuleSeries — 책 내용대로 판단) | `signals/judge.py` · `signals/explain.py` (+ 도구 `dsl/`) |
 | 시세 원본(받기·캔들 필드) | `signals/judge.py` (+ 도구 `dsl/tradeTool.py` · 창구 `market/`) |
 | 지운 연산(ma·ema·stdev·rsi·pct·count·streak — `Cond.GONE_OPS`) | 어디서도 쓰지 않는다 |
 | 할 일 목록 | `docs/HANDOFF.md` (다른 곳에 TODO 파일 금지) |

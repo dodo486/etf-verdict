@@ -3,7 +3,7 @@
 """조건 트리 DSL 평가 한 파일 — Cond(문법·평가) · Grade(등급·금액·수집).
 
 Cond  = 규칙의 단일 문법과 평가기(책 무관). 호출: Cond.series(node, ctx) 등.
-Grade = 날짜별 등급·금액·비중 + 시세 조달. 호출: Grade.ProductEval(...) · Grade.history_back(...).
+Grade = 날짜별 등급·금액·비중 + 시세 조달. 호출: Grade.RuleSeries(...) · Grade.history_back(...).
 
 두 클래스는 아래 모듈 수준 정의를 묶는 '공개 얼굴'이다. 내부끼리는 모듈 이름으로 부른다.
 공개 DSL 은 이 두 클래스뿐(verify_code.PUBLIC_DSL). 공통 직렬화: python -m dsl.tradeTool fmt <파일...>
@@ -693,7 +693,7 @@ def _series(node, ctx, s_sym):
 # 트리 파일의 키 배치·형식 검사·탐색은 dsl/tree_gateway.py(TreeGateway) 하나가 맡는다 — 여기는 동사의 이름과 뜻만.
 BLOCK, BUY, SELL = VERBS = ("안 산다", "산다", "판다")
 GATES = (BLOCK, BUY)                                    # 등급을 내는 동사(포지션 없이 그날 본다) — 판다는 보유분에만
-FAVOR = {BLOCK: False, BUY: True}                       # 그 동사의 갈래가 '매수 쪽'인 값 — 극성(수동 가정·빠진 묶음의 중립값)
+BUY_SIDE = {BLOCK: False, BUY: True}                       # 그 동사의 갈래가 '매수 쪽'인 값 — 극성(수동 가정·빠진 묶음의 중립값)
 
 
 def _uses_pos(node):
@@ -914,22 +914,22 @@ def session_closes(symbols, cal, asof):
     return out
 
 
-class ProductEval:
+class RuleSeries:
     """한 상품의 등급 동사(안 산다·산다)·비중을 전체 달력에 대해 한 번 계산해 둔다."""
 
-    def __init__(self, rules, hist, cal, asof=None, answers=None):
+    def __init__(self, rules, prices, days, asof=None, answers=None):
         """rules = 상품 하나의 규칙 묶음(TreeGateway.product — ProductRules). asof = 관측 시각(UTC datetime) — 장중(tf="1m"/"5m") 조건을 이 시점 이하로 자르고, 일봉은 asof 이하
         확정(settled) 봉만 본다(미확정 그날 일봉은 None). None 이면 실제 지금(일봉은 마지막 확정봉).
         answers = 사람이 답한 수동 {answer_key: 참/거짓} — 등급·금액·비중이 그 답으로 풀린다(서버 권위).
         None 이면 옛 동작 그대로."""
-        prod, index = rules.product, rules.index
-        self.rules, self.prod, self.index, self.cal, self.hist = rules, prod, index, list(cal), hist
-        sc = session_closes(rules.symbols(), list(cal), asof)
-        mk = lambda m: Ctx(hist, cal, prod, index, manual_as=m, asof=asof, session_close=sc, answers=answers)
+        product, index = rules.product, rules.index
+        self.rules, self.product, self.index, self.days, self.prices = rules, product, index, list(days), prices
+        sc = session_closes(rules.symbols(), list(days), asof)
+        mk = lambda m: Ctx(prices, days, product, index, manual_as=m, asof=asof, session_close=sc, answers=answers)
         self.ctx = {True: mk(True), False: mk(False), None: mk(None)}
         s = lambda node, m: series(node, self.ctx[m])
-        self.opt = {do: s(rules.gate(do), FAVOR[do]) for do in GATES}
-        self.pes = {do: s(rules.gate(do), not FAVOR[do]) for do in GATES}
+        self.opt = {do: s(rules.gate(do), BUY_SIDE[do]) for do in GATES}
+        self.pes = {do: s(rules.gate(do), not BUY_SIDE[do]) for do in GATES}
         w = rules.weight().qty.x                # 비중 식(Qty "cash") — None = 저자 미명시
         self.weight = {m: (s(w, m) if w is not None else None) for m in (None, True, False)}
         # 데이터 완전성 가드 — 이 상품 등급이 실제로 쓰는 가장 긴 워밍업(트리에서 파생, 하드코딩 아님).
@@ -946,61 +946,61 @@ class ProductEval:
         캘린더가 없거나 asof 가 없으면(라이브 지금) settled_map 이 no-op(None) → 날짜 index 그대로(항등)."""
         ctx = self.ctx[None]
         syms = sorted({ctx.bind(s) for s in self.rules.symbols()
-                       if not s.startswith("$")} | {self.prod}
+                       if not s.startswith("$")} | {self.product}
                       | ({ctx.bind("$index")} if self.index else set()))
         maps = [ctx.settled_map(s) for s in syms]
         out = []
-        for i in range(len(self.cal)):
+        for day in range(len(self.days)):
             idxs = []
             for m in maps:
-                idxs.append(i if m is None else m[i])   # None map = 가리지 않음(항등)
+                idxs.append(day if m is None else m[day])   # None map = 가리지 않음(항등)
             out.append(-1 if any(x is None for x in idxs) else min(idxs))
         return out
 
-    def incomplete(self, i):
-        """i 번째 봉의 1d 등급이 '불완전 데이터'인가 — 확정 봉이 필요 워밍업보다 적으면 True.
+    def incomplete(self, day):
+        """그날(day) 1d 등급이 '불완전 데이터'인가 — 확정 봉이 필요 워밍업보다 적으면 True.
         확정 index(가장 늦은 심볼 기준)가 warmup 미만이면 가장 긴 창이 덜 차 신호가 신뢰불가다."""
-        return self._confirmed[i] < self.warmup
+        return self._confirmed[day] < self.warmup
 
     # ---------------------------------------------------------------- 등급
-    def grade_key(self, i):
+    def grade_key(self, day):
         # 데이터 완전성 가드 — 워밍업이 모자란 봉은 확신 판정을 내지 않고 '판정 불가(불완전 데이터)'로 둔다.
         #   (조용히 None 이 섞인 opt/pes 로 ✅/🚫 를 내면 모르고 매매하게 된다 — 정직성 원칙.)
-        if self.incomplete(i):
+        if self.incomplete(day):
             return "unknown"
         # grade_rules.json 을 위에서 아래로 본다 — when 의 모든 동사가 맞는 첫 규칙이 이긴다.
         # 값은 3값(True/False/None) — 'is' 로 정확히 맞춘다(None 은 True·False 어디에도 안 맞는다).
         views = {"opt": self.opt, "pes": self.pes}
         for rule in GRADE_RULES["rules"]:
             view = views[rule["view"]]
-            if all(view[do][i] is want for do, want in rule["when"].items()):
+            if all(view[do][day] is want for do, want in rule["when"].items()):
                 return rule["key"]
         return GRADE_RULES["default"]
 
     # ---------------------------------------------------------------- 비중
-    def weight_of(self, i):
+    def weight_of(self, day):
         """그날 비중(%) — 수동 때문에 모르면 (None, [가능한 값들]) 로 범위를 함께 돌려준다."""
         if self.weight[None] is None:
             return None, None
-        v = self.weight[None][i]
+        v = self.weight[None][day]
         if v is not None:
             return v, None
-        alt = sorted({x for x in (self.weight[True][i], self.weight[False][i]) if x is not None})
+        alt = sorted({x for x in (self.weight[True][day], self.weight[False][day]) if x is not None})
         return None, alt or None
 
     # ---------------------------------------------------------------- 설명
-    def explain(self, i):
+    def explain(self, day):
         """라벨 달린 노드의 그날 값 — 수동은 '모름'(None)으로 둔 평가. {동사: [(label, ref, 값)]}"""
-        return {do: [(n.get("label"), n.get("ref"), series(n, self.ctx[None])[i])
+        return {do: [(n.get("label"), n.get("ref"), series(n, self.ctx[None])[day])
                      for n in labeled(self.rules.gate(do))] for do in GATES}
 
-    def top(self, i):
+    def top(self, day):
         """동사마다 맨 위 라벨 노드들의 그날 값(사유 문장용 — 안쪽 노드까지 늘어놓으면
         not 아래의 '거짓 = 정상' 노드가 '미충족'으로 읽힌다). 수동은 모름(None)."""
-        return {do: [(n.get("label"), n.get("ref"), series(n, self.ctx[None])[i])
+        return {do: [(n.get("label"), n.get("ref"), series(n, self.ctx[None])[day])
                      for n in _top_labeled(self.rules.gate(do))] for do in GATES}
 
-    def manual_items(self, i=None):
+    def manual_items(self, day=None):
         """사람 확인이 필요한 조건 [(동사, 라벨, ref)] — 판다(보유분)는 뺀다."""
         return [(z, n.get("label") or manual_text(n), n.get("ref"))
                 for z, _l, _r, node in self.rules.expressions() if z != SELL for n in manual_leaves(node)]
@@ -1138,7 +1138,7 @@ class Cond:
     BUY = BUY
     SELL = SELL
     GATES = GATES
-    FAVOR = FAVOR
+    BUY_SIDE = BUY_SIDE
     _uses_pos = _uses_pos
     compact_json = compact_json
     fmt_files = fmt_files
@@ -1155,7 +1155,7 @@ class Grade:
   안 산다 갈래 하나라도 참 → ⛔ 안 산다 · 산다 갈래 하나라도 참 → ✅ 산다 · 둘 다 아님 → ⚪ 관망
 수동(manual) 조건은 '확인됨/안 됨' 두 번 평가한다:
   안 돼도 산다(비관) → ✅ · 확인돼야 산다(낙관만) → 🟡 확인 대기 · 데이터 부족으로 못 정함 → ❔ 판정 불가
-  비관 = 산다의 수동은 거짓, 안 산다의 수동은 참 / 낙관 = 그 반대(FAVOR).
+  비관 = 산다의 수동은 거짓, 안 산다의 수동은 참 / 낙관 = 그 반대(BUY_SIDE).
 얼마나·판다:
   weight   산다 qty cash = 총 투자금 대비 비중(%) · tranches = 산다 qty budget 분할(2차 이후는 포지션 값으로)
   sells    판다 — 보유분이 있을 때만 평가(구간③ trading)
@@ -1173,7 +1173,7 @@ class Grade:
     history = history
     history_back = history_back
     session_closes = session_closes
-    ProductEval = ProductEval
+    RuleSeries = RuleSeries
     _top_labeled = _top_labeled
 
 
