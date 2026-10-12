@@ -6,5 +6,5 @@
                         + grade_rules.json(등급 사다리) · python -m dsl.tradeTool fmt <파일> = 공통 직렬화
 
 경계: dsl 은 shared · market 만 import 한다. 트리를 '만드는' 절차 문서는 authoring/checklist/ 에 있다.
-경계는 verify/verify_code.py 가 강제한다.
+경계는 verify/code/rules.py 가 강제한다.
 """

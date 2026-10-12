@@ -5,5 +5,5 @@
   · _dev_cache.py  개발용 시세 캐시(ETF_DEV_CACHE 일 때만)
 
 경계: market 은 shared 만 import 한다. 어느 상위 층도 market 을 거쳐 시세를 받는다(자가수집 금지).
-경계는 verify/verify_code.py 가 강제한다.
+경계는 verify/code/rules.py 가 강제한다.
 """

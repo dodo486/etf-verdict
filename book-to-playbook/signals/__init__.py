@@ -6,5 +6,5 @@
   · explain.py     판단 근거 설명(조건별 그날 값·측정 증거) — judge 만 부른다
 
 경계: signal 은 shared · market · dsl 만 import 한다(트리의 뜻은 dsl 공개 모듈로). 소비층·화면층은 모른다.
-경계는 verify/verify_code.py 가 강제한다.
+경계는 verify/code/rules.py 가 강제한다.
 """

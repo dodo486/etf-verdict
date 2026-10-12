@@ -26,7 +26,7 @@
 
 실행 환경: `book-to-playbook` 폴더에서 `PYTHONIOENCODING=utf-8`, `PYTHONPATH="<jhts 경로>;."`(없으면 시세가 빈다).
 
-- `python -m verify.verify_tree <slug> --dump 6` → `books/<slug>/logs/disagree.json`
+- `python -m authoring.checklist.compare <slug> 6` → `books/<slug>/logs/disagree.json`
   - **비교 단위 = 규칙.** a·b 의 규칙을 식(`label` 뗀 정규화)으로 맞춘다 — `common`(같은 식) · `only_a` · `only_b`,
     `same_behavior_as` = 3년간 판정이 한 번도 안 갈린 상대(식은 달라도 같은 뜻일 수 있다는 근거. 수동은 기계가 값을
     모르니 근거가 없다).
@@ -66,7 +66,7 @@ a·b 둘 다 원문에 어긋나진 않는데 갈린 경우(원문이 그 선택
 
 ## 5. 채점과 반복
 
-`python -m verify.verify_tree <slug>` — 정지가 0 이 될 때까지 3~4 를 반복한다(경고는 남아도 되지만 하나씩 이유를 보고).
+`python -m verify.book.tree <slug>` — 정지가 0 이 될 때까지 3~4 를 반복한다(경고는 남아도 되지만 하나씩 이유를 보고).
 
 | 정지 | 뜻 | 고칠 곳 |
 |---|---|---|

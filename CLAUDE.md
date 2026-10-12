@@ -4,12 +4,12 @@
 
 - **구조·원칙의 정본**: `book-to-playbook/docs/ARCHITECTURE.md` — 작업 전에 읽는다.
 - **할 일의 정본**: `book-to-playbook/docs/HANDOFF.md` 한 곳(다른 곳에 TODO 를 만들지 않는다).
-- **검사**: `python -m orchestration.run check` (book-to-playbook 에서). 실행 환경: `PYTHONPATH=<jhts 경로>`(jhts-marketdata 미설치 시 시세가 빈다), `PYTHONIOENCODING=utf-8`.
+- **검사**: `python -m entry.run check` (book-to-playbook 에서). 실행 환경: `PYTHONPATH=<jhts 경로>`(jhts-marketdata 미설치 시 시세가 빈다), `PYTHONIOENCODING=utf-8`.
 
 ## 꼭 지킬 것
 
 1. **결정 하나 = 주인 하나.** 같은 결정을 두 곳에 두지 않는다. 새로 '한 곳에서만 정할 것'이 생기면
-   `orchestration/verify_code.py` 주인 표(`OWNERS`)에 한 줄 추가.
+   `verify/code/rules.py` 주인 표(`OWNERS`)에 한 줄 추가.
 2. **특정 책에 맞추지 않는다.** 일반 부품 + 조합. 사례마다 칸·지표·필드를 덧대지 않는다.
 3. **숫자를 지어내지 않는다, 모르면 드러낸다.** 저자가 안 준 숫자는 `"?"`. 대신 채우는 기본값 금지.
 4. **tree.json 은 `TreeGateway` 로만 읽는다.** 화면(web)은 엔진 결과를 그리기만 한다.

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """구간③ 검사기 — 체결 규칙 평가 워크(trades.build_trades)·실전 판정 경로 불변식(책 무관 · 크기 고정) + 신호 패리티(--parity).
 
-조건 트리 원시함수·등급 검사는 구간② verify/verify_primitives.py 가 하고, 여기는 그 위에서 도는 구간③ 코드만 본다.
+조건 트리 원시함수·등급 검사는 구간② verify/code/primitives.py 가 하고, 여기는 그 위에서 도는 구간③ 코드만 본다.
   1. 거래 시뮬레이터 — 손으로 답을 셀 수 있는 시세로 진입·분할 매도·동시 발동·미청산·보유 중 신호 건너뛰기
      · 매도 정책 — 책에 매도 규칙이 없으면 거래 없이 매수 신호 뒤 N거래일 보유만(대체 매도 규칙을 지어내지 않는다)
   3. (--parity) 신호 패리티 — "백테스트 신호 == 실시간 신호"를 **실제 진입점으로 돌려** 증명한다(라이브 책의 tree.json·시세 필요).
@@ -25,8 +25,8 @@
   **일봉 신호**의 패리티를 증명한다. 분봉이 연결되면 같은 코드가 그 축도 덮는다(asof 를 분봉 범위로 주면 된다).
 
 사용:
-  python -m verify.verify_trading                                     # 1·2 (실패 있으면 exit 1)
-  python -m verify.verify_trading --parity [--window 120] [--slug trend]  # 3 — 100% 일치면 exit 0, 불일치 있으면 전체 목록 + exit 1
+  python -m verify.code.trading                                     # 1·2 (실패 있으면 exit 1)
+  python -m verify.code.trading --parity [--window 120] [--slug trend]  # 3 — 100% 일치면 exit 0, 불일치 있으면 전체 목록 + exit 1
 """
 import inspect
 import os

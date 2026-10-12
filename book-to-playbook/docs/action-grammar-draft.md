@@ -157,9 +157,9 @@ sumsince(세션 시작, 거래량) · 당일 고·저 = maxsince/minsince(세션
 첫 N분 고가 = valuewhen(세션 시작 후 N번째 봉, maxsince(세션 시작, 고가)) · 첫 눌림 저점 = valuewhen(첫 반등, minsince(세션 시작, 저가)).
 
 **지울 흔적(5번 작업 때 전부)**: `dsl/tradeTool.py`(계산·문법 목록·워밍업) · `authoring/checklist/COND_DSL.md`(문법·조합 표) ·
-`authoring/checklist/EXTRACTOR.md`(예시) · `verify/verify_primitives.py`(테스트) · `signals/explain.py`(설명 문구 "20일선"·"RSI14"·
-"k일 전 대비 변화율") · `verify/verify_view.py` · `books/*/tree_candidates/`(run3 로 대체). `signals/`·`consumers/backtest/` 에는 없음.
-주인 표(verify_code)에 "지운 연산 이름이 어디든 나오면 정지" 줄을 넣어 남김 없이.
+`authoring/checklist/EXTRACTOR.md`(예시) · `verify/code/primitives.py`(테스트) · `signals/explain.py`(설명 문구 "20일선"·"RSI14"·
+"k일 전 대비 변화율") · `verify/code/view.py` · `books/*/tree_candidates/`(run3 로 대체). `signals/`·`consumers/backtest/` 에는 없음.
+주인 표(verify.code.rules)에 "지운 연산 이름이 어디든 나오면 정지" 줄을 넣어 남김 없이.
 
 **구현은 pandas 로** — 지금 dsl/tradeTool.py(Cond)는 순수 파이썬 반복문. 기본 부품은 pandas 에 1:1(lag=`shift` · sum/highest/lowest=`rolling` ·
 smooth=`ewm(alpha)` · since 계열=구간별 `cumsum/cummax/cummin` · 순위=`rank` · 3값 논리=nullable `boolean`(Kleene, NA=모름)).
