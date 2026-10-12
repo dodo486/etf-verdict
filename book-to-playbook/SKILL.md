@@ -43,7 +43,7 @@ description: 트레이딩 책을 읽어 실전 매매 플레이북 + 기계가 �
 3) 페이지        books/trend/playbook.html 을 베이스로 #src·머리말(제목·상품 소개)만 교체.
                  시트 패널은 #verdict-data + #sheet-root 골격 그대로(UI 는 web/ui/*.js 가 주입된다).
 4) 체크리스트    authoring/extract/README.md 절차대로(추출자 a·b → 사례 작성자 → 심판 → authoring.extract.verify_tree 통과)
-5) 등록·배포     books.json 에 항목(slug/title/tickers/desc/live/engine.daily) → python -m entry.run daily
+5) 등록·배포     books.json 에 항목(slug/title/tickers/desc/live) → python -m entry.run daily
 ```
 
 ### 검사 실패 → 고칠 곳 (체크리스트 채점 `authoring.extract.verify_tree` 는 `authoring/extract/README.md`)
@@ -60,7 +60,7 @@ description: 트레이딩 책을 읽어 실전 매매 플레이북 + 기계가 �
 - 스캔 PDF만 있음 → 먼저 이미지화→OCR→청킹(jhts 파이프라인 재사용) 후 1)
 
 ## 판정 운영
-`python -m entry.run daily` — 책마다 `web.verdict_view`(판정 → 알림) → `web.backtest_page`(백테스트 탭 데이터) →
-검사. `python -m entry.run watch [--every N]` 는 asof=지금으로 N분마다 재판정(장중 포함).
+`python -m entry.run daily` — live 책마다 `entry.notify`(판정 → 알림) → `web.backtest_page`(백테스트 탭 데이터).
+장중 재판정은 로컬 실시간 서버(`python -m entry.serve`)가 시세가 바뀐 상품만 다시 판정한다.
 알림은 `telegram.env`(TELEGRAM_BOT_TOKEN/CHAT_ID)가 있으면 텔레그램, 없으면 데스크톱. 시세는 jhts 패키지(`PYTHONPATH`)에서만
 온다. 스케줄 등록·내 포지션 파일은 `SETUP.md`.

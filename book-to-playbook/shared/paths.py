@@ -123,12 +123,6 @@ def default_slug():
     return books[0]["slug"] if books else None
 
 
-def book_engine(slug, kind):
-    """그 책의 시세 엔진 모듈명(daily/intraday, 예: 'web.verdict_view').
-    없으면 None(=엔진 없는 책). 실행은 `python -m <모듈명> <slug>` (cwd=BASE)."""
-    return (book_meta(slug).get("engine") or {}).get(kind)
-
-
 # ---------------------------------------------------------------- 책 산출물 경로
 # 책마다의 산출물은 전부 BASE/books/<slug>/ 한 곳에 산다. 그 경로를 짓는 코드는 이 파일 하나다 —
 # 다른 파일이 BASE 에 "books"·slug 를 이어 붙이면 entry.verify_rules 주인 표('책 산출물 경로')가 막는다.

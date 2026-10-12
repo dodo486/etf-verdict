@@ -11,6 +11,7 @@
 """
 import math
 
+from market.store import settled_dates
 from tree.gateway import ARITH, AtLeast, bind, CMP, CondError, Node, _op_of, ROLES, UNKNOWN, WINDOW
 
 STREAK_CAP = 400          # 연속·경과일을 거꾸로 셀 때의 상한(데이터 길이보다 길면 무의미)
@@ -26,7 +27,7 @@ class Ctx:
         장부 = {"filled": {규칙 이름 | None(전체): 날짜별 산 횟수}, "sold": 날짜별 판 비율} — 없으면 filled·sold 는 모름.
         asof = 관측 시각(UTC datetime) — 일봉 확정(settled) 경계를 정한다. None 이면 실제 지금.
         session_close = {심볼: {YYYYMMDD: 그날 정규장 마감(UTC datetime, tz-aware)}} — 일봉 확정(settled) 경계.
-          거래소 캘린더(md_feed.sessions)에서 캐려 밖(cond)에서 넣는다(평가기는 jhts 를 모른다). 장중 asof 에서
+          거래소 캘린더에서 판단자가 넣는다(market.store.session_closes — 평가기는 jhts 를 모른다). 장중 asof 에서
           '마감이 asof 이후'인 일봉은 아직 미확정이므로 None 으로 가린다(look-ahead 0). asof=None 이거나 캘린더가
           비면(미설치·조회 실패) 아무것도 가리지 않는다 — 없는 캘린더가 조용히 일봉을 전부 지우지 않게.
         answers = {answer_key: True|False} — 사람이 답한 수동(없는 열쇠는 manual_as). None 이면 옛 동작 그대로.
@@ -97,8 +98,7 @@ class Ctx:
         closes = self.session_close.get(sym)
         if not closes:
             return None
-        # 세션 마감(마감 == asof 도 확정)이 asof 이하인 날만 확정 — 마감 > asof 인 '진행 중' 봉은 뺀다.
-        return {d for d, close in closes.items() if close is not None and close <= self.asof}
+        return settled_dates(closes, self.asof)   # 확정 규칙의 주인은 market/store 하나(Store.confirmed 와 같은 규칙)
 
     def settled_map(self, sym):
         """'일봉축 마지막 확정봉' 지도 — 길이 L 리스트 m 에서 m[i] = cal[i] 이하 마지막 '확정(settled)' 일봉의 index

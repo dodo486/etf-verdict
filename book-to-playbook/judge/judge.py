@@ -9,7 +9,8 @@
                   web/explain 의 값 함수)·보유분 상태(status)·체결 워크가 쓸 보유 조건 값(conditions)·가격(price — 체결가·수익률 계산용).
   · Holding       보유 하나의 상태(첫 매수 봉·평단·산 차수·체결 장부) — 값만. 평가는 ProductJudge 가 한다.
   · Decision · Amount · HoldingStatus   판정 사실을 담는 그릇(계산하지 않는다).
-  · 시세 받기     history · history_back · session_closes(일봉 확정 경계) — 시세 원본을 받는 유일한 곳(market 은 트리를 모른다)
+  · 시세 받기     history · history_back — 시세 원본을 받는 유일한 곳(market 은 트리를 모른다). 일봉 확정 경계는 market/store
+                  (session_closes — Store.confirmed 와 같은 규칙)를 받아 계산기 Ctx 에 넘긴다
   · 등급         RuleSeries(날짜별 등급·금액·비중·워밍업 가드) · GRADES · GRADE_RULES(grade_rules.json 사다리)
                  — 식 계산은 계산기 judge/eval(Ctx·series), 문법은 tree/gateway
   · 얼마나(판정의 '얼마나' — 라이브 화면·백테스트가 같이 쓴다, 아래 '얼마나' 절)
@@ -27,6 +28,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 from market import md_feed
+from market.store import session_closes
 from shared.paths import positions_json
 from tree.gateway import (
     Branch, BUY_SIDE, CondError, GATES, labeled, manual_leaves, manual_text, Qty, SELL, TreeGateway, WARMUP_DAYS)
@@ -43,36 +45,15 @@ def history(trees, start):
     return md_feed.histories(syms, start)
 
 
+def since(extra_days=0):
+    """시세를 받기 시작할 날(YYYYMMDD) — 지금부터 extra_days + 워밍업(WARMUP_DAYS)일 과거. 수집 시작일을 세는 한 곳
+    (배치 history_back · 라이브 저장소 등록 store.need 가 같이 쓴다 — 각자 날짜 계산을 복붙하지 않는다)."""
+    return (datetime.now() - timedelta(days=extra_days + WARMUP_DAYS)).strftime("%Y%m%d")
+
+
 def history_back(trees, extra_days=0):
-    """history 를 '지금부터 extra_days + 워밍업(WARMUP_DAYS)일 과거'부터 받는다 — 수집 시작일을 세는 한 곳.
-    백테스트(days)·라이브/재생(0)·검사(365*년 등)가 다 이걸로 부른다(각자 날짜 계산을 복붙하지 않는다)."""
-    start = (datetime.now() - timedelta(days=extra_days + WARMUP_DAYS)).strftime("%Y%m%d")
-    return history(trees, start)
-
-
-def session_closes(symbols, cal, asof):
-    """일봉 확정(settled) 경계 — {심볼: {YYYYMMDD: 그날 정규장 마감(UTC datetime)}}. Ctx 가 장중 asof 에서
-    '마감이 asof 이후'인 일봉(아직 미확정)을 가리는 데 쓴다. 경계는 하드코딩이 아니라 거래소 캘린더
-    (md_feed.sessions)에서 읽는다. asof 가 없으면(라이브 '지금' = 늘 마지막 확정봉) 가릴 것이 없으므로 빈 dict.
-    캘린더가 비면(jhts 미설치·조회 실패) 해당 심볼은 빠진다 → cond 가 '가리지 않음'으로 떨어진다(캘린더 없다고
-    일봉을 조용히 전부 지우지 않게). 시장(US/KR)이 같은 심볼은 캘린더를 한 번만 조회해 공유한다."""
-    import datetime as _dt
-    if asof is None or not cal:
-        return {}
-    start, end = min(cal), max(cal)
-    by_market = {}      # market → {YYYYMMDD: 마감 UTC}
-    out = {}
-    for sym in sorted(set(symbols)):
-        mkt = md_feed.market_of(sym)
-        if mkt is None:
-            continue
-        if mkt not in by_market:
-            by_market[mkt] = {s.date: s.close.astimezone(_dt.timezone.utc)
-                              for s in md_feed.sessions(mkt, start, end) if s.close is not None}
-        closes = by_market[mkt]
-        if closes:
-            out[sym] = closes
-    return out
+    """history 를 since(extra_days) 부터 받는다 — 백테스트(days)·재생(0)·검사(365*년 등)가 다 이걸로 부른다."""
+    return history(trees, since(extra_days))
 
 
 # ================================================================ 등급 — 등급의 뜻(트리 → 날짜별 등급·금액·비중)
@@ -646,12 +627,19 @@ class Judge:
             out.setdefault(x["prod"], []).append(x)
         return out
 
-    def decisions(self, prices, asof=None, answers=None):
-        """라이브 판정 — 상품마다 마지막 봉 Decision(내 포지션 상태 포함).
+    def subscriptions(self):
+        """구독표의 재료 — {상품: 그 상품 판정이 읽는 심볼들}(판때기 필요 심볼 + 상품 자신 — 판정 달력이 상품 봉이라).
+        라이브는 이 심볼 중 하나라도 바뀐 상품만 다시 판정한다(entry/live)."""
+        return {p: self._tree.board(p).symbols | {p} for p in self.products()}
+
+    def decisions(self, prices, asof=None, answers=None, products=None):
+        """라이브 판정 — 상품마다 마지막 봉 Decision(내 포지션 상태 포함). products = 판정할 상품만(생략 = 전부, 순서는 트리 순).
         → [(상품, Decision, ProductJudge, [내 포지션])] — 화면은 ProductJudge 에 규칙 설명을 묻는다."""
         my_positions = self.positions()
         out = []
         for p in self.products():
+            if products is not None and p not in products:
+                continue
             pj = self.product(p, prices, asof=asof, answers=answers)
             mine = my_positions.get(p, [])
             holdings = [Holding.at(pj.days, str(x["entry_date"]), float(x["entry_px"]), int(x.get("filled", 1))) for x in mine]

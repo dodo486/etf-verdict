@@ -3,49 +3,44 @@
 """book-to-playbook 로컬 실시간 서버 — 화면을 보는 유일한 경로(정적 스냅샷은 폐지됨).
 
 한 주소로 고정이다. books.json 에 어떤 책이 들어와도 **서버 재시작 없이** 바로 잡힌다
-(_slugs()·render_shell 이 매 요청 books.json 을 새로 읽는다). 매 요청 엔진을 새로 돌려
-그리므로 오래된 값이 '지금 값'처럼 보일 여지가 없다.
+(_slugs()·render_shell 이 매 요청 books.json 을 새로 읽고, 라이브 허브가 틱마다 책 목록을 다시 맞춘다).
+판정은 라이브 허브(entry/live.LiveHub) 하나가 낸다 — 시세가 바뀐 상품만 다시 판정해 책마다 최신 판정을 둔다.
 
 엔드포인트
   GET /                셸(책 선택) — 좌측 책목록 + 본문 iframe. 책을 눌러도 셸은 그대로, 본문만 바뀐다.
   GET /<slug>/         그 책 페이지 — 요청 시점 라이브 판정을 구워 넣는다(assemble).
   GET /<slug>/?tree=a  같은 페이지인데 소절별 원시 트리(🌲 규칙)만 추출자 후보 a(·b)로 — 심판 전 후보 확인용.
-  GET /api/verdict?slug=<책>  판정 JSON(라이브). 엔진(books.json engine.daily) --json 재사용 + 짧은
-                     TTL 캐시(기본 8초, 책별)로 잦은 폴링이 시세 창구를 안 두드리게. CORS 허용.
+  GET /api/verdict?slug=<책>  판정 JSON(라이브) — 허브의 최신 판정(hub.latest). 허브가 아직 한 번도 틱을 안 돌았으면
+                     그 자리에서 한 번 돌린다(첫 요청 데우기). 폴링은 시세 창구를 두드리지 않는다(허브 캐시만 읽음). CORS 허용.
   POST /api/verdict   body {slug, answers:{답 열쇠: true|false}} — 화면에서 사람이 답한 수동 조건까지 반영한 판정
-                     (서버 권위: 화면은 등급을 다시 계산하지 않는다). web.verdict_view.render(answers=) 를 in-process 로
-                     부른다(토글 지연 줄이기). 답마다 결과가 달라 캐시하지 않는다(무답 GET 캐시와 섞이지 않게).
-  GET /events?slug=<책>       SSE — ~15초마다 tick(브라우저가 받으면 /api/verdict 를 다시 당겨 재렌더).
+                     (서버 권위: 화면은 등급을 다시 계산하지 않는다). hub.judge_with — 허브의 같은 판단자·같은 시세로
+                     계산(재조회 없음). 답마다 결과가 달라 캐시하지 않는다.
+  GET /events?slug=<책>       SSE — 그 책 판정이 바뀌어 허브가 발행할 때마다 push(브라우저가 받으면 /api/verdict 를
+                     다시 당겨 재렌더). 바뀐 게 없으면 keepalive ping 만.
   기타 정적 파일       BASE 디렉터리에서 그대로 서빙(폰트·이미지 등).
 
-바인딩은 0.0.0.0(테일스케일/LAN 에서 폰으로 접속 가능). 포트는 PLAYBOOK_PORT 환경변수(기본 8799).
-
-설계 메모: 판정 계산부(compute_verdict)를 HTTP 배관과 분리해 둔다 — 서버리스로 그대로 이관 가능하게."""
+바인딩은 0.0.0.0(테일스케일/LAN 에서 폰으로 접속 가능). 포트는 PLAYBOOK_PORT 환경변수(기본 8799)."""
 import http.server
 import json
 import os
 import re
-import subprocess
-import sys
 import threading
 import time
 import urllib.parse
 
-PY = sys.executable or "python3"
 PORT = int(os.environ.get("PLAYBOOK_PORT", "8799"))
 HOST = os.environ.get("PLAYBOOK_HOST", "0.0.0.0")
-CACHE_TTL = float(os.environ.get("PLAYBOOK_TTL", "8"))   # 초 — 잦은 폴링이 시세 창구를 안 두드리게
-SSE_TICK = float(os.environ.get("PLAYBOOK_TICK", "15"))  # 초 — SSE tick 주기
+SSE_TICK = float(os.environ.get("PLAYBOOK_TICK", "15"))  # 초 — 라이브 허브 틱 주기(시세 저장소 갱신)
 
 # 어느 책을 라이브로 띄울지는 books.json 에서 온다(코드에 특정 책을 박지 않는다).
 # BOOK_SLUG 로 덮어쓸 수 있고, 기본은 첫 live 책.
-from shared.paths import BASE, default_slug, book_engine, live_slugs, load_manifest   # noqa: E402
-from entry.live import LiveHub   # 라이브 2단 pub-sub 조립(price_bus→신호→verdict_bus→화면)
+from shared.paths import BASE, default_slug, live_slugs, load_manifest   # noqa: E402
+from entry.live import LiveHub   # 라이브 조립(시세 저장소→구독표→바뀐 상품만 판정→verdict_bus→화면)
 DEFAULT_SLUG = os.environ.get("BOOK_SLUG") or (live_slugs() or [default_slug()])[0]
 
-# 라이브 2단 pub-sub 허브 하나 — Poller 가 SSE_TICK 초마다 price_bus 에 틱을 올리면, 책마다 신호 핸들러가
-# 판정을 계산해 그 책 verdict_bus 에 올린다(1단→2단). 열린 SSE 연결은 그 책 verdict_bus 를 '구독'해 판정이
-# 갱신될 때만 깨어난다(연결마다 따로 sleep 않는다 — 진짜 push). GET /api/verdict 는 허브 캐시(latest)를 읽는다.
+# 라이브 허브 하나 — Poller 가 SSE_TICK 초마다 틱을 올리면 시세 저장소가 최근 봉을 다시 받아, 봉이 바뀐 심볼을
+# 구독한 상품만 다시 판정해 그 책 verdict_bus 에 올린다. 열린 SSE 연결은 그 책 verdict_bus 를 '구독'해 판정이
+# 갱신될 때만 깨어난다(진짜 push). GET /api/verdict 는 허브 캐시(latest)를 읽는다.
 _hub = LiveHub()
 
 
@@ -54,61 +49,23 @@ def _slugs():
     바로 셸 목록·라우팅·API 에 잡힌다(한 주소 고정, 어떤 책이 들어와도)."""
     return live_slugs() or [DEFAULT_SLUG]
 
-# ------------------------------------------------------------------ 판정 계산부
-# (HTTP 배관과 분리 — 서버리스 함수로 그대로 이관 가능한 순수 호출부)
-_cache_lock = threading.Lock()
-_cache = {}                       # slug -> {"data":..., "ts":...}  (책마다 따로 캐시)
-
-
-def _run_verdict(slug):
-    """엔진(books.json engine.daily) --json 을 한 프로세스로 돌려 판정 dict 를 받는다 — 매번 새 시세로.
-
-    로직을 복제하지 않고 **같은 엔진 모듈의 --json 경로를 재사용**한다. 텔레그램/데스크톱 알림은
-    --no-send 로 끈다. 라이브 전용이라 판정을 파일로 저장하지 않는다(정적 스냅샷 폐지)."""
-    daily = book_engine(slug, "daily")
-    if not daily:
-        raise RuntimeError("%s 책에 시세 엔진(engine.daily)이 없습니다 — books.json 확인" % slug)
-    cmd = [PY, "-m", daily, slug, "--json", "--no-send"]
-    p = subprocess.run(cmd, cwd=BASE, capture_output=True, timeout=90)
-    if p.returncode != 0:
-        raise RuntimeError((p.stderr or b"").decode("utf-8", "replace")[:400]
-                           or "verdict 계산 실패(코드 %d)" % p.returncode)
-    data = json.loads(p.stdout.decode("utf-8"))
+# ------------------------------------------------------------------ 판정(허브에서 읽기만 — HTTP 배관과 분리)
+def verdict(slug):
+    """책 slug 의 최신 판정 top — 허브 캐시. 허브가 아직 틱을 안 돌았으면 한 번 돌려 데운다."""
+    top = _hub.latest(slug)
+    if top is None and not _hub.ticked:
+        _hub.tick()
+        top = _hub.latest(slug)
+    if top is None:
+        raise RuntimeError("%s 책 판정이 아직 없습니다" % slug)
+    data = dict(top)
     data["live"] = True          # 라이브 모드임을 프런트가 알 수 있게(정직한 신선도 표기용)
     return data
 
 
-def compute_verdict(slug, force=False):
-    """책 slug 의 판정 — 2단 pub-sub 허브가 이미 빚어 둔 최신 top(verdict_bus 소비자 캐시)이 있으면 그걸,
-    없으면(허브 틱 전) TTL 캐시/엔진 서브프로세스로 한 번 계산해 (data, from_cache) 반환.
-
-    허브 top 은 render(slug) 와 내용이 같다(Judge.decisions → _format, 서브프로세스 --json 과 동일 경로).
-    서브프로세스 경로는 러너·콜드 스타트용으로 남겨 둔다(books.json engine.daily — 배치 러너가 그대로 쓴다)."""
-    if not force:
-        top = _hub.latest(slug)
-        if top is not None:
-            data = dict(top)
-            data["live"] = True
-            return data, True
-    now = time.time()
-    with _cache_lock:
-        c = _cache.get(slug)
-        if not force and c and (now - c["ts"]) < CACHE_TTL:
-            return c["data"], True
-    data = _run_verdict(slug)                 # 락 밖에서(수 초 걸리는 호출이 다른 요청 안 막게)
-    with _cache_lock:
-        _cache[slug] = {"data": data, "ts": time.time()}
-    return data, False
-
-
-_render_lock = threading.Lock()
-
-
-def compute_verdict_answers(slug, answers):
-    """사람이 답한 수동까지 반영한 판정 — in-process(web.verdict_view.render). 캐시하지 않는다(답마다 다르다)."""
-    from web.verdict_view import render
-    with _render_lock:                        # 시세 창구·평가를 한 번에 하나씩(스레드 서버)
-        data = render(slug, answers=answers)
+def verdict_answers(slug, answers):
+    """사람이 답한 수동까지 반영한 판정 — 허브의 같은 판단자·시세로(hub.judge_with). 캐시하지 않는다(답마다 다르다)."""
+    data = _hub.judge_with(slug, answers)
     data["live"] = True
     return data
 
@@ -127,7 +84,7 @@ def render_page(slug, tree=None):
     판정 계산이 실패해도 페이지는 내보낸다(프런트가 폴링으로 재시도). tree = 원시 트리 보기에 쓸 후보("a"·"b", ?tree=)."""
     from web.book_page import assemble
     try:
-        data, _ = compute_verdict(slug)
+        data = verdict(slug)
     except Exception:
         data = None
     return assemble(slug, data, tree).encode("utf-8")
@@ -197,7 +154,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if slug not in _slugs():
             slug = DEFAULT_SLUG
         try:
-            body = json.dumps(compute_verdict_answers(slug, answers), ensure_ascii=False).encode("utf-8")
+            body = json.dumps(verdict_answers(slug, answers), ensure_ascii=False).encode("utf-8")
             self._send(body, "application/json; charset=utf-8")
         except Exception as ex:
             self._send(json.dumps({"error": str(ex)}, ensure_ascii=False).encode("utf-8"),
@@ -220,15 +177,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def _serve_verdict(self):
         qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-        force = "force" in qs
         slug = (qs.get("slug") or [DEFAULT_SLUG])[0]
         if slug not in _slugs():
             slug = DEFAULT_SLUG
         try:
-            data, cached = compute_verdict(slug, force=force)
-            data = dict(data)
-            data["_cached"] = cached
-            body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+            body = json.dumps(verdict(slug), ensure_ascii=False).encode("utf-8")
             self._send(body, "application/json; charset=utf-8")
         except Exception as ex:
             body = json.dumps({"error": str(ex)}, ensure_ascii=False).encode("utf-8")
@@ -289,17 +242,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             unsub()
 
 
-def _warm():
-    """첫 요청 전에 기본 책을 한 번 데워 첫 클릭 지연(수 초 콜드 페치)을 없앤다."""
-    try:
-        compute_verdict(DEFAULT_SLUG)
-    except Exception:
-        pass
-
-
 def _ticker():
-    """라이브 틱 — 허브 Poller 가 SSE_TICK 초마다 price_bus 에 틱을 올린다(책마다 신호 핸들러 → verdict_bus →
-    화면 소비자 캐시). start 가 스레드를 띄우므로 join 해 메인 스레드와 수명을 맞춘다(무한 루프, 데몬)."""
+    """라이브 틱 — 허브 Poller 가 SSE_TICK 초마다 hub.tick(저장소 갱신 → 바뀐 상품만 판정 → verdict_bus → 화면 캐시).
+    첫 틱은 바로 돈다(데우기). start 가 스레드를 띄우므로 join 해 수명을 맞춘다(무한 루프, 데몬)."""
     _hub.start(SSE_TICK, now=time.time).join()
 
 
@@ -310,8 +255,7 @@ if __name__ == "__main__":
     print("  LAN/폰:    http://<이 컴퓨터 IP 또는 테일스케일 MagicDNS>:%d/" % PORT)
     print("  판정 JSON: http://127.0.0.1:%d/api/verdict?slug=<책>" % PORT)
     print("  (종료: Ctrl+C)")
-    threading.Thread(target=_warm, daemon=True).start()
-    threading.Thread(target=_ticker, daemon=True).start()   # 라이브 틱 피더 시동(SSE 연결들이 구독)
+    threading.Thread(target=_ticker, daemon=True).start()   # 라이브 허브 시동(첫 틱이 데우기 — SSE 연결들이 구독)
     with http.server.ThreadingHTTPServer((HOST, PORT), Handler) as httpd:
         try:
             httpd.serve_forever()

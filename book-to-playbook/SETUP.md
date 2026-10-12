@@ -55,8 +55,7 @@ PYTHONPATH=C:\Users\<사용자>\jhts
 ## 3. 수동 실행
 
 ```
-python -m entry.run daily        # 판정 → 백테스트 탭 데이터 (장 마감 후, 검사는 돌지 않는다)
-python -m entry.run watch [--every N]  # asof=지금 기준 N분(기본 5)마다 재판정(장중 포함)
+python -m entry.run daily        # live 책마다 판정·알림 → 백테스트 탭 데이터 (장 마감 후, 검사는 돌지 않는다)
 python -m entry.run check        # 검사 전부(CHECKS 한 목록) — 무언가 바꿨을 때(커밋 전). 요약 + 종료코드
 ```
 
@@ -70,8 +69,8 @@ python -m entry.run check        # 검사 전부(CHECKS 한 목록) — 무언�
 ## 4. 스케줄 등록
 
 운용 주기: **화~토 08:00 (KST)** — 미국 장 마감 후 종가 기준 판정. 필요에 맞게 바꾼다.
-(이건 발행 스케줄일 뿐 판정 시점의 제한이 아니다 — 판정은 보는 그 순간(asof) 기준이고, 장중에도
-`python -m entry.run watch [--every N]` 이 asof=지금으로 N분마다 재판정한다.)
+(이건 알림 스케줄일 뿐 판정 시점의 제한이 아니다 — 장중 재판정은 로컬 실시간 서버(`entry.serve`, §7)가
+시세가 바뀐 상품만 다시 판정해 화면에 낸다.)
 
 ### macOS (launchd)
 
@@ -116,10 +115,6 @@ launchctl unload ~/Library/LaunchAgents/com.book-to-playbook.daily.plist   # 해
 ```cmd
 schtasks /Create /TN "book-to-playbook daily" /SC WEEKLY /D TUE,WED,THU,FRI,SAT /ST 08:00 ^
   /TR "\"D:\book-to-playbook\run.cmd\" daily"
-
-:: 장중 재판정(asof=지금 기준) — 21:30 에 띄우면 그때부터 --every N 분마다 재판정·발행한다(종료 전까지)
-schtasks /Create /TN "book-to-playbook watch" /SC WEEKLY /D MON,TUE,WED,THU,FRI /ST 21:30 ^
-  /TR "\"D:\book-to-playbook\run.cmd\" watch"
 ```
 
 ```cmd
@@ -155,13 +150,13 @@ schtasks /Delete /TN "book-to-playbook daily" /F            :: 해제
 | 판정이 전부 ❔ 판정 불가 | jhts 시세 조회 실패. `logs/cron.log` 의 stderr, 페이지 상단 '시세 없음 → 수집 요청' 확인 |
 | 🟡 확인 대기만 나온다 | 수동(✋) 조건(개장 전·장중·저자 미명시)이 있어서다 — 체크리스트에서 직접 체크하면 등급이 다시 계산된다 |
 | `판정 파일 없음 — 발행 중단` | `run.py daily` 가 먼저 돌아야 한다(jhts 가 PYTHONPATH 에 있는지 확인) |
-| 값이 안 바뀐다 | 캐시 TTL(기본 8초) 대기 또는 `/api/verdict?force=1` · 서버 재시작(`entry.serve`) |
+| 값이 안 바뀐다 | 시세가 바뀌어야 다시 판정한다(장 밖이면 그대로가 정상) · 다음 틱(`PLAYBOOK_TICK`초) 대기 · 서버 재시작(`entry.serve`) |
 | `python` 을 못 찾음(Windows) | `BOOK_TO_PLAYBOOK_PYTHON` 에 python.exe 전체 경로 지정 |
 
 ## 7. 로컬 실시간 서버로 보기 (폰 포함)
 
-판정 페이지는 **로컬 실시간 서버**로 본다(정적 발행·GitHub Pages 는 폐지 — §5). 매 요청마다 엔진을 새로
-돌려 그리고, SSE/폴링으로 값이 살아 움직인다(`🟢 실시간 · jhts(marketdata) · 갱신 HH:MM:SS`).
+판정 페이지는 **로컬 실시간 서버**로 본다(정적 발행·GitHub Pages 는 폐지 — §5). 라이브 허브가 틱마다 최근 시세를
+다시 받아 바뀐 상품만 다시 판정하고, SSE/폴링으로 값이 살아 움직인다(`🟢 실시간 · jhts(marketdata) · 갱신 HH:MM:SS`).
 
 ```bash
 python3 -m entry.serve                 # http://127.0.0.1:8799/ · 판정 JSON /api/verdict
@@ -172,14 +167,14 @@ PLAYBOOK_PORT=9000 python3 -m entry.serve   # 포트 변경
 |------|------|----|
 | `PLAYBOOK_PORT` | `8799` | 포트 |
 | `PLAYBOOK_HOST` | `0.0.0.0` | 바인딩 주소(LAN/테일스케일 접속 허용) |
-| `PLAYBOOK_TTL`  | `8`    | 판정 캐시 TTL(초) — 잦은 폴링이 시세 창구를 두드리지 않게 |
-| `PLAYBOOK_TICK` | `15`   | SSE tick 주기(초) |
+| `PLAYBOOK_TICK` | `15`   | 라이브 허브 틱 주기(초) — 시세 저장소 갱신 |
 
 | 경로 | 내용 |
 |------|------|
 | `GET /` | 최신 판정을 구워 넣은 플레이북 페이지(이후 스스로 갱신) |
-| `GET /api/verdict` | 판정 JSON(라이브) — `web.verdict_view` 로 계산, 8초 TTL 캐시, CORS 허용. `?force=1` 이면 캐시 무시 |
-| `GET /events` | SSE — tick 마다 브라우저가 `/api/verdict` 를 다시 당겨 그림 |
+| `GET /api/verdict` | 판정 JSON(라이브) — 라이브 허브의 최신 판정(폴링이 시세 창구를 두드리지 않음), CORS 허용 |
+| `POST /api/verdict` | `{slug, answers}` — 사람이 답한 수동 조건까지 반영한 판정(허브의 같은 판단자·시세로) |
+| `GET /events` | SSE — 판정이 바뀔 때마다 push, 브라우저가 `/api/verdict` 를 다시 당겨 그림 |
 
 **폰에서 보기**: 서버는 `0.0.0.0` 바인딩이라 같은 와이파이면 데스크톱 LAN IP 로 바로 붙는다
 (`ipconfig getifaddr en0` → `http://192.168.x.y:8799/`). 집 밖에서도 보려면 [Tailscale](https://tailscale.com)

@@ -4,8 +4,7 @@
 
 판정(시세 조달 + 판단)은 구간③ 판단자(judge/judge.Judge.decisions)가 내고, 이 파일은 그 Decision 과 설명을
 사람과 화면이 읽는 모양으로 빚기만 한다 — 화면은 트리를 다시 해석하지 않고 이 출력만 그린다(판단/표시 분리:
-화면은 판정을 계산하지 않는다). books.json 의 engine.daily 가 이 모듈이다(python -m web.verdict_view <slug> —
-라이브 서버·러너가 부르는 '진입+표시+알림' 껍데기 · 판단은 judge.judge 가 한다).
+화면은 판정을 계산하지 않는다). 라이브는 entry/live 허브가 판정 사실을 _format 으로, 일일 배치(entry.notify)는 render 로 빚는다.
 
 출력 계약(알림 · 화면 · /api/verdict 가 소비):
   top     : {slug, title, ts, date, source, cash, verbs[], grades{}, verdicts[], missing{}, positions_note}

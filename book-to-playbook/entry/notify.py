@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """알림(진입점) — 오늘 판정을 한 번 내서 문장으로 만들고 텔레그램(안 되면 데스크톱 알림)으로 보낸다. 수집 아님.
 
-  python -m entry.notify <slug> [--json] [--no-send]   books.json engine.daily 가 이 모듈(러너 daily · 서버가 부른다)
+  python -m entry.notify <slug> [--json] [--no-send]   일일 배치 — run daily 가 live 책마다 부른다(한 프로세스, 판정 한 번)
 
 판정 모양은 화면층(web/verdict_view.render·build_text)이 빚고, 여기는 보내기만 한다.
 네트워크(urllib)는 "시세 자가수집 금지" 규칙과 부딪히므로 entry/verify_rules.py ALLOW 에 이 한 파일만 예외로 둔다.

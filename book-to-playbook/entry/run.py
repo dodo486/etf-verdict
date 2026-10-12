@@ -6,12 +6,10 @@ run.sh·run.cmd 는 파이썬을 골라 이 모듈을 부르는 얇은 껍데기
 (sys.executable)로 돌리므로 설치본(homebrew·python.org·Microsoft Store)에 상관없이 그대로 동작한다.
 
 사용법
-  python -m entry.run daily        # 판정(체크리스트 = 조건 트리) → 알림 → 백테스트 (장 마감 후). 화면은 라이브 서버가 맡는다.
+  python -m entry.run daily        # live 책마다 판정·알림(entry.notify) → 백테스트 탭 데이터 (장 마감 후). 화면은 라이브 서버가 맡는다.
                                    #   검사는 돌지 않는다 — 검사 대상(코드·트리·원문·페이지)은 매일 바뀌지 않는다.
-  python -m entry.run watch [--every N]  # asof=지금 기준으로 N분(기본 5)마다 재판정(백테스트 제외).
-                             #   분봉(tf 1m·5m) 조건은 아직 시세 경로가 없어 모름(None).
   python -m entry.run check [--parity]  # 검사 전부(CHECKS 한 목록) — 요약 + 종료코드. 무언가 바꿨을 때(커밋 전) 돌린다
-  python -m entry.serve        # 화면 보기 — 셸(책목록)+모든 책을 실시간 서빙(정적 스냅샷 폐지)
+  python -m entry.serve        # 화면 보기 — 셸(책목록)+모든 책을 실시간 서빙. 장중 재판정도 여기(라이브 허브 entry/live)
 
 옵션
   --quiet      콘솔 출력 최소화(로그 파일에는 그대로 남음)
@@ -34,7 +32,7 @@ from shared.paths import BASE, LOGS, ensure_dir, load_env_file, write_text
 
 PY = sys.executable or "python3"
 
-# ---- 검사 목록 — 한 곳(run check 가 돈다). 검사는 대상이 바뀔 때 돈다 — 매일 돌지 않는다(daily·verdict·watch 에는 없음).
+# ---- 검사 목록 — 한 곳(run check 가 돈다). 검사는 대상이 바뀔 때 돈다 — 매일 돌지 않는다(daily 에는 없음).
 #   트리 검사는 트리가 바뀔 때만이 아니라 트리를 실행하는 엔진 코드(tree·judge)가 바뀔 때도 다시 돌아야 해서
 #   목록을 나누지 않고 한 번에 전부 돈다.
 #   opt   시세로 오래 도는 선택 검사 — run check --parity 일 때만
@@ -45,10 +43,12 @@ CHECKS = [
     Check("authoring.transcribe.verify_source", (), False, False, "플레이북 본문 해시"),
     Check("authoring.extract.verify_tree", ("--quick",), False, False, "트리 계약 — 소절 인덱스·트리 문법·ref"),
     Check("web.verify_page", (), False, False, "책 페이지 — 구획·UI 사본"),
+    Check("market.verify_store", (), False, False, "시세 칸 저장소"),
     Check("tree.verify_gateway", (), False, True, "트리 언어·출입구"),
     Check("judge.verify_eval", (), False, True, "계산기·등급"),
     Check("backtest.verify_trading", (), False, True, "거래 시뮬레이터·실전 경로"),
     Check("web.verify_view", (), False, True, "화면 설명 구조"),
+    Check("entry.verify_live", (), False, False, "라이브 허브 — 바뀐 상품만 판정 == 배치 판정"),
     Check("authoring.extract.verify_tree", (), False, True, "규칙 동작(트리 없음·미심판 불일치·원문 사례 불일치 등)"),
     Check("backtest.verify_trading", ("--parity",), True, False, "신호 패리티 — 백테스트 == 실시간(일봉)"),
 ]
@@ -148,12 +148,9 @@ class Runner:
 def main(argv):
     modes = [a for a in argv if not a.startswith("-")]
     mode = modes[0] if modes else "daily"
-    if mode == "watch":
-        from market.feed import watch                 # 장중 주기 재판정 루프(구간③) — 한 회차 = 이 러너의 verdict 모드
-        return watch(argv, lambda rest: main(["verdict"] + rest))
     if mode == "check":
         return check_main(argv)
-    if mode not in ("daily", "verdict"):
+    if mode != "daily":
         print(__doc__)
         return 2
 
@@ -168,19 +165,13 @@ def main(argv):
     r = Runner(mode, quiet)
     r.say("=== %s 시작 · %s · BASE=%s" % (mode, sys.platform, BASE))
 
-    # 어느 엔진을 돌릴지는 books.json 에서 온다(코드에 특정 책을 박지 않는다).
+    # 어느 책을 돌릴지는 books.json 의 live:true 에서 온다(코드에 특정 책을 박지 않는다 — 엔진은 전 책이 같다).
     live = paths.live_slugs()
     if not live:
-        r.say("!! books.json 에 live:true 책이 없음 — 시세 엔진 건너뜀")
-    if mode in ("daily", "verdict"):
-        for slug in live:
-            daily = paths.book_engine(slug, "daily")
-            if not daily:
-                r.say("!! %s: engine.daily 없음 — 건너뜀" % slug); continue
-            r.step(daily, [slug])                                              # 알림 포함 본 실행 — 화면은 라이브 서버가 맡는다
-            # 책 페이지 '백테스트' 탭 데이터(1년·3년) — 장 마감 후(daily)만. 실패해도 막지 않는다.
-            if mode == "daily":
-                r.step("web.backtest_page", [slug], required=False)
+        r.say("!! books.json 에 live:true 책이 없음 — 판정 건너뜀")
+    for slug in live:
+        r.step("entry.notify", [slug])                                 # 판정·알림(한 프로세스, 한 번) — 화면은 라이브 서버가 맡는다
+        r.step("web.backtest_page", [slug], required=False)           # 책 페이지 '백테스트' 탭 데이터(1년·3년). 실패해도 막지 않는다.
 
     # 정적 발행(GitHub Pages)은 폐지됐다 — 화면은 라이브 서버(entry.serve)가 매 요청 엔진을
     # 새로 돌려 그린다(오래된 값이 '지금 값'처럼 안 보이게). 파일로 굽지도, 레포에 push 하지도 않는다.

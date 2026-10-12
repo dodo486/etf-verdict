@@ -329,7 +329,7 @@ def m_gone_ops(src):
 # 판단자 — 트리 원본·시세 원본·조건 평가를 쓰는 곳은 판단자(judge/judge) 하나와 그 도구(tree)뿐.
 GATEWAY_NAMES = {"TreeGateway"}
 EVAL_NAMES = {"judge.eval": {"series", "Ctx"}, "judge.judge": {"RuleSeries"}}              # 평가 이름 {모듈: 이름}
-FETCH_NAMES = {"judge.judge": {"history", "history_back", "session_closes"}}                # 시세 받기 {모듈: 이름}
+FETCH_NAMES = {"judge.judge": {"history", "history_back"}, "market.store": {"session_closes", "market_closes"}}  # 시세 받기 {모듈: 이름}
 FETCH_ATTRS = {"histories", "minutes", "sessions"}                    # md_feed. 시세 받기
 BAR_FIELDS = {"open", "high", "low", "close", "volume"}               # 캔들(시세 원본) 필드
 
@@ -490,12 +490,14 @@ OWNERS = [
          hint="ProductJudge.decide·conditions·evaluate·value 로",
          allow={("judge/verify_eval.py", None): (None, "도구 단위 검사 — 계산기 자체를 시험한다"),
                 ("tree/verify_gateway.py", None): (None, "도구 단위 검사 — 문법 검사에 계산기를 곁들인다")}),
-    dict(concept="시세 원본", owners=("judge/judge.py", "judge/eval.py", "market/md_feed.py", "market/_dev_cache.py"),
+    dict(concept="시세 원본", owners=("judge/judge.py", "judge/eval.py", "market/md_feed.py", "market/_dev_cache.py",
+                                   "market/store.py"),
          match=m_raw_prices,
          why="시세 원본(받기·캔들 필드)을 만지는 곳은 판단자 하나(+ 계산기·시세 창구) — 다른 층은 판단자의 가격·판정만",
          hint="Judge.prices·shared_prices·recent, ProductJudge.price·days 로",
          allow={("judge/verify_eval.py", None): (None, "도구 단위 검사 — 계산기에 넣을 합성 캔들을 만든다"),
                 ("tree/verify_gateway.py", None): (None, "도구 단위 검사 — 합성 캔들을 만든다"),
+                ("market/verify_store.py", None): (None, "도구 단위 검사 — 시세 칸에 넣을 합성 캔들·세션을 만든다"),
                 ("web/verdict_view.py", None): ({".close"}, "판단자가 낸 Decision.close(가공된 종가)"),
                 ("authoring/transcribe/book_source.py", None): (None, "원문 파일 읽기(시세 아님)")}),
     dict(concept="지운 연산", owners=(), match=lambda src: [], everywhere=m_gone_ops,

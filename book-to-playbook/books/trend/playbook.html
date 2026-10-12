@@ -1675,7 +1675,7 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
 /* ============================================================
    라이브 모드 — 로컬 실시간 서버가 값을 살아 움직이게 한다(유일한 보기 경로).
 
-   · 서버(python3 -m web.serve)로 열면 /api/verdict?slug=<책> 가 응답한다
+   · 서버(python3 -m entry.serve)로 열면 /api/verdict?slug=<책> 가 응답한다
      → 15초마다 폴링(또는 /events SSE 수신)해 #verdict-data 를 갈아끼우고
        스코어카드·요약칩·진입판정·침체신호·신선도 라벨을 다시 그린다.
    · 서버 없이 열면 fetch 가 실패한다 → 라이브 아님 표시(값 없음). 하루 지난 스냅샷을
@@ -1703,7 +1703,7 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
   }
 
   // 판정을 받는다 — 화면에서 사람이 답한 수동 조건(checklist-ui 의 __verdictAnswers)이 있으면 POST 로 함께 보내
-  //   서버가 그 답까지 반영한 판정을 낸다(서버 권위 — 화면은 다시 계산하지 않는다). 답이 없으면 캐시되는 GET.
+  //   서버가 그 답까지 반영한 판정을 낸다(서버 권위 — 화면은 다시 계산하지 않는다). 답이 없으면 GET(허브의 최신 판정 — 시세가 바뀔 때만 다시 계산된다).
   function fetchVerdict(){
     var ans = null;
     try { ans = window.__verdictAnswers ? window.__verdictAnswers() : null; } catch(e){ ans = null; }

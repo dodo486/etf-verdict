@@ -42,7 +42,7 @@
    → 심판(`authoring/extract/JUDGE.md`)이 비교 도구(`python -m authoring.extract.compare <slug>`)로 다른 곳을 보고 원문과 대조해 최종 `tree.json`(규칙마다 `why`)을 직접 쓴다
    → `python -m authoring.extract.verify_tree <slug>` 통과.
 4. **페이지**: `books/trend/playbook.html` 을 베이스로 `#src` 와 머리말만 교체(시트 패널은 `#verdict-data` + `#sheet-root` 골격 그대로).
-5. **등록**: `books.json` 에 항목(slug/title/tickers/desc/live/engine). `python -m entry.run check` 가 통과해야 한다.
+5. **등록**: `books.json` 에 항목(slug/title/tickers/desc/live). `python -m entry.run check` 가 통과해야 한다.
 6. **배포**: `python -m entry.run daily`.
 
 수집 요청서는 없다 — 트리가 쓰는 심볼이 곧 수집 목록이고, jhts 에 없는 심볼은 수집 요청이 자동으로 남는다.
@@ -50,13 +50,12 @@
 ## 실행
 
 ```
-python -m entry.run daily        # 판정 → 백테스트 탭 데이터 (검사는 돌지 않는다)
+python -m entry.run daily        # live 책마다 판정·알림(entry.notify) → 백테스트 탭 데이터 (검사는 돌지 않는다)
 python -m entry.run check [--parity]   # 검사 전부(CHECKS) — 무언가 바꿨을 때(커밋 전). 요약 + 종료코드
-python -m entry.run watch [--every N] # asof=지금 기준 N분(기본 5)마다 재판정(백테스트 제외) — 분봉(tf 1m·5m) 조건은 아직 모름(None)
-python -m web.verdict_view <slug> [--json] [--no-send]       # 오늘 판정(판정 JSON·알림)
+python -m entry.notify <slug> [--json] [--no-send]          # 오늘 판정(판정 JSON·알림) — 한 책
 python -m backtest.runner <slug> [--days 365]   # 백테스트(로그·JSON)
 python -m web.backtest_page <slug>                            # 책 페이지 '백테스트' 탭 데이터
-python -m entry.serve                                           # 로컬 실시간 서버(SETUP.md §7)
+python -m entry.serve                                           # 로컬 실시간 서버 — 장중 재판정도 여기(시세가 바뀐 상품만, SETUP.md §7)
 ```
 
 환경: jhts 시세 패키지가 pip 설치가 아니면 `PYTHONPATH=<jhts 경로>` 를 줘야 시세가 들어온다(없으면 판정이 ❔).
@@ -86,7 +85,7 @@ python -m entry.serve                                           # 로컬 실시�
 | `judge/eval.py` · `judge/judge.py` | 계산기(Ctx·series — 트리 식에 시세를 넣어 계산) · 등급의 뜻(RuleSeries — 등급·금액·비중·워밍업 가드, +`grade_rules.json`) · 시세 받기(history) |
 | `judge/judge.py` · `entry/live.py` · `backtest/{trades,portfolio,runner}.py` · `entry/notify.py{telegram,desktop}.py` | ① 신호(판단자 Judge · 라이브 버스 조립) · ② 백테스트 소비(체결·vectorbt 돈·러너) · ② 알림 소비 |
 | `market/md_feed.py` | **jhts 시세 창구 — 유일한 수집 입구**(없으면 수집 요청) |
-| `web/verdict_view.py` · `entry/notify.py{telegram,desktop}.py` | 판정 JSON·알림 문장(books.json engine.daily) · 알림 송신(텔레그램·데스크톱) |
+| `web/verdict_view.py` · `entry/notify.py{telegram,desktop}.py` | 판정 JSON·알림 문장 · 알림 송신(텔레그램·데스크톱 — run daily 가 live 책마다) |
 | `web/book_page.py` · `entry/serve.py` · `web/build_home.py` · `web/backtest_page.py` | 페이지 조립 · 로컬 실시간 서버 · 홈 · 백테스트 탭 데이터 |
 | `authoring/transcribe/book_source.py` · `authoring/transcribe/verify_source.py` · `authoring/transcribe/pages.py` | 원문 소절 인덱스 · 플레이북 본문 무결 · 책 페이지 찾기·신선도 |
 | `authoring/transcribe/book_sources.json` · `authoring/transcribe/source_baseline.json` | 원문 위치 · 본문 해시 기준(커밋 대상) |
