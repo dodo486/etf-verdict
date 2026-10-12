@@ -1,19 +1,21 @@
 # 아키텍처 — 구조의 정본
 
 > 구조·원칙 설명은 이 파일 한 곳. README·HANDOFF 는 여기를 가리킨다. 할 일은 `docs/HANDOFF.md` 한 곳.
-> 2026-10-08 리팩터(TreeGateway → 폴더 재편 → 검사 정리), 2026-10-09 리팩터(팀 폴더 → layer-first 재배치 → 2단 pub-sub)에서 사용자와 정한 원칙.
+> 2026-10-08 리팩터(TreeGateway → 폴더 재편 → 검사 정리), 2026-10-09 리팩터(팀 폴더 → layer-first 재배치 → 2단 pub-sub),
+> 2026-10-12 리팩터(만드는 곳 = 검증하는 곳 · 검사는 바뀔 때만)에서 사용자와 정한 원칙.
 
 ## 1. 구조 한눈에 — 폴더 이름이 곧 파이프라인
 
 폴더 = 층(layer). 흐름은 **아래에서 위로 한 방향** — 아래는 위를 import 하지 않는다(소비·진입·검사만 위에서 아래를 부른다).
-**제작(authoring)이 왼쪽에서 tree.json 을 만들고, 런타임이 그 tree 를 오른쪽으로 흘린다. 검사(verify)는 전 층을 가로지르는 게이트.**
+**제작(authoring)이 왼쪽에서 tree.json 을 만들고(그 검증까지), 런타임이 그 tree 를 오른쪽으로 흘린다. verify 는 코드 검사만.**
+작업 순서(만들기 → 검증 → 사용)와 트리를 읽는 길은 1-2.
 
 ```
           books(설정·책마다 tree.json) · dsl(언어)
                  │
   제작 ───────────┤─────────────── 런타임 파이프라인: 시세 → 신호 → 소비 ───────────────
                  │
-authoring/   books/<slug>/tree.json 을 만든다(전사·추출 a·b·심판) — 런타임과 분리, 명령으로만 돈다
+authoring/   books/<slug>/tree.json 을 만들고 검증한다(전사·추출 a·b·심판 · 본문 해시·채점) — 런타임과 분리, 명령으로만 돈다
   │ 산출물 books/<slug>/*.json
   ▼
 dsl/         조건 트리의 언어(공개 토대) — tree_gateway(읽는 유일 출입구) · tradeTool(Cond=문법/계산 · Grade·RuleSeries=등급 수학, tf중립·asof)
@@ -68,6 +70,48 @@ feed.price_bus (1개) ──틱 {ts, trees, hist}── fan-out ─┬───�
 - **feed 는 가격을 모른다**(다른 층 import 0) — '언제 다시 판정하나'(트리거)만. '무엇을 계산할지'는 구독자(signals·consumers)가 정한다. 그래서 백테스트(과거 배치)는 feed 를 안 거치고 같은 signal 코드를 직접 돌린다(구독 밖).
 - **의존성 주입**: signals·consumers 는 feed 를 import 하지 않는다. 둘을 엮는 유일한 자리는 `entry/live.py`(조립 뿌리, entry 는 전 층 import 허용).
 - **오늘 판정 = asof=now 한 점(Judge.decisions) · 백테스트 = 전 날짜(Judge.signals)** — 같은 판단자를 쓰임만 달리(원칙 5).
+
+### 1-2. 작업 순서와 트리를 읽는 길 — 만드는 곳 = 검증하는 곳
+
+세로는 **작업 순서**, 오른쪽은 그 단계가 **트리를 읽는 길**. 검증은 그것을 만드는 단계 안에 있고(폴더도 같다),
+검사는 **대상이 바뀔 때만** 돈다 — 매일 돌지 않는다(daily·verdict·watch 에 검사 없음).
+
+```
+ 작업 순서(위 → 아래)                                              트리를 읽는 길
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 0. 원문 (구간①, authoring/playbook) — 원문을 바꿀 때
+    book_source(소절 인덱스) → 전사 → source_integrity(본문 해시 고정)      트리 안 읽음
+──────────────────────────────────────────────────────────────────────────────────
+ 1. 트리 만들기 + 검증 (구간②, authoring/checklist) — 트리를 바꿀 때
+    ① 추출자 a·b ─▶ tree_candidates/a.json · b.json (서로 모름)        서브에이전트가 씀
+    ② 사례 작성자 ─▶ scenarios.json                                   트리 안 읽음
+    ③ 심판  compare <slug> 6 → logs/disagree.json (a·b 다른 곳)         Judge.read
+            원문과 대조해 tree.json (규칙마다 why)                      심판이 씀
+    ④ 채점  score <slug> — 정지 0 까지 ③으로                            Judge.open/read
+            ('같은 뜻' 잣대는 compare 한 벌) · score --quick 트리 계약
+──────────────────────────────────────────────────────────────────────────────────
+ 2. 페이지 (consumers/display) — 페이지·UI 를 바꿀 때
+    playbook.html 골격 · book_page(구획·UI 사본 검사)                    트리 안 읽음
+──────────────────────────────────────────────────────────────────────────────────
+ 3. 사용 (구간③, 런타임) — 매일·장중, 검사 없음
+    entry/run daily·verdict · entry/live(watch·serve)                   Judge.open
+      → signals/judge  Judge·ProductJudge (판정·백테스트 신호)
+        ├▶ consumers/display  verdict_view · backtest_page (화면)
+        ├▶ consumers/backtest runner · trades (체결·수익)
+        └▶ consumers/notify   알림
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 코드 검사 (verify/) — 코드를 바꿀 때. rules · primitives · trading · view   가짜 트리(synthetic)만
+ 전부 한 번에: python -m entry.run check  (무언가 바꿨으면 커밋 전 — 엔진 dsl·signals 를 바꿔도 트리 검사까지)
+```
+
+트리를 읽는 길은 단계와 상관없이 하나다(원칙 13):
+
+```
+ tree.json · 후보 ──▶ dsl/tree_gateway.TreeGateway ──▶ signals/judge.Judge ──▶ 비교·채점·계약 / 화면·백테스트·라이브
+                      (키 배치를 아는 유일한 파일)        (트리 객체를 받는 유일한 곳)
+```
+
+트리 파일 모양이 바뀌면 고칠 곳은 `tree_gateway.py` 하나. 새 질문이 필요하면 출입구에 하나 + 판단자에 전달 한 줄.
 
 ## 2. 원칙
 

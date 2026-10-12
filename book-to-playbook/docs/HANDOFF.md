@@ -21,6 +21,9 @@ tree.json 은 지운 연산(pct·count·streak)·옛 `review` 키 때문에 **�
 
 | 커밋 | 내용 |
 |---|---|
+| `43ebea0` | **검사는 바뀔 때만** — daily·verdict·watch 에서 검사 제거, `--no-verify-tree` 폐지. 바꿨으면 커밋 전 `run check` |
+| `fba5686` | **만드는 곳 = 검증하는 곳**(동작 불변) — 트리 채점 → `authoring/checklist/score.py`(+`--quick` 트리 계약) · 본문 해시 → `authoring/playbook/` · 책 페이지 검사 → `consumers/display/book_page.py` · `verify/` 는 코드 검사만 |
+| `d25526f` | 심판 비교 도구를 `authoring/checklist/compare.py` 로(채점과 '같은 뜻' 잣대 한 벌) — authoring 층 import 에 signals |
 | `d9b5d63` | 검사 픽스처를 v3 규칙 트리로(출입구 `rule`·`synthetic`) — 깨져 있던 원시함수·거래·화면 검사 복구 |
 | `40deda9` | **6칸 잔재의 꼬인 참조 정리**(판정·백테스트 불변) — v3→v2→Qty 왕복 번역·뒷문(raw_*)·조심/defs 경로 삭제, 칸 극성 표 하나 |
 | `b78fdb0` | **6칸 → 3동사** — 평가기·출입구(gate·weight·sells·skips)·판정 JSON(gates·size·sells·verbs)·화면·등급 글자(✅ 산다·⛔ 안 산다), 🚫·`grade_rules` 출력 삭제 |
@@ -53,6 +56,9 @@ tree.json 은 지운 연산(pct·count·streak)·옛 `review` 키 때문에 **�
 - 초안 문서는 위가 끝나면 지침(`COND_DSL`·`EXTRACTOR`·`JUDGE`·`SCENARIO`)으로 옮기고 지운다(초안 머리말 규칙).
 
 ### 그 뒤
+- **트리 출입구 강제의 빈틈** — 주인 표 '트리 원본 키'는 `r["rules"]`·`.get("then")` 꼴만 잡는다. `"then" in r`·흔한 키
+  (`when`·`qty`)·`book_file(slug, "tree.json")` 직접 열기는 안 잡힌다(지금 위반은 0). 출입구 밖에서 `"tree.json"`·`"tree_candidates"`
+  를 파일 열기에 넘기면 정지하는 줄을 주인 표에 · 후보 파일 이름(`tree_candidates/a.json`…)이 compare·score 에 흩어진 것을 출입구로.
 - **백테스트 계산기 버그** — `portfolio` 가 1 unit = 시작자본 고정이라 손실 뒤 다음 진입이 남은 현금보다 클 수 있다
   (옛 표준 매도 사본에서 SOXL −162% 관측). 잔고 기준 사이징으로.
 - **장중 손익 백테스트**(분봉 ~7일뿐이라 보류 — 되살릴 땐 통일 신호 경로 위에 재구현) · tree 재생성 뒤
@@ -65,7 +71,7 @@ tree.json 은 지운 연산(pct·count·streak)·옛 `review` 키 때문에 **�
 
 | 문서 | 내용 |
 |---|---|
-| `docs/ARCHITECTURE.md` | 구조·원칙 12개·변경 규율·검사 |
+| `docs/ARCHITECTURE.md` | 구조(1-2 작업 순서·트리를 읽는 길)·원칙·변경 규율·검사 |
 | `docs/action-grammar-draft.md` | 트리 v3 설계(모양 확정 — 남은 세부는 3절 5-남음) |
 | `authoring/checklist/README.md` 외 지침 | 구간② 절차·역할 |
 | `market/md_feed.py` docstring | jhts 일봉·분봉 계약(어댑터가 기대하는 것·반환 계약) |
@@ -73,8 +79,8 @@ tree.json 은 지운 연산(pct·count·streak)·옛 `review` 키 때문에 **�
 ## 5. 검증 명령
 
 ```
-python -m entry.run check            # 전부(CHECKS 한 목록) — 요약 + 종료코드
-python -m verify.rules           # 코드 규칙 — 폴더 경계 + 주인 표
+python -m entry.run check            # 전부(CHECKS 한 목록) — 바꿨으면 커밋 전. 요약 + 종료코드
+python -m verify.rules               # 코드 규칙 — 폴더 경계 + 주인 표
 python -m authoring.checklist.score <slug>        # 트리 채점
 python -m authoring.checklist.score --quick   # 트리 계약(소절·트리 문법·ref)
 python -m consumers.display.book_page         # 책 페이지 구획·UI 사본
