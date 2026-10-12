@@ -30,7 +30,7 @@ description: 트레이딩 책을 읽어 실전 매매 플레이북 + 기계가 �
 ## ⛔ 절대 규칙 3 — 검사는 실행으로, 책이 계약에 맞춘다
 
 검사는 글자가 아니라 실행으로 본다(목록은 `entry/run.py` CHECKS 하나 — 매 발행마다 돌고, `python -m entry.run check` 로 전부). 통과시키려고 검사를 느슨하게 만들지 않는다.
-책 계약(`verify.verify_tree --contract`): 원문 소절 인덱스 · 트리 문법(여섯 칸 전부) · 트리 ref 가 실제 소절. 책 페이지(`verify.verify_view --pages`): 페이지 구획과 UI 사본.
+책 계약(`verify.verify_tree --contract`): 원문 소절 인덱스 · 트리 문법(v3 규칙·동사 셋) · 트리 ref 가 실제 소절. 책 페이지(`verify.verify_view --pages`): 페이지 구획과 UI 사본.
 
 ## 새 책 절차
 

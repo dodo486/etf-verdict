@@ -14,19 +14,19 @@
 
 폴더 구조, 아키텍처 원칙, 검사 목록은 **`docs/ARCHITECTURE.md` 한 곳**에 있다. 할 일은 `docs/HANDOFF.md`.
 
-## 체크리스트 — 판정 여섯 칸 (`authoring/checklist/COND_DSL.md`)
+## 체크리스트 — 규칙 목록 · 동사 셋 (`authoring/checklist/COND_DSL.md`)
 
-| 칸 | 묻는 것 | 결과 |
+트리는 **규칙 목록**이다(원문 판단 하나 = 규칙 하나). 규칙의 갈래는 동사 셋 중 하나를 한다:
+
+| 동사 | 묻는 것 | 결과 |
 |---|---|---|
-| `filter` | 들어가도 되는 시장인가 | 거짓 → 🚫 진입 금지 |
-| `avoid` | 사면 안 되는 자리인가 | 참 → ⛔ 보류 |
-| `entry` | 살 자리인가 | 참 → ✅ 매수 후보 · 거짓 → ⚪ 관망 |
-| `caution` | 사더라도 금액을 줄일까 | 걸린 규칙마다 금액 × scale (폭 미명시면 표시만) |
-| `sizing` | 얼마나(비중)·나눠서(분할) | 총 투자금 대비 % · 차수별 비율(미명시면 null) |
-| `exit` | 보유분을 언제 얼마나 팔까 | 걸리면 다음 봉 시가 매도 · 내 포지션(로컬 파일) 기준 판정 |
+| `안 산다` | 사면 안 되는 시장·자리인가 | 갈래 하나라도 참 → ⛔ 안 산다 |
+| `산다` | 살 자리인가 · 얼마나(`qty` cash = 비중 % · budget = 분할 비율) | 참 → ✅ 산다 · 둘 다 아님 → ⚪ 관망 |
+| `판다` | 보유분을 언제 얼마나 팔까(`qty` bought·held) | 걸리면 다음 봉 시가 매도 · 내 포지션(로컬 파일) 기준 판정 |
 
-시장 환경 점수·공격/균형/방어 모드·폭락 후 재진입처럼 **상품 여럿이 같이 보는 판단은 `defs` 에 한 번** 정의해
-각 칸이 참조한다(화면 맨 위 '공통 조건'). 조건의 신원은 식이다 — 저자가 숫자를 안 준 조건도 식으로 쓰고 그 숫자 자리만
+수동 조건 때문에 정해지지 않으면 🟡 확인 대기, 데이터가 모자라면 ❔ 판정 불가(사다리 정본 `dsl/grade_rules.json`).
+여러 규칙이 같이 보는 측정(장전 점수·모드 등)은 **이름 하나로** 두고 `{"rule": 이름}` 으로 참조한다(화면은 on 없는 규칙을
+'공통 시장 신호'로 한 번 모은다). 조건의 신원은 식이다 — 저자가 숫자를 안 준 조건도 식으로 쓰고 그 숫자 자리만
 `"?"`(사람이 판단 — 🟡). 식으로 쓸 수 없는 것만 문장 수동: `저자 미명시: …(정성)` · `데이터 없음:`(수집·연결 과제) ·
 `연산 없음:`(원시 연산 추가 과제). 문법 정본은 `authoring/checklist/COND_DSL.md`, 작성 규칙은 역할 문서.
 
@@ -39,7 +39,7 @@
    (요약 bullet 에 원문에 없는 숫자·칸 배치가 섞이기 쉽다) → `python -m verify.verify_source_integrity --accept --why "새 책"`.
 3. **체크리스트**(②): 역할마다 지침 문서 하나 — 추출자 a·b(`authoring/checklist/EXTRACTOR.md`, 서로 모름)가 플레이북만 보고
    규칙 목록 `<a|b>.rules.json` → 트리 `<a|b>.json` → 사례 작성자(`authoring/checklist/SCENARIO.md`)가 원문만 보고 `scenarios.json`
-   → 심판(`authoring/checklist/JUDGE.md`)이 비교 도구(`--dump`)로 다른 곳을 보고 원문과 대조해 최종 `tree.json`(`review` 포함)을 직접 쓴다
+   → 심판(`authoring/checklist/JUDGE.md`)이 비교 도구(`--dump`)로 다른 곳을 보고 원문과 대조해 최종 `tree.json`(규칙마다 `why`)을 직접 쓴다
    → `python -m verify.verify_tree <slug>` 통과.
 4. **페이지**: `books/trend/playbook.html` 을 베이스로 `#src` 와 머리말만 교체(시트 패널은 `#verdict-data` + `#sheet-root` 골격 그대로).
 5. **등록**: `books.json` 에 항목(slug/title/tickers/desc/live/engine). `python -m entry.run check --no-verify-tree`(코드 규칙·본문 해시·책 계약·책 페이지)가 통과해야 한다.

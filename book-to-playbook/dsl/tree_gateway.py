@@ -7,10 +7,9 @@
   나머지(판정 엔진·백테스트·화면)는 여기에 '질문'만 한다. 직접 접근은 verify/verify_code 주인 표가 막는다.
 
 트리 v3 (규칙 목록)
-  파일은 `rules` 목록(원문 판단 하나 = 규칙 하나, 동사 셋 안 산다·산다·판다). 소비자는 칸 이름으로 묻는다:
-    · 안 산다 → section(avoid)(any 걸림 → 사지 않음)   · 산다 → section(entry)(any 걸림 → 매수 후보)
-    · 산다 + qty cash → sizing(비중) · 산다 + qty budget → tranches(분할)   · 판다 → exit_rules
-    · filter 는 항상 참(시장 게이트도 '안 산다'로 흡수)
+  파일은 `rules` 목록(원문 판단 하나 = 규칙 하나, 동사 셋 안 산다·산다·판다 — 정본 Cond.VERBS). 소비자는 동사로 묻는다:
+    · gate(안 산다)·gate(산다) — 그 동사 갈래의 any 묶음(등급용, 포지션 쓰는 갈래 제외)
+    · weight — 산다 + qty cash(비중) · tranches — 산다 + qty budget(분할) · sells — 판다
   수량은 트리의 qty {of, x} 를 그대로 Qty(of, x) 로 건넨다("?" → None). 물량 변환은 consumers/backtest/trades.to_units.
   `{"rule": "이름"}` 참조와 이름 심볼(`$빅테크` 등 names)은 건네기 전에 **펼친다** — 평가기(Cond)는 평범한 식만 본다.
   `{"pos": "filled"/"sold", "rule": ...}` 는 pos 값만 남긴다(포지션이 없으면 None → 그 갈래 안 침 — 정직한 degrade).
@@ -22,7 +21,7 @@ from collections import namedtuple
 from dsl.tradeTool import Cond
 from shared.paths import book_file
 
-BLOCK, BUY, SELL = DO_VERBS = ("안 산다", "산다", "판다")
+BLOCK, BUY, SELL = Cond.BLOCK, Cond.BUY, Cond.SELL
 
 
 def rule(label, do, when=None, qty=None, **meta):
@@ -205,10 +204,13 @@ class TreeGateway:
         labels = [r.get("label") for r in rules if isinstance(r, dict)]
         if len(labels) != len(set(labels)):
             raise Cond.CondError("규칙 label 이 책 안에서 유일하지 않다")
+        bad = sorted({t.get("do") for r in rules if isinstance(r, dict) for t in r.get("then", [])} - set(Cond.VERBS))
+        if bad:
+            raise Cond.CondError("모르는 동사 %r (허용 %s)" % (bad, " · ".join(Cond.VERBS)))
         # 펼친 조건식의 문법만 검사(참조·이름 심볼은 이미 펼쳐짐)
         for prod in tree["products"]:
-            for sec in Cond.SECTIONS:
-                Cond.validate(self.section(prod, sec), "products.%s.%s" % (prod, sec))
+            for _do, label, _ref, node in self.expressions(prod):
+                Cond.validate(node, "%s.%s" % (prod, label or _do))
         return True
 
     # ---------------------------------------------------------------- 책·상품
@@ -230,39 +232,36 @@ class TreeGateway:
     def book(self, default=None):
         return default
 
-    def unexpressed(self):
+    def skips(self):
         """못 옮긴 규칙(skip) [{rule, ref, reason}]."""
         return [{"rule": r.get("label"), "ref": r.get("ref"), "reason": r["skip"]}
                 for r in self._d.get("rules", []) if "skip" in r]
 
-    # ---------------------------------------------------------------- 칸·규칙 (do → 칸 번역)
-    def section(self, prod, sec):
-        """조건 칸 — filter 는 항상 참, avoid = 안 산다 갈래 any, entry = 산다 갈래 any.
-        등급 칸은 포지션 독립이라 pos 쓰는 갈래(분할 2차+·보유 조건)는 뺀다 — 그것은 tranches·exit 가 본다."""
-        if sec == "filter":
-            return {"all": []}
-        if sec in ("avoid", "entry"):
-            do = BLOCK if sec == "avoid" else BUY
-            members = []
-            for r in self._rules_for(prod):
-                for t in r.get("then", []):
-                    if t.get("do") != do or "when" not in t:
-                        continue
-                    w = self._when_of(r, t)
-                    if Cond._uses_pos(w):                # 포지션 조건(분할 2차+)은 등급 칸 밖 — tranches 가 본다
-                        continue
-                    if isinstance(w, dict):              # 규칙 이름·소절·공통 여부를 붙여 화면이 '무슨 규칙'인지 보이게
-                        w = dict(w, label=r.get("label"), ref=r.get("ref"), allprod=not r.get("on"))
-                    members.append(w)
-            return {"any": members}
-        raise Cond.CondError("모르는 칸 %r" % sec)
+    # ---------------------------------------------------------------- 동사별 갈래
+    def gate(self, prod, do):
+        """등급 동사(안 산다·산다)의 갈래 any 묶음 — 갈래 하나라도 참이면 그 동사.
+        등급은 포지션 독립이라 pos 쓰는 갈래(분할 2차+·보유 조건)는 뺀다 — 그것은 tranches·sells 가 본다."""
+        if do not in Cond.GATES:
+            raise Cond.CondError("등급 동사가 아님 %r (허용 %s)" % (do, " · ".join(Cond.GATES)))
+        members = []
+        for r in self._rules_for(prod):
+            for t in r.get("then", []):
+                if t.get("do") != do or "when" not in t:
+                    continue
+                w = self._when_of(r, t)
+                if Cond._uses_pos(w):                    # 포지션 조건(분할 2차+)은 등급 밖 — tranches 가 본다
+                    continue
+                if isinstance(w, dict):                  # 규칙 이름·소절·공통 여부를 붙여 화면이 '무슨 규칙'인지 보이게
+                    w = dict(w, label=r.get("label"), ref=r.get("ref"), allprod=not r.get("on"))
+                members.append(w)
+        return {"any": members}
 
     def _qty_branches(self, prod, do, of=None):
         """이 상품의 do 갈래 [(규칙, 갈래)] — of 를 주면 qty 종류가 그것인 갈래만(qty 를 고르기만 한다 — 변환 아님)."""
         return [(r, t) for r in self._rules_for(prod) for t in r.get("then", [])
                 if t.get("do") == do and (of is None or (t.get("qty") or {}).get("of") == of)]
 
-    def sizing(self, prod):
+    def weight(self, prod):
         """비중 — 산다 갈래 중 qty cash 의 첫 갈래(Qty cash). 없으면 qty.x None 인 빈 Rule."""
         for r, t in self._qty_branches(prod, BUY, "cash"):
             return Rule(r.get("label"), r.get("ref"), qty=_qty(t["qty"]))
@@ -273,31 +272,24 @@ class TreeGateway:
         return [Rule(r.get("label"), r.get("ref"), when=self._when_of(r, t), qty=_qty(t["qty"]), allprod=not r.get("on"))
                 for r, t in self._qty_branches(prod, BUY, "budget")]
 
-    def exit_rules(self, prod):
+    def sells(self, prod):
         """판다 갈래 [Rule(when, qty bought/held)] — qty 없으면 남은 전량. 없으면 [](trades.exit_policy 가 정책을 정한다)."""
         return [Rule(r.get("label"), r.get("ref"), when=self._when_of(r, t), qty=_qty(t.get("qty"), Qty("held", 1.0)),
                      allprod=not r.get("on"))
                 for r, t in self._qty_branches(prod, SELL)]
 
     def expressions(self, prod):
-        """상품 하나의 모든 식 [(칸, 라벨, ref, 식)] — 심볼·워밍업·ref 훑기용."""
-        out = [(sec, None, None, self.section(prod, sec)) for sec in Cond.SECTIONS]
+        """상품 하나의 모든 식 [(동사, 라벨, ref, 식)] — 심볼·워밍업·ref 훑기용(등급 묶음은 라벨 None)."""
+        out = [(do, None, None, self.gate(prod, do)) for do in Cond.GATES]
         for t in self.tranches(prod):
             if t.when is not None:
-                out.append(("sizing", t.label, t.ref, t.when))
-        w = self.sizing(prod)
+                out.append((BUY, t.label, t.ref, t.when))
+        w = self.weight(prod)
         if w.qty.x is not None:
-            out.append(("sizing", w.label, w.ref, w.qty.x))
-        for r in self.exit_rules(prod):
-            out.append(("exit", r.label, r.ref, r.when))
+            out.append((BUY, w.label, w.ref, w.qty.x))
+        for r in self.sells(prod):
+            out.append((SELL, r.label, r.ref, r.when))
         return out
-
-    def scenario_node(self, prod, sec, rule=None):
-        if not self.has(prod):
-            return None
-        if sec in Cond.SECTIONS:
-            return self.section(prod, sec)
-        return None
 
     # ---------------------------------------------------------------- 트리 전체 훑기
     def _all_nodes(self):
@@ -355,8 +347,8 @@ class TreeGateway:
     def warmup(self, prod=None):
         mx = 0
         for p in [prod] if prod is not None else self._d["products"]:
-            for sec in Cond.SECTIONS:
-                mx = max(mx, Cond.warmup_of(self.section(p, sec)))
+            for do in Cond.GATES:
+                mx = max(mx, Cond.warmup_of(self.gate(p, do)))
         return mx
 
     def refs(self):

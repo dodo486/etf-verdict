@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""매도·분할 규칙 리더 + 규칙 평가 워크(구간③) — 트리(books/<slug>/tree.json)의
-exit/sizing 규칙을 읽어, 그 규칙을 봉마다 평가해 체결 일정·거래 요약을 만든다(책 무관, 돈·수수료·지표 없음).
+"""판다·분할 규칙 리더 + 규칙 평가 워크(구간③) — 트리(books/<slug>/tree.json)의
+판다 갈래·산다 분할(qty budget)을 읽어, 봉마다 평가해 체결 일정·거래 요약을 만든다(책 무관, 돈·수수료·지표 없음).
 
 이 모듈은 '규칙'만 다룬다 — 돈·수수료·성적(자산곡선·MaxDD·샤프)은 계산기(consumers/backtest/portfolio)가
 build_trades 결과(체결 일정)를 받아서 낸다. 매도 정책(책에 매도 규칙이 없으면 어떻게 하나)의 주인도 이 파일.
@@ -29,7 +29,7 @@ build_trades 결과(체결 일정)를 받아서 낸다. 매도 정책(책에 매
 규칙 평가 워크(돈·수수료·지표 없음)
   · build_trades   : 머리(tree)가 정한 진입 신호·분할·매도 규칙을 받아 '한 진입 → 그 청산까지'의
                      체결 일정(buys/sells)을 만든다. 평단은 봉마다 여기서 계산해 보유(judge.Holding — 라이브
-                     보유 화면과 같은 pos 주입 문맥)로 cond 에 넣고, cond 는 그 값을 '읽어' exit/분할 규칙만
+                     보유 화면과 같은 pos 주입 문맥)로 cond 에 넣고, cond 는 그 값을 '읽어' 판다·분할 갈래만
                      평가한다. 돈·수수료는 손대지 않는다 — 그건 계산기(portfolio)의 일.
   · _parity_stats  : 머리가 정한 거래 경계(한 진입→청산)로 집계한 거래 요약(거래수·승률·거래당 평균 등).
   · _position_facts: 지금 열려 있는(미청산) 마지막 거래의 사실(진입가·평단·현재수익률·보유일 등).
@@ -52,7 +52,7 @@ def exit_policy(gw, prod):
     """매도 정책 — 이 함수 하나가 주인이다(밖은 이걸 묻는다). "book" = 책의 매도 규칙으로 청산까지 시뮬레이션.
     "none" = 책에 매도 규칙이 없다 → 대체 매도 규칙을 지어내지 않고, 거래 시뮬레이션 없이 매수 신호 뒤
     N거래일 보유 수익률(backtest 의 HORIZONS)로만 평가한다(화면 문구 NO_EXIT_NOTE)."""
-    return "book" if gw.exit_rules(prod) else "none"
+    return "book" if gw.sells(prod) else "none"
 
 
 def tranches_of(gw, prod, trs=None):
@@ -62,11 +62,11 @@ def tranches_of(gw, prod, trs=None):
     return FULL if (not trs or trs[0].qty.x is None) else trs
 
 
-def unsized_note(gw, prod, exits):
+def unsized_note(gw, prod, sells):
     """저자가 비율을 안 준 수량 자리를 백테스트가 어떻게 계산했는지 — 없으면 None."""
     trs = gw.tranches(prod)
     out = ["분할 비율 저자 미명시 — 전량 한 번 매수로 계산"] if trs and trs[0].qty.x is None else []
-    out += ["매도 비율 저자 미명시 「%s」 — 팔지 않은 것으로 계산" % r.label for r in exits if r.qty.x is None]
+    out += ["매도 비율 저자 미명시 「%s」 — 팔지 않은 것으로 계산" % r.label for r in sells if r.qty.x is None]
     return " · ".join(out) or None
 
 
@@ -139,10 +139,10 @@ def size_notes(counts):
 
 
 # ------------------------------------------------------------------ 규칙 평가 워크: 신호·규칙 → 체결 일정(buys/sells)
-def build_trades(gw, prod, hist, cal, starts, exits, tranches=None, amount=None):
+def build_trades(gw, prod, hist, cal, starts, sell_rules, tranches=None, amount=None):
     """머리(tree — gw)가 정한 진입 신호·분할·매도 규칙을 받아 '한 진입 → 그 청산까지'의 거래 목록을 만든다.
     평단은 여기(규칙 평가 워크)가 봉마다 계산해 Holding 으로 주입하고, cond.py(순수 규칙 평가기)는 그 포지션 값을
-    pos 로 '읽어' exit/분할 규칙만 평가한다. 돈·수수료·지표는 손대지 않는다 — 그건 계산기(portfolio)가 한다.
+    pos 로 '읽어' 판다·분할 갈래만 평가한다. 돈·수수료·지표는 손대지 않는다 — 그건 계산기(portfolio)가 한다.
 
     규약(계산기가 체결 타이밍을 다시 정하지 않는다):
       · 물량 단위 = 시작자본 1.0. 사고팔 양은 전부 to_units(규칙 Qty, 장부) 하나로 낸다:
@@ -157,7 +157,7 @@ def build_trades(gw, prod, hist, cal, starts, exits, tranches=None, amount=None)
       · 수익률 = (판 금액 + 남은 물량 × 마지막 종가) ÷ 산 금액 − 1. 미청산은 마지막 종가로 평가.
       · manual 은 '매매가 안 나가는 쪽'으로 푼다(manual_as=False). 매도 비율 "?"(저자 미명시)도 같은 쪽 — 팔지 않는다.
 
-    starts = 신호 시작일 인덱스 목록. exits·tranches = [Rule](gw 가 건넨 것), tranches 생략 = 트리의 분할(tranches_of).
+    starts = 신호 시작일 인덱스 목록. sell_rules·tranches = [Rule](gw 가 건넨 것), tranches 생략 = 트리의 분할(tranches_of).
     amount = 봉 인덱스 → judge.Amount(Judge.amount — 라이브와 같은 경로) | None. 각 매수에 size(배수)·flags(모름) 를 남긴다."""
     tranches = tranches_of(gw, prod, tranches)
 
@@ -184,20 +184,20 @@ def build_trades(gw, prod, hist, cal, starts, exits, tranches=None, amount=None)
 
         def rebuild(frm):
             """frm 부터 평단이 바뀐다 → 날짜별 평단(cost)을 다시 계산해 pos 로 cond 에 주입(상태 주입).
-            cond 는 그 값을 읽어 ret/days/maxret/minret 로 exit·분할 규칙만 평가한다(역류 아님)."""
+            cond 는 그 값을 읽어 ret/days/maxret/minret 로 판다·분할 갈래만 평가한다(역류 아님)."""
             q = sum(b["qty"] for b in buys)
             avg = sum(b["qty"] * b["px"] for b in buys) / q
             for k in range(frm, L):
                 cost[k] = avg
             ctx = Holding(e, list(cost)).ctx(gw, prod, hist, cal, manual_as=False)
-            return ([Cond.series(r.when, ctx) for r in exits],
+            return ([Cond.series(r.when, ctx) for r in sell_rules],
                     [Cond.series(t.when, ctx) if t.when is not None else None for t in tranches])
 
         whens, twhens = rebuild(e)
         nxt, sells, fired, last = 1, [], set(), None
         for d in range(e, L):
             sold_today = False
-            for k, r in enumerate(exits):
+            for k, r in enumerate(sell_rules):
                 if k in fired or whens[k][d] is not True:
                     continue
                 fired.add(k)

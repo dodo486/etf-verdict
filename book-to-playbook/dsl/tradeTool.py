@@ -804,16 +804,12 @@ def _series(node, ctx, s_sym):
     raise CondError("모르는 연산 %r" % op)
 
 
-# ------------------------------------------------------------------ 칸의 뜻 · 파일 직렬화
-# 상품 한 개의 칸. 조건 칸 셋은 등급을, 나머지는 비중·분할·매도를 낸다.
-# 트리 파일의 키 배치·형식 검사·탐색은 dsl/tree_gateway.py(TreeGateway) 하나가 맡는다 — 여기는 칸의 이름과 뜻만.
-SECTIONS = ("filter", "entry", "avoid")                 # 조건 칸(등급)
-FAVOR = {"filter": True, "entry": True, "avoid": False}  # 조건 칸이 '매수 쪽'인 값 — 극성(수동 가정·빠진 칸의 중립값)
-ZONES = ("filter", "avoid", "entry", "caution", "sizing", "exit")   # 화면 머리글 순서(판정 JSON zones)
-# 여섯 칸의 한글 이름표 — 여기 한 곳이 정본이다. 화면(shared-ui.js zw)은 복붙하지 않고
-# 판정 JSON(consumers/display/verdict_view 가 VD.zones 로 실어보냄, ZONES 순서)을 받아 쓴다.
-ZONE_LABELS = {"filter": "필터", "avoid": "회피", "entry": "진입",
-               "caution": "조심", "sizing": "비중·분할", "exit": "매도"}
+# ------------------------------------------------------------------ 동사의 뜻 · 파일 직렬화
+# 트리 v3 의 규칙 갈래는 동사 셋 중 하나를 한다 — 여기 한 곳이 정본이다(화면은 판정 JSON 의 verbs 로 받는다).
+# 트리 파일의 키 배치·형식 검사·탐색은 dsl/tree_gateway.py(TreeGateway) 하나가 맡는다 — 여기는 동사의 이름과 뜻만.
+BLOCK, BUY, SELL = VERBS = ("안 산다", "산다", "판다")
+GATES = (BLOCK, BUY)                                    # 등급을 내는 동사(포지션 없이 그날 본다) — 판다는 보유분에만
+FAVOR = {BLOCK: False, BUY: True}                       # 그 동사의 갈래가 '매수 쪽'인 값 — 극성(수동 가정·빠진 묶음의 중립값)
 
 
 def _uses_pos(node):
@@ -974,10 +970,9 @@ def warmup_of(node):
 
 # ================= 등급·금액·수집 (옛 grade.py) =================
 GRADES = {
-    "buy": "✅ 매수 후보",
+    "buy": "✅ 산다",
     "confirm": "🟡 확인 대기",
-    "nofilter": "🚫 진입 금지",
-    "avoid": "⛔ 보류",
+    "avoid": "⛔ 안 산다",
     "wait": "⚪ 관망",
     "unknown": "❔ 판정 불가",
 }
@@ -1044,7 +1039,7 @@ def session_closes(symbols, cal, asof):
 
 
 class ProductEval:
-    """한 상품의 조건 칸·비중을 전체 달력에 대해 한 번 계산해 둔다."""
+    """한 상품의 등급 동사(안 산다·산다)·비중을 전체 달력에 대해 한 번 계산해 둔다."""
 
     def __init__(self, gw, prod, hist, cal, unobserved=None, asof=None, answers=None):
         """gw = TreeGateway. unobserved="exclude" = 관측값이 없는 장중 조건(observe)을 빼고 판단한다(백테스트 비교용).
@@ -1059,13 +1054,13 @@ class ProductEval:
                            asof=asof, session_close=sc, answers=answers)
         self.ctx = {True: mk(True), False: mk(False), None: mk(None)}
 
-        def s(node, m, sec=None):
+        def s(node, m, do=None):
             out = series(node, self.ctx[m])
-            # 칸 전체가 빠지면(EXCLUDED) 그 칸은 제약 없음 — 매수 쪽 값(FAVOR)
-            return [(None if sec is None else FAVOR[sec]) if x is EXCLUDED else x for x in out]
-        self.opt = {sec: s(gw.section(prod, sec), FAVOR[sec], sec) for sec in SECTIONS}
-        self.pes = {sec: s(gw.section(prod, sec), not FAVOR[sec], sec) for sec in SECTIONS}
-        w = gw.sizing(prod).qty.x                # 비중 식(Qty "cash") — None = 저자 미명시
+            # 묶음 전체가 빠지면(EXCLUDED) 그 동사는 제약 없음 — 매수 쪽 값(FAVOR)
+            return [(None if do is None else FAVOR[do]) if x is EXCLUDED else x for x in out]
+        self.opt = {do: s(gw.gate(prod, do), FAVOR[do], do) for do in GATES}
+        self.pes = {do: s(gw.gate(prod, do), not FAVOR[do], do) for do in GATES}
+        w = gw.weight(prod).qty.x                # 비중 식(Qty "cash") — None = 저자 미명시
         self.weight = {m: (s(w, m) if w is not None else None) for m in (None, True, False)}
         # 데이터 완전성 가드 — 이 상품 등급이 실제로 쓰는 가장 긴 워밍업(트리에서 파생, 하드코딩 아님).
         #   그보다 '확정 봉'이 적은 초기 구간의 1d 신호는 창이 덜 차 조용히 None/틀릴 수 있어 신뢰불가다
@@ -1103,12 +1098,12 @@ class ProductEval:
         #   (조용히 None 이 섞인 opt/pes 로 ✅/🚫 를 내면 모르고 매매하게 된다 — 정직성 원칙.)
         if self.incomplete(i):
             return "unknown"
-        # grade_rules.json 을 위에서 아래로 본다 — when 의 모든 칸이 맞는 첫 규칙이 이긴다.
+        # grade_rules.json 을 위에서 아래로 본다 — when 의 모든 동사가 맞는 첫 규칙이 이긴다.
         # 값은 3값(True/False/None) — 'is' 로 정확히 맞춘다(None 은 True·False 어디에도 안 맞는다).
         views = {"opt": self.opt, "pes": self.pes}
         for rule in GRADE_RULES["rules"]:
             view = views[rule["view"]]
-            if all(view[sec][i] is want for sec, want in rule["when"].items()):
+            if all(view[do][i] is want for do, want in rule["when"].items()):
                 return rule["key"]
         return GRADE_RULES["default"]
 
@@ -1125,27 +1120,21 @@ class ProductEval:
 
     # ---------------------------------------------------------------- 설명
     def explain(self, i):
-        """라벨 달린 노드의 그날 값 — 수동은 '모름'(None)으로 둔 평가. {구역: [(label, ref, 값)]}"""
-        out = {}
-        for sec in SECTIONS:
-            out[sec] = [(n.get("label"), n.get("ref"), series(n, self.ctx[None])[i])
-                        for n in labeled(self.gw.section(self.prod, sec))]
-        return out
+        """라벨 달린 노드의 그날 값 — 수동은 '모름'(None)으로 둔 평가. {동사: [(label, ref, 값)]}"""
+        return {do: [(n.get("label"), n.get("ref"), series(n, self.ctx[None])[i])
+                     for n in labeled(self.gw.gate(self.prod, do))] for do in GATES}
 
     def top(self, i):
-        """구역마다 맨 위 라벨 노드들의 그날 값(사유 문장용 — 안쪽 노드까지 늘어놓으면
+        """동사마다 맨 위 라벨 노드들의 그날 값(사유 문장용 — 안쪽 노드까지 늘어놓으면
         not 아래의 '거짓 = 정상' 노드가 '미충족'으로 읽힌다). 수동은 모름(None)."""
-        out = {}
-        for sec in SECTIONS:
-            out[sec] = [(n.get("label"), n.get("ref"), series(n, self.ctx[None])[i])
-                        for n in _top_labeled(self.gw.section(self.prod, sec))]
-        return out
+        return {do: [(n.get("label"), n.get("ref"), series(n, self.ctx[None])[i])
+                     for n in _top_labeled(self.gw.gate(self.prod, do))] for do in GATES}
 
     def manual_items(self, i=None):
-        """사람 확인이 필요한 조건 [(칸, 라벨, ref)] — i 를 주면 그날 관측된 observe 조건은 뺀다."""
+        """사람 확인이 필요한 조건 [(동사, 라벨, ref)] — 판다(보유분)는 뺀다. i 를 주면 그날 관측된 observe 조건은 뺀다."""
         out = []
         for z, _l, _r, node in self.gw.expressions(self.prod):
-            if z == "exit":
+            if z == SELL:
                 continue
             for n in manual_leaves(node):
                 if i is not None and "observe" in n and series(n["observe"], self.ctx[None])[i] is not None:
@@ -1174,7 +1163,7 @@ class Cond:
   옛 판정식은 type 마다 손으로 짠 계산기(16종)였다. 새 조건마다 코드가 늘었고, 이름과
   계산이 다른 계산기(전고점 '유지'가 실은 연속 신고가, '눌림 일수'에 반등일 포함)와
   한 필드의 두 뜻(op 가 방향 표시이자 비교 연산자)이 조용히 틀린 판정을 냈다.
-  또 규칙 형식이 평평해서(filter/entry/avoid 목록 + need 숫자) 원문 구조(택1·N개 중 M개·
+  또 규칙 형식이 평평해서(조건 목록 + need 숫자) 원문 구조(택1·N개 중 M개·
   필수 조건)를 못 담았다. 이 파일은 둘 다를 없앤다:
     · 계산은 원시 시계열 연산 몇 개의 조합뿐 — 새 조건은 코드가 아니라 트리로 쓴다.
     · 구조는 all / any / atleast / not 로 그대로 적는다.
@@ -1242,7 +1231,7 @@ class Cond:
   수동          {"manual": "사유"}
   관측·수동     {"observe": c, "manual": "사유"}   c 를 계산할 수 있으면 그 값, 모름이면 수동처럼(manual_as) 푼다
                 (평가기 기능 — 작성 규칙은 역할 문서. 추출 지침은 이 노드를 쓰라고 하지 않는다).
-  포지션        {"pos": "ret"|"days"|"maxret"|"minret"}   매도(exit)·2차 이후 분할 매수 규칙 안에서만.
+  포지션        {"pos": "ret"|"days"|"maxret"|"minret"|"filled"|"sold"}   판다·2차 이후 분할(산다) 갈래 안에서만.
                 ret = 평균 매입가 대비 오늘 종가 수익률(%), days = 첫 매수일부터 지난 봉(첫 매수일 0),
                 maxret/minret = 첫 매수일~오늘 종가 수익률의 최고/최저. 매수 전 날은 None.
   메타(아무 노드에) "label", "ref", "id", "note"
@@ -1285,10 +1274,12 @@ class Cond:
     _daily_axis = _daily_axis
     series = series
     _series = _series
-    SECTIONS = SECTIONS
+    VERBS = VERBS
+    BLOCK = BLOCK
+    BUY = BUY
+    SELL = SELL
+    GATES = GATES
     FAVOR = FAVOR
-    ZONES = ZONES
-    ZONE_LABELS = ZONE_LABELS
     _uses_pos = _uses_pos
     compact_json = compact_json
     fmt_files = fmt_files
@@ -1301,14 +1292,14 @@ class Cond:
 class Grade:
     """등급의 뜻(구간② DSL) — 조건 트리(books/<slug>/tree.json) → 날짜별 등급·금액·비중 (책 무관). 트리의 '뜻'은 여기 한 벌뿐이다.
 
-등급 (COND_DSL.md 1절, 조건 칸 셋):
-  filter 거짓 → 🚫 진입 금지 · avoid 참 → ⛔ 보류 · entry 참 → ✅ 매수 후보 · entry 거짓 → ⚪ 관망
+등급 (동사 둘 — 사다리는 grade_rules.json):
+  안 산다 갈래 하나라도 참 → ⛔ 안 산다 · 산다 갈래 하나라도 참 → ✅ 산다 · 둘 다 아님 → ⚪ 관망
 수동(manual) 조건은 '확인됨/안 됨' 두 번 평가한다:
-  안 돼도 매수(비관) → ✅ · 확인돼야 매수(낙관만) → 🟡 확인 대기 · 데이터 부족으로 못 정함 → ❔ 판정 불가
-  비관 = filter·entry 의 수동은 거짓, avoid 의 수동은 참 / 낙관 = 그 반대.
-규칙:
-  sizing   weight = 총 투자금 대비 비중(%) · tranches = 분할 매수(2차 이후는 포지션 값으로)
-  exit     보유분의 매도 — 보유가 있을 때만 평가(구간③ trading)
+  안 돼도 산다(비관) → ✅ · 확인돼야 산다(낙관만) → 🟡 확인 대기 · 데이터 부족으로 못 정함 → ❔ 판정 불가
+  비관 = 산다의 수동은 거짓, 안 산다의 수동은 참 / 낙관 = 그 반대(FAVOR).
+얼마나·판다:
+  weight   산다 qty cash = 총 투자금 대비 비중(%) · tranches = 산다 qty budget 분할(2차 이후는 포지션 값으로)
+  sells    판다 — 보유분이 있을 때만 평가(구간③ trading)
 
 판정은 봉이 끝난 직후(그날까지의 봉)로 낸다 — cond 연산이 전부 인과적이라 전체 이력을 한 번 계산해
 날짜로 꺼내도 미래를 보지 않는다(verify_primitives 가 강제).

@@ -33,17 +33,17 @@ class Holding:
         return cls(later[0] if later else None, cost, filled, entry_date)
 
     def ctx(self, gw, prod, hist, cal, manual_as=None):
-        """이 보유를 pos 로 주입한 평가 문맥 — cond 는 그 값을 '읽어' ret·days·maxret·minret 로 exit·분할 규칙만 평가한다."""
+        """이 보유를 pos 로 주입한 평가 문맥 — cond 는 그 값을 '읽어' ret·days·maxret·minret 로 판다·분할 갈래만 평가한다."""
         return Cond.Ctx(hist, cal, prod, gw.index(prod), manual_as=manual_as, pos=(self.entry_i, self.cost))
 
 
 @dataclass
 class HoldingState:
-    """보유 하나의 그 시점 규칙 상태 — exits = [(Rule, 값)], next_tranche = (Rule, 값)|None. 시세가 없으면 error."""
+    """보유 하나의 그 시점 규칙 상태 — sells = [(Rule, 값)](판다 갈래), next_tranche = (Rule, 값)|None. 시세가 없으면 error."""
     error: str = None
     ret: float = None
     days: float = None
-    exits: list = field(default_factory=list)
+    sells: list = field(default_factory=list)
     next_tranche: tuple = None
     ctx: object = None
 
@@ -70,8 +70,8 @@ class Decision:
     incomplete: bool = False
     confirmed: int = None            # 확정 봉 수(가장 늦은 심볼 기준)
     warmup: int = None               # 필요 워밍업(트리에서 파생)
-    top: dict = None                 # 구역별 맨 위 라벨 노드의 그날 값(사유 재료)
-    manual: list = None              # 사람 확인이 필요한 조건 [(칸, 라벨, ref)]
+    top: dict = None                 # 동사(안 산다·산다)별 맨 위 라벨 노드의 그날 값(사유 재료)
+    manual: list = None              # 사람 확인이 필요한 조건 [(동사, 라벨, ref)]
     amount: Amount = None            # 그날 '얼마나'(비중) — Judge.amount
     opt: dict = None
     pes: dict = None
@@ -111,7 +111,7 @@ class Judge:
     def amount(self, i):
         """i 번째 봉의 Amount — 라이브 Decision 과 백테스트 매수 크기가 같이 쓰는 단 하나의 '얼마나' 경로."""
         w, alt = self.pe.weight_of(i)
-        return Amount(w, alt, self.gw.sizing(self.prod).qty.x is not None)
+        return Amount(w, alt, self.gw.weight(self.prod).qty.x is not None)
 
     def latest(self):
         """(등급 키, 종가) — 달력 마지막 봉(라이브 '지금'). 시세가 없으면 ("unknown", None)."""
@@ -130,11 +130,11 @@ class Judge:
             prev_close=self.cs[i - 1].close if i >= 1 else None,
             incomplete=pe.incomplete(i), confirmed=pe._confirmed[i] + 1, warmup=pe.warmup,
             top=pe.top(i), manual=pe.manual_items(i), amount=self.amount(i),
-            opt={sec: pe.opt[sec][i] for sec in Cond.SECTIONS}, pes={sec: pe.pes[sec][i] for sec in Cond.SECTIONS},
+            opt={do: pe.opt[do][i] for do in Cond.GATES}, pes={do: pe.pes[do][i] for do in Cond.GATES},
             holdings=[self.hold(h, i) for h in holdings], eval=pe)
 
     def hold(self, h, i=None):
-        """보유 하나의 i 번째 봉(기본 마지막) 매도·다음 분할 규칙 상태 — 수동은 모름(manual_as=None)."""
+        """보유 하나의 i 번째 봉(기본 마지막) 판다·다음 분할 갈래 상태 — 수동은 모름(manual_as=None)."""
         if h.entry_i is None:
             return HoldingState(error="첫 매수일 %s 이후 시세 없음" % h.entry_date)
         i = len(self.cal) - 1 if i is None else i
@@ -142,7 +142,7 @@ class Judge:
         trs = self.gw.tranches(self.prod)
         nt = trs[h.filled] if 0 < h.filled < len(trs) else None
         return HoldingState(ret=Cond.series({"pos": "ret"}, ctx)[i], days=Cond.series({"pos": "days"}, ctx)[i],
-                            exits=[(r, Cond.series(r.when, ctx)[i]) for r in self.gw.exit_rules(self.prod)],
+                            sells=[(r, Cond.series(r.when, ctx)[i]) for r in self.gw.sells(self.prod)],
                             next_tranche=None if nt is None else (nt, Cond.series(nt.when, ctx)[i]), ctx=ctx)
 
 

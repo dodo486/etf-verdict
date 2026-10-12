@@ -104,8 +104,8 @@ feed.price_bus (1개) ──틱 {ts, trees, hist}── fan-out ─┬───�
 | 매도 정책(책에 매도 규칙이 없을 때 = 매수 신호만 평가) | `consumers/backtest/trades.py` `exit_policy` |
 | 금액 정책(비중 × 분할, 모름 처리) | `consumers/backtest/trades.py` `size_of` (사실은 `Judge.amount` 한 경로) |
 | 수량 변환('얼마나' → 물량, 매수·매도 공통) | `consumers/backtest/trades.py` `to_units` |
-| 칸·등급 이름표 | `dsl/tradeTool.py`(Cond·Grade) · `grade_rules.json` |
-| 등급 사다리(등급·금액 배수 계산) | `dsl/tradeTool.py`(Grade) — 화면은 다시 계산하지 않음(수동 답은 `POST /api/verdict`) |
+| 동사·등급 이름표(안 산다·산다·판다 · 등급 글자) | `dsl/tradeTool.py`(Cond.VERBS·Grade.GRADES) · `grade_rules.json` |
+| 등급 사다리(날짜별 등급 계산) | `dsl/tradeTool.py`(Grade) — 화면은 다시 계산하지 않음(수동 답은 `POST /api/verdict`) |
 | 할 일 목록 | `docs/HANDOFF.md` (다른 곳에 TODO 파일 금지) |
 
 새로 '한 곳에서만 정할 것'이 생기면 여기와 OWNERS 에 한 줄씩.

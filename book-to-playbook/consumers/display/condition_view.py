@@ -261,22 +261,19 @@ def _labeled_inside(node):
 
 
 def reason_of(key, ex, manual):
-    """등급 사유 한 줄 — 무엇이 걸렸는지 라벨로."""
-    def labels(sec, val):
-        return [l for l, _, v in ex.get(sec, []) if l and v is val]
-    if key == "nofilter":
-        bad = labels("filter", False)
-        return "필터 미충족: " + (" · ".join(bad[:3]) if bad else "전제 조건 거짓")
+    """등급 사유 한 줄 — 무엇이 걸렸는지 라벨로. ex = 동사별 맨 위 라벨 노드 값, manual = [(동사, 라벨, ref)]."""
+    def labels(do, val):
+        return [l for l, _, v in ex.get(do, []) if l and v is val]
     if key == "avoid":
-        hit = labels("avoid", True)
-        return "회피 신호: " + (" · ".join(hit[:3]) if hit else "회피 조건 참")
+        hit = labels(Cond.BLOCK, True)
+        return "%s: %s" % (Cond.BLOCK, " · ".join(hit[:3]) if hit else "조건 참")
     if key == "wait":
-        return "진입 조건 미충족 — 매수 자리 아님"
+        return "%s 신호 없음 — 관망" % Cond.BUY
     if key == "confirm":
-        items = [l for s, l, _ in manual if s in ("filter", "entry")] + \
-                ["(회피 아님) " + l for s, l, _ in manual if s == "avoid"]
-        return "수동·장중 확인 시 매수: " + " · ".join(items[:4])
+        items = [l for d, l, _ in manual if d == Cond.BUY] + \
+                ["(%s 아님) %s" % (Cond.BLOCK, l) for d, l, _ in manual if d == Cond.BLOCK]
+        return "수동·장중 확인 시 %s: %s" % (Cond.BUY, " · ".join(items[:4]))
     if key == "buy":
-        ok = labels("entry", True)
-        return "필터 통과 · 회피 없음 · 진입: " + (" · ".join(ok[:3]) if ok else "조건 충족")
+        ok = labels(Cond.BUY, True)
+        return "%s: %s" % (Cond.BUY, " · ".join(ok[:3]) if ok else "조건 충족")
     return "데이터 부족으로 판정 불가"

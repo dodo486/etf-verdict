@@ -2,9 +2,10 @@
   'use strict';
   /* ============================================================
      실전 체크리스트 — 조건 트리 판정 결과(#verdict-data)만 그린다 (책 무관 · 종목 하드코딩 없음)
-     · 트리를 직접 읽지 않는다. 판정 화면 데이터(consumers/display/verdict_view)가 낸 칸별 설명(view)을 그대로 그린다.
+     · 트리를 직접 읽지 않는다. 판정 화면 데이터(consumers/display/verdict_view)가 낸 동사별 설명(view)을 그대로 그린다.
+     · 머리글은 동사 셋(VD.verbs = ① 안 산다 ② 산다 ③ 판다, 정본 dsl/tradeTool.VERBS) + ④ 얼마나(비중·분할).
      · 사람이 체크하는 건 수동(✋) 조건뿐이다. 체크하면 그 답을 서버(POST /api/verdict)에 보내고, 서버가 답까지
-       반영해 낸 판정(등급·칸 값·금액)을 그대로 다시 그린다 — 서버 권위. 화면은 등급·3값 논리를 계산하지 않는다
+       반영해 낸 판정(등급·동사 값·금액)을 그대로 다시 그린다 — 서버 권위. 화면은 등급·3값 논리를 계산하지 않는다
        (평가기는 dsl/tradeTool.py 한 벌). 서버 없이 열면 체크는 저장되지만 판정은 바뀌지 않는다(그렇다고 알린다).
      ============================================================ */
 
@@ -31,14 +32,13 @@
   // 수동 조건 답은 그날(판정일) 것만 쓴다 — 어제 체크가 오늘 판정에 섞이지 않게.
   function answers(){ const k = (VD && VD.slug || '') + ':' + (VD && VD.date || ''); store.ans = store.ans || {}; store.ans[k] = store.ans[k] || {}; return store.ans[k]; }
 
-  // 수동 답 열쇠 — 서버(dsl/tradeTool.answer_key)와 같은 규칙: 여러 상품이 같이 보는 정의 안(shared)이면 책 전체에
-  //   하나("*"), 아니면 상품마다(path 앞머리 = 상품). 본체는 "?" 식이면 엔진이 준 식 열쇠(it.mkey), 문장 수동은 그 문장.
-  //   화면은 이 열쇠로 답을 모아 보낼 뿐 — 답으로 값을 계산하는 건 서버다.
-  function mkey(it, path){ return (it.shared ? '*' : path.split('.')[0]) + '|' + (it.mkey || it.manual); }
+  // 수동 답 열쇠 — 서버(dsl/tradeTool.answer_key)와 같은 규칙: 상품(path 앞머리) + '|' + 본체. 본체는 "?" 식이면
+  //   엔진이 준 식 열쇠(it.mkey), 문장 수동은 그 문장. 화면은 이 열쇠로 답을 모아 보낼 뿐 — 값 계산은 서버다.
+  function mkey(it, path){ return path.split('.')[0] + '|' + (it.mkey || it.manual); }
   // 등급 글자표는 엔진이 판정 JSON(VD.grades, = dsl/tradeTool.GRADES)에 실어보낸다 — 화면은 받아 쓴다.
   // 고치는 곳은 파이썬 한 곳. 혹시 없으면 키 그대로 보여 깨지지 않게.
   const GR = k => ((VD && VD.grades) || {})[k] || k;
-  const GCLS = {buy:'go', confirm:'small', unknown:'small', nofilter:'no', avoid:'no', wait:''};
+  const GCLS = {buy:'go', confirm:'small', unknown:'small', avoid:'no', wait:''};
   let pending = false, serverNote = '';   // 답을 보내고 서버 판정을 기다리는 중 · 서버 판정을 못 받음 알림
 
   /* ---- 그리기 ---- */
@@ -108,13 +108,12 @@
     const isM = it.manual !== undefined && !(it.observed && it.v !== null && it.v !== undefined);
     const a = isM ? ans[mkey(it, path)] : undefined;
     const val = it.v === undefined ? null : it.v;
-    // folded = 같은 칸 다른 곳에 이미 펼쳐 둔 조건(엔진이 표시) — 화면엔 한 줄만.
-    const kidsHtml = ((it.observed && isM) || it.folded) ? '' : kids;
+    const kidsHtml = (it.observed && isM) ? '' : kids;
     let ctl;
     if(isM){
       // 수동 조건 = 참/거짓 둘 중 하나를 고르는 것(체크박스 아님). 하나로 붙은 토글(세그먼트)로.
       // 고른 쪽만 켜지고, 같은 걸 다시 누르면 해제(미확인)된다.
-      ctl = '<span class="ck-man" data-key="'+esc(mkey(it, path))+'"'+(it.shared?' title="여러 상품이 같이 보는 조건 — 한 번 고르면 모든 상품에 적용"':'')+'>'
+      ctl = '<span class="ck-man" data-key="'+esc(mkey(it, path))+'">'
           + '<button data-a="1" class="seg t'+(a===true?' on':'')+'" title="이 조건이 참(맞음)">● 참</button>'
           + '<button data-a="0" class="seg f'+(a===false?' on':'')+'" title="이 조건이 거짓(아님)">○ 거짓</button>'
           + '</span>';
@@ -124,13 +123,13 @@
     const opw = OPW(it); const opl = opw ? ' <span class="ck-opl">'+esc(opw)+'</span>' : '';
     return '<div class="ck-row'+(isM?' man':' auto')+'" '+(it.ref?'data-ref="'+esc(it.ref)+'"':'')+'>'
       + '<div class="ck-line">'+ctl+'<span class="ck-t">'+esc(it.label || '수동 확인')+opl+num+refChip(it.ref)+'</span></div>'
-      + why + (it.folded && kids ? '<div class="ck-why">↕ 세부 조건은 이 칸에 따로 펼쳐 둠</div>' : '') + evLine(it.detail) + (kidsHtml ? '<div class="ck-kids">'+kidsHtml+'</div>' : '') + '</div>';
+      + why + evLine(it.detail) + (kidsHtml ? '<div class="ck-kids">'+kidsHtml+'</div>' : '') + '</div>';
   }
   function zoneHead(title, want, val){
     const ok = val === null ? '' : (val === want ? ' ok' : ' bad');
     return '<div class="grouplabel ck-zone'+ok+'">'+title+' <span class="ck-zv">'+(val===true?'참':val===false?'거짓':'확인 필요')+'</span></div>';
   }
-  // 칸(avoid/entry = any 묶음)을 원문 소절(ref)별로 모아 같은 절의 규칙이 붙어 보이게 한다(순서 보존).
+  // 등급 동사 묶음(안 산다·산다 = any)을 원문 소절(ref)별로 모아 같은 절의 규칙이 붙어 보이게 한다(순서 보존).
   //   원문 표시는 각 규칙 줄의 뱃지 하나뿐 — 따로 소절 머리글을 달지 않는다(같은 원문을 두 번 보이지 않게).
   function zoneByRef(zone, path, ans){
     if(!zone || !zone.kids || !zone.kids.length) return node(zone, path, ans, 0);
@@ -141,7 +140,7 @@
   }
   // 공통(allprod) 규칙만 걸러낸다 — 상품 카드에선 빼고, 화면 맨 위 "공통 시장 신호" 섹션에 한 번만 그린다.
   const isAllprod = it => !!(it && it.allprod);
-  // 공통 섹션 — on 없는 규칙(모든 상품에 같은 규칙)을 칸별로 한 번만. 단, $index/$self 를 쓰면 값이 상품마다
+  // 공통 섹션 — on 없는 규칙(모든 상품에 같은 규칙)을 동사별로 한 번만. 단, $index/$self 를 쓰면 값이 상품마다
   //   다르므로 각 규칙에 상품별 결과 칩(prod● / prod○ / prod?)을 붙이고, 수동(✋)은 상품별 토글로 그린다
   //   (답 열쇠 mkey 는 지금 규칙 그대로 — 상품마다 자기 답을 가진다. 값 손실·답 혼선 없음).
   function prodChips(pv){            // pv = [[prod, v], …] — 값이 다 같으면 칩 하나로 합친다
@@ -151,15 +150,15 @@
     return '<span class="ck-pcs">'+pv.map(([p,v])=>'<span class="ck-pc" title="'+esc(p)+'"><span class="ck-pcl">'+esc(p)+'</span>'+MARK(v)+'</span>').join('')+'</span>';
   }
   // 공통 매도 규칙 한 줄 — 카드의 매도 줄과 같은 모양(라벨·판다 폭·원문). 매도는 보유분에만 걸리므로 상품별
-  //   결과 칩은 '내 포지션'이 있을 때만(ps.exit[그 규칙 index]) 상품별로 보여준다(없으면 —).
+  //   결과 칩은 '내 포지션'이 있을 때만(ps.sells[그 규칙 index]) 상품별로 보여준다(없으면 —).
   function commonExitRow(lab, perProd, vs){
     const r0 = perProd[0][1];
-    // 포지션 보유분 마크 — 각 상품의 exit 목록에서 이 label 의 index 를 찾아 그 상품 포지션들의 판정을 모은다
+    // 포지션 보유분 마크 — 각 상품의 판다 목록에서 이 label 의 index 를 찾아 그 상품 포지션들의 판정을 모은다
     const marks = [];
     vs.forEach(v=>{
-      const idx = (v.exit||[]).findIndex(e=>e.label===lab);
+      const idx = (v.sells||[]).findIndex(e=>e.label===lab);
       if(idx < 0) return;
-      (v.positions||[]).forEach(ps=>{ const e = (ps.exit||[])[idx]; if(e) marks.push([v.prod, e.v]); });
+      (v.positions||[]).forEach(ps=>{ const e = (ps.sells||[])[idx]; if(e) marks.push([v.prod, e.v]); });
     });
     // 보유분 판정 마크(상품별) — 카드 매도 줄과 같게 줄 앞에. 포지션 없으면 '—'(걸릴 보유분이 없음).
     const st = marks.length ? prodChips(marks) : '<span class="ck-m n">—</span>';
@@ -172,22 +171,22 @@
     const vs = VD.verdicts || [];
     if(vs.length < 1) return '';
     const ans = answers();
-    // 칸별(회피·진입·매도) 공통 규칙을 첫 상품 순서대로 모은다(라벨로 상품 간 교차참조).
-    const secs = [['avoid','② '], ['entry','③ '], ['exit','⑥ ']];
-    const zl = k => (VD.zones && VD.zones[k]) || k;
+    // 동사별(안 산다·산다·판다) 공통 규칙을 첫 상품 순서대로 모은다(라벨로 상품 간 교차참조).
+    const V = VD.verbs || [], SELL = V[2];
+    const secs = [[V[0],'① '], [V[1],'② '], [SELL,'③ ']];
     let body = '';
     secs.forEach(([sec, num])=>{
-      // 첫 상품에서 이 칸의 공통 규칙 라벨 순서를 잡는다
-      const kidsOf = v => sec==='exit' ? (v.exit||[]) : ((v.zones && v.zones[sec] && v.zones[sec].kids) || []);
+      // 첫 상품에서 이 동사의 공통 규칙 라벨 순서를 잡는다
+      const kidsOf = v => sec===SELL ? (v.sells||[]) : ((v.gates && v.gates[sec] && v.gates[sec].kids) || []);
       const order = [];
       kidsOf(vs[0]).forEach(k=>{ if(isAllprod(k) && order.indexOf(k.label) < 0) order.push(k.label); });
       if(!order.length) return;
-      body += '<div class="grouplabel ck-zone" style="margin-top:14px">'+num+esc(zl(sec))+'</div>';
+      body += '<div class="grouplabel ck-zone" style="margin-top:14px">'+num+esc(sec)+'</div>';
       order.forEach(lab=>{
         // 각 상품에서 같은 label 의 항목을 찾아 교차참조(한 상품에만 있어도 공통 규칙이면 보인다)
         const perProd = vs.map(v=>[v.prod, (kidsOf(v).find(k=>k.label===lab)||null)]).filter(x=>x[1]);
         if(!perProd.length) return;
-        if(sec === 'exit'){ body += commonExitRow(lab, perProd, vs); return; }
+        if(sec === SELL){ body += commonExitRow(lab, perProd, vs); return; }
         const pv = perProd.map(([p,it])=> [p, (it.v===undefined?null:it.v)]);
         // 상품별 결과 칩 — 값이 다 같으면 칩 하나, 다르면 TQQQ● SOXL○ UPRO? 처럼 상품마다.
         const chips = '<div class="ck-cm-chips">'+prodChips(pv)+'</div>';
@@ -228,32 +227,20 @@
     if(v.close != null) h += '<p class="subtle" style="margin:4px 0 2px">'+esc(v.date)+' 종가 <b style="color:var(--head)">'+v.close.toFixed(2)+'</b>'+(v.chg!=null?' · 당일 '+(v.chg>=0?'+':'')+v.chg.toFixed(2)+'%':'')+'</p>';
     const nAns = Object.keys((VD && VD.answers) || {}).length;
     h += '<p class="subtle" style="margin:2px 0 10px">엔진 판정: '+esc(v.reason)+(nAns?' <b style="color:var(--gold)">· 체크한 수동 조건 '+nAns+'개 반영(서버 판정)</b>':'')+'</p>';
-    if(!v.zones){ return h; }
-    const z = v.zones;
-    // 칸 이름표(필터·회피·진입·조심·매도)는 엔진 값(VD.zones = dsl/tradeTool.ZONE_LABELS)에서 꺼낸다 — 복붙 금지.
-    //   동그라미 번호는 화면 전용 머리글이라 그대로 두고, 이름표 글자만 VD.zones 에서 가져온다(없으면 키 그대로).
-    const zl = k => (VD.zones && VD.zones[k]) || k;
-    // 칸 머리 값 = 남은 수동 답과 상관없이 정해졌으면(서버의 낙관 opt == 비관 pes) 그 값, 아니면 서버 값(대개 ? 확인 필요).
+    if(!v.gates){ return h; }
+    const z = v.gates, V = VD.verbs || [], BLOCK = V[0], BUY = V[1], SELL = V[2];
+    // 동사 머리 값 = 남은 수동 답과 상관없이 정해졌으면(서버의 낙관 opt == 비관 pes) 그 값, 아니면 서버 값(대개 ? 확인 필요).
     const zv = s => (v.opt && v.pes && v.opt[s] === v.pes[s]) ? v.opt[s] : (z[s] ? z[s].v : null);
-    h += zoneHead('① '+zl('filter')+' — 참이어야 본다', true, zv('filter')) + node(z.filter, P('filter'), ans, 0);
-    h += zoneHead('② '+zl('avoid')+' — 참이면 보류', false, zv('avoid')) + zoneByRef(z.avoid, P('avoid'), ans);
-    h += zoneHead('③ '+zl('entry')+' — 참이면 매수 자리', true, zv('entry')) + zoneByRef(z.entry, P('entry'), ans);
-    if((v.caution||[]).length){
-      const c = v.amount || {}, f = c.factor == null ? 1 : c.factor;   // 금액 배수·폭 미명시·확인 필요 = 서버(dsl/tradeTool Grade)
-      h += '<div class="grouplabel ck-zone" style="color:var(--gold)">④ '+esc(zl('caution'))+' — 사더라도 금액을 줄인다 <span class="ck-zv">금액 ×'+f.toFixed(2)+((c.unspecified||[]).length?' · 폭 미명시 '+c.unspecified.length:'')+((c.unknown||[]).length?' · 확인 필요 '+c.unknown.length:'')+'</span></div>';
-      v.caution.forEach((r,i)=>{
-        const lab = r.label + (r.scale!=null ? ' (금액 ×'+(+r.scale).toFixed(2)+')' : ' (줄일 폭 저자 미명시)');
-        h += node(Object.assign({}, r.view, {label: lab, ref: r.ref, note: r.note}), P('caution.'+i), ans, 0);
-      });
-    }
-    // 매도 규칙 + 내 포지션 — 공통(allprod) 매도 규칙은 공통 섹션에서 그리고, 카드엔 그 상품 전용만.
-    //   포지션(ps.exit)은 게이트웨이 순서(원래 i)로 쌓였으니 인덱스를 보존해 매칭한다.
-    const exitOwn = (v.exit||[]).map((r,i)=>[r,i]).filter(([r])=>!isAllprod(r));
+    h += zoneHead('① '+esc(BLOCK)+' — 하나라도 참이면 안 산다', false, zv(BLOCK)) + zoneByRef(z[BLOCK], P(BLOCK), ans);
+    h += zoneHead('② '+esc(BUY)+' — 하나라도 참이면 살 자리', true, zv(BUY)) + zoneByRef(z[BUY], P(BUY), ans);
+    // 판다 규칙 + 내 포지션 — 공통(allprod) 판다 규칙은 공통 섹션에서 그리고, 카드엔 그 상품 전용만.
+    //   포지션(ps.sells)은 게이트웨이 순서(원래 i)로 쌓였으니 인덱스를 보존해 매칭한다.
+    const exitOwn = (v.sells||[]).map((r,i)=>[r,i]).filter(([r])=>!isAllprod(r));
     if(exitOwn.length){
-      h += '<div class="grouplabel ck-zone" style="color:var(--entry)">⑥ '+esc(zl('exit'))+' — 보유분을 팔 때 (걸리면 다음 날 시가)</div>';
+      h += '<div class="grouplabel ck-zone" style="color:var(--entry)">③ '+esc(SELL)+' — 보유분을 팔 때 (걸리면 다음 날 시가)</div>';
       const pos = v.positions || [];
       exitOwn.forEach(([r,i])=>{
-        const live = pos.map(ps => (ps.exit||[])[i]).filter(Boolean);
+        const live = pos.map(ps => (ps.sells||[])[i]).filter(Boolean);
         const st = live.length ? live.map(e=>MARK(e.v)).join('') : '<span class="ck-m n">—</span>';
         h += '<div class="ck-row auto" '+(r.ref?'data-ref="'+esc(r.ref)+'"':'')+'><div class="ck-line">'+st+'<span class="ck-t">'+esc(r.label)+' <span class="ck-opl">'+esc(r.sell)+'</span>'+refChip(r.ref)+'</span></div>'+(r.note?'<div class="ck-why">'+esc(r.note)+'</div>':'')+'</div>';
       });
@@ -265,28 +252,28 @@
         h += '<p class="subtle" style="margin:6px 0 0">보유 포지션 없음 — 내 포지션은 로컬 파일(books/&lt;slug&gt;/positions.json)에 적으면 로컬 서버 화면에서 규칙별로 판정됩니다(공개 페이지에는 안 실림).</p>';
       }
     }
-    else if(!(v.exit||[]).length && v.exit_policy === 'none'){
-      // 매도 정책(엔진 필드 exit_policy — 정본 consumers/backtest/trades.exit_policy): 책에 매도 규칙이 없다 — 문구도 엔진(VD.no_exit_note)
-      // (공통 매도 규칙만 있어 카드가 비는 경우는 제외 — 그 규칙들은 공통 섹션에서 보인다.)
-      h += '<div class="grouplabel ck-zone" style="color:var(--entry)">⑥ '+esc(zl('exit'))+'</div><p class="subtle" style="margin:6px 0 0">'+esc(VD.no_exit_note || '')+'</p>';
+    else if(!(v.sells||[]).length && v.exit_policy === 'none'){
+      // 매도 정책(엔진 필드 exit_policy — 정본 consumers/backtest/trades.exit_policy): 책에 판다 규칙이 없다 — 문구도 엔진(VD.no_exit_note)
+      // (공통 판다 규칙만 있어 카드가 비는 경우는 제외 — 그 규칙들은 공통 섹션에서 보인다.)
+      h += '<div class="grouplabel ck-zone" style="color:var(--entry)">③ '+esc(SELL)+'</div><p class="subtle" style="margin:6px 0 0">'+esc(VD.no_exit_note || '')+'</p>';
     }
     return h;
   }
 
   function renderSizing(){
     const cap = +(store.capital || 1000);
-    const vs = (VD.verdicts||[]).filter(v=>v.sizing);
+    const vs = (VD.verdicts||[]).filter(v=>v.size);
     if(!vs.length) return '';
-    const anyW = vs.some(v=>v.sizing.weight_set);
-    const anyT = vs.some(v=>(v.sizing.tranches||[]).length);
+    const anyW = vs.some(v=>v.size.weight_set);
+    const anyT = vs.some(v=>(v.size.tranches||[]).length);
     if(!anyW && !anyT) return '';
-    let h = '<h2 id="sheet-sizing"><span class="step">⑤</span>비중 · 분할 계산</h2><div class="card">'
+    let h = '<h2 id="sheet-sizing"><span class="step">④</span>얼마나 — 비중 · 분할 계산</h2><div class="card">'
           + '<div class="calcrow"><label>총 투자금(만 원) <input id="ckCap" type="number" min="0" step="100" value="'+cap+'"></label></div>'
           + '<div class="tablewrap" style="margin-top:6px"><table><thead><tr><th>상품</th><th>오늘 비중</th><th>오늘 금액</th><th>분할</th></tr></thead><tbody>';
     let sum = 0, known = true;
     vs.forEach(v=>{
-      // 금액 = 총 투자금 × 엔진이 낸 오늘 물량(units — consumers/backtest/trades.to_units: 비중 × 분할 비율 × 조심 배수, 비중 모르면 null)
-      const s = v.sizing, am = v.amount || {}, f = am.factor == null ? 1 : am.factor, unspec = am.unspecified || [];
+      // 금액 = 총 투자금 × 엔진이 낸 오늘 물량(units — consumers/backtest/trades.to_units: 비중 × 분할 비율, 비중 모르면 null)
+      const s = v.size;
       let w = s.weight, wtxt;
       if(!s.weight_set){ wtxt = '<span class="manual-tag">저자 미명시</span>'; w = null; }
       else if(w == null){ known = false; wtxt = '<span class="manual-tag">✋ 확인 필요 '+(s.weight_range||[]).map(x=>x.toFixed(0)+'%').join(' / ')+'</span>'; }
@@ -294,13 +281,12 @@
       const amt = s.units == null ? null : cap * s.units;
       const trs = (s.tranches||[]).map(t=>esc(t.label)+(t.frac==null ? ' <span class="manual-tag">비율 저자 미명시</span>' : ' '+Math.round(t.frac*100)+'%'+(t.units!=null?' = '+Math.round(cap*t.units).toLocaleString('ko-KR')+'만':''))+(t.conditional?' <span class="subtle">(조건부)</span>':'')).join('<br>') || '한 번에 전량';
       h += '<tr><td style="color:var(--'+esc(v.prod.toLowerCase())+',var(--head))"><b>'+esc(v.prod)+'</b>'+refChip(s.ref)+'</td><td>'+wtxt+'</td><td>'
-         + (amt!=null ? Math.round(amt).toLocaleString('ko-KR')+'만'+(f<1?' <span class="subtle">(조심 ×'+f.toFixed(2)+')</span>':'') : '—')
-         + (unspec.length ? '<br><span class="manual-tag">줄일 폭 저자 미명시: '+esc(unspec.join(' · '))+'</span>' : '') + '</td><td>'+trs+'</td></tr>';
+         + (amt!=null ? Math.round(amt).toLocaleString('ko-KR')+'만' : '—') + '</td><td>'+trs+'</td></tr>';
     });
     h += '</tbody></table></div>';
     // 현금 비중은 엔진이 실어보낸 VD.cash(파이썬에서 max(0, 100-합)으로 0 이상 클램프)를 그대로 쓴다 —
     //   화면에서 100-sum 을 다시 계산하면 비중 합이 100%를 넘을 때 음수 현금이 떠서 엔진과 갈라진다.
-    if(anyW) h += '<p class="subtle" style="margin:8px 0 0">현금 '+(known && VD.cash!=null ? '<b style="color:var(--gold)">'+VD.cash.toFixed(1)+'%</b> = '+Math.round(cap*VD.cash/100).toLocaleString('ko-KR')+'만' : '— 비중 확인이 필요한 상품이 있어 계산 보류')+' · 비중은 트리의 sizing.weight(모드 조건 포함)에서, 금액 축소는 ④ 조심 규칙에서 옵니다.</p>';
+    if(anyW) h += '<p class="subtle" style="margin:8px 0 0">현금 '+(known && VD.cash!=null ? '<b style="color:var(--gold)">'+VD.cash.toFixed(1)+'%</b> = '+Math.round(cap*VD.cash/100).toLocaleString('ko-KR')+'만' : '— 비중 확인이 필요한 상품이 있어 계산 보류')+' · 비중은 산다 규칙이 준 비율(qty cash — 모드 조건 포함)에서 옵니다.</p>';
     return h + '</div>';
   }
 
@@ -319,11 +305,6 @@
     h += '<p class="subtle" id="td-ts">'+(VD.date?'<b>'+esc(VD.date)+'</b> 종가 기준':'')+(d?' · 판정 '+d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes()):'')+' · 출처 '+esc(VD.source||'')+' · ● 참 ○ 거짓 ? 모름 · ✋ 수동 조건만 직접 체크</p>';
     if(VD.missing && Object.keys(VD.missing).length){
       h += '<div class="note warn">시세 없음 → jhts 수집 요청: '+Object.keys(VD.missing).map(s=>esc(s)+' #'+esc(VD.missing[s])).join(' · ')+' — 그 심볼을 쓰는 조건은 ❔ 로 남습니다.</div>';
-    }
-    if((VD.common||[]).length){
-      const ans = answers();
-      h += '<h2 id="sheet-common"><span class="step">공통</span>여러 상품이 같이 보는 조건</h2><div class="card">'
-        + VD.common.map(c=>node(Object.assign({}, c.view, {label:c.label, ref:c.ref}), 'common.'+c.name, ans, 0)).join('') + '</div>';
     }
     h += renderCommon();
     h += '<h2 id="sheet-step2"><span class="step">판정</span>상품별 체크리스트</h2>';
@@ -367,7 +348,7 @@
     st.textContent =
       '#sheet-root{font-size:13.5px}'
       +'#sheet-root .ck-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}'
-      // 칸 머리글(①필터 ②회피 …) — 왼쪽 색 띠 바(참=초록·거짓=빨강)
+      // 동사 머리글(①안 산다 ②산다 …) — 왼쪽 색 띠 바(참=초록·거짓=빨강)
       +'#sheet-root .ck-zone{margin:20px 0 8px;padding:9px 13px;background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--mute);border-radius:9px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;font-weight:700;color:var(--head);line-height:1.4;letter-spacing:.01em}'
       +'#sheet-root .ck-zone.ok{border-left-color:var(--entry)} #sheet-root .ck-zone.bad{border-left-color:var(--warn)}'
       +'#sheet-root .ck-zone .ck-zv{font-size:11.5px;font-weight:600;color:var(--mute);white-space:nowrap}'

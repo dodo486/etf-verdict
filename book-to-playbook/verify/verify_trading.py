@@ -36,7 +36,7 @@ from collections import namedtuple
 from datetime import datetime, timedelta, timezone
 
 from shared.paths import BASE, live_slugs, read_text  # (UTF-8 출력 고정 포함)
-from dsl.tradeTool import Grade
+from dsl.tradeTool import Cond, Grade
 from dsl.tree_gateway import Qty, TreeGateway, rule, synthetic
 from consumers.backtest import trades as trades_mod
 from signals.engine import open_history
@@ -64,14 +64,14 @@ def t_trades():
     def bt(_tree, hist, cal, starts, ex, trs=None):
         """판다·산다(분할) 규칙(합성 v3 트리) → 출입구가 건넨 Rule 로 build_trades 에."""
         tree = TreeGateway.of(synthetic({"X": None}, *(ex + (trs or []))))
-        return trades_mod.build_trades(tree, "X", hist, cal, starts, tree.exit_rules("X"),
+        return trades_mod.build_trades(tree, "X", hist, cal, starts, tree.sells("X"),
                                        None if trs is None else tree.tranches("X"))
 
     def sell(label, when, of, x):
-        return rule(label, "판다", when, (of, x))
+        return rule(label, Cond.SELL, when, (of, x))
 
     def tr(label, x, when=None):
-        return rule(label, "산다", when, ("budget", x))
+        return rule(label, Cond.BUY, when, ("budget", x))
 
     R = {"pos": "ret"}
     # (1) 신호 0일 → 1일 시가 100 진입. 2일 종가 108(+8%) → 1차(처음 30%) 3일 시가 110 매도.
@@ -115,7 +115,7 @@ def t_trades():
     t = bt(tree, hist, cal, [0], ex)[0]
     check(t["sells"] == [] and not t["closed"], "비율 미명시 매도는 팔지 않음 %r" % t["sells"])
     tx = TreeGateway.of(synthetic({"X": None}, *ex))
-    check("「축소」" in (trades_mod.unsized_note(tx, "X", tx.exit_rules("X")) or ""), "비율 미명시 매도 문구")
+    check("「축소」" in (trades_mod.unsized_note(tx, "X", tx.sells("X")) or ""), "비율 미명시 매도 문구")
     # (5) 마지막 날 신호 → 다음 날이 없어 체결 못 함(미청산), fixed20 은 20거래일 모자라면 None
     rows = [(100, 100), (100, 100), (100, 120)]
     tree, hist, cal = mk(rows)
@@ -166,9 +166,9 @@ def t_no_exit():
     today = datetime.now()
     cal = [(today - timedelta(days=60 - k)).strftime("%Y%m%d") for k in range(60)]
     hist = {"X": [Candle(d, 100 + k, 101 + k, 99 + k, 100 + k, 1000) for k, d in enumerate(cal)]}
-    ex = [rule("익절", "판다", {"ge": [{"pos": "ret"}, 5]}, ("held", 1))]
+    ex = [rule("익절", Cond.SELL, {"ge": [{"pos": "ret"}, 5]}, ("held", 1))]
     for exits, pol in (([], "none"), (ex, "book")):
-        tree = TreeGateway.of(synthetic({"X": None}, rule("늘", "산다", {"all": []}), *exits))   # 매수 신호는 늘 참
+        tree = TreeGateway.of(synthetic({"X": None}, rule("늘", Cond.BUY, {"all": []}), *exits))   # 매수 신호는 늘 참
         check(trades_mod.exit_policy(tree, "X") == pol, "exit_policy %r" % pol)
         res = runner.run("x", 365, hist=hist, tree=tree)
         t = res["trades"]["X"]
@@ -190,10 +190,10 @@ def t_sizing():
     rows = [(100, 100), (100, 100), (100, 106), (106, 106), (106, 108), (108, 108)]
     cal = ["2021%04d" % i for i in range(len(rows))]
     hist = {"X": [Candle(d, o, max(o, c), min(o, c), c, 1000) for d, (o, c) in zip(cal, rows)]}
-    trs = [rule("1차", "산다", None, ("budget", 0.25)), rule("2차", "산다", {"ge": [R, 5]}, ("budget", 0.75))]
+    trs = [rule("1차", Cond.BUY, None, ("budget", 0.25)), rule("2차", Cond.BUY, {"ge": [R, 5]}, ("budget", 0.75))]
 
     def run(weight):
-        cash = [] if weight is None else [rule("비중", "산다", None, ("cash", weight))]
+        cash = [] if weight is None else [rule("비중", Cond.BUY, None, ("cash", weight))]
         tree = TreeGateway.of(synthetic({"X": None}, *(cash + trs)))
         j = Judge(tree, "X", hist, cal)
         tl = trades_mod.build_trades(tree, "X", hist, cal, [0], [], amount=j.amount)
@@ -222,9 +222,9 @@ def t_sizing():
     seen, orig = [], trades_mod.to_units
     trades_mod.to_units = lambda q, ld: seen.append(q.of) or orig(q, ld)
     try:
-        ex = [rule("반", "판다", {"ge": [R, 5]}, ("bought", 0.5)), rule("끝", "판다", {"ge": [R, 5]}, ("held", 1))]
-        tree = TreeGateway.of(synthetic({"X": None}, rule("비중", "산다", None, ("cash", 40)), *(trs + ex)))
-        trades_mod.build_trades(tree, "X", hist, cal, [0], tree.exit_rules("X"),
+        ex = [rule("반", Cond.SELL, {"ge": [R, 5]}, ("bought", 0.5)), rule("끝", Cond.SELL, {"ge": [R, 5]}, ("held", 1))]
+        tree = TreeGateway.of(synthetic({"X": None}, rule("비중", Cond.BUY, None, ("cash", 40)), *(trs + ex)))
+        trades_mod.build_trades(tree, "X", hist, cal, [0], tree.sells("X"),
                                 amount=Judge(tree, "X", hist, cal).amount)
     finally:
         trades_mod.to_units = orig

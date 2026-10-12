@@ -356,10 +356,10 @@ def t_syntax():
     except Cond.CondError as e:
         FAILS.append("올바른 case·tf 가 거부: %s" % e)
     W = {"gt": [C, 1]}
-    good = synthetic({"X": None}, rule("비중", "산다", None, ("cash", {"case": [[W, 14]], "else": 34})),
-                     rule("1차", "산다", None, ("budget", 0.25)),
-                     rule("2차", "산다", {"ge": [{"pos": "ret"}, 3]}, ("budget", 0.75)),
-                     rule("모름", "산다", {"manual": "저자 미명시: x"}, ("budget", "?")))
+    good = synthetic({"X": None}, rule("비중", Cond.BUY, None, ("cash", {"case": [[W, 14]], "else": 34})),
+                     rule("1차", Cond.BUY, None, ("budget", 0.25)),
+                     rule("2차", Cond.BUY, {"ge": [{"pos": "ret"}, 3]}, ("budget", 0.75)),
+                     rule("모름", Cond.BUY, {"manual": "저자 미명시: x"}, ("budget", "?")))
     try:
         TreeGateway.of(good)
     except Cond.CondError as e:
@@ -554,7 +554,7 @@ def t_grade():
     cal = ["2022%04d" % i for i in range(len(xs))]
     hist = {"X": [Candle(d, c, c, c, c, 1000) for d, c in zip(cal, xs)]}
     tree = TreeGateway.of(synthetic({"X": None},
-                                    rule("비중", "산다", None, ("cash", {"case": [[{"manual": "모드"}, 14]], "else": 34}))))
+                                    rule("비중", Cond.BUY, None, ("cash", {"case": [[{"manual": "모드"}, 14]], "else": 34}))))
     pe = Grade.ProductEval(tree, "X", hist, cal)
     w, alt = pe.weight_of(len(xs) - 1)
     check(w is None and alt == [14.0, 34.0], "수동 모드 비중은 모름 + 범위 %r %r" % (w, alt))
@@ -584,7 +584,7 @@ def t_answers():
     check(v(unk, True, {k(unk, "A"): False}) is False, "\"?\" 식도 답으로 풀린다")
     obs = {"observe": {"gt": [C, 0]}, "manual": "장중"}
     check(v(obs, None, {"A|장중": False}) is True, "관측된 observe 는 답보다 관측값")
-    tree = TreeGateway.of(synthetic({"A": None}, rule("실적", "산다", {"all": [m]})))
+    tree = TreeGateway.of(synthetic({"A": None}, rule("실적", Cond.BUY, {"all": [m]})))
     got = [Grade.ProductEval(tree, "A", hist, cal, answers=a).grade_key(2)
            for a in (None, {"A|실적 좋음": True}, {"A|실적 좋음": False})]
     check(got == ["confirm", "buy", "wait"], "등급까지 답으로 풀린다(확인 대기 → 매수 후보·관망) %r" % got)
@@ -623,8 +623,8 @@ def t_warmup_guard():
         check(got == exp, "warmup_of %r → %d (기대 %d)" % (node, got, exp))
 
     # 트리 상품 워밍업 = 등급을 내는 갈래(산다·안 산다) 전체의 최댓값.
-    tree = TreeGateway.of(synthetic({"P": None}, rule("신고가", "산다", {"gt": [C, {"highest": [C, 60]}]}),
-                                    rule("10일선 아래", "안 산다", {"lt": [C, AVG(C, 10)]})))
+    tree = TreeGateway.of(synthetic({"P": None}, rule("신고가", Cond.BUY, {"gt": [C, {"highest": [C, 60]}]}),
+                                    rule("10일선 아래", Cond.BLOCK, {"lt": [C, AVG(C, 10)]})))
     check(tree.warmup("P") == 59, "warmup = 등급 갈래 최댓값(highest60 → 59)")
 
     # 2) 워밍업 자르기 — 필요 워밍업 60(=highest60)짜리 트리. 충분한 봉 vs 모자란 봉.
@@ -741,50 +741,55 @@ def t_gateway():
         "rules": [
             {"label": "20일선 위", "ref": "1-1", "value": W},
             {"label": "선물 양", "ref": "1-2", "on": ["A"],
-             "then": [{"when": {"all": [{"rule": "20일선 위"}, M]}, "do": "산다"}]},
+             "then": [{"when": {"all": [{"rule": "20일선 위"}, M]}, "do": Cond.BUY}]},
             {"label": "지수 음", "ref": "2-1",
-             "then": [{"when": {"lt": [{"px": "close", "sym": "$index"}, 0]}, "do": "안 산다"}]},
-            {"label": "비중", "ref": "4-1", "then": [{"do": "산다", "qty": {"of": "cash", "x": 30}}]},
-            {"label": "1차", "ref": "4-2", "on": ["A"], "then": [{"do": "산다", "qty": {"of": "budget", "x": 0.5}}]},
+             "then": [{"when": {"lt": [{"px": "close", "sym": "$index"}, 0]}, "do": Cond.BLOCK}]},
+            {"label": "비중", "ref": "4-1", "then": [{"do": Cond.BUY, "qty": {"of": "cash", "x": 30}}]},
+            {"label": "1차", "ref": "4-2", "on": ["A"], "then": [{"do": Cond.BUY, "qty": {"of": "budget", "x": 0.5}}]},
             {"label": "2차", "on": ["A"], "then": [{"when": {"ge": [{"pos": "filled", "rule": "1차"}, 1]},
-                                                   "do": "산다", "qty": {"of": "budget", "x": 0.5}}]},
+                                                   "do": Cond.BUY, "qty": {"of": "budget", "x": 0.5}}]},
             {"label": "익절", "ref": "5-1",
-             "then": [{"when": {"ge": [{"pos": "ret"}, 9]}, "do": "판다", "qty": {"of": "held", "x": 1}}]},
+             "then": [{"when": {"ge": [{"pos": "ret"}, 9]}, "do": Cond.SELL, "qty": {"of": "held", "x": 1}}]},
             {"label": "묶음 상승", "ref": "6-1", "on": ["A"],
-             "then": [{"when": {"ge": [{"across": {"syms": ["$묶음"], "cond": UP}}, 1]}, "do": "산다"}]},
+             "then": [{"when": {"ge": [{"across": {"syms": ["$묶음"], "cond": UP}}, 1]}, "do": Cond.BUY}]},
             {"label": "못 옮김", "ref": "9-9", "skip": "데이터 없음: x"}]}
     g = TreeGateway.of(data)
     check(g.products() == ["A", "B"] and g.has("A") and not g.has("Z"), "products/has")
     check(g.index("A") == "^NDX" and g.index("B") is None and g.note("A") == "a 노트", "index/note")
-    check(g.section("A", "filter") == {"all": []}, "filter 는 항상 참(v3 엔 필터 칸 없음)")
-    ent = g.section("A", "entry")["any"]
-    check([n["label"] for n in ent] == ["선물 양", "묶음 상승"] and g.section("B", "entry") == {"any": []},
-          "entry = 산다 갈래(포지션·조건 없는 갈래 제외, on 반영) %r" % ent)
+    ent = g.gate("A", Cond.BUY)["any"]
+    check([n["label"] for n in ent] == ["선물 양", "묶음 상승"] and g.gate("B", Cond.BUY) == {"any": []},
+          "gate(산다) = 산다 갈래(포지션·조건 없는 갈래 제외, on 반영) %r" % ent)
     check(ent and ent[0]["all"][0] == dict(W, label="20일선 위", ref="1-1") and ent[0]["allprod"] is False,
           "{rule} 는 그 규칙 value 로 펼치고 이름·소절을 싣는다 %r" % (ent[:1],))
     check(len(ent) > 1 and ent[1]["ge"][0]["across"]["syms"] == ["N1", "N2"], "이름 심볼은 실제 티커로 펼친다")
-    av = g.section("A", "avoid")["any"]
-    check([(n["label"], n["allprod"]) for n in av] == [("지수 음", True)], "avoid = 안 산다 갈래 %r" % av)
-    sz = g.sizing("A")
-    check((sz.label, sz.ref, sz.qty) == ("비중", "4-1", ("cash", 30)), "sizing = 산다 qty cash")
+    av = g.gate("A", Cond.BLOCK)["any"]
+    check([(n["label"], n["allprod"]) for n in av] == [("지수 음", True)], "gate(안 산다) %r" % av)
+    try:
+        g.gate("A", Cond.SELL)
+        FAILS.append("판다는 등급 동사가 아닌데 gate 가 받음")
+    except Cond.CondError:
+        pass
+    sz = g.weight("A")
+    check((sz.label, sz.ref, sz.qty) == ("비중", "4-1", ("cash", 30)), "weight = 산다 qty cash")
     trs = g.tranches("A")
     check([(t.label, t.qty, t.when) for t in trs] == [("1차", ("budget", 0.5), None),
                                                        ("2차", ("budget", 0.5), {"ge": [{"pos": "filled"}, 1]})]
           and g.tranches("B") == [], "tranches = 산다 qty budget(pos 의 rule 은 뗀다) %r" % [(t.label, t.when) for t in trs])
-    e = g.exit_rules("A")
-    check([(r.label, r.qty) for r in e] == [("익절", ("held", 1.0))], "exit_rules = 판다 %r" % [(r.label, r.qty) for r in e])
+    e = g.sells("A")
+    check([(r.label, r.qty) for r in e] == [("익절", ("held", 1))], "sells = 판다 %r" % [(r.label, r.qty) for r in e])
     check(g.symbols() == {"A", "B", "^NDX", "NQ=F", "N1", "N2"} and g.symbols(["B"]) == {"B"}, "symbols %r" % g.symbols())
     check(g.minute_symbols() == {"NQ=F"} and g.timeframes() == {"1d", "1m"}, "minute_symbols/timeframes")
     check(g.warmup("A") == 19 and g.warmup("B") == 0 and g.warmup() == 19, "warmup")
     check(g.refs() == {"1-1", "1-2", "2-1", "4-1", "4-2", "5-1", "6-1", "9-9"}, "refs %r" % g.refs())
-    check(g.unexpressed() == [{"rule": "못 옮김", "ref": "9-9", "reason": "데이터 없음: x"}], "skip 규칙")
+    check(g.skips() == [{"rule": "못 옮김", "ref": "9-9", "reason": "데이터 없음: x"}], "skip 규칙")
     check(g.whole() is data and not TreeGateway({}) and bool(g) and TreeGateway.load("__없는책__") is None,
           "원본·빈·없는 트리")
-    bad = dict(data, rules=data["rules"] + [rule("x", "산다", {"rule": "없는 이름"})])
-    check(TreeGateway.of(bad).section("A", "entry")["any"][-1].get("manual", "").startswith("연산 없음: 미해결 참조"),
+    bad = dict(data, rules=data["rules"] + [rule("x", Cond.BUY, {"rule": "없는 이름"})])
+    check(TreeGateway.of(bad).gate("A", Cond.BUY)["any"][-1].get("manual", "").startswith("연산 없음: 미해결 참조"),
           "없는 이름 참조는 수동(연산 없음)으로 드러낸다")
     for broken in (dict(data, version=2), dict(data, products={}), dict(data, rules=[]),
-                   dict(data, rules=data["rules"] + [data["rules"][0]])):
+                   dict(data, rules=data["rules"] + [data["rules"][0]]),
+                   dict(data, rules=data["rules"] + [rule("y", "쉰다", {"all": []})])):
         try:
             TreeGateway.of(broken)
             FAILS.append("형식이 틀린 트리가 통과: %r" % sorted(broken))

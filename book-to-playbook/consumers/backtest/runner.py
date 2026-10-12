@@ -123,13 +123,13 @@ def run(slug, days=365, hist=None, tree=None, unobserved=None):
         if pol == "none":           # 책에 매도 규칙 없음 — 거래를 지어내지 않는다(매수 신호 뒤 N거래일 보유만: summary)
             trade_res[p] = {"exit_policy": pol}
         else:
-            exits = tree.exit_rules(p)
+            sells = tree.sells(p)
             # 매수 크기 = 그날 판정의 '얼마나'(j.amount — 라이브 화면과 같은 Judge 경로)에 금액 정책(trades.size_of)
-            tl = trades.build_trades(tree, p, hist, cal, starts, exits, amount=j.amount)
+            tl = trades.build_trades(tree, p, hist, cal, starts, sells, amount=j.amount)
             st = trades._parity_stats(tl)
-            trade_res[p] = {"exit_policy": pol, "unsized_note": trades.unsized_note(tree, p, exits),
+            trade_res[p] = {"exit_policy": pol, "unsized_note": trades.unsized_note(tree, p, sells),
                             "size_notes": trades.size_notes(st["size_counts"]), "stats": st, "trades": tl}
-        manual[p] = [{"section": s, "rule": l, "ref": r} for s, l, r in j.manual_items()]
+        manual[p] = [{"do": do, "rule": l, "ref": r} for do, l, r in j.manual_items()]
         if prow and period is None:
             period = [prow[0]["date"], prow[-1]["date"], len(prow)]
     return {"slug": slug, "title": tree.book(slug),

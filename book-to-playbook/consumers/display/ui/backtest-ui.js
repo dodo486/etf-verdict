@@ -111,7 +111,7 @@
       if (T.unsized_note) h += '<p class="bt-sub">⚠ ' + esc(T.unsized_note) + '</p>';
       // 금액(얼마나) — 엔진이 낸 횟수(stats.size_counts)와 문구(size_notes, 정본 consumers/backtest/trades.size_of 정책)를 그대로
       var SC = st.size_counts;
-      if (SC && SC.buys) h += '<p class="bt-sub">금액 = 비중 × 분할 비율 × 조심 배수 · 매수 ' + SC.buys + '회 중 조심으로 줄인 매수 ' + SC.cut + '회</p>';
+      if (SC && SC.buys) h += '<p class="bt-sub">금액 = 비중 × 분할 비율 · 매수 ' + SC.buys + '회</p>';
       if ((T.size_notes || []).length) h += '<p class="bt-sub">⚠ ' + T.size_notes.map(esc).join(' · ') + '</p>';
 
       // 포트폴리오 지표(vectorbt 계산기) — 총수익·MDD·샤프 + 자산곡선. 수수료·세금 반영(단순 가격차보다 보수적).
@@ -192,10 +192,10 @@
     // 가정·한계
     var man = [];
     Object.keys(P.manual || {}).forEach(function (p) {
-      (P.manual[p] || []).forEach(function (m) { man.push('[' + esc(p) + ' ' + esc(m.section) + '] ' + esc(m.rule)); });
+      (P.manual[p] || []).forEach(function (m) { man.push('[' + esc(p) + ' ' + esc(m.do) + '] ' + esc(m.rule)); });
     });
     h += '<div class="note" style="margin-top:26px"><b>읽는 법·한계</b><ul style="margin:6px 0 0;padding-left:18px">' +
-         '<li>매수 신호 = ✅ 매수 후보 + 🟡 확인 대기. 🟡 는 아래 <b>수동 조건이 모두 통과했다고 가정</b>한 낙관치다(과거 장중·개장 전 상태는 확인할 수 없다).</li>' +
+         '<li>매수 신호 = ✅ + 🟡 등급(산다 + 확인 대기). 🟡 는 아래 <b>수동 조건이 모두 통과했다고 가정</b>한 낙관치다(과거 장중·개장 전 상태는 확인할 수 없다).</li>' +
          '<li>거래 성적: 한 상품에 포지션 하나 — 보유 중의 신호는 건너뛴다. 매도는 종가 판정 → 다음 날 시가 체결. 저자가 준 규칙만 쓰고 안전장치 손절은 넣지 않는다(미청산이 그 결과). 책에 매도 규칙이 없는 상품은 대체 매도 규칙을 지어내지 않고 매수 신호 뒤 N거래일 보유 수익률만 본다.</li>' +
          '<li>표본이 작으면(거래 수십 건 이하) 우연의 영향이 크다. 과거 성적은 미래를 보장하지 않는다.</li>';
     if (P.missing_symbols && P.missing_symbols.length) h += '<li class="bt-warn">시세를 못 받은 심볼: ' + esc(P.missing_symbols.join(', ')) + '</li>';

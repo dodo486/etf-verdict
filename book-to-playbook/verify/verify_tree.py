@@ -53,7 +53,8 @@ from market import md_feed
 from dsl.tree_gateway import TreeGateway
 
 Candle = namedtuple("Candle", "date open high low close volume")
-COMPARED = Cond.SECTIONS + ("sizing",)               # 날마다 비교하는 칸(분할·매도는 거래로)
+COMPARED = Cond.GATES + ("weight",)                   # 날마다 비교하는 것(등급 동사 둘 + 비중 — 분할·판다는 거래로)
+SHAPES = COMPARED + (Cond.SELL,)                       # 모양(식)을 비교하는 것
 MANUAL_HEADS = ("저자 미명시", "데이터 없음", "연산 없음")
 
 
@@ -76,9 +77,9 @@ def _history(trees, years):
 
 def _day_values(pe, i):
     """칸별 그날 값 — 조건 칸은 수동 = 모름 평가, 비중은 (값, 범위)."""
-    out = {sec: Cond.series(pe.gw.section(pe.prod, sec), pe.ctx[None])[i] for sec in Cond.SECTIONS}
+    out = {do: Cond.series(pe.gw.gate(pe.prod, do), pe.ctx[None])[i] for do in Cond.GATES}
     w, alt = pe.weight_of(i)
-    out["sizing"] = (None if w is None else round(w, 6), tuple(alt or ()))
+    out["weight"] = (None if w is None else round(w, 6), tuple(alt or ()))
     out["grade"] = pe.grade_key(i)
     return out
 
@@ -164,7 +165,8 @@ def run_scenarios(tree, scen, overrides):
     syms = tree.symbols()
     for sc in (scen or {}).get("scenarios", []):
         name, p = sc.get("name"), sc.get("prod")
-        node = tree.scenario_node(p, sc.get("section"), sc.get("rule"))   # 사례 → 트리의 식(출입구가 가리킨다)
+        do = {"avoid": Cond.BLOCK, "entry": Cond.BUY}.get(sc.get("section"))   # 옛 칸 사례 → 등급 동사(그 밖은 형식오류)
+        node = tree.gate(p, do) if do and tree.has(p) else None
         if node is None:
             out.append((sc, "형식오류", None))
             continue
@@ -207,7 +209,7 @@ def _has_manual(n):
 def _stat_nodes(tree, prod):
     """통계 대상 라벨 노드 [(칸, 노드)] — 조건 칸.
     장중 관측(observe) 안쪽은 뺀다 — asof 기준 분봉이 없는 날은 판정 불가가 정상이다(그날은 수동으로 푼다)."""
-    out = [(sec, n) for sec in Cond.SECTIONS for n in Cond.labeled(tree.section(prod, sec))]
+    out = [(do, n) for do in Cond.GATES for n in Cond.labeled(tree.gate(prod, do))]
     inside = set()
     for _sec, n in out:
         if "observe" in n:
@@ -226,7 +228,7 @@ def fire_stats(tree, hist, years, ack=None):
         idx = _window(cal, years)
         N = max(1, len(idx))
         nodes = []
-        top_avoid = {repr(n) for n in Grade._top_labeled(tree.section(p, "avoid"))}
+        top_avoid = {repr(n) for n in Grade._top_labeled(tree.gate(p, Cond.BLOCK))}
         for sec, n in _stat_nodes(tree, p):
             if _has_manual(n):
                 continue                         # 수동이 섞이면 '안 뜸/모름'이 정상이다
@@ -261,7 +263,7 @@ def fire_stats(tree, hist, years, ack=None):
                 # 진입 ⇒ 회피: 회피는 맨 위 노드만(회피 안쪽 하위 조건이 진입과 겹치는 건 정상)
                 for (s1, l1, v1, r1), (s2, l2, v2, r2) in (((sa, la, va, ra), (sb, lb, vb, rb)),
                                                          ((sb, lb, vb, rb), (sa, la, va, ra))):
-                    if s1 == "entry" and s2 == "avoid" and r2 in top_avoid \
+                    if s1 == Cond.BUY and s2 == Cond.BLOCK and r2 in top_avoid \
                             and sum(1 for x in v1 if x) >= 10 \
                             and all(v2[k] is True for k in range(len(v1)) if v1[k] is True):
                         warns.append("%s 진입⇒회피: '%s' 가 뜨면 늘 '%s' 도 뜸" % (p, l1, l2))
@@ -280,7 +282,7 @@ def weight_overflow(tree, hist, years):
     """상품 비중 합이 100% 를 넘는 날 [(날짜, 합)] — 비중을 아는 상품만 더한다(수동 범위는 최댓값)."""
     by_day = {}
     for p in tree.products():
-        if tree.sizing(p).qty.x is None:
+        if tree.weight(p).qty.x is None:
             continue
         cal = [c.date for c in hist.get(p) or []]
         pe = Grade.ProductEval(tree, p, hist, cal)
@@ -310,7 +312,7 @@ def manual_heads(tree):
 
 # ------------------------------------------------------------------ 심판의 비교 도구(덤프 — 판단은 안 함)
 def _zone_explain(pe, sec, i):
-    if sec in Cond.SECTIONS:
+    if sec in Cond.GATES:
         return pe.explain(i)[sec]
     w, alt = pe.weight_of(i)
     return {"weight": w, "weight_range": alt, "tranches": _tranche_rows(pe.gw, pe.prod)}
@@ -323,7 +325,7 @@ def _tranche_rows(tree, prod):
 
 def _zone_node(tree, prod, sec):
     """칸 하나의 식 — 조건 칸만(규칙 칸은 None)."""
-    return tree.section(prod, sec) if sec in Cond.SECTIONS else None
+    return tree.gate(prod, sec) if sec in Cond.GATES else None
 
 
 def _section_key(tree, prod, sec):
@@ -526,12 +528,12 @@ def _rules_diff(ra, rb):
 def zone_diff(ta, tb, prod, zone):
     """상품 한 칸의 a·b 트리 모양 비교."""
     xa, xb = _zone_node(ta, prod, zone), _zone_node(tb, prod, zone)
-    if zone in Cond.SECTIONS:
+    if zone in Cond.GATES:
         return tree_diff(xa, xb)
-    if zone in ("caution", "exit"):
+    if zone == Cond.SELL:
         return {"status": "same" if _ckey(xa) == _ckey(xb) else "diff", "rules": _rules_diff(xa, xb)}
     out = {"status": "same" if _ckey(xa) == _ckey(xb) else "diff"}            # sizing
-    wa, wb = ta.sizing(prod).qty.x, tb.sizing(prod).qty.x
+    wa, wb = ta.weight(prod).qty.x, tb.weight(prod).qty.x
     if _ckey(wa) != _ckey(wb):
         out["weight"] = tree_diff(wa, wb) if isinstance(wa, dict) and isinstance(wb, dict) else {"a": wa, "b": wb}
     ra, rb = _tranche_rows(ta, prod), _tranche_rows(tb, prod)
@@ -619,7 +621,7 @@ def dump_disagreements(slug, per, years):
             out["%s.%s" % (p, sec)] = entry
     path = book_log(slug, "disagree.json")
     pairing = {p: pair_conditions(ta, tb, p, hist, years) for p in ta.products() if tb.has(p)}
-    shape = {p: {z: zone_diff(ta, tb, p, z) for z in Cond.ZONES} for p in ta.products() if tb.has(p)}
+    shape = {p: {z: zone_diff(ta, tb, p, z) for z in SHAPES} for p in ta.products() if tb.has(p)}
     write_text(path, json.dumps({"tree_diff": shape, "pairing": pairing,
                                  "sections": out}, ensure_ascii=False, indent=1, default=str))
     for p, t in pairing.items():
@@ -705,7 +707,7 @@ def check_exits(tree, ea, eb):
     stop = []
     decided = tree.review_exits()
     for p in tree.products():
-        sdiff = _section_key(ea, p, "exit") != _section_key(eb, p, "exit")
+        sdiff = _section_key(ea, p, Cond.SELL) != _section_key(eb, p, Cond.SELL)
         line = "  %s %-14s%s" % ("≠" if sdiff else "✅", p + ".exit", " 식 다름" if sdiff else " 식 같음")
         d = decided.get(p)
         if sdiff:
@@ -723,7 +725,7 @@ def check_exits(tree, ea, eb):
         if win_name == "custom":
             print(line)
             continue
-        if _section_key(tree, p, "exit") != _section_key(ea if win_name == "a" else eb, p, "exit"):
+        if _section_key(tree, p, Cond.SELL) != _section_key(ea if win_name == "a" else eb, p, Cond.SELL):
             stop.append("%s.exit 최종 규칙의 식이 %s 와 다름" % (p, win_name))
             line += "  ❌ 최종 != %s(식)" % win_name
         print(line)
@@ -847,7 +849,7 @@ def check_book(slug, years):
     else:
         stop.extend(_check_pair(slug, tree, ta, tb, hist, years))
         for name, t in (("a", ta), ("b", tb)):
-            un = t.unexpressed()
+            un = t.skips()
             if un:
                 heads = {}
                 for u in un:

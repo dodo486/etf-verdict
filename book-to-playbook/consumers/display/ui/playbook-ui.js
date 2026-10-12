@@ -10,15 +10,15 @@
   const esc = window.BP.esc;            // 공용 부품(shared-ui) — 고치는 곳은 거기 하나
   const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
   const REFS = (function(){ try { return JSON.parse(document.getElementById('verdict-data').textContent).refs || {}; } catch(e){ return {}; } })();
-  // 칸 이름표는 엔진 값(VD.zones)을 먼저 읽는다 — 공용 부품(shared-ui.zw) — 없으면 키 그대로.
+  // 소절이 든 동사(안 산다·산다·판다)는 엔진이 refs[소절].verbs 로 실어보낸 글자 그대로(정본 dsl/tradeTool.VERBS).
   function refBadge(headText){
     const m = headText.match(window.BP.REF_RE); if(!m) return '';
     const r = REFS[m[1]];
     if(r && (r.auto + r.manual) > 0){
-      const z = (r.zones||[]).map(x=>window.BP.zw(x)).join('·');
+      const z = (r.verbs||[]).join('·');
       return ' <span class="covb ref" title="체크리스트 '+esc(z)+' — 자동 '+r.auto+' · 수동 '+r.manual+'">✅ '+esc(z)+'</span>';
     }
-    if(r && r.unexpressed) return ' <span class="covb gap" title="'+esc(r.unexpressed.map(u=>u.rule+' — '+u.reason).join(' / '))+'">⚠ 트리로 못 옮김</span>';
+    if(r && r.skipped) return ' <span class="covb gap" title="'+esc(r.skipped.map(u=>u.rule+' — '+u.reason).join(' / '))+'">⚠ 트리로 못 옮김</span>';
     return ' <span class="covb mind" title="체크리스트에 해당 조건 없음(원칙·배경이거나 판단 규칙이 아님)">— 체크리스트 없음</span>';
   }
 

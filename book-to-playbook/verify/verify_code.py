@@ -282,7 +282,7 @@ def m_amount_policy(src):
     return [(ln, None, x) for ln, x in _js_hits(src, r"\bfunction\s+size_?[oO]f\s*\(")]
 
 
-# 수량 변환 — 정규화된 '얼마나'(출입구 Qty(of, x))를 물량으로 바꾸는 곳은 trades.to_units 하나(매수·매도·비중·조심 모두).
+# 수량 변환 — 정규화된 '얼마나'(출입구 Qty(of, x))를 물량으로 바꾸는 곳은 trades.to_units 하나(매수·매도·비중 모두).
 #   밖에서 basis(of)를 가르거나 수량(qty.x)으로 셈을 하면 종류별 해석이 다시 흩어진다.
 QTY_BASES = ("bought", "held", "budget")
 QTY_JS = (r"\.of\b|\b(?:frac|scale|weight)\b\s*\*(?!\s*100\b)"
@@ -309,9 +309,9 @@ def m_qty_convert(src):
 
 
 def _labels():
-    """칸·등급 이름표 글자 — 정본(Cond.ZONE_LABELS · Grade.GRADES)에서 읽는다(여기 다시 적지 않는다)."""
+    """동사·등급 이름표 글자 — 정본(Cond.VERBS · Grade.GRADES)에서 읽는다(여기 다시 적지 않는다)."""
     from dsl.tradeTool import Cond, Grade
-    return set(Cond.ZONE_LABELS.values()) | set(Grade.GRADES.values())
+    return set(Cond.VERBS) | set(Grade.GRADES.values())
 
 
 def m_labels(src):
@@ -323,8 +323,8 @@ def m_labels(src):
 
 # 등급 사다리 — 날짜별 등급을 내는 함수(정본 grade.ProductEval.grade_key).
 LADDER_PY = {"grade_key"}
-LADDER_JS = (r"\bfunction\s+(?:gradeKey|and3|or3|ev|cautionOf)\s*\("
-             r"|\b(?:const|let|var)\s+(?:gradeKey|and3|or3|ev|cautionOf)\s*=")
+LADDER_JS = (r"\bfunction\s+(?:gradeKey|and3|or3|ev)\s*\("
+             r"|\b(?:const|let|var)\s+(?:gradeKey|and3|or3|ev)\s*=")
 
 
 def m_grade_ladder(src):
@@ -365,9 +365,9 @@ OWNERS = [
          why="'얼마나'(Qty: cash·budget·bought·held)를 물량으로 바꾸는 곳은 trades.to_units 하나 — 매수(분할)·매도·"
              "비중이 같은 변환을 지난다. 밖은 Qty 를 건네기만 하고 basis 를 가르거나 셈하지 않는다",
          hint="trades.to_units(Qty, Ledger) · 화면은 엔진이 낸 units·sell 문장으로", allow={}),
-    dict(concept="칸·등급 이름표", owners=("dsl/tradeTool.py",), match=m_labels,
-         why="Cond.ZONE_LABELS · Grade.GRADES · grade_rules.json 이 정본 — 화면은 판정 JSON(zones·grades·grade_rules)으로 받는다",
-         hint="판정 JSON 의 zones·grades·grade_rules 로", allow={}),
+    dict(concept="동사·등급 이름표", owners=("dsl/tradeTool.py",), match=m_labels,
+         why="Cond.VERBS(안 산다·산다·판다) · Grade.GRADES · grade_rules.json 이 정본 — 화면은 판정 JSON(verbs·grades)으로 받는다",
+         hint="파이썬은 Cond.BLOCK·BUY·SELL·VERBS, 화면은 판정 JSON 의 verbs·grades 로", allow={}),
     dict(concept="등급 사다리", owners=("dsl/tradeTool.py",), match=m_grade_ladder,
          why="날짜별 등급을 내는 곳은 Grade 하나 — 두 벌이면 엔진과 화면 등급이 갈라진다",
          hint="판정 JSON 의 key 를 그대로(수동 답은 POST /api/verdict — 서버가 Cond.Ctx answers 로 낸다)", allow={}),

@@ -10,8 +10,8 @@
   if(!btn) return;
 
   function refs(){ try { return JSON.parse(document.getElementById('verdict-data').textContent).refs || {}; } catch(e){ return {}; } }
-  // 칸 이름표는 엔진 값(VD.zones)을 먼저 읽는다 — 공용 부품(shared-ui.zw) — 없으면 키 그대로.
-  function zones(r){ return (r.zones || []).map(function(z){ return window.BP.zw(z); }).join('·'); }
+  // 소절이 든 동사(안 산다·산다·판다) — 엔진이 refs[소절].verbs 로 실어보낸 글자 그대로(정본 dsl/tradeTool.VERBS).
+  function verbs(r){ return (r.verbs || []).join('·'); }
 
   /* ---- 분할 모드 토글 ---- */
   function fitTop(){
@@ -62,7 +62,7 @@
   /* ---- 소절 → 체크리스트 ---- */
   function jump(key, title){
     var r = refs()[key];
-    var unex = (r && r.unexpressed) || [];
+    var unex = (r && r.skipped) || [];
     if(!r || (r.auto + r.manual) === 0){
       note.innerHTML = '<span class="x" id="jnx">✕</span><b>' + (title || key) + '</b> — 체크리스트에 이 소절 조건이 없습니다.'
         + (unex.length ? '<br><span style="color:var(--warn)">트리로 못 옮긴 규칙:</span> '
@@ -86,7 +86,7 @@
       scrollIn(document.getElementById('panel-sheet'), target, 12);
       Array.prototype.forEach.call(hits.length ? hits : [target], flash);
     }, 80);
-    note.innerHTML = '<span class="x" id="jnx">✕</span><b>' + (title || key) + '</b> → ✅ 체크리스트 ' + zones(r)
+    note.innerHTML = '<span class="x" id="jnx">✕</span><b>' + (title || key) + '</b> → ✅ 체크리스트 ' + verbs(r)
       + ' · 자동 ' + r.auto + ' · 수동 ' + r.manual + ' · ' + (r.prods || []).join(', ')
       + (unex.length ? '<br><span style="color:var(--warn)">일부는 트리로 못 옮김:</span> '
            + unex.map(function(u){ return u.rule; }).join(' · ') : '');
@@ -145,7 +145,7 @@
   if(!rowsEl) return;
   var REFS = {};
   try { REFS = JSON.parse(document.getElementById('verdict-data').textContent).refs || {}; } catch(e){}
-  // 칸 이름표는 엔진 값(VD.zones)을 먼저 읽는다 — 공용 부품(shared-ui.zw)
+  // 소절이 든 동사는 엔진 값(refs[소절].verbs) 그대로
 
   // 소절 목록·제목은 플레이북 원문(#src)에서 가져온다(따로 적지 않는다 — 어긋날 수 있으므로)
   var TITLE = {}, KEYS = [], CHAP = {};
@@ -161,8 +161,8 @@
 
   function st(k){
     var r = REFS[k];
-    if(r && (r.auto + r.manual) > 0) return r.unexpressed ? 'part' : 'ref';
-    if(r && r.unexpressed) return 'gap';
+    if(r && (r.auto + r.manual) > 0) return r.skipped ? 'part' : 'ref';
+    if(r && r.skipped) return 'gap';
     return 'none';
   }
   var n = {ref:0, part:0, gap:0, none:0};
@@ -184,9 +184,9 @@
       var chap = CHAP[ck] || ck;
       if(chap !== lastChap){ html += '<div class="covchap">' + chap + '</div>'; lastChap = chap; }
       var where = (s === 'ref' || s === 'part')
-        ? (r.zones || []).map(function(z){ return window.BP.zw(z); }).join('·') + ' · 자동 ' + r.auto + ' · 수동 ' + r.manual
+        ? (r.verbs || []).join('·') + ' · 자동 ' + r.auto + ' · 수동 ' + r.manual
         : (s === 'gap' ? '⚠ 트리로 못 옮김' : '— 체크리스트 없음');
-      var why = (r.unexpressed || []).map(function(u){ return u.rule + ' (' + u.reason + ')'; }).join(' · ');
+      var why = (r.skipped || []).map(function(u){ return u.rule + ' (' + u.reason + ')'; }).join(' · ');
       html += '<div class="covrow ' + (s === 'none' ? 'mindset' : (s === 'gap' ? 'gap' : 'ref')) + '" data-k="' + k + '">'
            + '<span class="k">' + k + '</span>'
            + '<span class="ttl">' + (TITLE[k] || '') + '<span class="note">' + why + '</span></span>'
