@@ -47,7 +47,9 @@ from collections import namedtuple
 
 from shared import paths  # noqa: F401  (UTF-8 출력)
 from shared.paths import book_file, live_slugs, source_index_json
-from tree.tradeTool import Cond, Grade
+from tree.tradeTool import (
+    BLOCK, BUY, CondError, GATES, is_compact, is_manual, labeled, manual_leaves, manual_text, META, SELL,
+    _top_labeled, UNKNOWN, VERBS)
 from market import md_feed
 from judge.judge import Holding, Judge
 from authoring.extract.compare import (COMPARED, compare, evaluate, factorable, history, logic_key,
@@ -104,11 +106,11 @@ def _synthetic(sc, symbols):
 
 def _outcome(judge, i, view):
     """등급 동사 값(view = "opt" 낙관 · "pes" 비관) → 그날 결과(안 산다·산다·관망) — 하나로 안 정해지면 None."""
-    block, buy = judge.gate_value(Cond.BLOCK, i, view), judge.gate_value(Cond.BUY, i, view)
+    block, buy = judge.gate_value(BLOCK, i, view), judge.gate_value(BUY, i, view)
     if block is True:
-        return Cond.BLOCK
+        return BLOCK
     if block is False and buy is True:
-        return Cond.BUY
+        return BUY
     if block is False and buy is False:
         return WAIT
     return None
@@ -126,18 +128,18 @@ def scenario_result(tree, sc):
     수동 조건 때문에 갈리면 '확인됨/안 됨' 두 경우를 본다 — 어느 쪽으로도 기대값이 안 나오면 불일치(재현불가로 덮지 않는다)."""
     p, expect = sc.get("prod"), sc.get("expect")
     want, pct = (expect.get("do"), expect.get("pct")) if isinstance(expect, dict) else (expect, None)
-    if "section" in sc or want not in Cond.VERBS + (WAIT,) or not tree.has(p):
+    if "section" in sc or want not in VERBS + (WAIT,) or not tree.has(p):
         return "형식오류", None                  # 옛 칸 사례(section·참/거짓 기대값) 또는 모르는 결과·상품
     hist, cal = _synthetic(sc, tree.tree.symbols())
     judge = tree.product(p, hist, days=cal)
-    if want == Cond.SELL:
+    if want == SELL:
         alts = {_sell_hit(judge, m) for m in (None, True, False)}
-        got = {True: Cond.SELL, False: "안 판다", None: None}
+        got = {True: SELL, False: "안 판다", None: None}
         alts = {got[x] for x in alts}
     else:
         i = len(cal) - 1
         alts = {_outcome(judge, i, "opt"), _outcome(judge, i, "pes")}
-        if pct is not None and want == Cond.BUY:
+        if pct is not None and want == BUY:
             w, rng = judge.weight_at(i)
             ok_w = (w is not None and abs(w - float(pct)) <= 1e-6) or (w is None and float(pct) in (rng or []))
             if not ok_w:
@@ -165,12 +167,12 @@ def run_scenarios(tree, scen):
 
 # ------------------------------------------------------------------ 발화 통계
 def _has_manual(n):
-    return bool(Cond.manual_leaves(n))
+    return bool(manual_leaves(n))
 
 
 def _stat_nodes(tree, prod):
     """통계 대상 라벨 노드 [(동사, 노드)] — 등급 동사(안 산다·산다)."""
-    return [(do, n) for do in Cond.GATES for n in Cond.labeled(tree.tree.gate(prod, do))]
+    return [(do, n) for do in GATES for n in labeled(tree.tree.gate(prod, do))]
 
 
 def fire_stats(tree, hist, years):
@@ -182,7 +184,7 @@ def fire_stats(tree, hist, years):
         idx = window(cal, years)
         N = max(1, len(idx))
         nodes = []
-        top_avoid = {repr(n) for n in Grade._top_labeled(tree.tree.gate(p, Cond.BLOCK))}
+        top_avoid = {repr(n) for n in _top_labeled(tree.tree.gate(p, BLOCK))}
         for sec, n in _stat_nodes(tree, p):
             if _has_manual(n):
                 continue                         # 수동이 섞이면 '안 뜸/모름'이 정상이다
@@ -217,15 +219,15 @@ def fire_stats(tree, hist, years):
                 # 산다 ⇒ 안 산다: 안 산다는 맨 위 노드만(안쪽 하위 조건이 산다와 겹치는 건 정상)
                 for (s1, l1, v1, r1), (s2, l2, v2, r2) in (((sa, la, va, ra), (sb, lb, vb, rb)),
                                                          ((sb, lb, vb, rb), (sa, la, va, ra))):
-                    if s1 == Cond.BUY and s2 == Cond.BLOCK and r2 in top_avoid \
+                    if s1 == BUY and s2 == BLOCK and r2 in top_avoid \
                             and sum(1 for x in v1 if x) >= 10 \
                             and all(v2[k] is True for k in range(len(v1)) if v1[k] is True):
-                        warns.append("%s %s⇒%s: '%s' 가 뜨면 늘 '%s' 도 뜸" % (p, Cond.BUY, Cond.BLOCK, l1, l2))
+                        warns.append("%s %s⇒%s: '%s' 가 뜨면 늘 '%s' 도 뜸" % (p, BUY, BLOCK, l1, l2))
         g = [ev["grade"][i] for i in idx]
         nb, nc = g.count("buy"), g.count("confirm")
         table.append((p, "등급", "✅ %d일 · 🟡 %d일 · ❔ %d일" % (nb, nc, g.count("unknown")), None, ""))
         if nb + nc == 0:
-            warns.append("%s %s 도달 불가 — %d일 중 ✅·🟡 0일" % (p, Cond.BUY, len(g)))
+            warns.append("%s %s 도달 불가 — %d일 중 ✅·🟡 0일" % (p, BUY, len(g)))
         if g.count("unknown") / N > 0.05:
             warns.append("%s 판정 불가 %d일(데이터 부족)" % (p, g.count("unknown")))
     return table, warns, same
@@ -252,12 +254,12 @@ def manual_heads(tree):
     seen, cnt = set(), {}
     for p in tree.products():
         for _z, _l, _r, node in tree.tree.expressions(p):
-            for n in Cond.manual_leaves(node):
+            for n in manual_leaves(node):
                 key = n["manual"] if "manual" in n else logic_key(n)   # "?" 식은 식이 신원
                 if key in seen:
                     continue
                 seen.add(key)
-                text = Cond.manual_text(n)
+                text = manual_text(n)
                 head = next((h for h in MANUAL_HEADS if text.startswith(h + ":")), "사유 머리 없음")
                 cnt[head] = cnt.get(head, 0) + 1
     return cnt
@@ -320,11 +322,11 @@ def same_meaning(tree):
                 for v in node:
                     walk(v)
         for do, label, _r, node in tree.tree.expressions(p):
-            if label is None and do in Cond.GATES:
+            if label is None and do in GATES:
                 # 등급 묶음의 맨 위 항목은 규칙 이름을 단 갈래다 — 한 규칙의 여러 갈래(4개 이상 → 산다 · 2개 이하 →
                 #   안 산다)는 이름이 같은 게 정상이라 그 안쪽만 본다.
                 for member in node["any"]:
-                    walk([v for k, v in member.items() if k not in Cond.META] if isinstance(member, dict) else member)
+                    walk([v for k, v in member.items() if k not in META] if isinstance(member, dict) else member)
             else:
                 walk(node)
         out.extend(("같은 이름 다른 식", [lb]) for lb, ks in logics.items() if len(ks) > 1)
@@ -338,10 +340,10 @@ def symbol_gaps(tree):
     def walk(n, lab):
         if isinstance(n, dict):
             lab = n.get("label") or lab
-            if "px" in n and n.get("sym") == Cond.UNKNOWN:
+            if "px" in n and n.get("sym") == UNKNOWN:
                 out.append(lab or "(이름 없음)")
             for k, v in n.items():
-                if k not in Cond.META:
+                if k not in META:
                     walk(v, lab)
         elif isinstance(n, list):
             for v in n:
@@ -356,8 +358,8 @@ def _nameless_manual(node, out=None):
     조용히 사라진다. 이름은 추출자가 단다."""
     out = [] if out is None else out
     if isinstance(node, dict):
-        if Cond.is_manual(node) and not node.get("label"):
-            out.append(Cond.manual_text(node)[:40] if "manual" in node else json.dumps(node, ensure_ascii=False)[:60])
+        if is_manual(node) and not node.get("label"):
+            out.append(manual_text(node)[:40] if "manual" in node else json.dumps(node, ensure_ascii=False)[:60])
         for v in node.values():
             _nameless_manual(v, out)
     elif isinstance(node, list):
@@ -389,16 +391,16 @@ def check_book(slug, years):
     print("== %s" % slug)
     try:
         tree = Judge.open(slug)
-    except Cond.CondError as e:
+    except CondError as e:
         print("  ❌ tree.json 문법 오류: %s" % e)
         return ["%s 트리 문법" % slug], []
     if tree is None:
         print("  ❌ tree.json 없음 — 라이브 책은 조건 트리로만 판정한다")
         return ["%s 트리 없음" % slug], []
-    # 00. 직렬화 형식 정지 — 구간② 파일은 공통 직렬화(Cond.compact_json)로만 쓴다(줄 수를 부풀리지 않게)
+    # 00. 직렬화 형식 정지 — 구간② 파일은 공통 직렬화(tradeTool.compact_json)로만 쓴다(줄 수를 부풀리지 않게)
     loose = [n for n in ("tree.json", "tree_candidates/a.json", "tree_candidates/b.json", "tree_candidates/a.rules.json",
                          "tree_candidates/b.rules.json", "scenarios.json")
-             if os.path.exists(book_file(slug, n)) and not Cond.is_compact(book_file(slug, n))]
+             if os.path.exists(book_file(slug, n)) and not is_compact(book_file(slug, n))]
     if loose:
         stop.append("%s 공통 직렬화 아님 %d개" % (slug, len(loose)))
         print("  ❌ 공통 직렬화가 아닌 파일 %s — 쓴 사람이 python -m tree.tradeTool fmt <파일> 로 다시 쓴다" % loose)
@@ -430,7 +432,7 @@ def check_book(slug, years):
         if t:
             try:
                 t.validate()
-            except Cond.CondError as e:
+            except CondError as e:
                 print("  ❌ 후보 트리 문법 오류: %s" % e)
                 return ["%s 후보 트리 문법" % slug], []
     hist = history([tree, ta, tb], years)
@@ -525,7 +527,7 @@ def contract(slug):
         if not tree:
             raise ValueError("tree.json 없음")
         tree.validate()
-    except (OSError, ValueError, Cond.CondError) as e:
+    except (OSError, ValueError, CondError) as e:
         bad.append("tree.json 문법: %s" % e)
         tree = None
     if tree is not None and keys:

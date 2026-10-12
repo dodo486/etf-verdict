@@ -52,7 +52,7 @@ tree.json 은 지운 연산(pct·count·streak)·옛 `review` 키·옛 종목 �
 
 ### 5-남음. 트리 v3 코드 반영의 나머지 (초안 `docs/action-grammar-draft.md` 9절·5절)
 - **새 기본 부품**: 세션 시작 · `sumsince` · `smooth`(EMA 2/(n+1)·Wilder 1/n) · `sqrt` · 순위(후보 종목 중) — 후보: 세션 경과
-  시간(개장 캘린더 `md_feed.sessions().open`). **pandas 로 다시 구현**(지금 Cond 는 순수 파이썬 반복문).
+  시간(개장 캘린더 `md_feed.sessions().open`). **pandas 로 다시 구현**(지금 평가기(tradeTool)는 순수 파이썬 반복문).
 - 검사기 남은 것(JUDGE 5절 중 기계로 아직 못 보는 것): 판정 같은 조건의 포함관계(시세 없이 논리로) · 효과 없는 규칙(결과를
   바꾼 날 0일) · 원문 소절 누락(어느 규칙 ref 에도 없는 판단 소절) · 충실성(식 되는데 skip) · 결정 쪼개짐/흩어짐 · `ref` 형식(`·`).
 - 산다(분할)의 `repeat`("~할 때마다 더 산다")는 연산 없음으로 거부 중 — 원문이 요구하면 체결 워크에 구현.

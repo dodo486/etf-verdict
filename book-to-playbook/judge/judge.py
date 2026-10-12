@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """판단자(구간③) — 트리 원본과 시세 원본을 쓰는 유일한 곳. 책의 내용대로 판단하는 일은 여기 한 곳에서만 한다.
 
-  · Judge         책 하나의 판단자 — 트리를 열고(TreeGateway 는 여기서만), 시세를 받고(Grade.history 는 여기서만),
+  · Judge         책 하나의 판단자 — 트리를 열고(TreeGateway 는 여기서만), 시세를 받고(tradeTool.history 는 여기서만),
                   상품마다 ProductJudge 를 세운다. 라이브 판정(decisions)·백테스트 신호(signals)를 낸다.
   · ProductJudge  상품 하나의 판단자 — 트리에서 그 상품의 규칙만 골라 시세와 평가한다.
                   등급(grade·latest)·그날 판정(decide → Decision)·조건 설명(views)·보유분 상태(status)·체결 워크가
@@ -23,7 +23,7 @@ from collections import namedtuple
 from dataclasses import dataclass, field
 
 from shared.paths import positions_json
-from tree.tradeTool import Cond, Grade
+from tree.tradeTool import CondError, Ctx, GATES, GRADES, history_back, RuleSeries, series
 from tree.gateway import Branch, Qty, TreeGateway
 from judge import explain
 
@@ -71,7 +71,7 @@ class Decision:
 
     @property
     def grade(self):
-        return Grade.GRADES[self.key]
+        return GRADES[self.key]
 
 
 class Holding:
@@ -200,16 +200,16 @@ def size_notes(counts):
 
 # ================================================================ 상품 하나
 class ProductJudge:
-    """상품 하나의 판단자 — 생성 때 그 상품 규칙을 달력 전체로 한 번 계산해 둔다(Grade.RuleSeries).
+    """상품 하나의 판단자 — 생성 때 그 상품 규칙을 달력 전체로 한 번 계산해 둔다(tradeTool.RuleSeries).
     tree = 트리 출입구 · product = 상품 · prices = 시세 묶음(Judge 가 받은 것) · days = 판정 달력(생략 = 이 상품 봉 날짜)
-    · asof = 관측 시각(UTC datetime, None 이면 지금) · answers = 사람이 답한 수동 {Cond.answer_key: 참/거짓}."""
+    · asof = 관측 시각(UTC datetime, None 이면 지금) · answers = 사람이 답한 수동 {tradeTool.answer_key: 참/거짓}."""
 
     def __init__(self, tree, product, prices, days=None, asof=None, answers=None):
         self._tree, self.product = tree, product
         self._prices = prices
         self._bars = prices.get(self.product) or []
         self.days = [c.date for c in self._bars] if days is None else list(days)
-        self._series = Grade.RuleSeries(tree, product, prices, self.days, asof, answers)
+        self._series = RuleSeries(tree, product, prices, self.days, asof, answers)
 
     # ------------------------------------------------------------ 상품·가격
     @property
@@ -272,7 +272,7 @@ class ProductJudge:
     def gate_value(self, do, day, view=None):
         """등급 동사 하나의 그날 값 — view None = 수동 모름 · "opt" = 수동이 유리하게 · "pes" = 불리하게(검사·사례 채점용)."""
         if view is None:
-            return Cond.series(self._tree.gate(self.product, do), self._series.ctx[None])[day]
+            return series(self._tree.gate(self.product, do), self._series.ctx[None])[day]
         return (self._series.opt if view == "opt" else self._series.pes)[do][day]
 
     def weight_at(self, day):
@@ -292,13 +292,13 @@ class ProductJudge:
             prev_close=close[day - 1] if day >= 1 else None,
             incomplete=s.incomplete(day), confirmed=s._confirmed[day] + 1, warmup=s.warmup,
             top=s.top(day), manual=s.manual_items(day), amount=self.amount(day),
-            opt={do: s.opt[do][day] for do in Cond.GATES}, pes={do: s.pes[do][day] for do in Cond.GATES},
-            views={do: explain.view(self._tree.gate(self.product, do), s.ctx[None], day) for do in Cond.GATES},
+            opt={do: s.opt[do][day] for do in GATES}, pes={do: s.pes[do][day] for do in GATES},
+            views={do: explain.view(self._tree.gate(self.product, do), s.ctx[None], day) for do in GATES},
             holdings=[self.status(h, day) for h in holdings])
 
     def static_views(self):
         """시세 없이 보이는 등급 조건 설명(값 없음) — 시세가 없는 상품의 체크리스트 구조."""
-        return {do: explain.static_view(self._tree.gate(self.product, do), self.index) for do in Cond.GATES}
+        return {do: explain.static_view(self._tree.gate(self.product, do), self.index) for do in GATES}
 
     def describe(self, branch):
         """갈래 하나(비중·분할·판다)의 값 없는 설명."""
@@ -312,14 +312,14 @@ class ProductJudge:
     def _context(self, holding, manual_as=None):
         pos = ((holding.entry_day, holding.cost) if holding.book is None
                else (holding.entry_day, holding.cost, holding.book))
-        return Cond.Ctx(self._prices, self.days, self.product, self.index, manual_as=manual_as, pos=pos)
+        return Ctx(self._prices, self.days, self.product, self.index, manual_as=manual_as, pos=pos)
 
     def conditions(self, holding, sells, tranches, manual_as=False):
         """이 보유 상태로 판다 갈래·분할 차수 조건의 날짜별 값 — 백테스트 체결 워크가 체결을 정하는 데 쓴다.
         manual 은 '매매가 안 나가는 쪽'(manual_as=False)이 기본. → ([판다마다 값 목록], [분할마다 값 목록|None])."""
         ctx = self._context(holding, manual_as)
-        return ([Cond.series(r.when, ctx) for r in sells],
-                [Cond.series(t.when, ctx) if t.when is not None else None for t in tranches])
+        return ([series(r.when, ctx) for r in sells],
+                [series(t.when, ctx) if t.when is not None else None for t in tranches])
 
     def status(self, holding, day=None):
         """보유 하나의 그날(기본 마지막) 판다·다음 분할 상태 — 수동은 모름(manual_as=None)."""
@@ -330,15 +330,15 @@ class ProductJudge:
         trs = self.tranches()
         nt = trs[holding.filled] if 0 < holding.filled < len(trs) else None
         return HoldingStatus(
-            ret=Cond.series({"pos": "ret"}, ctx)[day], days=Cond.series({"pos": "days"}, ctx)[day],
-            sells=[(r, Cond.series(r.when, ctx)[day], explain.view(r.when, ctx, day)) for r in self.sells()],
-            next_tranche=None if nt is None else (nt, Cond.series(nt.when, ctx)[day], explain.view(nt.when, ctx, day)))
+            ret=series({"pos": "ret"}, ctx)[day], days=series({"pos": "days"}, ctx)[day],
+            sells=[(r, series(r.when, ctx)[day], explain.view(r.when, ctx, day)) for r in self.sells()],
+            next_tranche=None if nt is None else (nt, series(nt.when, ctx)[day], explain.view(nt.when, ctx, day)))
 
     # ------------------------------------------------------------ 검사기용(구간② — 조건 하나를 이 상품 시세로)
     def evaluate(self, node, manual_as=None, holding=None):
         """조건·값 식 하나의 날짜별 값(이 상품 문맥) — 트리 검사기가 a·b 비교·발화 통계·사례 채점에 쓴다."""
         ctx = self._context(holding, manual_as) if holding is not None else self._series.ctx[manual_as]
-        return Cond.series(node, ctx)
+        return series(node, ctx)
 
     def explain(self, day):
         """등급 동사별 라벨 노드의 그날 값 {동사: [(label, ref, 값)]}(검사기 덤프용)."""
@@ -351,7 +351,7 @@ class ProductJudge:
 
 # ================================================================ 책 하나
 class Judge:
-    """책 하나의 판단자 — 트리 원본(TreeGateway)·시세 원본(Grade.history)을 쓰는 유일한 곳.
+    """책 하나의 판단자 — 트리 원본(TreeGateway)·시세 원본(tradeTool.history)을 쓰는 유일한 곳.
     Judge.open(slug) 으로 열고, prices() 로 시세를 받아(또는 여러 책 공유 조회를 넘겨받아) 판정을 낸다."""
 
     def __init__(self, slug, tree):
@@ -383,13 +383,13 @@ class Judge:
     # ------------------------------------------------------------ 시세
     def prices(self, extra_days=0):
         """이 책이 쓰는 시세(워밍업 포함, extra_days 만큼 더 과거까지)."""
-        return Grade.history_back(self._tree, extra_days)
+        return history_back(self._tree, extra_days)
 
     @staticmethod
     def shared_prices(judges, extra_days=0):
         """여러 책이 같이 쓰는 시세를 한 번에(심볼 합집합 1회 조회) — 라이브 버스의 공유 시세."""
         judges = [j for j in judges if j]
-        return Grade.history_back([j._tree for j in judges], extra_days) if judges else Grade.History({})
+        return history_back([j._tree for j in judges], extra_days) if judges else {}
 
     @staticmethod
     def missing(prices):
@@ -404,10 +404,8 @@ class Judge:
 
     @staticmethod
     def until(prices, day):
-        """시세를 날짜 day(YYYYMMDD) 이하로 자른 새 묶음(분봉은 그대로) — 그날 마감 직후 라이브가 가졌을 시세(패리티 검사)."""
-        t = Grade.History({s: [c for c in (bars or []) if c.date <= day] for s, bars in prices.items()})
-        t.minutes = getattr(prices, "minutes", {})
-        return t
+        """시세를 날짜 day(YYYYMMDD) 이하로 자른 새 묶음 — 그날 마감 직후 라이브가 가졌을 시세(패리티 검사)."""
+        return {s: [c for c in (bars or []) if c.date <= day] for s, bars in prices.items()}
 
     # ------------------------------------------------------------ 상품
     def products(self):
@@ -419,7 +417,7 @@ class Judge:
     def product(self, product, prices, days=None, asof=None, answers=None):
         """상품 하나의 판단자."""
         if not self._tree.has(product):
-            raise Cond.CondError("트리에 없는 상품 %r" % product)
+            raise CondError("트리에 없는 상품 %r" % product)
         return ProductJudge(self._tree, product, prices, days, asof, answers)
 
     # ------------------------------------------------------------ 라이브 · 백테스트
@@ -457,7 +455,7 @@ class Judge:
                 if start is not None and d < start:
                     continue
                 k = pj.grade(i)                    # 워밍업 부족이면 ❔(불완전)로 — incomplete 로 함께 표시
-                pts.append({"date": d, "key": k, "grade": Grade.GRADES[k], "close": close[i], "incomplete": pj.incomplete(i)})
+                pts.append({"date": d, "key": k, "grade": GRADES[k], "close": close[i], "incomplete": pj.incomplete(i)})
             out[p] = (pj, pts)
         return out
 

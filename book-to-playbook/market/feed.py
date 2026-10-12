@@ -33,7 +33,7 @@ class Feed(Bus):
 
 def watch(argv, cycle):
     """장중 주기 재판정(백테스트 제외) — asof=지금 기준으로 N분마다 cycle(한 회차)을 다시 돌린다.
-    장중(tf="1m") 조건은 asof(관측 시점) 이하 마지막 분봉을 본다 — 분봉이 연결되면 살아나고, 그 전엔 None→🟡.
+    분봉(tf="1m"·"5m") 조건은 아직 시세 경로가 없어 모름(None)이다.
 
     --every N 간격(분, 기본 5) · --cycles K 횟수(기본 무한). cycle(rest) = 한 회차 실행(종료코드 반환).
     한 회차가 무엇을 하는지는 호출자(entry.run watch → verdict 모드: 판정·알림·검사)가 준다. 트리거는 Feed.run —

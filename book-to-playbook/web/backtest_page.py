@@ -11,7 +11,7 @@ import sys
 from datetime import datetime
 
 from shared.paths import backtest_json, write_text
-from tree.tradeTool import Grade
+from tree.tradeTool import GRADES
 from judge.judge import NO_EXIT_NOTE, Judge
 from backtest import portfolio
 from backtest.runner import BUY_OR_CONFIRM, HORIZONS, run
@@ -26,7 +26,7 @@ def page_data(slug):
         raise SystemExit("books/%s/tree.json 없음 — 조건 트리가 있어야 한다" % slug)
     prices = book.prices(max(d for _, d in PAGE_PERIODS))
     out = {"slug": slug, "generated": datetime.now().isoformat(timespec="seconds"),
-           "horizons": list(HORIZONS), "grades": list(Grade.GRADES.values()),
+           "horizons": list(HORIZONS), "grades": list(GRADES.values()),
            "buy_or_confirm": BUY_OR_CONFIRM,
            # 매도 정책 "none"(책에 매도 규칙 없음)일 때 화면이 그대로 쓰는 문구 — 정본 judge/judge.NO_EXIT_NOTE.
            "no_exit_note": NO_EXIT_NOTE, "periods": {}}

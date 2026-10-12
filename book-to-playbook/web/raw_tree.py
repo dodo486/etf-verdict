@@ -11,7 +11,7 @@
   식 → 글 규칙(종가·k일 전·모두{}·«이름» 등)은 여기 한 곳."""
 import re
 
-from tree.tradeTool import Cond
+from tree.tradeTool import CondError, META, _op_of, UNKNOWN
 
 PX = {"open": "시가", "high": "고가", "low": "저가", "close": "종가", "volume": "거래량"}
 POS = {"ret": "보유수익률%", "days": "보유일", "maxret": "최고수익%", "minret": "최저수익%",
@@ -24,7 +24,7 @@ def _esc(s):
 
 
 def _num(x):
-    return "?(미명시)" if x == Cond.UNKNOWN else str(x)
+    return "?(미명시)" if x == UNKNOWN else str(x)
 
 
 def _e(n):
@@ -33,11 +33,11 @@ def _e(n):
         return str(n)
     if not isinstance(n, dict):
         return _num(n)
-    if set(n) - set(Cond.META) == {"rule"}:
+    if set(n) - set(META) == {"rule"}:
         return "«%s»" % n["rule"]
     try:
-        op = Cond._op_of(n)
-    except Cond.CondError:
+        op = _op_of(n)
+    except CondError:
         return "(알 수 없는 식 %s)" % ",".join(sorted(n))
     v = n[op]
     if op == "manual":

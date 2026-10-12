@@ -21,8 +21,7 @@
                     asof 는 그날 마감 시점(UTC).
   전 상품 × 창(데이터 있는 최근 WINDOW 거래일) 전부에서 두 경로의 (key, grade) 가 **일치**하는지. 불일치가 하나라도
   있으면 (상품·날짜·백테스트·실시간) 을 전부 나열한다 — 숨기지 않는다.
-  분봉 데이터가 없으면 장중(tf="1m") 조건은 두 경로 모두 모름(None)이다. 따라서
-  **일봉 신호**의 패리티를 증명한다. 분봉이 연결되면 같은 코드가 그 축도 덮는다(asof 를 분봉 범위로 주면 된다).
+  분봉(tf="1m"·"5m") 조건은 시세 경로가 없어 두 경로 모두 모름(None)이다. 따라서 **일봉 신호**의 패리티를 증명한다.
 
 사용:
   python -m backtest.verify_trading                                     # 1·2 (실패 있으면 exit 1)
@@ -35,7 +34,7 @@ from collections import namedtuple
 from datetime import datetime, timedelta, timezone
 
 from shared.paths import BASE, live_slugs, read_text  # (UTF-8 출력 고정 포함)
-from tree.tradeTool import Cond, Grade
+from tree.tradeTool import BUY, GRADES, SELL
 from tree.gateway import Qty, rule, synthetic
 from backtest import trades as trades_mod
 from judge import judge as judge_mod
@@ -67,10 +66,10 @@ def t_trades():
         return trades_mod.build_trades(judge, starts, judge.sells(), None if trs is None else judge.tranches())
 
     def sell(label, when, of, x):
-        return rule(label, Cond.SELL, when, (of, x))
+        return rule(label, SELL, when, (of, x))
 
     def tr(label, x, when=None):
-        return rule(label, Cond.BUY, when, ("budget", x))
+        return rule(label, BUY, when, ("budget", x))
 
     R = {"pos": "ret"}
     # (1) 신호 0일 → 1일 시가 100 진입. 2일 종가 108(+8%) → 1차(처음 30%) 3일 시가 110 매도.
@@ -110,7 +109,7 @@ def t_trades():
     t = bt(tree, hist, cal, [0], [sell("1차", {"ge": [R, 7]}, "bought", 0.3)])[0]
     check(len(t["sells"]) == 1, "규칙 한 번만")
     # (4b) repeat — 조건이 다시 맞을 때마다(거짓 → 참으로 바뀐 날) 또 판다: +8%(참) → 0%(거짓) → +9%(다시 참)
-    t = bt(tree, hist, cal, [0], [rule("반복 축소", Cond.SELL, {"ge": [R, 7]}, ("held", 0.5), repeat=True)])[0]
+    t = bt(tree, hist, cal, [0], [rule("반복 축소", SELL, {"ge": [R, 7]}, ("held", 0.5), repeat=True)])[0]
     check([(x["date"], round(x["qty"], 6)) for x in t["sells"]] == [(cal[2], 0.5), (cal[4], 0.25)],
           "repeat 판다는 다시 참이 된 날마다 %r" % t["sells"])
     # (5) 매도 비율 null(저자 미명시) — 걸려도 팔지 않고 문구로 드러낸다
@@ -165,7 +164,7 @@ def t_trades():
     # 판 비율 — 절반까지만 판다(sold < 0.5): +0%·+1%·+2%·… 매일 참인 30% 매도 repeat 는 판 비율이 0.5 를 넘으면 멈춘다
     rows = [(100, 100), (100, 100), (100, 99), (100, 101), (100, 99), (100, 101), (100, 99), (100, 101), (100, 100)]
     tree, hist, cal = mk(rows)
-    half = rule("절반까지", Cond.SELL, {"all": [{"ge": [R, 1]}, {"lt": [{"pos": "sold"}, 0.5]}]}, ("bought", 0.3), repeat=True)
+    half = rule("절반까지", SELL, {"all": [{"ge": [R, 1]}, {"lt": [{"pos": "sold"}, 0.5]}]}, ("bought", 0.3), repeat=True)
     t = bt(tree, hist, cal, [0], [half])[0]
     check([round(x["qty"], 6) for x in t["sells"]] == [0.3, 0.3], "pos sold 로 '절반까지만' %r" % t["sells"])
     # 분할이 없으면 한 번에 전량(옛 규약과 같은 결과) · 비율이 저자 미명시(null)여도 전량(비율을 지어내지 않는다)
@@ -183,9 +182,9 @@ def t_no_exit():
     today = datetime.now()
     cal = [(today - timedelta(days=60 - k)).strftime("%Y%m%d") for k in range(60)]
     hist = {"X": [Candle(d, 100 + k, 101 + k, 99 + k, 100 + k, 1000) for k, d in enumerate(cal)]}
-    ex = [rule("익절", Cond.SELL, {"ge": [{"pos": "ret"}, 5]}, ("held", 1))]
+    ex = [rule("익절", SELL, {"ge": [{"pos": "ret"}, 5]}, ("held", 1))]
     for exits, pol in (([], "none"), (ex, "book")):
-        book = Judge.of(synthetic(["X"], rule("늘", Cond.BUY, {"all": []}), *exits))   # 매수 신호는 늘 참
+        book = Judge.of(synthetic(["X"], rule("늘", BUY, {"all": []}), *exits))   # 매수 신호는 늘 참
         check(judge_mod.exit_policy(book.product("X", hist).sells()) == pol, "exit_policy %r" % pol)
         res = runner.run("x", 365, prices=hist, book=book)
         t = res["trades"]["X"]
@@ -206,10 +205,10 @@ def t_sizing():
     rows = [(100, 100), (100, 100), (100, 106), (106, 106), (106, 108), (108, 108)]
     cal = ["2021%04d" % i for i in range(len(rows))]
     hist = {"X": [Candle(d, o, max(o, c), min(o, c), c, 1000) for d, (o, c) in zip(cal, rows)]}
-    trs = [rule("1차", Cond.BUY, None, ("budget", 0.25)), rule("2차", Cond.BUY, {"ge": [R, 5]}, ("budget", 0.75))]
+    trs = [rule("1차", BUY, None, ("budget", 0.25)), rule("2차", BUY, {"ge": [R, 5]}, ("budget", 0.75))]
 
     def run(weight):
-        cash = [] if weight is None else [rule("비중", Cond.BUY, None, ("cash", weight))]
+        cash = [] if weight is None else [rule("비중", BUY, None, ("cash", weight))]
         judge = Judge.of(synthetic(["X"], *(cash + trs))).product("X", hist, days=cal)
         tl = trades_mod.build_trades(judge, [0], [], amount=judge.amount)
         return tl[0]["buys"], trades_mod._parity_stats(tl)["size_counts"]
@@ -238,8 +237,8 @@ def t_sizing():
     seen, orig = [], judge_mod.to_units
     trades_mod.to_units = judge_mod.to_units = lambda q, ld: seen.append(q.of) or orig(q, ld)
     try:
-        ex = [rule("반", Cond.SELL, {"ge": [R, 5]}, ("bought", 0.5)), rule("끝", Cond.SELL, {"ge": [R, 5]}, ("held", 1))]
-        judge = Judge.of(synthetic(["X"], rule("비중", Cond.BUY, None, ("cash", 40)), *(trs + ex))).product("X", hist, days=cal)
+        ex = [rule("반", SELL, {"ge": [R, 5]}, ("bought", 0.5)), rule("끝", SELL, {"ge": [R, 5]}, ("held", 1))]
+        judge = Judge.of(synthetic(["X"], rule("비중", BUY, None, ("cash", 40)), *(trs + ex))).product("X", hist, days=cal)
         trades_mod.build_trades(judge, [0], judge.sells(), amount=judge.amount)
     finally:
         trades_mod.to_units = judge_mod.to_units = orig
@@ -285,7 +284,7 @@ def compare(slug, window=WINDOW):
                 continue
             # 실시간 경로: 라이브가 D 마감 직후 봤을 입력(D 이하 이력·그날 마감 asof)으로 Judge.latest.
             key, _close = book.product(p, Judge.until(full, d), asof=_asof_of(d)).latest()
-            live_row = (key, Grade.GRADES[key])
+            live_row = (key, GRADES[key])
             total += 1
             if live_row != bt_row:
                 mismatches.append({"prod": p, "date": d, "bt_key": bt_row[0], "bt_grade": bt_row[1],

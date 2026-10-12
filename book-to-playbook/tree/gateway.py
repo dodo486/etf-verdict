@@ -7,11 +7,11 @@
   나머지(판정 엔진·백테스트·화면)는 여기에 '질문'만 한다. 직접 접근은 entry/verify_rules 주인 표가 막는다.
 
 트리 v3 (규칙 목록)
-  파일은 `rules` 목록(원문 판단 하나 = 규칙 하나, 동사 셋 안 산다·산다·판다 — 정본 Cond.VERBS). 소비자는 동사로 묻는다:
+  파일은 `rules` 목록(원문 판단 하나 = 규칙 하나, 동사 셋 안 산다·산다·판다 — 정본 tradeTool.VERBS). 소비자는 동사로 묻는다:
     · gate(안 산다)·gate(산다) — 그 동사 갈래의 any 묶음(등급용, 포지션 쓰는 갈래 제외)
     · weight — 산다 + qty cash(비중) · tranches — 산다 + qty budget(분할) · sells — 판다
   수량은 트리의 qty {of, x} 를 그대로 Qty(of, x) 로 건넨다("?" → None). 물량 변환은 judge/judge.to_units.
-  `{"rule": "이름"}` 참조는 건네기 전에 **펼친다** — 평가기(Cond)는 평범한 식만 본다.
+  `{"rule": "이름"}` 참조는 건네기 전에 **펼친다** — 평가기(tradeTool)는 평범한 식만 본다.
   트리는 상품을 모르는 공통 로직이다. 상품마다 달라지는 것은 해석기(판단자)가 채운다:
     · 시세 잎 sym = 역할 `$self`(판정 중인 상품) · `$index`(그 상품의 지수 — products 의 index) · 또는 구체 티커(^VIX 등)
     · 규칙·노드 `on` = 저자가 상품을 이름으로 짚은 규칙의 대상 상품 필터(생략 = 전 상품)
@@ -22,10 +22,10 @@ import json
 import os
 from collections import namedtuple
 
-from tree.tradeTool import Cond
+from tree.tradeTool import (
+    BUY, CondError, GATES, labeled_all, META, ROLES, SELL, _uses_pos, validate, VERBS, warmup_of)
 from shared.paths import book_file
 
-BLOCK, BUY, SELL = Cond.BLOCK, Cond.BUY, Cond.SELL
 # 트리 v3 파일 형식(COND_DSL 1·5절) — 여기 밖의 키는 거부한다(옛 양식·오타를 조용히 무시하지 않는다).
 TOP_KEYS = ("version", "products", "rules", "note")
 PRODUCT_KEYS = ("index", "ref", "note")
@@ -112,7 +112,7 @@ class TreeGateway:
     def path(slug, which=None):
         """트리 파일 경로 — which = None(최종 tree.json) · "a"·"b"(추출자 후보). 모르는 이름이면 CondError."""
         if which not in FILES:
-            raise Cond.CondError("모르는 트리 %r (허용 %s)" % (which, " · ".join(str(k) for k in FILES)))
+            raise CondError("모르는 트리 %r (허용 %s)" % (which, " · ".join(str(k) for k in FILES)))
         return book_file(slug, FILES[which])
 
     @classmethod
@@ -147,7 +147,7 @@ class TreeGateway:
         if "pos" in node:                        # 포지션 값 — {"pos": "filled", "rule": 이름} 의 rule 은 참조가 아니라 장부 열쇠
             return dict(node)
         # bare {"rule": "이름"} → 그 규칙의 value(없으면 첫 갈래 when)
-        if "rule" in node and set(node) - set(Cond.META) == {"rule"}:
+        if "rule" in node and set(node) - set(META) == {"rule"}:
             name = node["rule"]
             if name in seen:
                 return {"manual": "연산 없음: 순환 참조 %s" % name}
@@ -164,7 +164,7 @@ class TreeGateway:
                 if node.get("ref") or r.get("ref"):
                     exp["ref"] = node.get("ref") or r.get("ref")
             return exp
-        return {k: (v if k in Cond.META else self._expand(v, seen)) for k, v in node.items()}
+        return {k: (v if k in META else self._expand(v, seen)) for k, v in node.items()}
 
     def _sub_value(self, node, val):
         """갈래의 `"$value"` 를 그 규칙의 value(이미 펼친 노드)로 치환."""
@@ -173,7 +173,7 @@ class TreeGateway:
         if isinstance(node, list):
             return [self._sub_value(x, val) for x in node]
         if isinstance(node, dict):
-            return {k: (v if k in Cond.META else self._sub_value(v, val)) for k, v in node.items()}
+            return {k: (v if k in META else self._sub_value(v, val)) for k, v in node.items()}
         return node
 
     def _x_of(self, r):
@@ -213,31 +213,31 @@ class TreeGateway:
     def validate(self):
         tree = self._d
         if not isinstance(tree, dict):
-            raise Cond.CondError("트리 파일은 객체여야 한다")
+            raise CondError("트리 파일은 객체여야 한다")
         if tree.get("version") != 3:
-            raise Cond.CondError("version 3 트리만 읽는다 (받은 값 %r)" % tree.get("version"))
+            raise CondError("version 3 트리만 읽는다 (받은 값 %r)" % tree.get("version"))
         if not isinstance(tree.get("products"), dict) or not tree["products"]:
-            raise Cond.CondError("products 가 비어 있다")
+            raise CondError("products 가 비어 있다")
         rules = tree.get("rules")
         if not isinstance(rules, list) or not rules:
-            raise Cond.CondError("rules 가 비어 있다")
+            raise CondError("rules 가 비어 있다")
         self._check_shape(tree, rules)
         # 펼친 조건식의 문법만 검사({"rule"} 참조는 이미 펼쳐짐) + $index 를 쓰면 그 상품에 index 가 있어야 한다
         for prod in tree["products"]:
             for _do, label, _ref, node in self.expressions(prod):
-                Cond.validate(node, "%s.%s" % (prod, label or _do))
-                if not self.index(prod) and any(n.get("sym") == "$index" for n in Cond.labeled_all(node)
+                validate(node, "%s.%s" % (prod, label or _do))
+                if not self.index(prod) and any(n.get("sym") == "$index" for n in labeled_all(node)
                                                 if isinstance(n, dict) and "px" in n):
-                    raise Cond.CondError("%s.%s: $index 를 쓰는데 products.%s 에 index 가 없다" % (prod, label or _do, prod))
+                    raise CondError("%s.%s: $index 를 쓰는데 products.%s 에 index 가 없다" % (prod, label or _do, prod))
         return True
 
     @staticmethod
     def _keys(obj, allowed, where):
         if not isinstance(obj, dict):
-            raise Cond.CondError("%s: 객체여야 한다" % where)
+            raise CondError("%s: 객체여야 한다" % where)
         extra = sorted(set(obj) - set(allowed))
         if extra:
-            raise Cond.CondError("%s: 모르는 키 %s (허용 %s)" % (where, extra, " · ".join(allowed)))
+            raise CondError("%s: 모르는 키 %s (허용 %s)" % (where, extra, " · ".join(allowed)))
 
     def _check_shape(self, tree, rules):
         """파일 형식 — 맨 위·상품·규칙·갈래·qty 의 키와 값의 모양."""
@@ -250,40 +250,40 @@ class TreeGateway:
             self._keys(r, RULE_KEYS, "규칙 %r" % (r.get("label") if isinstance(r, dict) else r))
             lab = r.get("label")
             if not (isinstance(lab, str) and lab.strip()):
-                raise Cond.CondError("규칙에 label(이름)이 없다: %r" % sorted(r))
+                raise CondError("규칙에 label(이름)이 없다: %r" % sorted(r))
             if lab in labels:
-                raise Cond.CondError("규칙 label 이 책 안에서 유일하지 않다: %r" % lab)
+                raise CondError("규칙 label 이 책 안에서 유일하지 않다: %r" % lab)
             labels.add(lab)
             if "then" in r and "skip" in r:
-                raise Cond.CondError("규칙 %r: then 과 skip 을 같이 쓸 수 없다" % lab)
+                raise CondError("규칙 %r: then 과 skip 을 같이 쓸 수 없다" % lab)
             if "then" not in r and "skip" not in r and "value" not in r:
-                raise Cond.CondError("규칙 %r: then(행동)·value(이름 조건)·skip(못 옮김) 중 하나가 필요하다" % lab)
+                raise CondError("규칙 %r: then(행동)·value(이름 조건)·skip(못 옮김) 중 하나가 필요하다" % lab)
             if "skip" in r and not (isinstance(r["skip"], str) and r["skip"].strip()):
-                raise Cond.CondError("규칙 %r: skip 사유 문자열이 필요하다" % lab)
+                raise CondError("규칙 %r: skip 사유 문자열이 필요하다" % lab)
             bad_on = [x for x in (r.get("on") or []) if x not in targets]
             if bad_on:
-                raise Cond.CondError("규칙 %r: on 의 %s 가 products 에 없다" % (lab, bad_on))
+                raise CondError("규칙 %r: on 의 %s 가 products 에 없다" % (lab, bad_on))
             if "then" in r and not (isinstance(r["then"], list) and r["then"]):
-                raise Cond.CondError("규칙 %r: then 은 갈래 목록이어야 한다" % lab)
+                raise CondError("규칙 %r: then 은 갈래 목록이어야 한다" % lab)
             if "value" in r:                       # 이름 조건은 참조되지 않아도 문법을 본다
-                Cond.validate(self._expand(r["value"]), "규칙 %r value" % lab)
+                validate(self._expand(r["value"]), "규칙 %r value" % lab)
             for k, t in enumerate(r.get("then") or []):
                 where = "규칙 %r 갈래 %d" % (lab, k)
                 self._keys(t, BRANCH_KEYS, where)
                 do = t.get("do")
-                if do not in Cond.VERBS:
-                    raise Cond.CondError("%s: 모르는 동사 %r (허용 %s)" % (where, do, " · ".join(Cond.VERBS)))
+                if do not in VERBS:
+                    raise CondError("%s: 모르는 동사 %r (허용 %s)" % (where, do, " · ".join(VERBS)))
                 if "when" not in t and not (do == BUY and t.get("qty")):
-                    raise Cond.CondError("%s: when(조건)이 필요하다(조건 없는 갈래는 산다의 비중·1차 분할뿐)" % where)
+                    raise CondError("%s: when(조건)이 필요하다(조건 없는 갈래는 산다의 비중·1차 분할뿐)" % where)
                 if "repeat" in t and (t["repeat"] is not True or do != SELL):
-                    raise Cond.CondError("%s: repeat 은 판다 갈래에 true 로만(산다·안 산다의 반복은 연산 없음)" % where)
+                    raise CondError("%s: repeat 은 판다 갈래에 true 로만(산다·안 산다의 반복은 연산 없음)" % where)
                 q = t.get("qty")
                 if q is not None:
                     self._keys(q, ("of", "x"), where + " qty")
                     if q.get("of") not in QTY_OF.get(do, ()):
-                        raise Cond.CondError("%s: %s 갈래의 qty 종류는 %s (받은 값 %r)"
+                        raise CondError("%s: %s 갈래의 qty 종류는 %s (받은 값 %r)"
                                              % (where, do, " · ".join(QTY_OF.get(do, ())) or "없음", q.get("of")))
-                    Cond.validate(self._x_of(r)(q.get("x")), where + " qty.x")
+                    validate(self._x_of(r)(q.get("x")), where + " qty.x")
 
     # ---------------------------------------------------------------- 책·상품
     def _p(self, prod):
@@ -311,15 +311,15 @@ class TreeGateway:
     def gate(self, prod, do):
         """등급 동사(안 산다·산다)의 갈래 any 묶음 — 갈래 하나라도 참이면 그 동사.
         등급은 포지션 독립이라 pos 쓰는 갈래(분할 2차+·보유 조건)는 뺀다 — 그것은 tranches·sells 가 본다."""
-        if do not in Cond.GATES:
-            raise Cond.CondError("등급 동사가 아님 %r (허용 %s)" % (do, " · ".join(Cond.GATES)))
+        if do not in GATES:
+            raise CondError("등급 동사가 아님 %r (허용 %s)" % (do, " · ".join(GATES)))
         members = []
         for r in self._rules_for(prod):
             for t in r.get("then", []):
                 if t.get("do") != do or "when" not in t:
                     continue
                 w = self._when_of(r, t)
-                if Cond._uses_pos(w):                    # 포지션 조건(분할 2차+)은 등급 밖 — tranches 가 본다
+                if _uses_pos(w):                    # 포지션 조건(분할 2차+)은 등급 밖 — tranches 가 본다
                     continue
                 if isinstance(w, dict):                  # 규칙 이름·소절·공통 여부를 붙여 화면이 '무슨 규칙'인지 보이게
                     w = dict(w, label=r.get("label"), ref=r.get("ref"), allprod=not r.get("on"))
@@ -352,7 +352,7 @@ class TreeGateway:
 
     def expressions(self, prod):
         """상품 하나의 모든 식 [(동사, 라벨, ref, 식)] — 심볼·워밍업·ref 훑기용(등급 묶음은 라벨 None)."""
-        out = [(do, None, None, self.gate(prod, do)) for do in Cond.GATES]
+        out = [(do, None, None, self.gate(prod, do)) for do in GATES]
         for t in self.tranches(prod):
             if t.when is not None:
                 out.append((BUY, t.label, t.ref, t.when))
@@ -364,22 +364,16 @@ class TreeGateway:
         return out
 
     # ---------------------------------------------------------------- 트리 전체 훑기
-    def _all_nodes(self):
-        nodes = []
-        for p in self._d["products"]:
-            nodes.extend(n for _z, _l, _r, n in self.expressions(p))
-        return nodes
-
     def symbols(self, prods=None):
         """트리가 참조하는 실제 심볼 전부 — 상품 · 그 상품의 지수 · 식의 구체 티커($self·$index 는 위 둘로 채워짐)."""
         out = set()
 
         def walk(n):
             if isinstance(n, dict):
-                if "px" in n and n.get("sym") not in Cond.ROLES:
+                if "px" in n and n.get("sym") not in ROLES:
                     out.add(n.get("sym"))
                 for k, x in n.items():
-                    if k not in Cond.META:
+                    if k not in META:
                         walk(x)
             elif isinstance(n, list):
                 for x in n:
@@ -394,31 +388,11 @@ class TreeGateway:
         out.discard(None)
         return out
 
-    def minute_symbols(self):
-        out = set()
-        for node in self._all_nodes():
-            for n in Cond.labeled_all(node):
-                if not (isinstance(n, dict) and "px" in n and n.get("tf") in ("1m", "5m")):
-                    continue
-                s = n.get("sym")
-                if s == "$self":
-                    out.update(self._d["products"])
-                elif s == "$index":
-                    out.update(self.index(p) for p in self._d["products"])
-                else:
-                    out.add(s)
-        out.discard(None)
-        return out
-
-    def timeframes(self):
-        return {n.get("tf", "1d") for node in self._all_nodes() for n in Cond.labeled_all(node)
-                if isinstance(n, dict) and "px" in n}
-
     def warmup(self, prod=None):
         mx = 0
         for p in [prod] if prod is not None else self._d["products"]:
-            for do in Cond.GATES:
-                mx = max(mx, Cond.warmup_of(self.gate(p, do)))
+            for do in GATES:
+                mx = max(mx, warmup_of(self.gate(p, do)))
         return mx
 
     def refs(self):

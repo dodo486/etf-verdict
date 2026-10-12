@@ -9,7 +9,7 @@
 
 출력 계약(알림 · 화면 · /api/verdict 가 소비):
   top     : {slug, title, ts, date, source, cash, verbs[], grades{}, verdicts[], missing{}, positions_note}
-            verbs = 동사 셋(정본 Cond.VERBS — 화면 머리글) · grades = 등급 글자표(정본 Grade.GRADES)
+            verbs = 동사 셋(정본 tradeTool.VERBS — 화면 머리글) · grades = 등급 글자표(정본 tradeTool.GRADES)
   verdict : {prod, index, note, date, close, chg, key, grade, reason,
              gates{안 산다, 산다: view}, opt{..}, pes{..},     등급 동사 둘의 중첩 설명 + 낙관·비관 값
              size{label, ref, weight, weight_range, units, tranches[{label, ref, frac, units, view?}]},   얼마나(산다 qty)
@@ -23,8 +23,7 @@ from datetime import datetime, timedelta, timezone
 
 from shared.paths import book_meta
 from market import md_feed
-from tree.tradeTool import Cond
-from tree.tradeTool import Grade
+from tree.tradeTool import BLOCK, BUY, GRADES, VERBS
 from judge.judge import NO_EXIT_NOTE, Judge, exit_policy, live_units, sell_text
 
 SOURCE = "jhts 시세팀(일봉)"
@@ -42,17 +41,17 @@ def reason_of(key, ex, manual):
     def labels(do, val):
         return [l for l, _, v in ex.get(do, []) if l and v is val]
     if key == "avoid":
-        hit = labels(Cond.BLOCK, True)
-        return "%s: %s" % (Cond.BLOCK, " · ".join(hit[:3]) if hit else "조건 참")
+        hit = labels(BLOCK, True)
+        return "%s: %s" % (BLOCK, " · ".join(hit[:3]) if hit else "조건 참")
     if key == "wait":
-        return "%s 신호 없음 — 관망" % Cond.BUY
+        return "%s 신호 없음 — 관망" % BUY
     if key == "confirm":
-        items = [l for d, l, _ in manual if d == Cond.BUY] + \
-                ["(%s 아님) %s" % (Cond.BLOCK, l) for d, l, _ in manual if d == Cond.BLOCK]
-        return "수동·장중 확인 시 %s: %s" % (Cond.BUY, " · ".join(items[:4]))
+        items = [l for d, l, _ in manual if d == BUY] + \
+                ["(%s 아님) %s" % (BLOCK, l) for d, l, _ in manual if d == BLOCK]
+        return "수동·장중 확인 시 %s: %s" % (BUY, " · ".join(items[:4]))
     if key == "buy":
-        ok = labels(Cond.BUY, True)
-        return "%s: %s" % (Cond.BUY, " · ".join(ok[:3]) if ok else "조건 충족")
+        ok = labels(BUY, True)
+        return "%s: %s" % (BUY, " · ".join(ok[:3]) if ok else "조건 충족")
     return "데이터 부족으로 판정 불가"
 
 
@@ -78,7 +77,7 @@ def product_verdict(judge, d, mine):
     if not d.has_data:
         # 시세가 없어도 체크리스트 '구조'(규칙·조건 항목)는 정적으로 보여준다 — 값은 모름(❔), 지어내지 않는다.
         req = md_feed.requested().get(judge.product, "-")
-        return dict(base, key="unknown", grade=Grade.GRADES["unknown"], date="", close=None, chg=None,
+        return dict(base, key="unknown", grade=GRADES["unknown"], date="", close=None, chg=None,
                     reason="%s 시세 없음(수집 요청 %s) — 아래는 판정 전 체크리스트 구조" % (judge.product, req),
                     gates=judge.static_views(), opt={}, pes={}, **_rule_views(judge))
     reason = reason_of(d.key, d.top, d.manual)
@@ -113,7 +112,7 @@ def _holding_view(hs):
 # ------------------------------------------------------------------ 책 하나
 def render(slug, asof=None, answers=None):
     """asof = 관측 시각(UTC datetime). None 이면 지금 — 장중(tf="1m") 조건을 이 시점 이하로 자른다.
-    answers = 화면에서 사람이 답한 수동 {Cond.answer_key: 참/거짓} — 판단자가 그 답으로 등급·조건 값·금액을 낸다
+    answers = 화면에서 사람이 답한 수동 {tradeTool.answer_key: 참/거짓} — 판단자가 그 답으로 등급·조건 값·금액을 낸다
     (서버 권위 — 화면은 다시 계산하지 않는다). None 이면 답 없는 판정, 주면 top["answers"] 로 되돌려 준다.
 
     판정(Judge.decisions)과 모양 빚기(_format)를 쪼개 둔다 — 라이브 2단 pub-sub(entry/live)에서 신호
@@ -132,9 +131,9 @@ def _format(slug, book, prices, decisions, answers=None):
     top = {"slug": slug, "title": book_title(slug), "ts": now.isoformat(), "source": SOURCE,
            "verdicts": [], "missing": {}, "cash": None,
            # 등급 글자표(키→라벨)를 실어보낸다 — 화면이 따로 복붙하지 않고 이걸 받아 쓴다(단일 출처).
-           "grades": Grade.GRADES,
-           # 동사 셋(화면 머리글·판정 JSON 키) — Cond.VERBS 가 정본이다. 화면은 복붙하지 않고 이걸 받아 쓴다.
-           "verbs": list(Cond.VERBS),
+           "grades": GRADES,
+           # 동사 셋(화면 머리글·판정 JSON 키) — tradeTool.VERBS 가 정본이다. 화면은 복붙하지 않고 이걸 받아 쓴다.
+           "verbs": list(VERBS),
            # 매도 정책 "none"(책에 매도 규칙 없음) 문구 — 정본 judge/judge.NO_EXIT_NOTE(화면이 받아 쓴다).
            "no_exit_note": NO_EXIT_NOTE}
     if book is None:

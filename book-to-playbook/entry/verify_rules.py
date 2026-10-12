@@ -307,9 +307,9 @@ def m_qty_convert(src):
 
 
 def m_gone_ops(src):
-    """어디서든(주인 포함) — 지운 전용 지표 연산(Cond.GONE_OPS: ma·ema·stdev·rsi)을 연산 이름으로 다시 쓰는 자리.
+    """어디서든(주인 포함) — 지운 전용 지표 연산(tradeTool.GONE_OPS: ma·ema·stdev·rsi)을 연산 이름으로 다시 쓰는 자리.
     dict 키·비교·튜플 원소로 쓴 문자열 상수를 본다(조합으로 쓴다 — COND_DSL 6절)."""
-    from tree.tradeTool import Cond
+    from tree.tradeTool import GONE_OPS
     if src.kind != "py":
         return []
     out = []
@@ -322,19 +322,41 @@ def m_gone_ops(src):
         elif isinstance(n, (ast.Tuple, ast.List, ast.Set)):
             keys = n.elts
         out.extend((n.lineno, fn, k.value) for k in keys
-                   if isinstance(k, ast.Constant) and isinstance(k.value, str) and k.value in Cond.GONE_OPS)
+                   if isinstance(k, ast.Constant) and isinstance(k.value, str) and k.value in GONE_OPS)
     return out
 
 
 # 판단자 — 트리 원본·시세 원본·조건 평가를 쓰는 곳은 판단자(judge/judge) 하나와 그 도구(tree)뿐.
 GATEWAY_NAMES = {"TreeGateway"}
-EVAL_ATTRS = {"series", "Ctx", "RuleSeries"}                       # Cond.series·Cond.Ctx·Grade.RuleSeries
-FETCH_ATTRS = {"history", "history_back", "History", "histories", "minutes", "sessions"}   # Grade.·md_feed. 시세 받기
+EVAL_NAMES = {"series", "Ctx", "RuleSeries"}                       # tree.tradeTool 의 평가 이름
+FETCH_NAMES = {"history", "history_back"}                            # tree.tradeTool 의 시세 받기
+FETCH_ATTRS = {"histories", "minutes", "sessions"}                    # md_feed. 시세 받기
 BAR_FIELDS = {"open", "high", "low", "close", "volume"}               # 캔들(시세 원본) 필드
 
 
 def _call_funcs(tree):
     return {id(n.func) for n in ast.walk(tree) if isinstance(n, ast.Call)}
+
+
+def _tradetool_uses(src, names):
+    """tree.tradeTool 의 이름(names) 을 쓰는 자리 [(노드, 함수, 원래 이름)] — `from tree.tradeTool import x [as y]` 로
+    가져와 부르는 y, 또는 `import tree.tradeTool as t` 의 t.x. (import 줄 자체는 세지 않는다 — 쓰는 자리만.)"""
+    local, mods = {}, set()
+    for n in ast.walk(src.tree):
+        if isinstance(n, ast.ImportFrom) and n.module == "tree.tradeTool":
+            local.update({(a.asname or a.name): a.name for a in n.names if a.name in names})
+        elif isinstance(n, ast.ImportFrom) and n.module == "tree" and any(a.name == "tradeTool" for a in n.names):
+            mods.update(a.asname or a.name for a in n.names if a.name == "tradeTool")
+        elif isinstance(n, ast.Import):
+            mods.update(a.asname for a in n.names if a.name == "tree.tradeTool" and a.asname)
+    out = []
+    for n, fn in _py_nodes(src.tree):
+        if isinstance(n, ast.Name) and n.id in local:
+            out.append((n, fn, local[n.id]))
+        elif (isinstance(n, ast.Attribute) and n.attr in names and isinstance(n.value, ast.Name)
+              and n.value.id in mods):
+            out.append((n, fn, n.attr))
+    return out
 
 
 def m_gateway_use(src):
@@ -349,25 +371,23 @@ def m_gateway_use(src):
 
 
 def m_evaluate(src):
-    """조건을 직접 평가하는 자리 — Cond.series·Cond.Ctx·Grade.RuleSeries."""
+    """조건을 직접 평가하는 자리 — tradeTool 의 series·Ctx·RuleSeries."""
     if src.kind != "py":
         return []
-    return [(n.lineno, fn, "%s.%s" % (n.value.id, n.attr)) for n, fn in _py_nodes(src.tree)
-            if isinstance(n, ast.Attribute) and n.attr in EVAL_ATTRS and isinstance(n.value, ast.Name)
-            and n.value.id in ("Cond", "Grade")]
+    return [(n.lineno, fn, name) for n, fn, name in _tradetool_uses(src, EVAL_NAMES)]
 
 
 def m_raw_prices(src):
-    """시세 원본을 만지는 자리 — 시세 받기(Grade.history…·md_feed.histories…)와 캔들 필드(.open·.close…) 읽기.
+    """시세 원본을 만지는 자리 — 시세 받기(tradeTool.history…·md_feed.histories…)와 캔들 필드(.open·.close…) 읽기.
     (메서드 호출 f.close() 처럼 호출되는 속성은 뺀다.)"""
     if src.kind != "py":
         return []
     calls = _call_funcs(src.tree)
-    out = []
+    out = [(n.lineno, fn, name) for n, fn, name in _tradetool_uses(src, FETCH_NAMES)]
     for n, fn in _py_nodes(src.tree):
         if not isinstance(n, ast.Attribute) or not isinstance(n.ctx, ast.Load):
             continue
-        if n.attr in FETCH_ATTRS and isinstance(n.value, ast.Name) and n.value.id in ("Grade", "md_feed"):
+        if n.attr in FETCH_ATTRS and isinstance(n.value, ast.Name) and n.value.id == "md_feed":
             out.append((n.lineno, fn, "%s.%s" % (n.value.id, n.attr)))
         elif n.attr in BAR_FIELDS and id(n) not in calls:
             out.append((n.lineno, fn, "." + n.attr))
@@ -375,9 +395,9 @@ def m_raw_prices(src):
 
 
 def _labels():
-    """동사·등급 이름표 글자 — 정본(Cond.VERBS · Grade.GRADES)에서 읽는다(여기 다시 적지 않는다)."""
-    from tree.tradeTool import Cond, Grade
-    return set(Cond.VERBS) | set(Grade.GRADES.values())
+    """동사·등급 이름표 글자 — 정본(tradeTool.VERBS · GRADES)에서 읽는다(여기 다시 적지 않는다)."""
+    from tree.tradeTool import GRADES, VERBS
+    return set(VERBS) | set(GRADES.values())
 
 
 def m_labels(src):
@@ -458,7 +478,7 @@ OWNERS = [
                 ("authoring/transcribe/book_source.py", None): (None, "원문 파일 읽기(시세 아님)")}),
     dict(concept="지운 연산", owners=(), match=lambda src: [], everywhere=m_gone_ops,
          why="전용 연산(ma·ema·stdev·rsi·pct·count·streak·across)은 지웠다 — 기본 부품(sum·lag·case·atleast…) 조합으로 쓴다. "
-             "정본 목록 Cond.GONE_OPS",
+             "정본 목록 tradeTool.GONE_OPS",
          hint="COND_DSL 6절 조합 예시로(평균 = sum ÷ n · 여러 종목 중 N개 = atleast·of)",
          allow={("tree/tradeTool.py", None): (None, "지운 연산 목록 정본(GONE_OPS)"),
                 ("tree/verify_primitives.py", "t_syntax"): ({"ma", "across"}, "지운 연산이 문법에서 거부되는지 보는 자리"),
@@ -467,11 +487,11 @@ OWNERS = [
          why="소절 키를 알아보는 정규식은 shared/sections 하나 — 전사(원문 인덱스)와 화면(원문 탭)이 같은 키를 본다",
          hint="shared.sections 의 KEY·MARK_*·PB_HEAD·marks 로", allow={}),
     dict(concept="동사·등급 이름표", owners=("tree/tradeTool.py",), match=m_labels,
-         why="Cond.VERBS(안 산다·산다·판다) · Grade.GRADES · grade_rules.json 이 정본 — 화면은 판정 JSON(verbs·grades)으로 받는다",
-         hint="파이썬은 Cond.BLOCK·BUY·SELL·VERBS, 화면은 판정 JSON 의 verbs·grades 로", allow={}),
+         why="tradeTool.VERBS(안 산다·산다·판다) · GRADES · grade_rules.json 이 정본 — 화면은 판정 JSON(verbs·grades)으로 받는다",
+         hint="파이썬은 tradeTool 의 BLOCK·BUY·SELL·VERBS, 화면은 판정 JSON 의 verbs·grades 로", allow={}),
     dict(concept="등급 사다리", owners=("tree/tradeTool.py",), match=m_grade_ladder,
-         why="날짜별 등급을 내는 곳은 Grade 하나 — 두 벌이면 엔진과 화면 등급이 갈라진다",
-         hint="판정 JSON 의 key 를 그대로(수동 답은 POST /api/verdict — 서버가 Cond.Ctx answers 로 낸다)", allow={}),
+         why="날짜별 등급을 내는 곳은 tradeTool.RuleSeries.grade_key 하나 — 두 벌이면 엔진과 화면 등급이 갈라진다",
+         hint="판정 JSON 의 key 를 그대로(수동 답은 POST /api/verdict — 서버가 tradeTool.Ctx answers 로 낸다)", allow={}),
 ]
 SELF = "entry/verify_rules.py"      # 표 자신(금지 표식 목록을 들고 있다) — 표식 검사에서 뺀다
 

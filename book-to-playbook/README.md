@@ -52,7 +52,7 @@
 ```
 python -m entry.run daily        # 판정 → 백테스트 탭 데이터 (검사는 돌지 않는다)
 python -m entry.run check [--parity]   # 검사 전부(CHECKS) — 무언가 바꿨을 때(커밋 전). 요약 + 종료코드
-python -m entry.run watch [--every N] # asof=지금 기준 N분(기본 5)마다 재판정(백테스트 제외) — 장중 조건은 분봉이 연결되면 살아난다
+python -m entry.run watch [--every N] # asof=지금 기준 N분(기본 5)마다 재판정(백테스트 제외) — 분봉(tf 1m·5m) 조건은 아직 모름(None)
 python -m web.verdict_view <slug> [--json] [--no-send]       # 오늘 판정(판정 JSON·알림)
 python -m backtest.runner <slug> [--days 365]   # 백테스트(로그·JSON)
 python -m web.backtest_page <slug>                            # 책 페이지 '백테스트' 탭 데이터
@@ -82,7 +82,7 @@ python -m entry.serve                                           # 로컬 실시�
 | `authoring/extract/compare.py` | 심판 비교 도구(a·b 덤프) · '같은 뜻' 잣대(채점기도 이것으로) |
 | 각 층의 `verify_*.py` | 검사 — 검사하는 대상 옆에 둔다(`tree/verify_primitives` · `judge/verify_view` · `backtest/verify_trading` · `web/verify_page` · `entry/verify_rules` 등). 전부 한 번에 `python -m entry.run check` |
 | `web/ui/*.js` · `web/inject_ui.py` | 화면 JS(책 무관 공유) · 페이지 주입 |
-| `tree/gateway.py` · `tradeTool.py` | 구간② 공개 DSL — 트리 출입구 · Cond(문법·평가기) · Grade(등급의 뜻 — 등급·금액·비중·워밍업·시세 조달) |
+| `tree/gateway.py` · `tradeTool.py` | 구간② 공개 DSL — 트리 출입구 · 문법·평가기(validate·series) · 등급의 뜻(RuleSeries — 등급·금액·비중·워밍업) · 시세 조달(history) |
 | `judge/judge.py` · `entry/live.py` · `backtest/{trades,portfolio,runner}.py` · `entry/notify.py{telegram,desktop}.py` | ① 신호(판단자 Judge · 라이브 버스 조립) · ② 백테스트 소비(체결·vectorbt 돈·러너) · ② 알림 소비 |
 | `market/md_feed.py` | **jhts 시세 창구 — 유일한 수집 입구**(없으면 수집 요청) |
 | `web/verdict_view.py` · `entry/notify.py{telegram,desktop}.py` | 판정 JSON·알림 문장(books.json engine.daily) · 알림 송신(텔레그램·데스크톱) |

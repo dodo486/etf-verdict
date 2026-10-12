@@ -1,12 +1,102 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""조건 트리 DSL 평가 한 파일 — Cond(문법·평가) · Grade(등급·금액·수집).
+"""조건 트리 DSL 평가 한 파일 — 문법·평가(앞 절) · 등급·금액·수집(뒤 절). 공개 이름은 모듈 수준 정의 그대로
+(from tree.tradeTool import series, Ctx, RuleSeries …). 공통 직렬화: python -m tree.tradeTool fmt <파일...>
 
-Cond  = 규칙의 단일 문법과 평가기(책 무관). 호출: Cond.series(node, ctx) 등.
-Grade = 날짜별 등급·금액·비중 + 시세 조달. 호출: Grade.RuleSeries(...) · Grade.history_back(...).
+■ 조건 트리 — 규칙의 단일 문법과 그 평가기 (책 무관)
 
-두 클래스는 아래 모듈 수준 정의를 묶는 '공개 얼굴'이다. 내부끼리는 모듈 이름으로 부른다.
-공개 DSL 은 이 두 클래스뿐. 공통 직렬화: python -m tree.tradeTool fmt <파일...>
+왜 있나
+  옛 판정식은 type 마다 손으로 짠 계산기(16종)였다. 새 조건마다 코드가 늘었고, 이름과
+  계산이 다른 계산기(전고점 '유지'가 실은 연속 신고가, '눌림 일수'에 반등일 포함)와
+  한 필드의 두 뜻(op 가 방향 표시이자 비교 연산자)이 조용히 틀린 판정을 냈다.
+  또 규칙 형식이 평평해서(조건 목록 + need 숫자) 원문 구조(택1·N개 중 M개·
+  필수 조건)를 못 담았다. 이 파일은 둘 다를 없앤다:
+    · 계산은 원시 시계열 연산 몇 개의 조합뿐 — 새 조건은 코드가 아니라 트리로 쓴다.
+    · 구조는 all / any / atleast / not 로 그대로 적는다.
+
+값
+  모든 식은 '날짜별 시계열'(달력 길이의 리스트)이다. 숫자 시계열은 float|None,
+  조건 시계열은 True|False|None. None = 데이터가 없어 모름 — 조용히 거짓으로 치지 않는다.
+  모든 연산은 인과적이다(그날까지의 값만 쓴다) — tree.verify_primitives 가 강제한다.
+
+관측 시점(asof)
+  평가는 '사용자가 보는 그 순간(asof)' 기준이다. asof = 관측 시각(UTC datetime) — 라이브는 실제 지금
+  또는 지정 시각, 백테스트는 재생되는 각 시점. 일봉 필드는 asof 이하 마지막 확정 일봉을 본다.
+  일봉 아닌 봉(tf "1m"·"5m")은 아직 시세 경로가 없어 None(모름) — 조용히 거짓으로 치지 않는다.
+
+3값 논리
+  all : 하나라도 False → False, 아니면 하나라도 None → None, 아니면 True (빈 all = True)
+  any : 하나라도 True → True, 아니면 하나라도 None → None, 아니면 False (빈 any = False)
+  atleast n : True 개수 ≥ n → True, True+None < n → False, 그 외 None
+  not : True↔False, None 은 None
+
+하한(AtLeast)
+  barssince 가 모르는 날(또는 데이터 시작)에 닿으면 정확한 길이는 모르지만 '최소 N'은 안다.
+  그 값은 AtLeast(N) 로 담기고, 비교는 하한만으로 결론이 나면 참/거짓(예: 최소 50일 ≥ 3 → 참),
+  아니면 None 이다. 덧셈·뺄셈(상수)은 하한을 유지하고, 그 밖의 연산(창·곱·나눗셈)에선 None 이 된다.
+
+수동(manual)
+  {"manual": "사유"} 는 식으로 쓸 수 없는 조건(순수 주관·데이터 없음·연산 없음). 값은 평가 시 manual_as 로
+  주어진다(엔진이 '확인되면/안 되면' 두 번 평가해 '확인 대기'를 가린다). 데이터 None 과 다르다.
+  극성: not 아래의 수동은 반대 값을 받는다(manual_as=True 는 '수동이 전부 구역에 유리하게 풀림'
+  이라는 뜻 — '겹치면 쉼' = not(all(.., 수동)) 에서 낙관 평가가 오히려 겹침을 가정하던 버그를 막는다).
+  사람이 답한 수동(Ctx answers — 조건별 답 맵)은 그 답이 manual_as 보다 먼저다. 답은 잎의 참/거짓 그 자체라
+  not 아래에서도 뒤집지 않는다(not 이 그 값을 뒤집을 뿐). 답 열쇠 = answer_key — 상품 + "|" + manual_key(잎).
+
+모르는 값 "?"
+  저자가 숫자(기준·기간·개수)를 안 준 조건도 식으로 적는다 — 모르는 숫자 자리만 "?" 로 둔다.
+    "SOXL 이 5일선에서 너무 벌어짐" → {"ge": [(SOXL ÷ MA5(SOXL) − 1)×100, "?"]}
+  "?" 를 품은 판단 노드(비교의 양쪽 식 어디든 "?", 또는 atleast 의 n 이 "?")는 수동처럼 사람이 참/거짓을 정한다
+  (manual_as·극성 규칙 그대로). 화면은 비교의 알려진 쪽 값을 근거 숫자로 보여준다. 식이 조건의 신원이라
+  같은 식이면 같은 조건이다(문장·이름과 무관). 수치로 정할 수 없는 순수 주관만 {"manual": "저자 미명시: …(정성)"}.
+
+문법 (JSON) — 허용 키 밖은 전부 오류(조용히 무시하지 않는다):
+  숫자          3, 1.5            (상수)   "?" = 저자가 안 준 숫자(모르는 값) — 숫자가 들어갈 자리 어디든
+  시세          {"px": "close"|"open"|"high"|"low"|"volume", "sym": 티커, "tf": 봉?}   sym = 구체 티커(필수 —
+                상품 자신이면 그 티커, 지수면 지수 티커. $ 심볼 없음),
+                tf 기본 "1d"(일봉 — asof 이하 '확정(settled)' 일봉; 장중 asof 면 아직 마감 안 된 그날 일봉은
+                None, 즉 전일 종가까지만 본다). tf "1m"·"5m"(분봉)은 적을 수 있지만 시세 경로가 없어
+                값은 모름(None).
+  산술          {"add"|"sub"|"mul"|"div"|"max"|"min": [a, b]}   max/min = 같은 날 두 값 중 큰/작은 값
+                {"abs": a}
+  선택          {"case": [[c1, v1], [c2, v2], ...], "else": v}   위에서부터 처음 참인 c 의 v.
+                앞의 c 가 모름(None)이면 결과도 모름(뒤 갈래로 넘어가지 않는다).
+  이동/창       {"highest"|"lowest"|"sum": [s, n]}   (평균 = sum ÷ n — 전용 지표 연산은 두지 않는다)
+                {"lag": [s, k]}   k 거래일 전 값   (변화율 % = (s ÷ lag(s,k) − 1) × 100)
+  비교          {"gt"|"ge"|"lt"|"le": [a, b]}
+  논리          {"all": [...]}, {"any": [...]}, {"atleast": n, "of": [...]}, {"not": c}
+  시간          {"barssince": c}        c 가 마지막으로 참이었던 날부터 지난 거래일(오늘 참이면 0)
+                                        (연속 참 일수 = barssince(not c) · 최근 n일 중 참인 날 수 = sum(case(c,1,0), n))
+                {"valuewhen": [c, s]}   c 가 마지막으로 참이었던 날의 s 값
+                {"minsince"|"maxsince": [c, s]}  c 가 마지막으로 참이었던 날부터 오늘까지 s 의 최저/최고
+  수동          {"manual": "사유"}
+  포지션        {"pos": "ret"|"days"|"maxret"|"minret"|"filled"|"sold"}   판다·2차 이후 분할(산다) 갈래 안에서만.
+                ret = 평균 매입가 대비 오늘 종가 수익률(%), days = 첫 매수일부터 지난 봉(첫 매수일 0),
+                maxret/minret = 첫 매수일~오늘 종가 수익률의 최고/최저. 매수 전 날은 None.
+                filled = 산 횟수({"pos": "filled", "rule": "1차"} = 그 규칙으로 산 횟수, rule 없으면 전체) ·
+                sold = 지금까지 판 비율(판 물량 ÷ 산 물량). 둘은 체결 장부가 있어야 안다(없으면 모름).
+  메타(아무 노드에) "label", "ref", "id", "note", "on"(노드 레벨 대상 상품 — 그 밖의 상품에선 항상 참)
+
+종목 모델: 규칙·노드가 어느 상품에 판정을 내나 = on · 시세 잎이 읽는 티커 = sym. 둘뿐이다
+  ("여러 종목 중 N개" = {"atleast": N, "of": [종목별 비교 …]}, 각 잎 sym = 그 티커).
+
+■ 등급 — 등급의 뜻(구간② DSL) — 조건 트리(books/<slug>/tree.json) → 날짜별 등급·금액·비중 (책 무관). 트리의 '뜻'은 여기 한 벌뿐이다.
+
+등급 (동사 둘 — 사다리는 grade_rules.json):
+  안 산다 갈래 하나라도 참 → ⛔ 안 산다 · 산다 갈래 하나라도 참 → ✅ 산다 · 둘 다 아님 → ⚪ 관망
+수동(manual) 조건은 '확인됨/안 됨' 두 번 평가한다:
+  안 돼도 산다(비관) → ✅ · 확인돼야 산다(낙관만) → 🟡 확인 대기 · 데이터 부족으로 못 정함 → ❔ 판정 불가
+  비관 = 산다의 수동은 거짓, 안 산다의 수동은 참 / 낙관 = 그 반대(BUY_SIDE).
+얼마나·판다:
+  weight   산다 qty cash = 총 투자금 대비 비중(%) · tranches = 산다 qty budget 분할(2차 이후는 포지션 값으로)
+  sells    판다 — 보유분이 있을 때만 평가(구간③ trading)
+
+판정은 봉이 끝난 직후(그날까지의 봉)로 낸다 — cond 연산이 전부 인과적이라 전체 이력을 한 번 계산해
+날짜로 꺼내도 미래를 보지 않는다(tree.verify_primitives 가 강제).
+
+트리는 원본 dict 가 아니라 TreeGateway(tree/gateway.py — 트리를 읽는 유일한 출입구)로 받는다.
+같은 뜻을 만드는 쪽(authoring.extract.verify_tree 의 사례·authoring.extract.compare 의 a/b 비교)과 읽는 쪽(구간③ 판정·백테스트)이 함께 쓴다 — 화면용 설명(view·
+측정 증거)은 판단자(judge/judge·explain)가 이 평가 문맥으로 빚는다 — 화면은 그리기만.
 """
 import json
 import math
@@ -24,9 +114,8 @@ UNKNOWN_REASON = "저자 미명시: 기준 숫자를 주지 않음(식의 ? 자�
 PX_FIELDS = ("open", "high", "low", "close", "volume")
 POS_FIELDS = ("ret", "days", "maxret", "minret", "filled", "sold")
 ARITH = ("add", "sub", "mul", "div", "max", "min")
-TIMEFRAMES = ("1d", "1m", "5m")  # 봉 길이 — asof 축에서 자른다. 일봉은 확정(settled) 일봉, 분봉은 asof 이하
-                           # 마지막 분봉, 5분봉은 1분봉을 세션 안에서 5분 OHLC 로 집계한 뒤 asof 이하 마지막.
-                           # 데이터가 없으면 None(모름).
+TIMEFRAMES = ("1d", "1m", "5m")  # 봉 길이(문법) — 평가하는 건 일봉(확정 settled 일봉)뿐. 1m·5m 는 트리에 적을 수 있지만
+                                 # 아직 시세 경로가 없어 값은 전부 None(모름) — 시세 저장소가 생기면 거기서 채운다.
 WINDOW = ("highest", "lowest", "sum")   # 창(n거래일) 집계 — 평균 등 지표는 전용 연산 없이 조합(COND_DSL 6절)
 GONE_OPS = ("ma", "ema", "stdev", "rsi", "pct", "count", "streak", "across")   # 지운 전용 연산 — 조합으로 쓴다(across → atleast·of · entry.verify_rules 주인 표가 되살림을 막는다)
 CMP = ("gt", "ge", "lt", "le")
@@ -218,14 +307,14 @@ class Ctx:
         """self_sym = 평가 중인 상품($self) · index_sym = 그 상품의 지수($index, 없으면 None).
         pos = (첫 매수일 인덱스, 평균 매입가 | 날짜별 평균 매입가 목록[, 장부]) — 판다·분할 갈래 평가 때만.
         장부 = {"filled": {규칙 이름 | None(전체): 날짜별 산 횟수}, "sold": 날짜별 판 비율} — 없으면 filled·sold 는 모름.
-        asof = 관측 시각(UTC datetime) — 분봉(tf="1m"/"5m") 필드를 이 시각 이하로 자른다. None 이면 실제 지금.
+        asof = 관측 시각(UTC datetime) — 일봉 확정(settled) 경계를 정한다. None 이면 실제 지금.
         session_close = {심볼: {YYYYMMDD: 그날 정규장 마감(UTC datetime, tz-aware)}} — 일봉 확정(settled) 경계.
           거래소 캘린더(md_feed.sessions)에서 캐려 밖(cond)에서 넣는다(평가기는 jhts 를 모른다). 장중 asof 에서
           '마감이 asof 이후'인 일봉은 아직 미확정이므로 None 으로 가린다(look-ahead 0). asof=None 이거나 캘린더가
           비면(미설치·조회 실패) 아무것도 가리지 않는다 — 없는 캘린더가 조용히 일봉을 전부 지우지 않게.
         answers = {answer_key: True|False} — 사람이 답한 수동(없는 열쇠는 manual_as). None 이면 옛 동작 그대로."""
         self.pos = pos
-        self.asof = asof          # 관측 시각(UTC datetime) — 분봉 조회를 이 시각 이하로 자른다. None 이면 실제 지금
+        self.asof = asof          # 관측 시각(UTC datetime) — 일봉 확정 경계. None 이면 실제 지금
         self.hist = hist
         self.cal = list(cal)
         self.self_sym = self_sym
@@ -269,9 +358,7 @@ class Ctx:
 
     def px(self, sym, field, tf="1d"):
         """심볼·필드의 asof 축 시계열(달력 길이). 일봉(tf="1d")은 날짜별 '확정(settled)' 일봉(장중 asof 면 아직
-        마감 안 된 그날 일봉은 None 으로 가림 — look-ahead 0), 분봉(tf="1m")은 그날 asof 이하 마지막 분봉 값,
-        5분봉(tf="5m")은 세션 안 1분봉→5분 OHLC 집계의 그날 asof 이하 마지막 5분봉 값
-        (분봉/5분봉 데이터가 없으면 전부 None — 모름)."""
+        마감 안 된 그날 일봉은 None 으로 가림 — look-ahead 0). 일봉이 아닌 봉(1m·5m)은 시세 경로가 없어 전부 None(모름)."""
         key = (sym, field, tf)
         if key not in self._px:
             if tf == "1d":
@@ -280,10 +367,7 @@ class Ctx:
                 self._px[key] = [by.get(d) if (settled is None or d in settled) else None
                                  for d in self.cal]
             else:
-                mins = getattr(self.hist, "minutes", {}).get(sym) or {}
-                if tf == "5m":
-                    mins = aggregate_5m(mins)
-                self._px[key] = minute_series(mins, self.cal, field, self.asof)
+                self._px[key] = [None] * len(self.cal)
         return self._px[key]
 
     def _settled_dates(self, sym):
@@ -318,61 +402,6 @@ class Ctx:
                     m.append(last)          # cal[i] 이하 마지막 확정 index(없으면 None)
                 self._smap[sym] = m
         return self._smap[sym]
-
-
-# ------------------------------------------------------------------ 분봉(asof 축)
-def minute_series(minutes, cal, field, asof=None):
-    """날짜별 'asof 이하 마지막 분봉'의 필드 값. minutes = {YYYYMMDDHHMM(UTC): {open,high,low,close,volume} 또는 종가}.
-    분봉 데이터가 asof 이하 그날 범위에 없으면 None(모름).
-    분봉 다축 달력(그날의 분봉 구간)은 후속 범위다 — 데이터가 연결되면 여기만 채운다.
-
-    계산: asof 이하 분봉 키를 한 번만 오름차순으로 훑어 '날짜 → 그날 마지막(가장 늦은) 키' 인덱스를 만들고
-    (덮어쓰기), 날짜별로 그 키의 값을 꺼낸다. 날짜마다 전체 분봉을 되훑던 옛 O(cal×분봉) 루프를
-    O(분봉+cal)로 바꾼 것 — 고르는 분봉이 같아 값은 완전히 동일하다. 'last key 의 값'을 그대로 쓴다
-    (None 이어도): pandas groupby.last() 는 결측(None)을 건너뛰어 '마지막 봉이 None'인 경우 다른 값을 내므로
-    쓰지 않는다(의미가 조용히 달라지는 걸 막는다)."""
-    import datetime as _dt
-    asof = asof or _dt.datetime.now(_dt.timezone.utc)
-    hi = asof.astimezone(_dt.timezone.utc).strftime("%Y%m%d%H%M")
-    last_key = {}
-    for k in sorted(k for k in minutes if k <= hi):     # 오름차순 → 덮어쓰기로 날짜별 '마지막' 키만 남음
-        last_key[k[:8]] = k
-    out = []
-    for d in cal:
-        k = last_key.get(d)
-        if k is None:
-            out.append(None)
-            continue
-        bar = minutes[k]
-        val = bar if not isinstance(bar, dict) else bar.get(field)
-        out.append(None if val is None else float(val))
-    return out
-
-
-def aggregate_5m(minutes):
-    """1분봉 OHLCV {YYYYMMDDHHMM(UTC): {open,high,low,close,volume} 또는 종가} → 5분봉 {5분 시작키: {OHLCV}}.
-    5분 버킷은 '같은 날·같은 시(HH)·분을 5로 내림'(09:30·09:35…)으로 묶어 세션 경계를 넘지 않는다
-    (버킷 키가 YYYYMMDDHH 를 포함하므로 다른 날·다른 세션의 분봉은 절대 한 버킷에 섞이지 않는다).
-    OHLC = 버킷 안 (첫 open, 최고 high, 최저 low, 끝 close), volume = 합. 스칼라 종가만 있으면 O=H=L=C=종가,
-    volume=0. 각 필드가 모두 없는 봉은 건너뛴다(가짜로 채우지 않는다)."""
-    buckets = {}                 # 5분 시작키(YYYYMMDDHHmm, mm=5의 배수) → [(분키, 봉dict), ...] 시간순
-    for k in sorted(minutes):
-        mm = int(k[10:12])
-        bkey = k[:10] + "%02d" % (mm - mm % 5)     # 같은 날·시 + 분 5내림 (세션/날 경계 안 넘음)
-        bar = minutes[k]
-        if not isinstance(bar, dict):
-            bar = {"open": bar, "high": bar, "low": bar, "close": bar, "volume": 0.0}
-        buckets.setdefault(bkey, []).append(bar)
-    out = {}
-    for bkey, bars in buckets.items():
-        o = next((b.get("open") for b in bars if b.get("open") is not None), None)
-        c = next((b.get("close") for b in reversed(bars) if b.get("close") is not None), None)
-        highs = [b.get("high") for b in bars if b.get("high") is not None]
-        lows = [b.get("low") for b in bars if b.get("low") is not None]
-        vols = [b.get("volume") for b in bars if b.get("volume") is not None]
-        out[bkey] = {"open": o, "high": max(highs) if highs else None, "low": min(lows) if lows else None,
-                     "close": c, "volume": sum(vols) if vols else None}
-    return out
 
 
 def _num(x):
@@ -430,7 +459,7 @@ def _or3(vals):
 
 
 # 일봉축 조회(asof 이하 마지막 확정봉) 대상이 아닌 잎 — 하나라도 있으면 그 식은 '1d-순수'가 아니다.
-#   · 분봉/5분봉 px(tf 1m/5m) : asof 이하 '살아 있는' 축(오늘 재생) — 일봉 확정 경계로 당기면 안 된다.
+#   · 일봉 아닌 px(tf 1m/5m)  : 일봉 확정 경계로 당기면 안 된다(값은 지금 전부 None — 모름).
 #   · manual/pos              : 일봉 봉이 아닌 값(수동·포지션).
 _NON_DAILY = ("manual", "pos")
 
@@ -774,7 +803,7 @@ def warmup_of(node):
       3값 논리로 위에 전파돼 '모름'이 된다 — 데이터가 모자란 줄 모르고 ✅/🚫 확신을 내는 길목이다.
       시세가 rate-limit 로 잘려(워밍업 부족) 들어오면 바로 이 일이 난다(실제 발견된 버그).
       이 함수가 트리에서 '필요한 확정 봉 수'를 직접 뽑아, 그보다 짧은 구간의 1d 신호를 '불완전'으로
-      표면화하는 가드(Grade)의 임계값이 된다 — WARMUP_DAYS(fetch 버퍼)와 무관하다.
+      표면화하는 가드(RuleSeries.incomplete)의 임계값이 된다 — WARMUP_DAYS(fetch 버퍼)와 무관하다.
 
     어떻게 세나 (연산마다 '그날 값이 서려면 그 앞에 몇 봉이 더 있어야 하나'를 더해 가장 깊은 사슬)
       · 창(highest/lowest/sum) n             : n-1 + 안쪽
@@ -841,22 +870,13 @@ GRADE_RULES = json.load(
 WARMUP_DAYS = 500
 
 
-class History(dict):
-    """{심볼: 일봉} + minutes{심볼: 분봉}. 장중(tf="1m") 값은 asof 축에서 분봉을 잘라 읽는다(minute_series)."""
-    minutes = {}
-
-
 def history(trees, start):
-    """트리(들 — TreeGateway)가 쓰는 모든 심볼의 일봉(+ 장중(tf="1m") 값에 쓰는 심볼의 분봉) — 수집 단계(md_feed)
-    하나로 받는다. jhts 는 md_feed 에서만 만진다(팀 경계). 분봉이 연결되기 전에는 minutes 가 비어 있고
-    장중 조건은 모름(None)이다."""
-    syms, msyms = set(), set()
+    """트리(들 — TreeGateway)가 쓰는 모든 심볼의 일봉 {심볼: 일봉} — 수집 단계(md_feed) 하나로 받는다.
+    jhts 는 md_feed 에서만 만진다(팀 경계). 일봉 아닌 봉(tf 1m·5m)은 받지 않는다 — 그 조건은 모름(None)."""
+    syms = set()
     for t in trees if isinstance(trees, list) else [trees]:
         syms |= t.symbols()
-        msyms |= t.minute_symbols()
-    h = History(md_feed.histories(syms, start))
-    h.minutes = {s: md_feed.minutes(s) for s in sorted(msyms)}
-    return h
+    return md_feed.histories(syms, start)
 
 
 def history_back(trees, extra_days=0):
@@ -895,7 +915,7 @@ class RuleSeries:
     """한 상품의 등급 동사(안 산다·산다)·비중을 전체 달력에 대해 한 번 계산해 둔다."""
 
     def __init__(self, tree, product, prices, days, asof=None, answers=None):
-        """tree = 트리 출입구(TreeGateway) · product = 판정할 상품 — 그 상품의 규칙을 골라 평가한다. asof = 관측 시각(UTC datetime) — 장중(tf="1m"/"5m") 조건을 이 시점 이하로 자르고, 일봉은 asof 이하
+        """tree = 트리 출입구(TreeGateway) · product = 판정할 상품 — 그 상품의 규칙을 골라 평가한다. asof = 관측 시각(UTC datetime) — 일봉은 asof 이하
         확정(settled) 봉만 본다(미확정 그날 일봉은 None). None 이면 실제 지금(일봉은 마지막 확정봉).
         answers = 사람이 답한 수동 {answer_key: 참/거짓} — 등급·금액·비중이 그 답으로 풀린다(서버 권위).
         None 이면 옛 동작 그대로."""
@@ -992,166 +1012,6 @@ def _top_labeled(node):
     for k in kids:
         out.extend(_top_labeled(k))
     return out
-
-# ================= 공개 얼굴 =================
-class Cond:
-    """조건 트리 — 규칙의 단일 문법과 그 평가기 (책 무관).
-
-왜 있나
-  옛 판정식은 type 마다 손으로 짠 계산기(16종)였다. 새 조건마다 코드가 늘었고, 이름과
-  계산이 다른 계산기(전고점 '유지'가 실은 연속 신고가, '눌림 일수'에 반등일 포함)와
-  한 필드의 두 뜻(op 가 방향 표시이자 비교 연산자)이 조용히 틀린 판정을 냈다.
-  또 규칙 형식이 평평해서(조건 목록 + need 숫자) 원문 구조(택1·N개 중 M개·
-  필수 조건)를 못 담았다. 이 파일은 둘 다를 없앤다:
-    · 계산은 원시 시계열 연산 몇 개의 조합뿐 — 새 조건은 코드가 아니라 트리로 쓴다.
-    · 구조는 all / any / atleast / not 로 그대로 적는다.
-
-값
-  모든 식은 '날짜별 시계열'(달력 길이의 리스트)이다. 숫자 시계열은 float|None,
-  조건 시계열은 True|False|None. None = 데이터가 없어 모름 — 조용히 거짓으로 치지 않는다.
-  모든 연산은 인과적이다(그날까지의 값만 쓴다) — tree.verify_primitives 가 강제한다.
-
-관측 시점(asof)
-  평가는 '사용자가 보는 그 순간(asof)' 기준이다. asof = 관측 시각(UTC datetime) — 라이브는 실제 지금
-  또는 지정 시각, 백테스트는 재생되는 각 시점. 각 시세 조회는 asof 로 자른다: 일봉 필드는 asof 이하
-  마지막 확정 일봉(고정), 분봉/장중 필드(tf="1m")는 asof 이하 마지막 분봉(살아 있음). 데이터가 없으면
-  None(모름) — 조용히 거짓으로 치지 않는다. '아침 한 시점 고정 판정'은 없다 — 조건이 요구하는 데이터를
-  그 조건이 말하는 봉(일봉·분봉)으로 asof 기준 가져올 뿐이다.
-
-3값 논리
-  all : 하나라도 False → False, 아니면 하나라도 None → None, 아니면 True (빈 all = True)
-  any : 하나라도 True → True, 아니면 하나라도 None → None, 아니면 False (빈 any = False)
-  atleast n : True 개수 ≥ n → True, True+None < n → False, 그 외 None
-  not : True↔False, None 은 None
-
-하한(AtLeast)
-  barssince 가 모르는 날(또는 데이터 시작)에 닿으면 정확한 길이는 모르지만 '최소 N'은 안다.
-  그 값은 AtLeast(N) 로 담기고, 비교는 하한만으로 결론이 나면 참/거짓(예: 최소 50일 ≥ 3 → 참),
-  아니면 None 이다. 덧셈·뺄셈(상수)은 하한을 유지하고, 그 밖의 연산(창·곱·나눗셈)에선 None 이 된다.
-
-수동(manual)
-  {"manual": "사유"} 는 식으로 쓸 수 없는 조건(순수 주관·데이터 없음·연산 없음). 값은 평가 시 manual_as 로
-  주어진다(엔진이 '확인되면/안 되면' 두 번 평가해 '확인 대기'를 가린다). 데이터 None 과 다르다.
-  극성: not 아래의 수동은 반대 값을 받는다(manual_as=True 는 '수동이 전부 구역에 유리하게 풀림'
-  이라는 뜻 — '겹치면 쉼' = not(all(.., 수동)) 에서 낙관 평가가 오히려 겹침을 가정하던 버그를 막는다).
-  사람이 답한 수동(Ctx answers — 조건별 답 맵)은 그 답이 manual_as 보다 먼저다. 답은 잎의 참/거짓 그 자체라
-  not 아래에서도 뒤집지 않는다(not 이 그 값을 뒤집을 뿐). 답 열쇠 = answer_key — 상품 + "|" + manual_key(잎).
-
-모르는 값 "?"
-  저자가 숫자(기준·기간·개수)를 안 준 조건도 식으로 적는다 — 모르는 숫자 자리만 "?" 로 둔다.
-    "SOXL 이 5일선에서 너무 벌어짐" → {"ge": [(SOXL ÷ MA5(SOXL) − 1)×100, "?"]}
-  "?" 를 품은 판단 노드(비교의 양쪽 식 어디든 "?", 또는 atleast 의 n 이 "?")는 수동처럼 사람이 참/거짓을 정한다
-  (manual_as·극성 규칙 그대로). 화면은 비교의 알려진 쪽 값을 근거 숫자로 보여준다. 식이 조건의 신원이라
-  같은 식이면 같은 조건이다(문장·이름과 무관). 수치로 정할 수 없는 순수 주관만 {"manual": "저자 미명시: …(정성)"}.
-
-문법 (JSON) — 허용 키 밖은 전부 오류(조용히 무시하지 않는다):
-  숫자          3, 1.5            (상수)   "?" = 저자가 안 준 숫자(모르는 값) — 숫자가 들어갈 자리 어디든
-  시세          {"px": "close"|"open"|"high"|"low"|"volume", "sym": 티커, "tf": 봉?}   sym = 구체 티커(필수 —
-                상품 자신이면 그 티커, 지수면 지수 티커. $ 심볼 없음),
-                tf 기본 "1d"(일봉 — asof 이하 '확정(settled)' 일봉; 장중 asof 면 아직 마감 안 된 그날 일봉은
-                None, 즉 전일 종가까지만 본다). tf "1m"(분봉 — asof 이하 마지막 분봉, 장중 값). tf "5m"(5분봉 —
-                세션 안 1분봉을 5분 OHLC 로 집계한 뒤 asof 이하 마지막 5분봉). 데이터가 없으면 모름(None).
-  산술          {"add"|"sub"|"mul"|"div"|"max"|"min": [a, b]}   max/min = 같은 날 두 값 중 큰/작은 값
-                {"abs": a}
-  선택          {"case": [[c1, v1], [c2, v2], ...], "else": v}   위에서부터 처음 참인 c 의 v.
-                앞의 c 가 모름(None)이면 결과도 모름(뒤 갈래로 넘어가지 않는다).
-  이동/창       {"highest"|"lowest"|"sum": [s, n]}   (평균 = sum ÷ n — 전용 지표 연산은 두지 않는다)
-                {"lag": [s, k]}   k 거래일 전 값   (변화율 % = (s ÷ lag(s,k) − 1) × 100)
-  비교          {"gt"|"ge"|"lt"|"le": [a, b]}
-  논리          {"all": [...]}, {"any": [...]}, {"atleast": n, "of": [...]}, {"not": c}
-  시간          {"barssince": c}        c 가 마지막으로 참이었던 날부터 지난 거래일(오늘 참이면 0)
-                                        (연속 참 일수 = barssince(not c) · 최근 n일 중 참인 날 수 = sum(case(c,1,0), n))
-                {"valuewhen": [c, s]}   c 가 마지막으로 참이었던 날의 s 값
-                {"minsince"|"maxsince": [c, s]}  c 가 마지막으로 참이었던 날부터 오늘까지 s 의 최저/최고
-  수동          {"manual": "사유"}
-  포지션        {"pos": "ret"|"days"|"maxret"|"minret"|"filled"|"sold"}   판다·2차 이후 분할(산다) 갈래 안에서만.
-                ret = 평균 매입가 대비 오늘 종가 수익률(%), days = 첫 매수일부터 지난 봉(첫 매수일 0),
-                maxret/minret = 첫 매수일~오늘 종가 수익률의 최고/최저. 매수 전 날은 None.
-                filled = 산 횟수({"pos": "filled", "rule": "1차"} = 그 규칙으로 산 횟수, rule 없으면 전체) ·
-                sold = 지금까지 판 비율(판 물량 ÷ 산 물량). 둘은 체결 장부가 있어야 안다(없으면 모름).
-  메타(아무 노드에) "label", "ref", "id", "note", "on"(노드 레벨 대상 상품 — 그 밖의 상품에선 항상 참)
-
-종목 모델: 규칙·노드가 어느 상품에 판정을 내나 = on · 시세 잎이 읽는 티커 = sym. 둘뿐이다
-  ("여러 종목 중 N개" = {"atleast": N, "of": [종목별 비교 …]}, 각 잎 sym = 그 티커)."""
-    META = META
-    ROLES = ROLES
-    UNKNOWN = UNKNOWN
-    UNKNOWN_REASON = UNKNOWN_REASON
-    PX_FIELDS = PX_FIELDS
-    POS_FIELDS = POS_FIELDS
-    ARITH = ARITH
-    TIMEFRAMES = TIMEFRAMES
-    WINDOW = WINDOW
-    GONE_OPS = GONE_OPS
-    CMP = CMP
-    STREAK_CAP = STREAK_CAP
-    CondError = CondError
-    AtLeast = AtLeast
-    _op_of = _op_of
-    _has_unknown = _has_unknown
-    is_unknown = is_unknown
-    is_manual = is_manual
-    manual_text = manual_text
-    strip_meta = strip_meta
-    manual_key = manual_key
-    answer_key = answer_key
-    product_specific = product_specific
-    validate = validate
-    Ctx = Ctx
-    minute_series = minute_series
-    aggregate_5m = aggregate_5m
-    _num = _num
-    _exact = _exact
-    _cmp = _cmp
-    _window = _window
-    _and3 = _and3
-    _or3 = _or3
-    _NON_DAILY = _NON_DAILY
-    _daily_axis = _daily_axis
-    series = series
-    _series = _series
-    VERBS = VERBS
-    BLOCK = BLOCK
-    BUY = BUY
-    SELL = SELL
-    GATES = GATES
-    BUY_SIDE = BUY_SIDE
-    _uses_pos = _uses_pos
-    compact_json = compact_json
-    fmt_files = fmt_files
-    is_compact = is_compact
-    labeled = labeled
-    manual_leaves = manual_leaves
-    labeled_all = labeled_all
-    warmup_of = warmup_of
-
-class Grade:
-    """등급의 뜻(구간② DSL) — 조건 트리(books/<slug>/tree.json) → 날짜별 등급·금액·비중 (책 무관). 트리의 '뜻'은 여기 한 벌뿐이다.
-
-등급 (동사 둘 — 사다리는 grade_rules.json):
-  안 산다 갈래 하나라도 참 → ⛔ 안 산다 · 산다 갈래 하나라도 참 → ✅ 산다 · 둘 다 아님 → ⚪ 관망
-수동(manual) 조건은 '확인됨/안 됨' 두 번 평가한다:
-  안 돼도 산다(비관) → ✅ · 확인돼야 산다(낙관만) → 🟡 확인 대기 · 데이터 부족으로 못 정함 → ❔ 판정 불가
-  비관 = 산다의 수동은 거짓, 안 산다의 수동은 참 / 낙관 = 그 반대(BUY_SIDE).
-얼마나·판다:
-  weight   산다 qty cash = 총 투자금 대비 비중(%) · tranches = 산다 qty budget 분할(2차 이후는 포지션 값으로)
-  sells    판다 — 보유분이 있을 때만 평가(구간③ trading)
-
-판정은 봉이 끝난 직후(그날까지의 봉)로 낸다 — cond 연산이 전부 인과적이라 전체 이력을 한 번 계산해
-날짜로 꺼내도 미래를 보지 않는다(tree.verify_primitives 가 강제).
-
-트리는 원본 dict 가 아니라 TreeGateway(tree/gateway.py — 트리를 읽는 유일한 출입구)로 받는다.
-같은 뜻을 만드는 쪽(authoring.extract.verify_tree 의 사례·authoring.extract.compare 의 a/b 비교)과 읽는 쪽(구간③ 판정·백테스트)이 함께 쓴다 — 화면용 설명(view·
-측정 증거)은 판단자(judge/judge·explain)가 이 평가 문맥으로 빚는다 — 화면은 그리기만."""
-    GRADES = GRADES
-    GRADE_RULES = GRADE_RULES
-    WARMUP_DAYS = WARMUP_DAYS
-    History = History
-    history = history
-    history_back = history_back
-    session_closes = session_closes
-    RuleSeries = RuleSeries
-    _top_labeled = _top_labeled
 
 
 if __name__ == "__main__":

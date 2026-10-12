@@ -16,11 +16,11 @@ from datetime import datetime, timedelta
 
 from shared import paths  # noqa: F401  (UTF-8 출력)
 from shared.paths import book_log, write_text
-from tree.tradeTool import Cond
+from tree.tradeTool import CMP, CondError, GATES, is_manual, META, _op_of, SELL
 from judge.judge import Judge
 
-COMPARED = Cond.GATES + ("weight",)                   # 날마다 비교하는 것(등급 동사 둘 + 비중 — 분할·판다는 거래로)
-SHAPES = COMPARED + (Cond.SELL,)                       # 모양(식)을 비교하는 것
+COMPARED = GATES + ("weight",)                   # 날마다 비교하는 것(등급 동사 둘 + 비중 — 분할·판다는 거래로)
+SHAPES = COMPARED + (SELL,)                       # 모양(식)을 비교하는 것
 
 
 # ------------------------------------------------------------------ 실제 시세 평가
@@ -30,7 +30,7 @@ def history(books, years):
 
 def _day_values(judge, i):
     """그날 값 — 등급 동사는 수동 = 모름 평가, 비중은 (값, 범위)."""
-    out = {do: judge.gate_value(do, i) for do in Cond.GATES}
+    out = {do: judge.gate_value(do, i) for do in GATES}
     w, alt = judge.weight_at(i)
     out["weight"] = (None if w is None else round(w, 6), tuple(alt or ()))
     out["grade"] = judge.grade(i)
@@ -75,7 +75,7 @@ def compare(ta, tb, hist, years):
 def _strip_meta(node):
     """META(label·ref·id·note)를 모든 깊이에서 떼낸 '순수 로직'만 남긴다 — 되접기 신원 비교용."""
     if isinstance(node, dict):
-        return {k: _strip_meta(v) for k, v in node.items() if k not in Cond.META}
+        return {k: _strip_meta(v) for k, v in node.items() if k not in META}
     if isinstance(node, list):
         return [_strip_meta(x) for x in node]
     return node
@@ -123,8 +123,8 @@ def _cond_op(node):
     if not isinstance(node, dict):
         return None
     try:
-        return Cond._op_of(node)
-    except Cond.CondError:
+        return _op_of(node)
+    except CondError:
         return None
 
 
@@ -137,7 +137,7 @@ def factorable(node):
         return False
     if op in _RULE_OPS:
         return True
-    return op in Cond.CMP and bool(node.get("label"))
+    return op in CMP and bool(node.get("label"))
 
 
 # ------------------------------------------------------------------ 규칙 단위 이중 추출 · 같은 뜻 정리
@@ -159,7 +159,7 @@ def pair_rules(ta, tb):
 
 # ------------------------------------------------------------------ 심판의 비교 도구(덤프 — 판단은 안 함)
 def _zone_explain(judge, sec, i):
-    if sec in Cond.GATES:
+    if sec in GATES:
         return judge.explain(i)[sec]
     w, alt = judge.weight_at(i)
     return {"weight": w, "weight_range": alt, "tranches": _tranche_rows(judge.tranches())}
@@ -172,7 +172,7 @@ def _tranche_rows(tranches):
 
 def _zone_node(tree, prod, sec):
     """등급 동사 하나의 식(any 묶음) — 안 산다·산다만(그 밖은 None)."""
-    return tree.tree.gate(prod, sec) if sec in Cond.GATES else None
+    return tree.tree.gate(prod, sec) if sec in GATES else None
 
 
 def _section_key(tree, prod, sec):
@@ -216,7 +216,7 @@ def pair_conditions(ta, tb, prod, hist, years):
     idx = window(cal, years)
 
     def ser(judge, v):
-        if Cond.is_manual(v["expr"]):
+        if is_manual(v["expr"]):
             return None
         try:
             s = judge.evaluate(v["expr"])
@@ -232,7 +232,7 @@ def pair_conditions(ta, tb, prod, hist, years):
             same = [other[j]["label"] for j in theirs if mine[k] is not None and theirs[j] is not None
                     and mine[k] == theirs[j] and any(x is not None for x in mine[k])]
             rows.append({"label": v["label"], "zones": v["zones"], "expr": v["expr"],
-                         "manual": Cond.is_manual(v["expr"]), "same_behavior_as": same})
+                         "manual": is_manual(v["expr"]), "same_behavior_as": same})
         return rows
     return {"common": common, "only_a": side(only_a, sa, sb, only_b), "only_b": side(only_b, sb, sa, only_a)}
 
@@ -270,7 +270,7 @@ def _descendant_keys(node, acc=None):
     if isinstance(node, dict):
         acc.add(_ckey(node))
         for k, v in node.items():
-            if k not in Cond.META:
+            if k not in META:
                 _descendant_keys(v, acc)
     elif isinstance(node, list):
         for v in node:
@@ -281,7 +281,7 @@ def _descendant_keys(node, acc=None):
 def _shape(node):
     """티커(sym)를 뺀 식 모양 — 짝 찾기 전용(a 는 지수, b 는 상품 자신을 본 같은 갈래도 짝으로 맞춰 차이를 보이게)."""
     if isinstance(node, dict):
-        return {k: _shape(v) for k, v in node.items() if k not in Cond.META and k != "sym"}
+        return {k: _shape(v) for k, v in node.items() if k not in META and k != "sym"}
     if isinstance(node, list):
         return [_shape(x) for x in node]
     return node
@@ -366,7 +366,7 @@ def _rules_diff(ra, rb):
         r["status"] = "diff"
         if isinstance(x.get("when"), dict) and isinstance(y.get("when"), dict):
             r["when"] = tree_diff(x["when"], y["when"])
-        others = [k for k in set(x) | set(y) if k not in Cond.META and k != "when" and _ckey(x.get(k)) != _ckey(y.get(k))]
+        others = [k for k in set(x) | set(y) if k not in META and k != "when" and _ckey(x.get(k)) != _ckey(y.get(k))]
         if others:
             r["fields"] = {k: {"a": _strip_meta(x.get(k)), "b": _strip_meta(y.get(k))} for k in others}
         return r
@@ -376,9 +376,9 @@ def _rules_diff(ra, rb):
 def zone_diff(ta, tb, prod, zone):
     """상품 한 칸의 a·b 트리 모양 비교."""
     xa, xb = _zone_node(ta, prod, zone), _zone_node(tb, prod, zone)
-    if zone in Cond.GATES:
+    if zone in GATES:
         return tree_diff(xa, xb)
-    if zone == Cond.SELL:
+    if zone == SELL:
         return {"status": "same" if _ckey(xa) == _ckey(xb) else "diff", "rules": _rules_diff(xa, xb)}
     out = {"status": "same" if _ckey(xa) == _ckey(xb) else "diff"}            # weight(비중·분할)
     wa, wb = ta.tree.weight(prod).qty.x, tb.tree.weight(prod).qty.x

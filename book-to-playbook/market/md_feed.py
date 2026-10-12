@@ -3,7 +3,7 @@
 """jhts 시세수집팀(jhts.marketdata) 어댑터 — 파이프라인의 유일한 시세 창구(수집 단계).
 
 무엇을 받을지는 체크리스트(조건 트리)가 정한다: TreeGateway.symbols()(tree/gateway.py)가 규칙
-전부(펼친 식)에서 심볼을 뽑고, tree.tradeTool 의 Grade.history 가 이 파일의 histories() 하나로 받는다. 판정 엔진·백테스트·트리 검사가
+전부(펼친 식)에서 심볼을 뽑고, tree.tradeTool 의 history 가 이 파일의 histories() 하나로 받는다. 판정 엔진·백테스트·트리 검사가
 모두 같은 입구를 쓴다 — 수집 요청서(data_spec)를 따로 쓰지 않는다.
 
 시세가 없는 심볼은 지어내지 않고 jhts 수집 요청(collection_requests, requester "etf-verdict",
@@ -67,8 +67,8 @@ def minutes(symbol):
     """1분봉 OHLCV {YYYYMMDDHHMM(UTC): {open,high,low,close,volume}} — 계약은 MIGRATION_NOTES ④.
     jhts.marketdata.minute_bars 로 받는다: 리스트 [{dt(ISO8601 UTC, 끝 Z), open,high,low,close,vol}] 오름차순.
     여기서 모양만 계약으로 바꾼다 — dt 를 YYYYMMDDHHMM(UTC 그대로) 키로, vol → volume 로.
-    실패·빈결과·미설치·예외 → {} (가짜로 안 채운다 — 평가기에서 '모름' 으로 정직하게 떨어진다).
-    cond.minute_series 는 이 OHLCV dict(또는 스칼라 종가)를 둘 다 받으므로 트리·평가기는 무변경."""
+    실패·빈결과·미설치·예외 → {} (가짜로 안 채운다).
+    아직 평가기는 이걸 부르지 않는다 — 일봉 아닌 봉(tf 1m·5m)은 모름(None). 앞으로 시세 저장소가 쓴다."""
     if not AVAILABLE:
         return {}
     try:

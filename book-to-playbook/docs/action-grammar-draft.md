@@ -160,7 +160,7 @@ sumsince(세션 시작, 거래량) · 당일 고·저 = maxsince/minsince(세션
 "k일 전 대비 변화율") · `judge/verify_view.py` · `books/*/tree_candidates/`(run3 로 대체). `judge/`·`backtest/` 에는 없음.
 주인 표(entry.verify_rules)에 "지운 연산 이름이 어디든 나오면 정지" 줄을 넣어 남김 없이.
 
-**구현은 pandas 로** — 지금 tree/tradeTool.py(Cond)는 순수 파이썬 반복문. 기본 부품은 pandas 에 1:1(lag=`shift` · sum/highest/lowest=`rolling` ·
+**구현은 pandas 로** — 지금 tree/tradeTool.py 평가기는 순수 파이썬 반복문. 기본 부품은 pandas 에 1:1(lag=`shift` · sum/highest/lowest=`rolling` ·
 smooth=`ewm(alpha)` · since 계열=구간별 `cumsum/cummax/cummin` · 순위=`rank` · 3값 논리=nullable `boolean`(Kleene, NA=모름)).
 우리 코드로 남는 것: `"?"`·수동·극성, asof·확정 일봉·일봉/분봉 혼합·워밍업. 지표 라이브러리(TA-Lib·pandas-ta)는 쓰지 않음
 (지표 하나씩 들여오기 = 같은 실수, 계산 관례도 제각각) — 단 조합 예시가 맞는지 대조하는 **테스트 정답지**로만.
