@@ -140,10 +140,10 @@ a·b 비교는 **규칙 식으로만**(매매 시뮬레이션 비교 없음, A�
 
 | 연산 | 판정 | 대체 조합 |
 |---|---|---|
-| `pct` | 삭제 | (값 ÷ lag(값,k) − 1) × 100 — "VIX ≥ 10%" vs "VIX ÷ 어제 ≥ 1.1" 같은 말 두 표기의 원인 |
-| `rsi` | 삭제 | `smooth`·사칙연산 조합 |
-| `count` | 삭제 | `sum`(case(c,1,0), n) |
-| `streak` | 삭제 | `barssince`(not c) |
+| `pct` | 삭제(반영 2026-10-12) | (값 ÷ lag(값,k) − 1) × 100 — "VIX ≥ 10%" vs "VIX ÷ 어제 ≥ 1.1" 같은 말 두 표기의 원인 |
+| `rsi` | 삭제(반영 2026-10-12) | `smooth`·사칙연산 조합 |
+| `count` | 삭제(반영 2026-10-12) | `sum`(case(c,1,0), n) |
+| `streak` | 삭제(반영 2026-10-12) | `barssince`(not c) |
 | `ma` | **삭제(확정 2026-10-09)** | `sum`(s,n) ÷ n — 식이 길어져도 순수 조합 유지(전용 연산 안 둠) |
 | `ema` | 일반화 | `smooth`(s, 2/(n+1)) |
 | `stdev` | 일반화 | `sqrt` + 사칙연산 |
@@ -176,7 +176,7 @@ smooth=`ewm(alpha)` · since 계열=구간별 `cumsum/cummax/cummin` · 순위=`
   "names": {"$반도체대표주": {"syms": ["NVDA", "AMD", "AVGO"], "ref": "4-2", "note": "운영 판단: 원문 '대표주' — 4-2·7-2 의 3종"}},
   "rules": [
     {"label": "VIX 전일 대비", "ref": "2-4·6-2",
-     "value": {"pct": [{"px": "close", "sym": "^VIX"}, 1]},
+     "value": {"mul": [{"sub": [{"div": [{"px": "close", "sym": "^VIX"}, {"lag": [{"px": "close", "sym": "^VIX"}, 1]}]}, 1]}, 100]},
      "then": [{"when": {"ge": ["$value", 20]}, "do": "판다", "qty": {"of": "held", "x": "?"}},
               {"when": {"ge": ["$value", 10]}, "do": "안 산다"}],
      "why": "a 채택 — b 는 10%·20% 를 규칙 둘로 쪼갬(같은 값이라 갈래 하나)"},
@@ -186,7 +186,7 @@ smooth=`ewm(alpha)` · since 계열=구간별 `cumsum/cummax/cummin` · 순위=`
                          {"label": "S&P500 선물 전일 종가 위", "gt": ["…"]},
                          {"label": "VIX 안정", "lt": [{"rule": "VIX 전일 대비"}, 10]},
                          {"label": "금리 안정", "not": "…"},
-                         {"label": "달러 안정", "le": [{"pct": [{"px": "close", "sym": "DX-Y.NYB"}, 1]}, 0]}]},
+                         {"label": "달러 안정", "le": [{"div": [{"px": "close", "sym": "DX-Y.NYB"}, {"lag": [{"px": "close", "sym": "DX-Y.NYB"}, 1]}]}, 1]}]},
      "then": [{"when": {"ge": ["$value", 4]}, "do": "산다"},
               {"when": {"le": ["$value", 2]}, "do": "안 산다"}],
      "note": "3점 '소액만'은 입장(관망 — 갈래 없음, 2절 A). 2-6 '달러·금리·VIX 동시 불편하면 크게 들어갈 장 아님'은 이 점수의 풀이 — 따로 규칙 아님"},

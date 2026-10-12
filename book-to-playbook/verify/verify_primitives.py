@@ -12,7 +12,7 @@
 무엇을 하나 (기준은 전부 cond.py 와 독립적으로 구한다)
   1. 수치 연산 — pandas rolling/shift 로 계산한 값과 무작위 시계열(결측 포함)에서 대조
   2. 3값 논리 — '모름' 자리에 참/거짓을 전부 넣어 본 결과로 정답을 정의해 전수 대조
-  3. 시간 연산(count·streak·barssince·valuewhen·across) — 단순 반복 구현과 대조
+  3. 시간 연산(barssince·valuewhen·across, 조합: 최근 참 일수·연속 참 일수) — 단순 반복 구현과 대조
   4. 인과성 — 미래 데이터를 잘라도 과거 날짜 값이 같아야 한다(미래 참조 금지)
   5. 문법 — 모르는 키·인자 수·빈 구역은 거부, 올바른 트리는 통과
   6. 표현력 회귀 — 이번에 발견된 버그 유형을 트리로 적어 원문 뜻대로 나오는지
@@ -83,6 +83,21 @@ def AVG(s, n):
     return {"div": [{"sum": [s, n]}, n]}
 
 
+def PCT(s, k):
+    """k일 전 대비 변화율(%) — (s ÷ lag(s,k) − 1) × 100 (COND_DSL 6절 조합)."""
+    return {"mul": [{"sub": [{"div": [s, {"lag": [s, k]}]}, 1]}, 100]}
+
+
+def COUNT(c, n):
+    """최근 n일 중 c 가 참인 날 수 — sum(case(c,1,0), n)."""
+    return {"sum": [{"case": [[c, 1]], "else": 0}, n]}
+
+
+def STREAK(c):
+    """오늘부터 거꾸로 c 가 연속 참인 날 수 — barssince(not c)."""
+    return {"barssince": {"not": c}}
+
+
 # ------------------------------------------------------------------ 1. 수치 연산
 def t_numeric(rng):
     for trial in range(30):
@@ -108,8 +123,8 @@ def t_numeric(rng):
             check(all(same(got[i], ref[i]) for i in range(len(xs))), "lag(%d) 불일치" % k)
             if k:
                 ref = (ps / ps.shift(k) - 1) * 100
-                got = Cond.series({"pct": [C, k]}, ctx)
-                check(all(same(got[i], ref[i], 1e-7) for i in range(len(xs))), "pct(%d) 불일치" % k)
+                got = Cond.series(PCT(C, k), ctx)
+                check(all(same(got[i], ref[i], 1e-7) for i in range(len(xs))), "변화율(%d일) 조합 불일치" % k)
         a = Cond.series({"sub": [C, {"lag": [C, 1]}]}, ctx)
         ref = ps - ps.shift(1)
         check(all(same(a[i], ref[i], 1e-7) for i in range(len(xs))), "sub 불일치")
@@ -182,12 +197,6 @@ def t_logic():
         got = Cond.series(node, make_ctx([1.0]))[0]
         exp = 10 if c1 else (None if c1 is None else (20 if c2 else (None if c2 is None else 30)))
         check(same(got, None if exp is None else float(exp)), "case %r %r → %r (기대 %r)" % (c1, c2, got, exp))
-    # 조건 → 숫자(상승일 1, 아니면 0) 의 합 = count 와 같아야 한다
-    xs = [100.0, 101.0, 100.0, 102.0, 103.0, 101.0, 104.0]
-    up = {"gt": [C, {"lag": [C, 1]}]}
-    s1 = Cond.series({"sum": [{"case": [[up, 1]], "else": 0}, 5]}, make_ctx(xs))
-    s2 = Cond.series({"count": [up, 5]}, make_ctx(xs))
-    check(all(same(a, b) for a, b in zip(s1, s2)), "sum(case) = count")
 
 
 # ------------------------------------------------------------------ 3. 시간 연산
@@ -199,12 +208,12 @@ def t_time(rng):
         ctx = make_ctx(xs)
         c = {"gt": [C, 0]}
         for n in (1, 3, 7):
-            got = Cond.series({"count": [c, n]}, ctx)
+            got = Cond.series(COUNT(c, n), ctx)
             for i in range(60):
                 w = bits[i - n + 1:i + 1] if i - n + 1 >= 0 else None
                 exp = None if (w is None or None in w) else float(sum(w))
                 check(same(got[i], exp), "count(%d)@%d %r≠%r" % (n, i, got[i], exp))
-        got = Cond.series({"streak": c}, ctx)
+        got = Cond.series(STREAK(c), ctx)
         for i in range(60):
             cnt, exp = 0, None
             for j in range(i, -1, -1):
@@ -216,7 +225,7 @@ def t_time(rng):
                 cnt += 1
             if exp is None and cnt > 0:
                 exp = Cond.AtLeast(cnt)       # 모르는 날·데이터 시작에 닿음 → 최소 cnt
-            check(same(got[i], exp), "streak@%d %r≠%r" % (i, got[i], exp))
+            check(same(got[i], exp), "연속 참 일수@%d %r≠%r" % (i, got[i], exp))
         got = Cond.series({"barssince": c}, ctx)
         vw = Cond.series({"valuewhen": [c, {"lag": [C, 0]}]}, ctx)
         val = [float(v) for v in range(60)]           # 결측 없는 값열(위치 = 값)
@@ -266,11 +275,11 @@ def t_bounds():
     # 실제 쓰임: 데이터 시작부터 20일선 위(정확한 길이 모름)라도 '3일 이상'은 참
     xs = [100.0 + i for i in range(40)]
     up = {"gt": [C, AVG(C, 20)]}
-    check(Cond.series({"ge": [{"streak": up}, 3]}, make_ctx(xs))[-1] is True, "긴 상승 streak≥3 = 참")
-    check(Cond.series({"lt": [{"streak": up}, 3]}, make_ctx(xs))[-1] is False, "긴 상승 streak<3 = 거짓")
-    check(Cond.series({"ge": [{"streak": up}, 30]}, make_ctx(xs))[-1] is None, "streak≥30 은 모름(21일만 확인)")
-    check(isinstance(Cond.series({"add": [{"streak": up}, 1]}, make_ctx(xs))[-1], Cond.AtLeast), "하한+1 = 하한")
-    check(Cond.series(AVG({"streak": up}, 2), make_ctx(xs))[-1] is None, "하한의 이동평균 = 모름")
+    check(Cond.series({"ge": [STREAK(up), 3]}, make_ctx(xs))[-1] is True, "긴 상승 streak≥3 = 참")
+    check(Cond.series({"lt": [STREAK(up), 3]}, make_ctx(xs))[-1] is False, "긴 상승 streak<3 = 거짓")
+    check(Cond.series({"ge": [STREAK(up), 30]}, make_ctx(xs))[-1] is None, "streak≥30 은 모름(21일만 확인)")
+    check(isinstance(Cond.series({"add": [STREAK(up), 1]}, make_ctx(xs))[-1], Cond.AtLeast), "하한+1 = 하한")
+    check(Cond.series(AVG(STREAK(up), 2), make_ctx(xs))[-1] is None, "하한의 이동평균 = 모름")
 
 
 def t_pos(rng):
@@ -306,14 +315,14 @@ def t_pos(rng):
 # ------------------------------------------------------------------ 4. 인과성
 CAUSAL_NODES = [
     AVG(C, 5),
-    {"highest": [C, 10]}, {"pct": [C, 3]}, {"lag": [C, 2]},
-    {"count": [{"gt": [C, {"lag": [C, 1]}]}, 5]},
-    {"streak": {"gt": [C, AVG(C, 5)]}},
+    {"highest": [C, 10]}, PCT(C, 3), {"lag": [C, 2]},
+    COUNT({"gt": [C, {"lag": [C, 1]}]}, 5),
+    STREAK({"gt": [C, AVG(C, 5)]}),
     {"barssince": {"ge": [C, {"highest": [C, 10]}]}},
     {"valuewhen": [{"gt": [C, {"highest": [{"lag": [C, 1]}, 10]}]}, {"highest": [{"lag": [C, 1]}, 10]}]},
     {"minsince": [{"gt": [C, {"highest": [{"lag": [C, 1]}, 10]}]}, C]},
-    {"atleast": 2, "of": [{"gt": [C, 100]}, {"lt": [{"pct": [C, 1]}, 0]}, {"gt": [C, AVG(C, 3)]}]},
-    {"max": [C, AVG(C, 5)]}, {"abs": {"pct": [C, 1]}},
+    {"atleast": 2, "of": [{"gt": [C, 100]}, {"lt": [PCT(C, 1), 0]}, {"gt": [C, AVG(C, 3)]}]},
+    {"max": [C, AVG(C, 5)]}, {"abs": PCT(C, 1)},
     {"case": [[{"gt": [C, AVG(C, 5)]}, {"highest": [C, 3]}]], "else": {"lowest": [C, 3]}},
 ]
 
@@ -452,7 +461,7 @@ def t_settled_mtf():
     cal_wo = ["20261001"]
     without = {"X": [Candle("20261001", 100.0, 100.0, 100.0, 100.0, 1000)]}   # 오늘 봉 없음(현재 feed 모습)
     derived = [node1d, AVG(node1d, 1), {"highest": [node1d, 1]}, {"lag": [node1d, 0]},
-               {"gt": [node1d, 50]}, {"streak": {"gt": [node1d, 50]}}]
+               {"gt": [node1d, 50]}, STREAK({"gt": [node1d, 50]})]
     for h in (10, 13, 15, 19, 20, 21):       # 장중~장후 여러 asof
         a = dt.datetime(2026, 10, 2, h, 0, tzinfo=utc)
         cw = Cond.Ctx(with_today, cal, "X", asof=a, session_close=sc)
@@ -578,8 +587,8 @@ def t_warmup_guard():
     직접 뽑아, 그보다 확정 봉이 적은 초기 구간의 1d 신호를 '불완전 데이터(❔)'로 표면화한다.
 
     확인:
-      1) 필요 워밍업을 트리에서 바르게 계산한다(창 n-1·lag k·count n-1 가 가장 깊은 사슬로 누적되고,
-         streak/barssince 류는 AtLeast/None 으로 스스로 불확실을 드러내므로 워밍업에 넣지 않는다).
+      1) 필요 워밍업을 트리에서 바르게 계산한다(창 n-1·lag k 가 가장 깊은 사슬로 누적되고,
+         barssince 류는 AtLeast/None 으로 스스로 불확실을 드러내므로 워밍업에 넣지 않는다).
       2) 워밍업을 일부러 잘라낸(필요보다 적은 봉) 입력 → 그 초기 구간은 incomplete=True 이고 grade_key 가 ❔.
       3) 워밍업이 충분한 구간 → incomplete=False, 가드 끼기 전과 등급이 '그대로'(오탐 0).
     """
@@ -589,14 +598,14 @@ def t_warmup_guard():
     cases = [
         (C, 0), ({"px": "close"}, 0), ({"manual": "x"}, 0), (5, 0),
         (AVG(C, 20), 19), ({"highest": [C, 60]}, 59), ({"sum": [C, 10]}, 9),
-        ({"lag": [C, 5]}, 5), ({"pct": [C, 3]}, 3), ({"count": [C, 10]}, 9),
+        ({"lag": [C, 5]}, 5), (PCT(C, 3), 3), (COUNT({"gt": [C, 0]}, 10), 9),
         (AVG({"lag": [C, 5]}, 20), 24),                          # 중첩: lag5 안에 평균20 → 5 + 19
-        ({"streak": {"gt": [C, AVG(C, 20)]}}, 19),               # streak 자체는 안 더함, 안쪽 평균20 만
+        (STREAK({"gt": [C, AVG(C, 20)]}), 19),                   # 연속 일수 자체는 안 더함, 안쪽 평균20 만
         ({"barssince": {"ge": [C, {"highest": [C, 60]}]}}, 59),
         ({"valuewhen": [{"gt": [C, 0]}, AVG(C, 30)]}, 29),       # max(안쪽) = 29
         ({"all": [AVG(C, 5), {"highest": [C, 60]}]}, 59),        # 논리 묶음 = 자식 최댓값
         ({"atleast": 1, "of": [{"lag": [C, 2]}, AVG(C, 10)]}, 9),
-        ({"not": AVG(C, 7)}, 6), ({"abs": {"pct": [C, 4]}}, 4),
+        ({"not": AVG(C, 7)}, 6), ({"abs": PCT(C, 4)}, 4),
         ({"case": [[{"gt": [C, 0]}, AVG(C, 8)]], "else": {"highest": [C, 40]}}, 39),
     ]
     for node, exp in cases:
@@ -650,7 +659,7 @@ def t_warmup_guard():
 # ------------------------------------------------------------------ 6. 표현력 회귀(이번 버그 유형)
 def t_regress():
     # (a) '20일선 회복 후 2거래일 유지' — 1일만 위면 거짓, 회복일+2일이면 참
-    hold = {"ge": [{"streak": {"gt": [C, AVG(C, 20)]}}, 3]}
+    hold = {"ge": [STREAK({"gt": [C, AVG(C, 20)]}), 3]}
     xs = [100.0] * 25 + [90.0] * 5 + [110.0]
     check(Cond.series(hold, make_ctx(xs))[-1] is False, "2일 유지: 1일만 위인데 참")
     check(Cond.series(hold, make_ctx(xs + [111.0, 112.0]))[-1] is True, "2일 유지: 3일 위인데 거짓")

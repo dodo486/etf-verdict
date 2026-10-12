@@ -36,7 +36,7 @@ def t_view():
     xs = [100.0] * 30 + [130.0]
     cal = ["2022%04d" % i for i in range(len(xs))]
     hist = {"X": [Candle(d, c, c, c, c, 1000) for d, c in zip(cal, xs)]}
-    jump = {"ge": [{"pct": [C, 1]}, 20]}
+    jump = {"ge": [{"mul": [{"sub": [{"div": [C, {"lag": [C, 1]}]}, 1]}, 100]}, 20]}   # 전일 대비 +20% 이상
     tree = TreeGateway.of(synthetic({"X": None}))
     pe = Grade.ProductEval(tree, "X", hist, cal)
     node = {"all": [dict(jump, label="급등", ref="1"), {"not": {"label": "수동", "manual": "x"}}]}
@@ -47,9 +47,9 @@ def t_view():
     check(hid["op"] == "atleast" and hid["n"] == 1 and hid["kids"][0].get("hidden") is True
           and hid["kids"][0]["v"] is True, "라벨 없는 잎은 hidden 으로 값과 함께 %r" % hid)
     # 창 길이·lag 가 "?"(저자 미명시)인 식도 근거 설명이 죽지 않는다 — "?일" 로 보인다
-    unk = {"label": "최근 ?일 급등", "ge": [{"pct": [C, "?"]}, {"lowest": [C, "?"]}]}
+    unk = {"label": "최근 ?일 급등", "ge": [{"lag": [C, "?"]}, {"lowest": [C, "?"]}]}
     d = cv._view(unk, pe.ctx[None], len(xs) - 1).get("detail") or []
-    check(d and d[0]["lhsd"] == "?일 전 대비 변화율" and d[0]["rhsd"] == "?일 최저", "\"?\" 창 설명 %r" % d)
+    check(d and d[0]["lhsd"] == "종가 ?일 전" and d[0]["rhsd"] == "?일 최저", "\"?\" 창 설명 %r" % d)
 
 
 PAGE_IDS = ('id="src"', 'id="verdict-data"', 'id="sheet-root"')

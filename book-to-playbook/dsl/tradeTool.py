@@ -27,7 +27,7 @@ TIMEFRAMES = ("1d", "1m", "5m")  # 봉 길이 — asof 축에서 자른다. 일�
                            # 마지막 분봉, 5분봉은 1분봉을 세션 안에서 5분 OHLC 로 집계한 뒤 asof 이하 마지막.
                            # 데이터가 없으면 None(모름).
 WINDOW = ("highest", "lowest", "sum")   # 창(n거래일) 집계 — 평균 등 지표는 전용 연산 없이 조합(COND_DSL 6절)
-GONE_OPS = ("ma", "ema", "stdev", "rsi")  # 지운 전용 지표 연산 — 조합으로 쓴다(verify_code 주인 표가 되살림을 막는다)
+GONE_OPS = ("ma", "ema", "stdev", "rsi", "pct", "count", "streak")   # 지운 전용 연산 — 조합으로 쓴다(verify_code 주인 표가 되살림을 막는다)
 CMP = ("gt", "ge", "lt", "le")
 STREAK_CAP = 400          # 연속·경과일을 거꾸로 셀 때의 상한(데이터 길이보다 길면 무의미)
 
@@ -167,7 +167,7 @@ def validate(node, path="$"):
         two(op)
         validate(v[0], path + "." + op + "[0]")
         validate(v[1], path + "." + op + "[1]")
-    elif op in WINDOW or op in ("lag", "pct"):
+    elif op in WINDOW or op == "lag":
         two(op)
         validate(v[0], path + "." + op + "[0]")
         if op == "lag":
@@ -189,11 +189,7 @@ def validate(node, path="$"):
             validate(c, "%s.of[%d]" % (path, i))
     elif op == "not":
         validate(v, path + ".not")
-    elif op == "count":
-        two(op)
-        validate(v[0], path + ".count[0]")
-        posint(v[1], "n")
-    elif op in ("streak", "barssince"):
+    elif op == "barssince":
         validate(v, path + "." + op)
     elif op in ("valuewhen", "minsince", "maxsince"):
         two(op)
@@ -303,7 +299,7 @@ class Ctx:
 
     def settled_map(self, sym):
         """'일봉축 마지막 확정봉' 지도 — 길이 L 리스트 m 에서 m[i] = cal[i] 이하 마지막 '확정(settled)' 일봉의 index
-        (그런 확정봉이 없으면 None). 일봉-tf 식(일봉 잎·그 위 창/lag/streak…)을 평가할 때, 평가 index i 를 'asof 이하
+        (그런 확정봉이 없으면 None). 일봉-tf 식(일봉 잎·그 위 창/lag/barssince…)을 평가할 때, 평가 index i 를 'asof 이하
         마지막 확정 일봉'으로 바꾸는 데 쓴다 — 장중 asof 면 오늘 봉은 미확정이라 m[i] = 어제 index → 일봉 잎·ma20 이
         '어제까지의 실제값'(None 아님)으로 나온다. 오늘 미확정 봉은 절대 안 본다(look-ahead 0).
 
@@ -505,7 +501,7 @@ def _series(node, ctx, s_sym):
     v = node[op]
     if is_unknown(node):
         return [ctx.manual_value(node)] * L  # 저자가 숫자를 안 준 판단 — 사람이 정한다(수동과 같은 규칙)
-    if op in WINDOW + ("lag", "pct", "count") and v[1] == UNKNOWN:
+    if op in WINDOW + ("lag",) and v[1] == UNKNOWN:
         return [None] * L                    # 기간을 모름 — 값도 모름
     S = lambda n: series(n, ctx, s_sym)
 
@@ -578,15 +574,6 @@ def _series(node, ctx, s_sym):
         s, k = S(v[0]), v[1]
         return [s[i - k] if i - k >= 0 else None for i in range(L)]
 
-    if op == "pct":
-        s, k = S(v[0]), v[1]
-        out = []
-        for i in range(L):
-            a = s[i]
-            b = s[i - k] if i - k >= 0 else None
-            out.append((a / b - 1) * 100 if (_exact(a) and _exact(b) and b != 0) else None)
-        return out
-
     if op in ("all", "any"):
         cols = [S(c) for c in v]
         f = _and3 if op == "all" else _or3
@@ -604,34 +591,6 @@ def _series(node, ctx, s_sym):
 
     if op == "not":
         return [x if x is None else (not x) for x in series(v, ctx.flipped(), s_sym)]
-
-    if op == "count":
-        c, n = S(v[0]), v[1]
-        out = []
-        for i in range(L):
-            if i - n + 1 < 0:
-                out.append(None)
-                continue
-            w = c[i - n + 1:i + 1]
-            out.append(None if any(x is None for x in w) else float(sum(1 for x in w if x)))
-        return out
-
-    if op == "streak":
-        c = S(v)
-        out = []
-        for i in range(L):
-            cnt, j, val = 0, i, None
-            while j >= 0 and cnt < STREAK_CAP:
-                if c[j] is None or not c[j]:
-                    break
-                cnt += 1
-                j -= 1
-            if j >= 0 and cnt < STREAK_CAP and c[j] is False:
-                val = float(cnt)            # 거짓에서 끊김 — 정확한 길이
-            elif cnt > 0:
-                val = AtLeast(cnt)          # 모르는 날·데이터 시작·상한에 닿음 — 최소 cnt
-            out.append(val)
-        return out
 
     if op == "barssince":
         c = S(v)
@@ -831,9 +790,8 @@ def warmup_of(node):
 
     어떻게 세나 (연산마다 '그날 값이 서려면 그 앞에 몇 봉이 더 있어야 하나'를 더해 가장 깊은 사슬)
       · 창(highest/lowest/sum) n             : n-1 + 안쪽
-      · lag/pct k                            : k  + 안쪽
-      · count n                              : n-1 + 안쪽
-      · streak/barssince/valuewhen/minsince/maxsince : 안쪽만. 이들은 데이터 시작에 닿으면 조용히
+      · lag k                                : k  + 안쪽
+      · barssince/valuewhen/minsince/maxsince : 안쪽만. 이들은 데이터 시작에 닿으면 조용히
         틀리지 않고 AtLeast/None(모름)으로 스스로 불확실을 드러내므로(STREAK_CAP 는 fetch 버퍼가
         아닌 역방향 상한일 뿐) 워밍업 기준에 넣지 않는다 — 넣으면 정상 데이터의 짧은 창도 오탐한다.
       · 산술·비교·abs·case·논리(all/any/atleast/not)·across : 자식 중 최댓값
@@ -848,17 +806,15 @@ def warmup_of(node):
     w = warmup_of
     if is_unknown(node):
         return 0                             # 사람이 정하는 판단 — 기계 lookback 없음
-    if op in WINDOW + ("lag", "pct", "count") and v[1] == UNKNOWN:
+    if op in WINDOW + ("lag",) and v[1] == UNKNOWN:
         return w(v[0])                       # 기간을 모름 — 그 값은 늘 모름이라 이 창은 워밍업에 안 넣는다
     if op == "px":
         return 0
     if op in WINDOW:
         return (v[1] - 1) + w(v[0])
-    if op in ("lag", "pct"):
+    if op == "lag":
         return v[1] + w(v[0])
-    if op == "count":
-        return (v[1] - 1) + w(v[0])
-    if op in ("streak", "barssince"):
+    if op == "barssince":
         return w(v)                          # AtLeast/None 으로 스스로 불확실을 드러낸다 — 워밍업에 안 넣음
     if op in ("valuewhen", "minsince", "maxsince"):
         return max(w(v[0]), w(v[1]))
@@ -1085,7 +1041,7 @@ class Cond:
   not : True↔False, None 은 None
 
 하한(AtLeast)
-  streak·barssince 가 모르는 날(또는 데이터 시작)에 닿으면 정확한 길이는 모르지만 '최소 N'은 안다.
+  barssince 가 모르는 날(또는 데이터 시작)에 닿으면 정확한 길이는 모르지만 '최소 N'은 안다.
   그 값은 AtLeast(N) 로 담기고, 비교는 하한만으로 결론이 나면 참/거짓(예: 최소 50일 ≥ 3 → 참),
   아니면 None 이다. 덧셈·뺄셈(상수)은 하한을 유지하고, 그 밖의 연산(창·곱·나눗셈)에선 None 이 된다.
 
@@ -1115,13 +1071,11 @@ class Cond:
   선택          {"case": [[c1, v1], [c2, v2], ...], "else": v}   위에서부터 처음 참인 c 의 v.
                 앞의 c 가 모름(None)이면 결과도 모름(뒤 갈래로 넘어가지 않는다).
   이동/창       {"highest"|"lowest"|"sum": [s, n]}   (평균 = sum ÷ n — 전용 지표 연산은 두지 않는다)
-                {"lag": [s, k]}   k 거래일 전 값
-                {"pct": [s, k]}   k 거래일 전 대비 변화율(%)
+                {"lag": [s, k]}   k 거래일 전 값   (변화율 % = (s ÷ lag(s,k) − 1) × 100)
   비교          {"gt"|"ge"|"lt"|"le": [a, b]}
   논리          {"all": [...]}, {"any": [...]}, {"atleast": n, "of": [...]}, {"not": c}
-  시간          {"count": [c, n]}       최근 n거래일(오늘 포함) 중 c 가 참인 날 수
-                {"streak": c}           오늘부터 거꾸로 c 가 연속 참인 날 수(오늘 거짓이면 0)
-                {"barssince": c}        c 가 마지막으로 참이었던 날부터 지난 거래일(오늘 참이면 0)
+  시간          {"barssince": c}        c 가 마지막으로 참이었던 날부터 지난 거래일(오늘 참이면 0)
+                                        (연속 참 일수 = barssince(not c) · 최근 n일 중 참인 날 수 = sum(case(c,1,0), n))
                 {"valuewhen": [c, s]}   c 가 마지막으로 참이었던 날의 s 값
                 {"minsince"|"maxsince": [c, s]}  c 가 마지막으로 참이었던 날부터 오늘까지 s 의 최저/최고
   여러 종목     {"across": {"syms": [...], "cond": c}}   c 가 참인 종목 수(c 안에서 "$s" = 그 종목)

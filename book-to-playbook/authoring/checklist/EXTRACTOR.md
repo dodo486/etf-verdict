@@ -55,7 +55,7 @@
   "book": "<slug>",
   "items": [
     {"label": "VIX 전일 대비", "ref": ["2-4", "6-2"],
-     "value": {"pct": [{"px": "close", "sym": "^VIX"}, 1]},
+     "value": {"mul": [{"sub": [{"div": [{"px": "close", "sym": "^VIX"}, {"lag": [{"px": "close", "sym": "^VIX"}, 1]}]}, 1]}, 100]},
      "then": [{"when": {"ge": ["$value", 20]}, "do": "판다", "qty": {"of": "held", "x": "?"}},
               {"when": {"ge": ["$value", 10]}, "do": "안 산다"}],
      "source_text": ["VIX가 전일 대비 10% 이상 뛰면 추격 매수 중지", "..."],

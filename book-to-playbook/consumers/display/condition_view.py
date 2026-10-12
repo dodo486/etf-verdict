@@ -59,15 +59,9 @@ def _describe_operand(e):
     if op in ("highest", "lowest", "sum"):
         m = {"highest": "최고", "lowest": "최저", "sum": "합계"}
         return "%s일 %s" % (_n(e[op][1]), m[op])
-    if op == "pct":
-        return "전일 대비 변화율" if e["pct"][1] == 1 else "%s일 전 대비 변화율" % _n(e["pct"][1])
     if op == "lag":
         inner = _describe_operand(e["lag"][0])
         return ("%s " % inner if inner else "") + "%s일 전" % _n(e["lag"][1])
-    if op == "streak":
-        return "연속 참 일수"
-    if op == "count":
-        return "최근 참 일수"
     if op == "barssince":
         return "마지막 참 이후 일수"
     if op == "pos":
@@ -88,9 +82,7 @@ def _unit_of(e):
         op = Cond._op_of(e)
     except Cond.CondError:
         return ""
-    if op == "pct":
-        return "%"
-    if op in ("streak", "count", "barssince"):
+    if op == "barssince":
         return "일"
     if op == "div":
         return "배"
@@ -101,7 +93,6 @@ def _unit_of(e):
 
 def _inputs_of(e, ctx, i, acc, seen, top=True):
     """파생값이 '무슨 원시 숫자로 나왔나'를 [{d, v}]로 모은다 — 사용자가 검증할 수 있게.
-    · pct(변화율)은 두 끝점(오늘·k일 전)을 보여준다. 예: 오늘 종가 770.6 · 5일 전 765.6.
     · 산술(합·차·비율)은 안의 시세 잎들을 보여준다. 예: 고가 771 · 종가 770.6.
     · LHS 자체가 단일 잎(종가·20일선·연속일수)이면 분해하지 않는다 — 피연산자가 이미 값으로 보인다.
     중복 설명은 한 번만."""
@@ -117,12 +108,6 @@ def _inputs_of(e, ctx, i, acc, seen, top=True):
         op = Cond._op_of(e)
     except Cond.CondError:
         return
-    if op == "pct":                                   # 변화율 — 두 끝점을 보여준다
-        s, k = e["pct"]
-        base = _describe_operand(s) or "값"
-        add("오늘 " + base, _meas_val(s, ctx, i))
-        add("%s일 전" % _n(k), _meas_val({"lag": [s, k]}, ctx, i))
-        return
     if op in Cond.ARITH:
         for sub in e[op]:
             _inputs_of(sub, ctx, i, acc, seen, top=False)
@@ -130,8 +115,8 @@ def _inputs_of(e, ctx, i, acc, seen, top=True):
     if op == "abs":
         _inputs_of(e["abs"], ctx, i, acc, seen, top=False)
         return
-    # 단일 잎(px·streak·창…): 산술 안쪽이면 값으로 보여주고, LHS 통째면(top) 분해하지 않는다
-    if not top and op in ("px", "lag", "streak", "count", "barssince", "highest", "lowest", "sum", "pos"):
+    # 단일 잎(px·lag·창…): 산술 안쪽이면 값으로 보여주고, LHS 통째면(top) 분해하지 않는다
+    if not top and op in ("px", "lag", "barssince", "highest", "lowest", "sum", "pos"):
         add(_describe_operand(e), _meas_val(e, ctx, i))
     # case·valuewhen 등은 생략(라벨이 설명을 맡는다)
 
