@@ -3,7 +3,8 @@
 """신호 백테스트 (책 무관) — 과거 N일 동안 매일 '그날 장 마감 기준' 판정을 다시 내고,
 그 판정 뒤에 실제로 가격이 어떻게 갔는지 잰다.
 
-판정은 라이브와 같은 판정기(signals/judge.Judge — 같은 트리·같은 등급 코드)가 judge.signal_series 로 낸다.
+판정은 라이브와 같은 판단자(signals/judge — 같은 트리·같은 등급 코드)가 Judge.signals 로 낸다. 가격(시가·종가)도
+판단자에게 받는다 — 이 파일은 트리·시세 원본을 열지 않는다.
 트리 연산은 전부 인과적이라(그날까지의 값만 씀 — verify_primitives 가 강제) 전체 이력을 한 번
 계산해 날짜로 꺼낸다. 시세는 md_feed → jhts 시세팀에서 온다.
 
@@ -33,19 +34,18 @@ from datetime import datetime, timedelta
 
 from shared.paths import book_log, book_meta, write_text
 from consumers.backtest import trades
-from signals.judge import signal_series
-from signals.engine import open_history
+from signals.judge import Judge
 
 HORIZONS = (5, 10, 20)
 BUY_OR_CONFIRM = "✅+🟡 (수동 확인 가정)"
 
 
 # ------------------------------------------------------------------ 수익률 통계
-def _fwd(cs, i, h):
-    """cs[i] 가 신호일일 때 T+1 시가 진입 → T+h 종가 수익률(%). 미래 부족이면 None."""
-    if i + h >= len(cs) or not cs[i + 1].open:
+def _fwd(opens, closes, i, h):
+    """i 가 신호일일 때 T+1 시가 진입 → T+h 종가 수익률(%). 미래 부족이면 None."""
+    if i + h >= len(closes) or not opens[i + 1]:
         return None
-    return (cs[i + h].close / cs[i + 1].open - 1) * 100
+    return (closes[i + h] / opens[i + 1] - 1) * 100
 
 
 def _stats(vals):
@@ -56,7 +56,7 @@ def _stats(vals):
             "win": sum(1 for v in vals if v > 0) / len(vals) * 100}
 
 
-def _bucket(prod_rows, idx, cs, pick):
+def _bucket(prod_rows, idx, opens, closes, pick):
     """pick(row) 가 참인 날 → {days, signals, fwd} (연속 구간 첫날 진입)."""
     days, starts, prev = 0, [], False
     for r in prod_rows:
@@ -68,67 +68,65 @@ def _bucket(prod_rows, idx, cs, pick):
         prev = b
     ii = [idx[d] for d in starts if d in idx]
     return {"days": days, "signals": len(starts),
-            "fwd": {h: _stats([_fwd(cs, i, h) for i in ii]) for h in HORIZONS}}
+            "fwd": {h: _stats([_fwd(opens, closes, i, h) for i in ii]) for h in HORIZONS}}
 
 
-def _summarize(prod_rows, cs):
-    idx = {c.date: i for i, c in enumerate(cs)}
+def _summarize(prod_rows, dates, opens, closes):
+    idx = {d: i for i, d in enumerate(dates)}
     grades = {}
     for g in dict.fromkeys(r["grade"] for r in prod_rows):
-        grades[g] = _bucket(prod_rows, idx, cs, lambda r, g=g: r["grade"] == g)
-    grades[BUY_OR_CONFIRM] = _bucket(prod_rows, idx, cs, lambda r: r["key"] in ("buy", "confirm"))
+        grades[g] = _bucket(prod_rows, idx, opens, closes, lambda r, g=g: r["grade"] == g)
+    grades[BUY_OR_CONFIRM] = _bucket(prod_rows, idx, opens, closes, lambda r: r["key"] in ("buy", "confirm"))
     all_i = [idx[r["date"]] for r in prod_rows if r["date"] in idx]
-    base = {h: _stats([_fwd(cs, i, h) for i in all_i]) for h in HORIZONS}
-    hold = (cs[all_i[-1]].close / cs[all_i[0]].close - 1) * 100 if len(all_i) >= 2 else None
+    base = {h: _stats([_fwd(opens, closes, i, h) for i in all_i]) for h in HORIZONS}
+    hold = (closes[all_i[-1]] / closes[all_i[0]] - 1) * 100 if len(all_i) >= 2 else None
     return {"grades": grades, "baseline": base, "buy_hold": hold}
 
 
 # ------------------------------------------------------------------ 실행
-def run(slug, days=365, hist=None, tree=None):
-    """hist 를 주면 시세를 다시 받지 않는다(여러 기간을 한 번에 돌릴 때)."""
-    tree, hist = open_history(slug, days, tree, hist)
+def run(slug, days=365, prices=None, book=None):
+    """book(Judge)·prices 를 주면 다시 열거나 받지 않는다(여러 기간을 한 번에 돌릴 때)."""
+    book = book if book is not None else Judge.open(slug)
+    if book is None:
+        raise SystemExit("books/%s/tree.json 없음 — 조건 트리가 있어야 한다" % slug)
+    prices = prices if prices is not None else book.prices(days)
     today = datetime.now()
     start = (today - timedelta(days=days)).strftime("%Y%m%d")
-    missing = sorted(s for s, cs in hist.items() if not cs)
+    missing = Judge.missing(prices)
 
-    # 신호 = judge.signal_series(일봉 벡터 1회계산 — 라이브 latest() 와 같은 Judge.grade). 백테스트는 그 신호 뒤에
-    #   집계·계산기를 붙인다(판단/계산 분리 — 여기선 판정기가 낸 신호를 '받아쓰기'만 한다). judges=Judge(워밍업·수동조건).
-    sig = signal_series(tree, hist, start=start)
-
+    # 신호 = Judge.signals(일봉 벡터 1회계산 — 라이브 latest() 와 같은 grade 경로). 백테스트는 그 신호 뒤에
+    #   집계·계산기를 붙인다(판단/계산 분리 — 여기선 판단자가 낸 신호를 '받아쓰기'만 한다).
     rows, summary, manual, period, trade_res, incomplete = [], {}, {}, None, {}, {}
-    for p in tree.products():
-        cs = hist.get(p) or []
-        cal = [c.date for c in cs]
-        j = sig["judges"][p]
-        pts = sig["series"][p]
+    for p, (judge, pts) in book.signals(prices, start=start).items():
+        dates, opens, closes = judge.days, judge.price("open"), judge.price("close")
         prow = [{"date": pt["date"], "prod": p, "key": pt["key"], "grade": pt["grade"]} for pt in pts]
         inc_days = sum(1 for pt in pts if pt["incomplete"])   # 워밍업 부족 날 수 — ❔(불완전)로 뺀 날
         if inc_days:
             # 불완전 데이터 표면화(missing_symbols 패턴) — 필요 워밍업 대비 확정 봉이 모자란 날 수.
             #   그 날들의 1d 신호는 조용히 계산하지 않고 ❔(판정 불가)로 뺐다.
-            incomplete[p] = {"required_warmup": j.warmup, "incomplete_days": inc_days}
+            incomplete[p] = {"required_warmup": judge.warmup, "incomplete_days": inc_days}
         rows.extend(prow)
-        summary[p] = _summarize(prow, cs)
-        # 거래: 매수 신호(✅·🟡) 시작일 다음 날 시가 진입 → 책 매도 규칙으로 청산(보유 중 신호는 건너뜀).
-        #   매도 정책(trades.exit_policy)이 "none"(책에 매도 규칙 없음)이면 거래를 만들지 않는다.
-        pos_of = {d: i for i, d in enumerate(cal)}
+        summary[p] = _summarize(prow, dates, opens, closes)
+        # 거래: 매수 신호(✅·🟡) 시작일 다음 날 시가 진입 → 책 판다 규칙으로 청산(보유 중 신호는 건너뜀).
+        #   매도 정책(trades.exit_policy)이 "none"(책에 판다 규칙 없음)이면 거래를 만들지 않는다.
+        day_of = {d: i for i, d in enumerate(dates)}
         starts, prev = [], False
         for r in prow:
             b = r["key"] in ("buy", "confirm")
             if b and not prev:
-                starts.append(pos_of[r["date"]])
+                starts.append(day_of[r["date"]])
             prev = b
-        pol = trades.exit_policy(tree, p)
-        if pol == "none":           # 책에 매도 규칙 없음 — 거래를 지어내지 않는다(매수 신호 뒤 N거래일 보유만: summary)
+        sells = judge.sells()
+        pol = trades.exit_policy(sells)
+        if pol == "none":           # 책에 판다 규칙 없음 — 거래를 지어내지 않는다(매수 신호 뒤 N거래일 보유만: summary)
             trade_res[p] = {"exit_policy": pol}
         else:
-            sells = tree.sells(p)
-            # 매수 크기 = 그날 판정의 '얼마나'(j.amount — 라이브 화면과 같은 Judge 경로)에 금액 정책(trades.size_of)
-            tl = trades.build_trades(tree, p, hist, cal, starts, sells, amount=j.amount)
+            # 매수 크기 = 그날 판정의 '얼마나'(judge.amount — 라이브 화면과 같은 경로)에 금액 정책(trades.size_of)
+            tl = trades.build_trades(judge, starts, sells, amount=judge.amount)
             st = trades._parity_stats(tl)
-            trade_res[p] = {"exit_policy": pol, "unsized_note": trades.unsized_note(tree, p, sells),
+            trade_res[p] = {"exit_policy": pol, "unsized_note": trades.unsized_note(judge.tranches(), sells),
                             "size_notes": trades.size_notes(st["size_counts"]), "stats": st, "trades": tl}
-        manual[p] = [{"do": do, "rule": l, "ref": r} for do, l, r in j.manual_items()]
+        manual[p] = [{"do": do, "rule": l, "ref": r} for do, l, r in judge.manual_items()]
         if prow and period is None:
             period = [prow[0]["date"], prow[-1]["date"], len(prow)]
     return {"slug": slug, "title": book_meta(slug).get("title") or slug,

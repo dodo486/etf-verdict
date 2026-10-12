@@ -9,15 +9,15 @@
 
 ## 신호 패리티(--parity) — 왜 남아 있나
 
-백테스트와 라이브는 이제 같은 판정기(Judge.grade)를 지난다. 그래도 둘이 **구조적으로 같을 수는 없다** —
+백테스트와 라이브는 이제 같은 판단자(ProductJudge.grade)를 지난다. 그래도 둘이 **구조적으로 같을 수는 없다** —
 입력이 다르기 때문이다: 백테스트는 전체 이력을 한 번 세워 과거 날 i 를 꺼내고(asof 없음), 라이브는 그날 D 마감
 직후 가진 이력(D 이하로 잘린 hist)으로 마지막 봉을 asof(그날 마감 시각)에 판정한다. 이 둘이 같으려면 cond 연산이
 인과적이고(미래를 안 봄) asof 확정봉 가리기(settled)가 일봉 마감과 맞아야 한다 — 그걸 실행으로 확인한다.
 
   · 백테스트 경로 : `consumers.backtest.run(slug, days=N)` 의 `daily` 행 → {date, prod, key, grade}.
-                    (내부에서 judge.signal_series 가 Judge(tree, p, hist, cal).grade(i) 를 전체 달력에 돌린다.)
-  · 실시간 경로   : 각 과거일 D 에 대해 hist 를 D 이하로 잘라(judge.truncate) `Judge(tree, p, hist, asof).latest()`
-                    — 라이브 판정 엔진(signals.engine.live_decisions)이 등급을 얻는 바로 그 호출이다.
+                    (내부에서 Judge.signals 가 상품마다 ProductJudge.grade(day) 를 전체 달력에 돌린다.)
+  · 실시간 경로   : 각 과거일 D 에 대해 시세를 D 이하로 잘라(Judge.until) `book.product(p, 그 시세, asof).latest()`
+                    — 라이브 판정(Judge.decisions)이 등급을 얻는 바로 그 호출이다.
                     asof 는 그날 마감 시점(UTC).
   전 상품 × 창(데이터 있는 최근 WINDOW 거래일) 전부에서 두 경로의 (key, grade) 가 **일치**하는지. 불일치가 하나라도
   있으면 (상품·날짜·백테스트·실시간) 을 전부 나열한다 — 숨기지 않는다.
@@ -36,9 +36,9 @@ from datetime import datetime, timedelta, timezone
 
 from shared.paths import BASE, live_slugs, read_text  # (UTF-8 출력 고정 포함)
 from dsl.tradeTool import Cond, Grade
-from dsl.tree_gateway import Qty, TreeGateway, rule, synthetic
+from dsl.tree_gateway import Qty, rule, synthetic
 from consumers.backtest import trades as trades_mod
-from signals.engine import open_history
+from signals.judge import Judge
 
 Candle = namedtuple("Candle", "date open high low close volume")
 FAILS = []
@@ -61,10 +61,9 @@ def t_trades():
         return None, hist, cal
 
     def bt(_tree, hist, cal, starts, ex, trs=None):
-        """판다·산다(분할) 규칙(합성 v3 트리) → 출입구가 건넨 Rule 로 build_trades 에."""
-        tree = TreeGateway.of(synthetic({"X": None}, *(ex + (trs or []))))
-        return trades_mod.build_trades(tree, "X", hist, cal, starts, tree.sells("X"),
-                                       None if trs is None else tree.tranches("X"))
+        """판다·산다(분할) 규칙(합성 v3 트리) → 상품 판단자가 건넨 갈래로 build_trades 에."""
+        judge = Judge.of(synthetic({"X": None}, *(ex + (trs or [])))).product("X", hist, days=cal)
+        return trades_mod.build_trades(judge, starts, judge.sells(), None if trs is None else judge.tranches())
 
     def sell(label, when, of, x):
         return rule(label, Cond.SELL, when, (of, x))
@@ -117,8 +116,8 @@ def t_trades():
     ex = [sell("축소", {"ge": [R, 7]}, "held", "?")]
     t = bt(tree, hist, cal, [0], ex)[0]
     check(t["sells"] == [] and not t["closed"], "비율 미명시 매도는 팔지 않음 %r" % t["sells"])
-    tx = TreeGateway.of(synthetic({"X": None}, *ex))
-    check("「축소」" in (trades_mod.unsized_note(tx, "X", tx.sells("X")) or ""), "비율 미명시 매도 문구")
+    tx = Judge.of(synthetic({"X": None}, *ex)).product("X", hist, days=cal)
+    check("「축소」" in (trades_mod.unsized_note(tx.tranches(), tx.sells()) or ""), "비율 미명시 매도 문구")
     # (5) 마지막 날 신호 → 다음 날이 없어 체결 못 함(미청산), fixed20 은 20거래일 모자라면 None
     rows = [(100, 100), (100, 100), (100, 120)]
     tree, hist, cal = mk(rows)
@@ -185,9 +184,9 @@ def t_no_exit():
     hist = {"X": [Candle(d, 100 + k, 101 + k, 99 + k, 100 + k, 1000) for k, d in enumerate(cal)]}
     ex = [rule("익절", Cond.SELL, {"ge": [{"pos": "ret"}, 5]}, ("held", 1))]
     for exits, pol in (([], "none"), (ex, "book")):
-        tree = TreeGateway.of(synthetic({"X": None}, rule("늘", Cond.BUY, {"all": []}), *exits))   # 매수 신호는 늘 참
-        check(trades_mod.exit_policy(tree, "X") == pol, "exit_policy %r" % pol)
-        res = runner.run("x", 365, hist=hist, tree=tree)
+        book = Judge.of(synthetic({"X": None}, rule("늘", Cond.BUY, {"all": []}), *exits))   # 매수 신호는 늘 참
+        check(trades_mod.exit_policy(book.product("X", hist).sells()) == pol, "exit_policy %r" % pol)
+        res = runner.run("x", 365, prices=hist, book=book)
         t = res["trades"]["X"]
         check(t["exit_policy"] == pol, "backtest 매도 정책 %r" % t)
         if pol == "none":
@@ -201,7 +200,6 @@ def t_no_exit():
 def t_sizing():
     """금액 정책(trades.size_of) — 매수 크기 = 분할 비율 × 비중(%)/100. 크기는 그날 판정의 Judge.amount
     (라이브 화면과 같은 경로)에서 온다. 비중 미명시·모름은 ×1 로 두고 횟수를 센다."""
-    from signals.judge import Judge
     R = {"pos": "ret"}
     ON = {"gt": [{"px": "close"}, 0]}                     # 늘 참
     rows = [(100, 100), (100, 100), (100, 106), (106, 106), (106, 108), (108, 108)]
@@ -211,9 +209,8 @@ def t_sizing():
 
     def run(weight):
         cash = [] if weight is None else [rule("비중", Cond.BUY, None, ("cash", weight))]
-        tree = TreeGateway.of(synthetic({"X": None}, *(cash + trs)))
-        j = Judge(tree, "X", hist, cal)
-        tl = trades_mod.build_trades(tree, "X", hist, cal, [0], [], amount=j.amount)
+        judge = Judge.of(synthetic({"X": None}, *(cash + trs))).product("X", hist, days=cal)
+        tl = trades_mod.build_trades(judge, [0], [], amount=judge.amount)
         return tl[0]["buys"], trades_mod._parity_stats(tl)["size_counts"]
 
     # 비중 40% → 1차 0.25×0.4 · 2차(2일 +6% → 3일 시가) 0.75×0.4
@@ -240,9 +237,8 @@ def t_sizing():
     trades_mod.to_units = lambda q, ld: seen.append(q.of) or orig(q, ld)
     try:
         ex = [rule("반", Cond.SELL, {"ge": [R, 5]}, ("bought", 0.5)), rule("끝", Cond.SELL, {"ge": [R, 5]}, ("held", 1))]
-        tree = TreeGateway.of(synthetic({"X": None}, rule("비중", Cond.BUY, None, ("cash", 40)), *(trs + ex)))
-        trades_mod.build_trades(tree, "X", hist, cal, [0], tree.sells("X"),
-                                amount=Judge(tree, "X", hist, cal).amount)
+        judge = Judge.of(synthetic({"X": None}, rule("비중", Cond.BUY, None, ("cash", 40)), *(trs + ex))).product("X", hist, days=cal)
+        trades_mod.build_trades(judge, [0], judge.sells(), amount=judge.amount)
     finally:
         trades_mod.to_units = orig
     check({"budget", "cash", "bought", "held"} <= set(seen), "매수·매도·비중이 to_units 하나로 %r" % seen)
@@ -263,37 +259,37 @@ def compare(slug, window=WINDOW):
     """한 책의 두 경로를 실제로 돌려 (상품·날짜)별 (key, grade) 를 비교한다.
     → {total, match, mismatches:[{prod, date, bt_key, bt_grade, live_key, live_grade}], products, window}."""
     from consumers.backtest import runner               # 패리티만 쓰는 실제 드라이버 진입점(1·2 검사는 안 부른다)
-    from signals.judge import Judge, truncate
     # 라이브 판정(render)과 같은 방식으로 전체 일봉을 한 번 받는다(워밍업 포함).
     # window 만큼 + 워밍업을 넉넉히 — backtest.run 의 days 도 이 창을 덮게 준다.
-    tree, full = open_history(slug, window * 2 + 30)
+    book = Judge.open(slug)
+    full = book.prices(window * 2 + 30)
 
     # 백테스트 경로: 실제 드라이버 진입점. daily 행에서 (prod, date) → (key, grade).
-    bt = runner.run(slug, days=window * 2 + 30, hist=full, tree=tree)
+    bt = runner.run(slug, days=window * 2 + 30, prices=full, book=book)
     bt_daily = {(r["prod"], r["date"]): (r["key"], r["grade"]) for r in bt["daily"]}
 
     mismatches = []
     total = 0
-    for p in tree.products():
-        cs = full.get(p) or []
-        if not cs:
+    for p in book.products():
+        days = book.product(p, full).days
+        if not days:
             continue
         # 비교할 날짜 = 이 상품의 데이터 중 '최근 window 거래일'. 백테스트 daily 에도 있는 날만 센다
         # (양쪽 다 판정한 날끼리만 비교 — 한쪽이 범위 밖이면 비교 대상이 아니다).
-        dates = [c.date for c in cs][-window:]
+        dates = days[-window:]
         for d in dates:
             bt_row = bt_daily.get((p, d))
             if bt_row is None:
                 continue
             # 실시간 경로: 라이브가 D 마감 직후 봤을 입력(D 이하 이력·그날 마감 asof)으로 Judge.latest.
-            key, _close = Judge(tree, p, truncate(full, d), asof=_asof_of(d)).latest()
+            key, _close = book.product(p, Judge.until(full, d), asof=_asof_of(d)).latest()
             live_row = (key, Grade.GRADES[key])
             total += 1
             if live_row != bt_row:
                 mismatches.append({"prod": p, "date": d, "bt_key": bt_row[0], "bt_grade": bt_row[1],
                                    "live_key": live_row[0], "live_grade": live_row[1]})
     return {"slug": slug, "total": total, "match": total - len(mismatches),
-            "mismatches": mismatches, "products": tree.products(), "window": window}
+            "mismatches": mismatches, "products": book.products(), "window": window}
 
 
 def parity_text(reports):

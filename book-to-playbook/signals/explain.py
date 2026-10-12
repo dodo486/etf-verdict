@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""조건 → 화면 항목(웹 화면층). 판정 JSON 의 view·측정 증거(detail)·사유 문장을 여기서 빚는다(책 무관).
+"""판단 근거 설명(구간③ 판단자의 일부) — 조건 노드 하나 → 그날 값·측정 증거가 달린 설명 항목(책 무관).
 
-조건의 '뜻'(등급·금액·비중)은 dsl/tradeTool.py 의 Grade 한 벌이고, 여기는 그 평가 문맥(Cond.Ctx)을 받아
-사람이 읽는 모양으로 묶기만 한다 — 판정을 다시 내지 않는다.
-  · _view        노드 하나 → 화면 항목 하나(중첩 설명 + 그날 값 + 측정 증거)
+조건을 시세로 평가하는 일이라 판단자(signals/judge)만 부른다 — 화면(consumers/display)은 판단자가 낸 설명을
+그리기만 한다(표시는 판단하지 않는다). 평가 문맥(Cond.Ctx)은 판단자가 만든다.
+  · view         노드 하나 → 설명 항목 하나(중첩 설명 + 그날 값 + 측정 증거)
+  · static_view  값 없는 규칙 설명(시세·포지션 없이)
   · _measure 외  '무엇을 재서 얼마였나'(측정 증거)
-  · reason_of    등급 사유 한 줄
 """
 from dsl.tradeTool import Cond
 
@@ -160,7 +160,7 @@ def _measure(node, ctx, i, top=True):
     return facts
 
 
-def _view(node, ctx, i):
+def view(node, ctx, i):
     """노드 하나 → 화면 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, hidden?}.
 
     · 논리 노드(all/any/atleast/not)는 op 와 자식 항목 전부를 담는다 — 화면이 사람이 체크한 수동 조건으로
@@ -191,7 +191,7 @@ def _view(node, ctx, i):
             if node["atleast"] == Cond.UNKNOWN:  # 몇 개 필요한지 저자 미명시 — 묶음은 수동(사람이 개수 판단), 단 후보는 펼친다
                 item["manual"] = Cond.UNKNOWN_REASON
                 item["mkey"] = Cond.manual_key(node)
-        item["kids"] = [_view(k, kctx, i) for k in kids]
+        item["kids"] = [view(k, kctx, i) for k in kids]
     elif Cond.is_unknown(node):
         # 저자가 숫자를 안 준 식("?") — 사람이 정하는 수동 잎. 답을 묶는 열쇠는 식(문장 아님 — 같은 식 = 같은 질문).
         item["manual"] = Cond.UNKNOWN_REASON
@@ -199,7 +199,7 @@ def _view(node, ctx, i):
     elif op == "manual":
         item["manual"] = node["manual"]
     else:
-        inner = [_view(k, ctx, i) for k in _labeled_inside(node)]
+        inner = [view(k, ctx, i) for k in _labeled_inside(node)]
         if inner:
             item["kids"] = inner
         if not node.get("label"):
@@ -234,20 +234,18 @@ def _labeled_inside(node):
     return out
 
 
-def reason_of(key, ex, manual):
-    """등급 사유 한 줄 — 무엇이 걸렸는지 라벨로. ex = 동사별 맨 위 라벨 노드 값, manual = [(동사, 라벨, ref)]."""
-    def labels(do, val):
-        return [l for l, _, v in ex.get(do, []) if l and v is val]
-    if key == "avoid":
-        hit = labels(Cond.BLOCK, True)
-        return "%s: %s" % (Cond.BLOCK, " · ".join(hit[:3]) if hit else "조건 참")
-    if key == "wait":
-        return "%s 신호 없음 — 관망" % Cond.BUY
-    if key == "confirm":
-        items = [l for d, l, _ in manual if d == Cond.BUY] + \
-                ["(%s 아님) %s" % (Cond.BLOCK, l) for d, l, _ in manual if d == Cond.BLOCK]
-        return "수동·장중 확인 시 %s: %s" % (Cond.BUY, " · ".join(items[:4]))
-    if key == "buy":
-        ok = labels(Cond.BUY, True)
-        return "%s: %s" % (Cond.BUY, " · ".join(ok[:3]) if ok else "조건 충족")
-    return "데이터 부족으로 판정 불가"
+def static_view(node, index=None):
+    """포지션·시세 없이 보이는 규칙 설명(값 없음) — 라벨·논리 묶음·수동 사유만(비중·분할·판다 갈래, 시세 없는 상품)."""
+    if node is None:
+        return None
+
+    def strip(it):
+        it = {k: x for k, x in it.items() if k != "v"}
+        if "kids" in it:
+            it["kids"] = [strip(k) for k in it["kids"]]
+        return it
+    ctx = Cond.Ctx({}, ["0"], "$none", index, manual_as=None, pos=(0, 1.0))
+    try:
+        return strip(view(node, ctx, 0))
+    except Cond.CondError:
+        return None

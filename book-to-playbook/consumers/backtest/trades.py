@@ -34,13 +34,12 @@ build_trades 결과(체결 일정)를 받아서 낸다. 매도 정책(책에 매
   · _parity_stats  : 머리가 정한 거래 경계(한 진입→청산)로 집계한 거래 요약(거래수·승률·거래당 평균 등).
   · _position_facts: 지금 열려 있는(미청산) 마지막 거래의 사실(진입가·평단·현재수익률·보유일 등).
 
-트리는 호출자가 넘긴 TreeGateway(gw — dsl/tree_gateway.py)로 읽는다 — 규칙은 gw 가 건네는 Rule(label·when·qty)로만,
-수량은 정규화된 Qty(of, x)로만 다룬다(원본 키 모양을 모른다).
+트리·시세 원본은 모른다 — 상품 판단자(signals/judge.ProductJudge)에게 갈래 목록(판다·분할 Branch 값)·날짜·가격(시가·종가)·
+'이 보유 상태로 조건 값'(conditions)을 받아 체결(언제 몇 주)만 정한다. 수량은 정규화된 Qty(of, x)로만 다룬다.
 """
 import statistics
 from collections import namedtuple
 
-from dsl.tradeTool import Cond
 from dsl.tree_gateway import Qty, Rule
 from signals.judge import Holding
 
@@ -48,23 +47,21 @@ FULL = [Rule("전량", qty=Qty("budget", 1.0))]    # 한 번에 전량 — 분�
 NO_EXIT_NOTE = "책에 매도 규칙 없음 — 매수 신호만 평가"   # 매도 정책 "none" 의 표시 문구(백테스트 탭·판정 화면이 받아 쓴다)
 
 
-def exit_policy(gw, prod):
+def exit_policy(sells):
     """매도 정책 — 이 함수 하나가 주인이다(밖은 이걸 묻는다). "book" = 책의 매도 규칙으로 청산까지 시뮬레이션.
     "none" = 책에 매도 규칙이 없다 → 대체 매도 규칙을 지어내지 않고, 거래 시뮬레이션 없이 매수 신호 뒤
     N거래일 보유 수익률(backtest 의 HORIZONS)로만 평가한다(화면 문구 NO_EXIT_NOTE)."""
-    return "book" if gw.sells(prod) else "none"
+    return "book" if sells else "none"
 
 
-def tranches_of(gw, prod, trs=None):
-    """시뮬레이션에 쓰는 분할(trs 생략 = 트리의 분할) — 없거나 저자가 비율을 안 줬으면("?") 전량 한 번으로
+def tranches_of(trs):
+    """시뮬레이션에 쓰는 분할 — 없거나 저자가 비율을 안 줬으면("?") 전량 한 번으로
     계산한다(비율을 지어내지 않는다 — 결과에 unsized_note 로 표시)."""
-    trs = gw.tranches(prod) if trs is None else trs
     return FULL if (not trs or trs[0].qty.x is None) else trs
 
 
-def unsized_note(gw, prod, sells):
+def unsized_note(trs, sells):
     """저자가 비율을 안 준 수량 자리를 백테스트가 어떻게 계산했는지 — 없으면 None."""
-    trs = gw.tranches(prod)
     out = ["분할 비율 저자 미명시 — 전량 한 번 매수로 계산"] if trs and trs[0].qty.x is None else []
     out += ["매도 비율 저자 미명시 「%s」 — 팔지 않은 것으로 계산" % r.label for r in sells if r.qty.x is None]
     return " · ".join(out) or None
@@ -142,10 +139,10 @@ def size_notes(counts):
 
 
 # ------------------------------------------------------------------ 규칙 평가 워크: 신호·규칙 → 체결 일정(buys/sells)
-def build_trades(gw, prod, hist, cal, starts, sell_rules, tranches=None, amount=None):
-    """머리(tree — gw)가 정한 진입 신호·분할·매도 규칙을 받아 '한 진입 → 그 청산까지'의 거래 목록을 만든다.
-    평단은 여기(규칙 평가 워크)가 봉마다 계산해 Holding 으로 주입하고, cond.py(순수 규칙 평가기)는 그 포지션 값을
-    pos 로 '읽어' 판다·분할 갈래만 평가한다. 돈·수수료·지표는 손대지 않는다 — 그건 계산기(portfolio)가 한다.
+def build_trades(judge, starts, sell_rules, tranches=None, amount=None):
+    """상품 판단자(judge — ProductJudge)가 낸 진입 신호·분할·판다 갈래로 '한 진입 → 그 청산까지'의 거래 목록을 만든다.
+    평단·체결 장부는 여기(체결 워크)가 봉마다 계산해 Holding 으로 넘기고, 조건 값은 판단자가 그 보유 상태로
+    평가해 준다(judge.conditions). 돈·수수료·지표는 손대지 않는다 — 그건 계산기(portfolio)가 한다.
 
     규약(계산기가 체결 타이밍을 다시 정하지 않는다):
       · 물량 단위 = 시작자본 1.0. 사고팔 양은 전부 to_units(규칙 Qty, 장부) 하나로 낸다:
@@ -163,20 +160,19 @@ def build_trades(gw, prod, hist, cal, starts, sell_rules, tranches=None, amount=
       · 수익률 = (판 금액 + 남은 물량 × 마지막 종가) ÷ 산 금액 − 1. 미청산은 마지막 종가로 평가.
       · manual 은 '매매가 안 나가는 쪽'으로 푼다(manual_as=False). 매도 비율 "?"(저자 미명시)도 같은 쪽 — 팔지 않는다.
 
-    starts = 신호 시작일 인덱스 목록. sell_rules·tranches = [Rule](gw 가 건넨 것), tranches 생략 = 트리의 분할(tranches_of).
-    amount = 봉 인덱스 → judge.Amount(Judge.amount — 라이브와 같은 경로) | None. 각 매수에 size(배수)·flags(모름) 를 남긴다."""
-    tranches = tranches_of(gw, prod, tranches)
+    starts = 신호 시작일 인덱스 목록. sell_rules·tranches = 판단자가 건넨 갈래(Branch), tranches 생략 = 그 상품의 분할.
+    amount = 봉 인덱스 → Amount(judge.amount — 라이브와 같은 경로) | None. 각 매수에 size(배수)·flags(모름) 를 남긴다."""
+    tranches = tranches_of(judge.tranches() if tranches is None else tranches)
+    days = judge.days
 
     def buy(i, at, t):
         """i 번째 봉에서 정한 차수 t 의 매수(체결 at = 다음 봉) — 물량은 to_units(차수 Qty, 그날 장부)."""
         led, fl = size_of(amount(i)) if amount is not None else (Ledger(), set())
-        return {"date": cal[at], "px": opens[at], "qty": to_units(t.qty, led), "tranche": t.label,
+        return {"date": days[at], "px": opens[at], "qty": to_units(t.qty, led), "tranche": t.label,
                 "size": to_units(Qty("budget", 1.0), led), "flags": sorted(fl)}
-    cs = {c.date: c for c in hist.get(prod) or []}
-    at = {d: k for k, d in enumerate(cal)}
-    opens = [cs[d].open if d in cs else None for d in cal]
-    closes = [cs[d].close if d in cs else None for d in cal]
-    L = len(cal)
+    at = {d: k for k, d in enumerate(days)}
+    opens, closes = judge.price("open"), judge.price("close")
+    L = len(days)
     out, free_from = [], 0
     for s in starts:
         e = s + 1
@@ -205,15 +201,13 @@ def build_trades(gw, prod, hist, cal, starts, sell_rules, tranches=None, amount=
             return {"filled": filled, "sold": [(g / q) if q > 1e-12 else None for g, q in zip(gone, got)]}
 
         def rebuild(frm):
-            """frm 부터 평단이 바뀐다 → 날짜별 평단(cost)을 다시 계산해 장부와 함께 pos 로 cond 에 주입(상태 주입).
-            cond 는 그 값을 읽어 ret/days/maxret/minret/filled/sold 로 판다·분할 갈래만 평가한다(역류 아님)."""
+            """frm 부터 평단이 바뀐다 → 날짜별 평단(cost)을 다시 계산해 장부와 함께 보유 상태로 넘기고, 판단자가 그 상태로
+            판다·분할 갈래의 날짜별 값을 평가해 준다(manual 은 매매가 안 나가는 쪽)."""
             q = sum(b["qty"] for b in buys)
             avg = sum(b["qty"] * b["px"] for b in buys) / q
             for k in range(frm, L):
                 cost[k] = avg
-            ctx = Holding(e, list(cost), book=book()).ctx(gw, prod, hist, cal, manual_as=False)
-            return ([Cond.series(r.when, ctx) for r in sell_rules],
-                    [Cond.series(t.when, ctx) if t.when is not None else None for t in tranches])
+            return judge.conditions(Holding(e, list(cost), book=book()), sell_rules, tranches, manual_as=False)
 
         nxt, sells, fired, last = 1, [], set(), None
         whens, twhens = rebuild(e)
@@ -233,7 +227,7 @@ def build_trades(gw, prod, hist, cal, starts, sell_rules, tranches=None, amount=
                 q = min(q, remaining)             # 남은 것보다 많이 팔 수는 없다
                 if q <= 1e-12:
                     continue
-                sells.append({"date": cal[d + 1], "px": opens[d + 1], "qty": q, "rule": r.label})
+                sells.append({"date": days[d + 1], "px": opens[d + 1], "qty": q, "rule": r.label})
                 remaining -= q
                 sold_today = True
             if remaining <= 1e-9:
@@ -256,7 +250,7 @@ def build_trades(gw, prod, hist, cal, starts, sell_rules, tranches=None, amount=
         if not closed:
             value += remaining * (closes[L - 1] or buys[-1]["px"])
         px = opens[e]
-        out.append({"entry": cal[e], "entry_px": px, "exit": cal[end] if closed else None,
+        out.append({"entry": days[e], "entry_px": px, "exit": days[end] if closed else None,
                     "closed": closed, "days": end - e, "ret": (value / spent - 1) * 100,
                     "buys": buys, "sells": sells, "fixed20": ((closes[e + 19] / px - 1) * 100
                                                               if e + 19 < L and closes[e + 19] else None)})

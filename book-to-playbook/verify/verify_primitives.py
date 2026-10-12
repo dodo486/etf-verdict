@@ -564,7 +564,7 @@ def t_grade():
     hist = {"X": [Candle(d, c, c, c, c, 1000) for d, c in zip(cal, xs)]}
     tree = TreeGateway.of(synthetic({"X": None},
                                     rule("비중", Cond.BUY, None, ("cash", {"case": [[{"manual": "모드"}, 14]], "else": 34}))))
-    pe = Grade.ProductEval(tree, "X", hist, cal)
+    pe = Grade.ProductEval(tree.product("X"), hist, cal)
     w, alt = pe.weight_of(len(xs) - 1)
     check(w is None and alt == [14.0, 34.0], "수동 모드 비중은 모름 + 범위 %r %r" % (w, alt))
 
@@ -592,7 +592,7 @@ def t_answers():
     check(v(m, None, {"B|실적 좋음": True}) is None, "다른 상품의 답은 안 먹는다")
     check(v(unk, True, {k(unk, "A"): False}) is False, "\"?\" 식도 답으로 풀린다")
     tree = TreeGateway.of(synthetic({"A": None}, rule("실적", Cond.BUY, {"all": [m]})))
-    got = [Grade.ProductEval(tree, "A", hist, cal, answers=a).grade_key(2)
+    got = [Grade.ProductEval(tree.product("A"), hist, cal, answers=a).grade_key(2)
            for a in (None, {"A|실적 좋음": True}, {"A|실적 좋음": False})]
     check(got == ["confirm", "buy", "wait"], "등급까지 답으로 풀린다(확인 대기 → 매수 후보·관망) %r" % got)
 
@@ -641,7 +641,7 @@ def t_warmup_guard():
     xs = [x if x is not None else 100.0 for x in rand_series(rng, need + 40, miss=0)]
     cal = ["2024%04d" % i for i in range(len(xs))]
     hist = {"P": [Candle(d, c, c, c, c, 1000) for d, c in zip(cal, xs)]}
-    pe = Grade.ProductEval(tree, "P", hist, cal)
+    pe = Grade.ProductEval(tree.product("P"), hist, cal)
     # 초기 W 개 봉(index 0..W-1)은 확정 봉이 모자라 incomplete → grade_key 가 ❔(unknown).
     check(all(pe.incomplete(i) for i in range(W)), "워밍업 부족 구간(0..%d) 전부 incomplete" % (W - 1))
     check(all(pe.grade_key(i) == "unknown" for i in range(W)),
@@ -665,7 +665,7 @@ def t_warmup_guard():
     # 짧게 잘린 쪽은 워밍업이 모자란 꼬리 봉을 ❔ 로 뺀다(바로 그 '251봉 vs 594봉' 버그를 잡는 경로).
     short = {"P": [Candle(d, c, c, c, c, 1000) for d, c in zip(cal, xs)][-30:]}   # 꼬리 30봉만(워밍업 없음)
     short_cal = [c.date for c in short["P"]]
-    pe_short = Grade.ProductEval(tree, "P", short, short_cal)
+    pe_short = Grade.ProductEval(tree.product("P"), short, short_cal)
     check(all(pe_short.incomplete(i) for i in range(len(short_cal))),
           "짧게 잘린 이력(워밍업 없음)은 전 구간 불완전 — 긴 이력이면 신호 낼 꼬리까지 ❔ 로 뺀다")
     last = len(cal) - 1

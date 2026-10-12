@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""화면층 검사기 — 조건 → 화면 항목(condition_view._view)의 구조·측정 증거(책 무관 · 크기 고정) + 책 페이지 구조(--pages).
+"""화면층 검사기 — 판단자가 내는 조건 설명(ProductJudge.view)의 구조·측정 증거(책 무관 · 크기 고정) + 책 페이지 구조(--pages).
 
 판정 JSON 의 view 는 화면(checklist-ui)이 조건 칸을 그리고 수동 조건의 답 열쇠(mkey·shared)를 만드는 모양이다
 (값은 서버가 낸다 — 서버 권위). 그 모양(논리 노드의 op·kids, 라벨 없는 잎의 hidden, "?" 창 설명)을 손으로 정한 답과
@@ -17,9 +17,8 @@ from collections import namedtuple
 
 from shared import paths  # noqa: F401  (UTF-8 출력)
 from shared.paths import live_slugs, playbook_html, read_text
-from dsl.tradeTool import Grade
-from dsl.tree_gateway import TreeGateway, synthetic
-from consumers.display import condition_view as cv
+from dsl.tree_gateway import synthetic
+from signals.judge import Judge
 
 Candle = namedtuple("Candle", "date open high low close volume")
 C = {"px": "close"}
@@ -37,18 +36,17 @@ def t_view():
     cal = ["2022%04d" % i for i in range(len(xs))]
     hist = {"X": [Candle(d, c, c, c, c, 1000) for d, c in zip(cal, xs)]}
     jump = {"ge": [{"mul": [{"sub": [{"div": [C, {"lag": [C, 1]}]}, 1]}, 100]}, 20]}   # 전일 대비 +20% 이상
-    tree = TreeGateway.of(synthetic({"X": None}))
-    pe = Grade.ProductEval(tree, "X", hist, cal)
+    judge = Judge.of(synthetic({"X": None})).product("X", hist, days=cal)
     node = {"all": [dict(jump, label="급등", ref="1"), {"not": {"label": "수동", "manual": "x"}}]}
-    v = cv._view(node, pe.ctx[None], len(xs) - 1)
+    v = judge.view(node, len(xs) - 1)
     check(v["op"] == "all" and v["kids"][0]["v"] is True and v["kids"][0]["label"] == "급등"
           and v["kids"][1]["op"] == "not" and v["kids"][1]["kids"][0]["manual"] == "x", "view 구조 %r" % v)
-    hid = cv._view({"atleast": 1, "of": [jump, {"manual": "y"}]}, pe.ctx[None], len(xs) - 1)
+    hid = judge.view({"atleast": 1, "of": [jump, {"manual": "y"}]}, len(xs) - 1)
     check(hid["op"] == "atleast" and hid["n"] == 1 and hid["kids"][0].get("hidden") is True
           and hid["kids"][0]["v"] is True, "라벨 없는 잎은 hidden 으로 값과 함께 %r" % hid)
     # 창 길이·lag 가 "?"(저자 미명시)인 식도 근거 설명이 죽지 않는다 — "?일" 로 보인다
     unk = {"label": "최근 ?일 급등", "ge": [{"lag": [C, "?"]}, {"lowest": [C, "?"]}]}
-    d = cv._view(unk, pe.ctx[None], len(xs) - 1).get("detail") or []
+    d = judge.view(unk, len(xs) - 1).get("detail") or []
     check(d and d[0]["lhsd"] == "종가 ?일 전" and d[0]["rhsd"] == "?일 최저", "\"?\" 창 설명 %r" % d)
 
 

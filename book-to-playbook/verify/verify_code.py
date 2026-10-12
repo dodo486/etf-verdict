@@ -328,6 +328,54 @@ def m_gone_ops(src):
     return out
 
 
+# 판단자 — 트리 원본·시세 원본·조건 평가를 쓰는 곳은 판단자(signals/judge) 하나와 그 도구(dsl)뿐.
+GATEWAY_NAMES = {"TreeGateway", "ProductRules"}
+EVAL_ATTRS = {"series", "Ctx", "ProductEval"}                       # Cond.series·Cond.Ctx·Grade.ProductEval
+FETCH_ATTRS = {"history", "history_back", "History", "histories", "minutes", "sessions"}   # Grade.·md_feed. 시세 받기
+BAR_FIELDS = {"open", "high", "low", "close", "volume"}               # 캔들(시세 원본) 필드
+
+
+def _call_funcs(tree):
+    return {id(n.func) for n in ast.walk(tree) if isinstance(n, ast.Call)}
+
+
+def m_gateway_use(src):
+    """출입구(TreeGateway·ProductRules)를 이름으로 쓰는 자리 — import 포함."""
+    if src.kind != "py":
+        return []
+    out = [(ln, f, x) for ln, f, x in _py_names(src) if x in GATEWAY_NAMES]
+    for n, fn in _py_nodes(src.tree):
+        if isinstance(n, ast.ImportFrom) and n.module == "dsl.tree_gateway":
+            out.extend((n.lineno, fn, a.name) for a in n.names if a.name in GATEWAY_NAMES)
+    return out
+
+
+def m_evaluate(src):
+    """조건을 직접 평가하는 자리 — Cond.series·Cond.Ctx·Grade.ProductEval."""
+    if src.kind != "py":
+        return []
+    return [(n.lineno, fn, "%s.%s" % (n.value.id, n.attr)) for n, fn in _py_nodes(src.tree)
+            if isinstance(n, ast.Attribute) and n.attr in EVAL_ATTRS and isinstance(n.value, ast.Name)
+            and n.value.id in ("Cond", "Grade")]
+
+
+def m_raw_prices(src):
+    """시세 원본을 만지는 자리 — 시세 받기(Grade.history…·md_feed.histories…)와 캔들 필드(.open·.close…) 읽기.
+    (메서드 호출 f.close() 처럼 호출되는 속성은 뺀다.)"""
+    if src.kind != "py":
+        return []
+    calls = _call_funcs(src.tree)
+    out = []
+    for n, fn in _py_nodes(src.tree):
+        if not isinstance(n, ast.Attribute) or not isinstance(n.ctx, ast.Load):
+            continue
+        if n.attr in FETCH_ATTRS and isinstance(n.value, ast.Name) and n.value.id in ("Grade", "md_feed"):
+            out.append((n.lineno, fn, "%s.%s" % (n.value.id, n.attr)))
+        elif n.attr in BAR_FIELDS and id(n) not in calls:
+            out.append((n.lineno, fn, "." + n.attr))
+    return out
+
+
 def _labels():
     """동사·등급 이름표 글자 — 정본(Cond.VERBS · Grade.GRADES)에서 읽는다(여기 다시 적지 않는다)."""
     from dsl.tradeTool import Cond, Grade
@@ -379,11 +427,29 @@ OWNERS = [
          why="매수 크기(비중 × 분할)와 모름(비중 미명시·모름)을 어떻게 셀지는 trades.size_of 하나 — "
              "그 사실은 Judge.amount 한 경로로만(라이브 화면 = 백테스트)",
          hint="Judge.amount 로 사실을, trades.size_of 로 크기를",
-         allow={("signals/judge.py", "amount"): (AMOUNT_FACTS, "Judge.amount — 그날 사실(Amount)을 꺼내는 한 경로")}),
+         allow={("signals/judge.py", "amount"): (AMOUNT_FACTS, "ProductJudge.amount — 그날 사실(Amount)을 꺼내는 한 경로"),
+                ("signals/judge.py", "weight_at"): (AMOUNT_FACTS, "검사기용 그날 비중 사실(매수 크기 정책 아님)")}),
     dict(concept="수량 변환", owners=("consumers/backtest/trades.py",), match=m_qty_convert,
          why="'얼마나'(Qty: cash·budget·bought·held)를 물량으로 바꾸는 곳은 trades.to_units 하나 — 매수(분할)·매도·"
              "비중이 같은 변환을 지난다. 밖은 Qty 를 건네기만 하고 basis 를 가르거나 셈하지 않는다",
          hint="trades.to_units(Qty, Ledger) · 화면은 엔진이 낸 units·sell 문장으로", allow={}),
+    dict(concept="트리 출입구 사용", owners=("dsl/tree_gateway.py", "dsl/tradeTool.py", "signals/judge.py"),
+         match=m_gateway_use,
+         why="트리 원본을 쓰는 곳은 판단자(signals/judge) 하나 — 다른 층(체결·화면·라이브·검사)은 판단자에게 묻는다",
+         hint="signals.judge.Judge(책)·ProductJudge(상품)에 물을 것",
+         allow={("verify/verify_primitives.py", None): (None, "도구 단위 검사 — 출입구 자체의 계약을 시험한다")}),
+    dict(concept="조건 평가(판단)", owners=("dsl/tradeTool.py", "dsl/tree_gateway.py", "signals/judge.py", "signals/explain.py"),
+         match=m_evaluate,
+         why="책의 내용대로 시세를 판단하는 곳은 판단자 하나 — 체결 워크·화면·검사기는 판단자가 낸 값만 쓴다",
+         hint="ProductJudge.decide·conditions·evaluate·view 로",
+         allow={("verify/verify_primitives.py", None): (None, "도구 단위 검사 — 평가기 자체를 시험한다")}),
+    dict(concept="시세 원본", owners=("dsl/tradeTool.py", "signals/judge.py", "market/md_feed.py", "market/_dev_cache.py"),
+         match=m_raw_prices,
+         why="시세 원본(받기·캔들 필드)을 만지는 곳은 판단자 하나(+ 도구 평가기·시세 창구) — 다른 층은 판단자의 가격·판정만",
+         hint="Judge.prices·shared_prices·recent, ProductJudge.price·days 로",
+         allow={("verify/verify_primitives.py", None): (None, "도구 단위 검사 — 평가기에 넣을 합성 캔들을 만든다"),
+                ("consumers/display/verdict_view.py", None): ({".close"}, "판단자가 낸 Decision.close(가공된 종가)"),
+                ("authoring/playbook/book_source.py", None): (None, "원문 파일 읽기(시세 아님)")}),
     dict(concept="지운 연산", owners=(), match=lambda src: [], everywhere=m_gone_ops,
          why="전용 지표 연산(ma·ema·stdev·rsi)은 지웠다 — 지표는 기본 부품(sum·lag·pct·case…) 조합으로 쓴다. 정본 목록 Cond.GONE_OPS",
          hint="COND_DSL 6절 조합 예시로(평균 = sum ÷ n)",

@@ -81,7 +81,7 @@ def compute_verdict(slug, force=False):
     """책 slug 의 판정 — 2단 pub-sub 허브가 이미 빚어 둔 최신 top(verdict_bus 소비자 캐시)이 있으면 그걸,
     없으면(허브 틱 전) TTL 캐시/엔진 서브프로세스로 한 번 계산해 (data, from_cache) 반환.
 
-    허브 top 은 render(slug) 와 내용이 같다(engine.live_decisions → _format, 서브프로세스 --json 과 동일 경로).
+    허브 top 은 render(slug) 와 내용이 같다(Judge.decisions → _format, 서브프로세스 --json 과 동일 경로).
     서브프로세스 경로는 러너·콜드 스타트용으로 남겨 둔다(books.json engine.daily — 배치 러너가 그대로 쓴다)."""
     if not force:
         top = _hub.latest(slug)

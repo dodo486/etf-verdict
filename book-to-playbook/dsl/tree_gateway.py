@@ -78,6 +78,43 @@ def _qty(q, default=None, expand=lambda x: x):
     return Qty(q.get("of"), _num(expand(q.get("x")))) if q else default
 
 
+class ProductRules:
+    """상품 하나에 걸리는 규칙 묶음(읽기 전용) — 출입구가 내주고, 판단자(signals/judge)가 그 상품을 판정할 때 쓴다.
+    판정에 필요한 것은 이 상품의 기준지수·등급 조건·비중·분할·판다·심볼·워밍업뿐이다(책의 다른 상품은 모른다)."""
+
+    def __init__(self, tree, product):
+        self._tree, self.product = tree, product
+
+    @property
+    def index(self):
+        return self._tree.index(self.product)
+
+    @property
+    def note(self):
+        return self._tree.note(self.product)
+
+    def gate(self, do):
+        return self._tree.gate(self.product, do)
+
+    def weight(self):
+        return self._tree.weight(self.product)
+
+    def tranches(self):
+        return self._tree.tranches(self.product)
+
+    def sells(self):
+        return self._tree.sells(self.product)
+
+    def expressions(self):
+        return self._tree.expressions(self.product)
+
+    def symbols(self):
+        return self._tree.symbols([self.product])
+
+    def warmup(self):
+        return self._tree.warmup(self.product)
+
+
 class TreeGateway:
     """트리 하나(v3 규칙 목록). load/read/open/of 로 만들고 질문으로 읽는다.
     갈래를 do 동사로 골라 건네고, {"rule"}·이름 심볼은 펼쳐 건넨다."""
@@ -301,6 +338,12 @@ class TreeGateway:
 
     def products(self):
         return list(self._d["products"])
+
+    def product(self, product):
+        """상품 하나의 규칙 묶음(ProductRules)."""
+        if not self.has(product):
+            raise Cond.CondError("트리에 없는 상품 %r" % product)
+        return ProductRules(self, product)
 
     def has(self, prod):
         return prod in self._d["products"]

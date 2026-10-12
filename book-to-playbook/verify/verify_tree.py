@@ -10,7 +10,7 @@
   대조했다. 그래서 '2'라는 글자만 있으면 2거래일 유지가 1일로 판정돼도 통과했고, 사전에 없는
   새 조건(RSI·볼린저…)은 '찾은 게 없으니 누락도 없음'으로 통과했다. 이 검사는 규칙을 실제 시세와
   원문 사례에 돌려 본다 — 조건 종류를 몰라도 같은 절차가 돈다. 트리의 뜻은 dsl/(cond·grade)
-  한 벌이라 여기서 본 동작이 곧 구간③ 판정 엔진의 동작이다. 트리 읽기도 판정 엔진과 같은 출입구(TreeGateway).
+  한 벌이라 여기서 본 동작이 곧 구간③ 판정 엔진의 동작이다. 트리·시세는 판정과 같은 판단자(signals/judge.Judge).
 
 무엇을 하나 (books/<slug>/ 아래) — 정지·경고의 뜻과 고칠 곳은 authoring/checklist/JUDGE.md 5절
   1. 최종 트리(tree.json, 심판이 씀) — 라이브 책은 반드시 있어야 하고, 문법 검사를 통과해야 한다.
@@ -52,8 +52,7 @@ from shared import paths  # noqa: F401  (UTF-8 출력)
 from shared.paths import book_file, book_log, live_slugs, source_index_json, write_text
 from dsl.tradeTool import Cond, Grade
 from market import md_feed
-from dsl.tree_gateway import TreeGateway
-from signals.judge import Holding
+from signals.judge import Holding, Judge
 
 Candle = namedtuple("Candle", "date open high low close volume")
 COMPARED = Cond.GATES + ("weight",)                   # 날마다 비교하는 것(등급 동사 둘 + 비중 — 분할·판다는 거래로)
@@ -70,29 +69,29 @@ def _load(slug, name):
 
 
 def _load_tree(slug, name):
-    """후보 트리(검사 전) — 트리 읽기는 출입구(TreeGateway) 하나로. 없으면 빈 출입구(거짓 — 옛 None 과 같게 걸러진다)."""
-    t = TreeGateway.read(slug, name)
-    return t if t is not None else TreeGateway(None)
+    """후보 트리(검사 전) — 트리·시세는 판단자(Judge) 하나로. 없으면 빈 판단자(거짓)."""
+    return Judge.read(slug, name)
 
 
 # ------------------------------------------------------------------ 실제 시세 평가
-def _history(trees, years):
-    return Grade.history_back([t for t in trees if t], int(365 * years))
+def _history(books, years):
+    return Judge.shared_prices([b for b in books if b], int(365 * years))
 
 
-def _day_values(pe, i):
+def _day_values(judge, i):
     """그날 값 — 등급 동사는 수동 = 모름 평가, 비중은 (값, 범위)."""
-    out = {do: Cond.series(pe.gw.gate(pe.prod, do), pe.ctx[None])[i] for do in Cond.GATES}
-    w, alt = pe.weight_of(i)
+    out = {do: judge.gate_value(do, i) for do in Cond.GATES}
+    w, alt = judge.weight_at(i)
     out["weight"] = (None if w is None else round(w, 6), tuple(alt or ()))
-    out["grade"] = pe.grade_key(i)
+    out["grade"] = judge.grade(i)
     return out
 
 
-def _eval(tree, prod, hist, cal):
-    pe = Grade.ProductEval(tree, prod, hist, cal)
-    days = [_day_values(pe, i) for i in range(len(cal))]
-    return {k: [d[k] for d in days] for k in COMPARED + ("grade",)}, pe
+def _eval(book, prod, prices, days=None):
+    """상품 하나를 그 책 판단자로 달력 전체 평가 → ({항목: 날짜별 값}, ProductJudge). days 생략 = 그 상품 봉 날짜."""
+    judge = book.product(prod, prices, days=days)
+    vals = [_day_values(judge, i) for i in range(len(judge.days))]
+    return {k: [d[k] for d in vals] for k in COMPARED + ("grade",)}, judge
 
 
 def _window(cal, years):
@@ -107,8 +106,8 @@ def compare(ta, tb, hist, years):
         if not tb.has(p):
             res[p] = {"missing_in_b": True}
             continue
-        cal = [c.date for c in hist.get(p) or []]
-        ea, _ = _eval(ta, p, hist, cal)
+        ea, ja = _eval(ta, p, hist)
+        cal = ja.days
         eb, _ = _eval(tb, p, hist, cal)
         idx = _window(cal, years)
         res[p] = {}
@@ -159,9 +158,9 @@ def _synthetic(sc, symbols):
     return hist, cal
 
 
-def _outcome(view, i):
-    """등급 동사 값(opt 또는 pes 한쪽) → 그날 결과(안 산다·산다·관망) — 하나로 안 정해지면 None."""
-    block, buy = view[Cond.BLOCK][i], view[Cond.BUY][i]
+def _outcome(judge, i, view):
+    """등급 동사 값(view = "opt" 낙관 · "pes" 비관) → 그날 결과(안 산다·산다·관망) — 하나로 안 정해지면 None."""
+    block, buy = judge.gate_value(Cond.BLOCK, i, view), judge.gate_value(Cond.BUY, i, view)
     if block is True:
         return Cond.BLOCK
     if block is False and buy is True:
@@ -171,10 +170,10 @@ def _outcome(view, i):
     return None
 
 
-def _sell_hit(tree, p, hist, cal, m):
+def _sell_hit(judge, m):
     """첫날 종가에 사서 들고 있었다면 마지막 날 판다 갈래가 걸렸나 — 참·거짓·모름(manual_as=m)."""
-    ctx = Holding(0, hist[p][0].close).ctx(tree, p, hist, cal, manual_as=m)
-    vals = [Cond.series(r.when, ctx)[-1] for r in tree.sells(p)]
+    holding = Holding(0, judge.price("close")[0])
+    vals = [judge.evaluate(r.when, m, holding)[-1] for r in judge.sells()]
     return True if True in vals else (False if all(v is False for v in vals) else None)
 
 
@@ -186,16 +185,16 @@ def scenario_result(tree, sc):
     if "section" in sc or want not in Cond.VERBS + (WAIT,) or not tree.has(p):
         return "형식오류", None                  # 옛 칸 사례(section·참/거짓 기대값) 또는 모르는 결과·상품
     hist, cal = _synthetic(sc, tree.symbols())
+    judge = tree.product(p, hist, days=cal)
     if want == Cond.SELL:
-        alts = {_sell_hit(tree, p, hist, cal, m) for m in (None, True, False)}
+        alts = {_sell_hit(judge, m) for m in (None, True, False)}
         got = {True: Cond.SELL, False: "안 판다", None: None}
         alts = {got[x] for x in alts}
     else:
-        pe = Grade.ProductEval(tree, p, hist, cal)
         i = len(cal) - 1
-        alts = {_outcome(pe.opt, i), _outcome(pe.pes, i)}
+        alts = {_outcome(judge, i, "opt"), _outcome(judge, i, "pes")}
         if pct is not None and want == Cond.BUY:
-            w, rng = pe.weight_of(i)
+            w, rng = judge.weight_at(i)
             ok_w = (w is not None and abs(w - float(pct)) <= 1e-6) or (w is None and float(pct) in (rng or []))
             if not ok_w:
                 return "불일치", "비중 %s%%" % (w if w is not None else "/".join("%g" % x for x in rng or []) or "모름")
@@ -234,9 +233,8 @@ def fire_stats(tree, hist, years):
     """→ (표, 경고, 같은 조건 쌍[(상품, 동사a, 라벨a, 동사b, 라벨b)])."""
     warns, table, same = [], [], []
     for p in tree.products():
-        cal = [c.date for c in hist.get(p) or []]
-        ev, pe = _eval(tree, p, hist, cal)
-        ctx = pe.ctx[None]
+        ev, judge = _eval(tree, p, hist)
+        cal = judge.days
         idx = _window(cal, years)
         N = max(1, len(idx))
         nodes = []
@@ -244,7 +242,7 @@ def fire_stats(tree, hist, years):
         for sec, n in _stat_nodes(tree, p):
             if _has_manual(n):
                 continue                         # 수동이 섞이면 '안 뜸/모름'이 정상이다
-            s = Cond.series(n, ctx)
+            s = judge.evaluate(n)
             v = [s[i] for i in idx]
             if not all(x is None or isinstance(x, bool) for x in v):
                 continue                         # 숫자 노드는 통계 대상 아님
@@ -295,10 +293,10 @@ def weight_overflow(tree, hist, years):
     for p in tree.products():
         if tree.weight(p).qty.x is None:
             continue
-        cal = [c.date for c in hist.get(p) or []]
-        pe = Grade.ProductEval(tree, p, hist, cal)
+        judge = tree.product(p, hist)
+        cal = judge.days
         for i in _window(cal, years):
-            w, alt = pe.weight_of(i)
+            w, alt = judge.weight_at(i)
             v = w if w is not None else (max(alt) if alt else None)
             if v is not None:
                 by_day[cal[i]] = by_day.get(cal[i], 0.0) + v
@@ -322,16 +320,16 @@ def manual_heads(tree):
 
 
 # ------------------------------------------------------------------ 심판의 비교 도구(덤프 — 판단은 안 함)
-def _zone_explain(pe, sec, i):
+def _zone_explain(judge, sec, i):
     if sec in Cond.GATES:
-        return pe.explain(i)[sec]
-    w, alt = pe.weight_of(i)
-    return {"weight": w, "weight_range": alt, "tranches": _tranche_rows(pe.gw, pe.prod)}
+        return judge.explain(i)[sec]
+    w, alt = judge.weight_at(i)
+    return {"weight": w, "weight_range": alt, "tranches": _tranche_rows(judge.tranches())}
 
 
-def _tranche_rows(tree, prod):
+def _tranche_rows(tranches):
     """분할 차수의 덤프·비교용 모양 [{label, ref, frac, when}]."""
-    return [{"label": t.label, "ref": t.ref, "frac": t.qty.x, "when": t.when} for t in tree.tranches(prod)]
+    return [{"label": t.label, "ref": t.ref, "frac": t.qty.x, "when": t.when} for t in tranches]
 
 
 def _zone_node(tree, prod, sec):
@@ -374,15 +372,16 @@ def pair_conditions(ta, tb, prod, hist, years):
               for k in ca if k in cb]
     only_a = {k: v for k, v in ca.items() if k not in cb}
     only_b = {k: v for k, v in cb.items() if k not in ca}
-    cal = [c.date for c in hist.get(prod) or []]
+    pa = ta.product(prod, hist)
+    cal = pa.days
+    pb = tb.product(prod, hist, days=cal)
     idx = _window(cal, years)
-    pa, pb = Grade.ProductEval(ta, prod, hist, cal), Grade.ProductEval(tb, prod, hist, cal)
 
-    def ser(pe, v):
+    def ser(judge, v):
         if Cond.is_manual(v["expr"]):
             return None
         try:
-            s = Cond.series(v["expr"], pe.ctx[None])
+            s = judge.evaluate(v["expr"])
         except Exception:  # noqa: BLE001
             return None
         return [s[i] for i in idx]
@@ -547,7 +546,7 @@ def zone_diff(ta, tb, prod, zone):
     wa, wb = ta.weight(prod).qty.x, tb.weight(prod).qty.x
     if _ckey(wa) != _ckey(wb):
         out["weight"] = tree_diff(wa, wb) if isinstance(wa, dict) and isinstance(wb, dict) else {"a": wa, "b": wb}
-    ra, rb = _tranche_rows(ta, prod), _tranche_rows(tb, prod)
+    ra, rb = _tranche_rows(ta.tranches(prod)), _tranche_rows(tb.tranches(prod))
     if _ckey(ra) != _ckey(rb):
         out["tranches"] = _rules_diff(ra, rb)
     return out
@@ -615,15 +614,14 @@ def dump_disagreements(slug, per, years):
             cal = r["_cal"]
             step = max(1, len(r["days"]) // per)
             picks = r["days"][::step][:per]
-            pa = Grade.ProductEval(ta, p, hist, cal)
-            pb = Grade.ProductEval(tb, p, hist, cal)
+            pa = ta.product(p, hist, days=cal)
+            pb = tb.product(p, hist, days=cal)
             cases = []
             for d in picks:
                 i = cal.index(d)
                 prices = {}
                 for s in sorted(ta.symbols([p]) | tb.symbols([p])):
-                    cs = [c for c in hist.get(s) or [] if c.date <= d][-25:]
-                    prices[s] = [[c.date, c.open, c.high, c.low, c.close, c.volume] for c in cs]
+                    prices[s] = Judge.recent(hist, s, d, 25)
                 cases.append({"date": d, "a": r["_ia"][sec][i], "b": r["_ib"][sec][i],
                               "a_explain": _zone_explain(pa, sec, i), "b_explain": _zone_explain(pb, sec, i),
                               "prices_last25[date,o,h,l,c,v]": prices})
@@ -842,7 +840,7 @@ def check_book(slug, years):
     stop, warn = [], []
     print("== %s" % slug)
     try:
-        tree = TreeGateway.load(slug)
+        tree = Judge.open(slug)
     except Cond.CondError as e:
         print("  ❌ tree.json 문법 오류: %s" % e)
         return ["%s 트리 문법" % slug], []
@@ -888,7 +886,7 @@ def check_book(slug, years):
                 print("  ❌ 후보 트리 문법 오류: %s" % e)
                 return ["%s 후보 트리 문법" % slug], []
     hist = _history([tree, ta, tb], years)
-    missing = sorted(s for s, cs in hist.items() if not cs)
+    missing = Judge.missing(hist)
     if missing:
         req = md_feed.requested()
         stop.append("%s 시세 없는 심볼 %s" % (slug, missing))
@@ -975,7 +973,9 @@ def contract(slug):
         bad.append("source_index.json 없음/깨짐: %s" % e)
         keys = set()
     try:
-        tree = TreeGateway.open(TreeGateway.path(slug))
+        tree = Judge.read(slug, "tree.json")
+        if not tree:
+            raise ValueError("tree.json 없음")
         tree.validate()
     except (OSError, ValueError, Cond.CondError) as e:
         bad.append("tree.json 문법: %s" % e)

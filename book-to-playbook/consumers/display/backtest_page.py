@@ -12,7 +12,7 @@ from datetime import datetime
 
 from shared.paths import backtest_json, write_text
 from dsl.tradeTool import Grade
-from signals.engine import open_history
+from signals.judge import Judge
 from consumers.backtest import portfolio, trades
 from consumers.backtest.runner import BUY_OR_CONFIRM, HORIZONS, run
 
@@ -21,26 +21,28 @@ PAGE_PERIODS = (("1y", 365), ("3y", 1095))
 
 def page_data(slug):
     """책 페이지 '백테스트' 탭이 읽는 요약(일별 행 제외). 시세는 가장 긴 기간으로 한 번만 받는다."""
-    tree, hist = open_history(slug, max(d for _, d in PAGE_PERIODS))
+    book = Judge.open(slug)
+    if book is None:
+        raise SystemExit("books/%s/tree.json 없음 — 조건 트리가 있어야 한다" % slug)
+    prices = book.prices(max(d for _, d in PAGE_PERIODS))
     out = {"slug": slug, "generated": datetime.now().isoformat(timespec="seconds"),
            "horizons": list(HORIZONS), "grades": list(Grade.GRADES.values()),
            "buy_or_confirm": BUY_OR_CONFIRM,
            # 매도 정책 "none"(책에 매도 규칙 없음)일 때 화면이 그대로 쓰는 문구 — 정본 consumers/backtest/trades.NO_EXIT_NOTE.
            "no_exit_note": trades.NO_EXIT_NOTE, "periods": {}}
     for key, days in PAGE_PERIODS:
-        res = run(slug, days, hist=hist, tree=tree)
+        res = run(slug, days, prices=prices, book=book)
         prods = {}
         for p in res["summary"]:
             d = dict(res["summary"][p], trades=res["trades"][p])
             # 매도 정책("book"|"none") — 화면(backtest-ui)은 이 필드만 본다(정본 trades.exit_policy).
             d["exit_policy"] = res["trades"][p]["exit_policy"]
             # 계산기 지표(vectorbt) — 판정기가 낸 '그 거래'(res["trades"])를 portfolio 로 다시 굴려
-            #   자산곡선·MaxDD·샤프·총수익을 옛 지표 옆에 나란히 둔다(중복 수집 없음 — 같은 hist·같은 거래).
-            cs = hist.get(p) or []
-            cal = [c.date for c in cs]
-            closes = [c.close for c in cs]
+            #   자산곡선·MaxDD·샤프·총수익을 옛 지표 옆에 나란히 둔다(중복 수집 없음 — 같은 시세·같은 거래). 가격은 판단자에게.
+            judge = book.product(p, prices)
             tl = res["trades"][p].get("trades")       # 매도 정책 "none" 이면 거래 없음 — 계산기 생략
-            d["vectorbt"] = portfolio.run_product(p, cal, closes, tl) if cal and tl is not None else None
+            d["vectorbt"] = (portfolio.run_product(p, judge.days, judge.price("close"), tl)
+                             if judge.days and tl is not None else None)
             prods[p] = d
         out["periods"][key] = {
             "days": days, "period": res["period"], "trading_days": res["trading_days"],
