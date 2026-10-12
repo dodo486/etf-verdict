@@ -51,11 +51,9 @@ def _describe_operand(e):
     except Cond.CondError:
         return ""
     if op == "px":
-        sym = e.get("sym", "$self")
         base = _PXF.get(e["px"], e["px"])
         pre = "장중 " if e.get("tf", "1d") in ("1m", "5m") else ""   # 장중 분봉 vs 확정 일봉 구분
-        core = base if sym in ("$self", "$index") else "%s %s" % (sym, base)
-        return pre + core
+        return pre + "%s %s" % (e["sym"], base)
     if op in ("highest", "lowest", "sum"):
         m = {"highest": "최고", "lowest": "최저", "sum": "합계"}
         return "%s일 %s" % (_n(e[op][1]), m[op])
@@ -176,7 +174,7 @@ def view(node, ctx, i):
             item[k] = node[k]
     if node.get("allprod"):                      # 공통(on 없음) 규칙 — 화면이 상품 카드에서 빼고 공통 섹션으로 모은다
         item["allprod"] = True
-        # 상품에 안 기대는 공통 규칙($self/$index 안 씀)은 상품마다 값·질문이 같다 → 화면이 한 줄로 합쳐도 된다는 힌트.
+        # 상품에 안 기대는 공통 규칙(pos 안 씀 — 시세 잎은 구체 티커)은 상품마다 값·질문이 같다 → 화면이 한 줄로 합쳐도 된다는 힌트.
         #   답 열쇠(mkey)는 지금 규칙 그대로(상품별) — 화면이 그 한 줄의 수동 답을 세 상품 열쇠에 같이 넣는다(서버 무변).
         if not Cond.product_specific(node):
             item["allsame"] = True
@@ -234,7 +232,7 @@ def _labeled_inside(node):
     return out
 
 
-def static_view(node, index=None):
+def static_view(node):
     """포지션·시세 없이 보이는 규칙 설명(값 없음) — 라벨·논리 묶음·수동 사유만(비중·분할·판다 갈래, 시세 없는 상품)."""
     if node is None:
         return None
@@ -244,7 +242,7 @@ def static_view(node, index=None):
         if "kids" in it:
             it["kids"] = [strip(k) for k in it["kids"]]
         return it
-    ctx = Cond.Ctx({}, ["0"], "$none", index, manual_as=None, pos=(0, 1.0))
+    ctx = Cond.Ctx({}, ["0"], "$none", manual_as=None, pos=(0, 1.0))
     try:
         return strip(view(node, ctx, 0))
     except Cond.CondError:

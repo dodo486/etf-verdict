@@ -20,7 +20,7 @@
      이름·출처·메모를 뗀 펼친 식). a·b 가 같은 식으로 합의하지 않은 최종 규칙(한쪽에서 고름·심판이 새로 씀)은 그 규칙의
      `why` 가 있어야 한다(미심판 불일치). 등급 동사(안 산다·산다)·비중은 실제 시세 수년치로 날마다 비교해 일치율을 보인다(참고).
   3. 같은 뜻 정리 — 같은 식 두 벌(규칙 둘이 같은 뜻 · 같은 측정을 참조 없이 두 번) · 이름↔식 1:1(같은 이름 다른 식 ·
-     같은 식 다른 이름) · skip 사유 머리(데이터 없음:·연산 없음:) · 종목·이름 심볼에 "?" 남음 → 정지.
+     같은 식 다른 이름) · skip 사유 머리(데이터 없음:·연산 없음:) · 시세 잎 티커(sym)에 "?" 남음 → 정지.
   4. 원문 사례 재현 — 원문만 보고 따로 쓴 시나리오(scenarios.json)를 합성 시세로 돌려 그날 결과(안 산다·산다·관망·판다,
      비중 % 포함)가 기대값과 맞는지. 틀리면 정지(사례가 원문을 잘못 읽었으면 심판이 보고 — 사례 작성자가 다시 쓴다).
   5. 발화 통계 — 최종 트리의 라벨 노드를 실제 시세에서 날마다 평가해: 한 번도 안 뜸 · 거의 매일 ·
@@ -332,9 +332,22 @@ def same_meaning(tree):
 
 
 def symbol_gaps(tree):
-    """종목 기준지수·이름 심볼에 "?" 가 남은 자리(사용자 확인 대상)."""
-    out = ["%s 기준지수" % p for p in tree.products() if tree.index(p) == Cond.UNKNOWN]
-    out += ["%s" % n for n, syms in tree.name_symbols().items() if Cond.UNKNOWN in syms or not syms]
+    """시세 잎의 티커(sym)가 "?" 로 남은 자리(사용자 확인 대상 — 저자가 어느 종목인지 안 줌) → [식의 라벨]."""
+    out = []
+
+    def walk(n, lab):
+        if isinstance(n, dict):
+            lab = n.get("label") or lab
+            if "px" in n and n.get("sym") == Cond.UNKNOWN:
+                out.append(lab or "(이름 없음)")
+            for k, v in n.items():
+                if k not in Cond.META:
+                    walk(v, lab)
+        elif isinstance(n, list):
+            for v in n:
+                walk(v, lab)
+    for c in tree.conditions():
+        walk(c, None)
     return out
 
 
@@ -410,8 +423,8 @@ def check_book(slug, years):
         print("  ❌ skip 사유가 '데이터 없음:'·'연산 없음:' 로 시작하지 않음: %s" % bad_skip[:3])
     gaps = symbol_gaps(tree)
     if gaps:
-        stop.append("%s 종목·심볼 \"?\" 남음 %d개" % (slug, len(gaps)))
-        print("  ❌ 종목·이름 심볼에 \"?\" 남음(사용자 확인): %s" % gaps[:5])
+        stop.append("%s 티커 \"?\" 남음 %d개" % (slug, len(gaps)))
+        print("  ❌ 시세 잎 티커(sym)에 \"?\" 남음(사용자 확인): %s" % gaps[:5])
     ta, tb = load_tree(slug, "tree_candidates/a.json"), load_tree(slug, "tree_candidates/b.json")
     for t in (ta, tb):
         if t:

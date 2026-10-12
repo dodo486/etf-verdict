@@ -11,7 +11,9 @@
     · gate(안 산다)·gate(산다) — 그 동사 갈래의 any 묶음(등급용, 포지션 쓰는 갈래 제외)
     · weight — 산다 + qty cash(비중) · tranches — 산다 + qty budget(분할) · sells — 판다
   수량은 트리의 qty {of, x} 를 그대로 Qty(of, x) 로 건넨다("?" → None). 물량 변환은 consumers/backtest/trades.to_units.
-  `{"rule": "이름"}` 참조와 이름 심볼(`$빅테크` 등 names)은 건네기 전에 **펼친다** — 평가기(Cond)는 평범한 식만 본다.
+  `{"rule": "이름"}` 참조는 건네기 전에 **펼친다** — 평가기(Cond)는 평범한 식만 본다.
+  종목 모델은 둘뿐 — 규칙(·노드)이 어느 상품에 판정을 내나 = `on`, 시세 잎이 읽는 티커 = `sym`(구체 티커, 필수).
+  ($self·$index·$s·이름 심볼 names·products 의 index 칸·across 는 폐지 — 형식 검사가 거부한다.)
   `{"pos": "filled", "rule": 이름}`(그 규칙으로 산 횟수)은 그대로 건넨다 — 값은 체결 장부(trades)가 낸다.
 """
 import json
@@ -23,9 +25,8 @@ from shared.paths import book_file
 
 BLOCK, BUY, SELL = Cond.BLOCK, Cond.BUY, Cond.SELL
 # 트리 v3 파일 형식(COND_DSL 1·5절) — 여기 밖의 키는 거부한다(옛 양식·오타를 조용히 무시하지 않는다).
-TOP_KEYS = ("version", "products", "names", "rules", "note")
-PRODUCT_KEYS = ("index", "ref", "note")
-NAME_KEYS = ("syms", "ref", "note")
+TOP_KEYS = ("version", "products", "rules", "note")
+PRODUCT_KEYS = ("ref", "note")
 RULE_KEYS = ("label", "ref", "note", "on", "value", "then", "skip", "why")
 BRANCH_KEYS = ("when", "do", "qty", "repeat")
 QTY_OF = {BUY: ("cash", "budget"), SELL: ("bought", "held")}   # 동사마다 쓸 수 있는 qty 종류(안 산다는 qty 없음)
@@ -44,9 +45,8 @@ def rule(label, do, when=None, qty=None, repeat=False, **meta):
 
 
 def synthetic(products, *rules, **top):
-    """합성 트리(검사용, v3). products = {종목: 기준지수 | None} 또는 {종목: {index…}}. 규칙이 없으면 skip 하나를 둔다
-    (v3 는 빈 rules 를 거부한다)."""
-    prods = {p: (v if isinstance(v, dict) else ({"index": v} if v else {})) for p, v in products.items()}
+    """합성 트리(검사용, v3). products = 상품 티커 목록. 규칙이 없으면 skip 하나를 둔다(v3 는 빈 rules 를 거부한다)."""
+    prods = {p: {} for p in products}
     return dict(top, version=3, products=prods,
                 rules=list(rules) or [{"label": "(합성 — 규칙 없음)", "skip": "연산 없음: 합성 트리"}])
 
@@ -80,14 +80,10 @@ def _qty(q, default=None, expand=lambda x: x):
 
 class ProductRules:
     """상품 하나에 걸리는 규칙 묶음(읽기 전용) — 출입구가 내주고, 판단자(signals/judge)가 그 상품을 판정할 때 쓴다.
-    판정에 필요한 것은 이 상품의 기준지수·등급 조건·비중·분할·판다·심볼·워밍업뿐이다(책의 다른 상품은 모른다)."""
+    판정에 필요한 것은 이 상품의 등급 조건·비중·분할·판다·심볼·워밍업뿐이다(책의 다른 상품은 모른다)."""
 
     def __init__(self, tree, product):
         self._tree, self.product = tree, product
-
-    @property
-    def index(self):
-        return self._tree.index(self.product)
 
     @property
     def note(self):
@@ -117,12 +113,11 @@ class ProductRules:
 
 class TreeGateway:
     """트리 하나(v3 규칙 목록). load/read/open/of 로 만들고 질문으로 읽는다.
-    갈래를 do 동사로 골라 건네고, {"rule"}·이름 심볼은 펼쳐 건넨다."""
+    갈래를 do 동사로 골라 건네고, {"rule"} 참조는 펼쳐 건넨다."""
 
     def __init__(self, data):
         self._d = data or {}
         self._by_label = {r.get("label"): r for r in self._d.get("rules", []) if isinstance(r, dict)}
-        self._names = self._d.get("names") or {}
 
     def __bool__(self):
         return bool(self._d)
@@ -154,21 +149,9 @@ class TreeGateway:
         t.validate()
         return t
 
-    # ---------------------------------------------------------------- 펼치기 ({"rule"}·이름 심볼)
-    def _syms_of(self, name, seen=()):
-        """이름 심볼($빅테크) → 실제 티커 목록(중첩 이름은 재귀로 평탄화)."""
-        if name in seen:
-            return []
-        out = []
-        for s in (self._names.get(name) or {}).get("syms", []):
-            if isinstance(s, str) and s.startswith("$") and s in self._names:
-                out.extend(self._syms_of(s, seen + (name,)))
-            else:
-                out.append(s)
-        return out
-
+    # ---------------------------------------------------------------- 펼치기 ({"rule"} 참조)
     def _expand(self, node, seen=()):
-        """조건식을 평가기가 바로 먹을 모양으로 — {"rule"} 펼침, pos 의 rule 제거, across 의 이름 심볼 평탄화."""
+        """조건식을 평가기가 바로 먹을 모양으로 — {"rule"} 펼침(pos 의 rule 은 장부 열쇠라 그대로)."""
         if isinstance(node, list):
             return [self._expand(x, seen) for x in node]
         if not isinstance(node, dict):
@@ -193,18 +176,6 @@ class TreeGateway:
                 if node.get("ref") or r.get("ref"):
                     exp["ref"] = node.get("ref") or r.get("ref")
             return exp
-        if "across" in node and isinstance(node["across"], dict):
-            ac = dict(node["across"])
-            syms = []
-            for s in ac.get("syms") or []:
-                if isinstance(s, str) and s.startswith("$") and s in self._names:
-                    syms.extend(self._syms_of(s))
-                else:
-                    syms.append(s)
-            ac["syms"] = syms
-            if "cond" in ac:
-                ac["cond"] = self._expand(ac["cond"], seen)
-            return {"across": ac}
         return {k: (v if k in Cond.META else self._expand(v, seen)) for k, v in node.items()}
 
     def _sub_value(self, node, val):
@@ -218,7 +189,7 @@ class TreeGateway:
         return node
 
     def _x_of(self, r):
-        """규칙 r 의 qty.x 를 평가기가 먹을 모양으로 — 식이면 {"rule"}·이름 심볼을 펼치고 "$value" 를 r 의 value 로."""
+        """규칙 r 의 qty.x 를 평가기가 먹을 모양으로 — 식이면 {"rule"} 참조를 펼치고 "$value" 를 r 의 value 로."""
         def ex(x):
             if not isinstance(x, (dict, list)):
                 return x
@@ -227,17 +198,12 @@ class TreeGateway:
         return ex
 
     def _on(self, r):
-        """규칙의 대상 상품 — on 의 이름 심볼은 실제 종목으로 펼친다(생략 = None → 전부)."""
+        """규칙의 대상 상품(생략 = None → 전부)."""
         on = r.get("on")
-        if not on:
-            return None
-        out = set()
-        for x in on:
-            out.update(self._syms_of(x) if x in self._names else [x])
-        return out
+        return set(on) if on else None
 
     def _when_of(self, r, t):
-        """규칙 r 의 갈래 t 의 when 을 평가기가 먹을 모양으로 — {"rule"}·이름심볼 펼치고 `"$value"` 를 r 의 value 로 치환."""
+        """규칙 r 의 갈래 t 의 when 을 평가기가 먹을 모양으로 — {"rule"} 펼치고 `"$value"` 를 r 의 value 로 치환."""
         w = t.get("when")
         if w is None:
             return None
@@ -268,7 +234,7 @@ class TreeGateway:
         if not isinstance(rules, list) or not rules:
             raise Cond.CondError("rules 가 비어 있다")
         self._check_shape(tree, rules)
-        # 펼친 조건식의 문법만 검사(참조·이름 심볼은 이미 펼쳐짐)
+        # 펼친 조건식의 문법만 검사({"rule"} 참조는 이미 펼쳐짐)
         for prod in tree["products"]:
             for _do, label, _ref, node in self.expressions(prod):
                 Cond.validate(node, "%s.%s" % (prod, label or _do))
@@ -283,15 +249,11 @@ class TreeGateway:
             raise Cond.CondError("%s: 모르는 키 %s (허용 %s)" % (where, extra, " · ".join(allowed)))
 
     def _check_shape(self, tree, rules):
-        """파일 형식 — 맨 위·상품·이름 심볼·규칙·갈래·qty 의 키와 값의 모양."""
+        """파일 형식 — 맨 위·상품·규칙·갈래·qty 의 키와 값의 모양."""
         self._keys(tree, TOP_KEYS, "트리 맨 위")
         for p, v in tree["products"].items():
             self._keys(v, PRODUCT_KEYS, "products.%s" % p)
-        for n, v in (tree.get("names") or {}).items():
-            self._keys(v, NAME_KEYS, "names.%s" % n)
-            if not (isinstance(v.get("syms"), list) and v["syms"]):
-                raise Cond.CondError("names.%s: syms 목록이 필요하다" % n)
-        targets = set(tree["products"]) | set(tree.get("names") or {})
+        targets = set(tree["products"])
         labels = set()
         for r in rules:
             self._keys(r, RULE_KEYS, "규칙 %r" % (r.get("label") if isinstance(r, dict) else r))
@@ -309,7 +271,7 @@ class TreeGateway:
                 raise Cond.CondError("규칙 %r: skip 사유 문자열이 필요하다" % lab)
             bad_on = [x for x in (r.get("on") or []) if x not in targets]
             if bad_on:
-                raise Cond.CondError("규칙 %r: on 의 %s 가 products·names 에 없다" % (lab, bad_on))
+                raise Cond.CondError("규칙 %r: on 의 %s 가 products 에 없다" % (lab, bad_on))
             if "then" in r and not (isinstance(r["then"], list) and r["then"]):
                 raise Cond.CondError("규칙 %r: then 은 갈래 목록이어야 한다" % lab)
             if "value" in r:                       # 이름 조건은 참조되지 않아도 문법을 본다
@@ -347,9 +309,6 @@ class TreeGateway:
 
     def has(self, prod):
         return prod in self._d["products"]
-
-    def index(self, prod):
-        return self._p(prod).get("index")
 
     def note(self, prod):
         return self._p(prod).get("note")
@@ -423,17 +382,13 @@ class TreeGateway:
         return nodes
 
     def symbols(self, prods=None):
-        """트리가 참조하는 실제 심볼 전부(상품·지수·펼친 식의 티커)."""
+        """트리가 참조하는 실제 심볼 전부(상품 + 식의 시세 잎 sym)."""
         out = set()
 
         def walk(n):
             if isinstance(n, dict):
                 if "px" in n:
-                    s = n.get("sym", "$self")
-                    if not s.startswith("$"):
-                        out.add(s)
-                if "across" in n and isinstance(n["across"], dict):
-                    out.update(s for s in (n["across"].get("syms") or []) if not str(s).startswith("$"))
+                    out.add(n.get("sym"))
                 for k, x in n.items():
                     if k not in Cond.META:
                         walk(x)
@@ -443,8 +398,6 @@ class TreeGateway:
 
         for p in (self._d["products"] if prods is None else prods):
             out.add(p)
-            if self.index(p):
-                out.add(self.index(p))
             for _z, _l, _r, node in self.expressions(p):
                 walk(node)
         out.discard(None)
@@ -456,11 +409,7 @@ class TreeGateway:
             for n in Cond.labeled_all(node):
                 if not (isinstance(n, dict) and "px" in n and n.get("tf") in ("1m", "5m")):
                     continue
-                s = n.get("sym", "$self")
-                if s.startswith("$"):
-                    out.update(self.index(p) if s == "$index" else p for p in self._d["products"])
-                else:
-                    out.add(s)
+                out.add(n.get("sym"))
         out.discard(None)
         return out
 
@@ -476,9 +425,9 @@ class TreeGateway:
         return mx
 
     def refs(self):
-        """트리가 근거로 단 원문 소절 전부 — 규칙·상품·이름 심볼의 ref("·" 로 여럿)."""
+        """트리가 근거로 단 원문 소절 전부 — 규칙·상품의 ref("·" 로 여럿)."""
         out = set()
-        items = list(self._d.get("rules", [])) + list(self._d["products"].values()) + list(self._names.values())
+        items = list(self._d.get("rules", [])) + list(self._d["products"].values())
         for r in items:
             rf = r.get("ref")
             if isinstance(rf, str):
@@ -494,7 +443,7 @@ class TreeGateway:
 
     def body(self, label, expand=True):
         """규칙 하나의 '뜻'(이름·출처·메모·why 를 뺀 것) — {products, value, branches[{do, when, qty}], skip}.
-        expand=True 면 {"rule"}·이름 심볼을 펼친 식(a·b 가 이름을 달리 지어도 뜻이 같으면 같다), False 면 적힌 그대로
+        expand=True 면 {"rule"} 참조를 펼친 식(a·b 가 이름을 달리 지어도 뜻이 같으면 같다), False 면 적힌 그대로
         (같은 측정을 참조 없이 두 번 쓴 '두 벌'을 가린다). 같은 뜻인지 가리는 비교용(구간② 검사기). 없는 이름이면 None."""
         r = self._by_label.get(label)
         if r is None:
@@ -516,9 +465,6 @@ class TreeGateway:
         """심판이 그 규칙을 a·b 중 고른 이유(최종 트리만) — 없으면 None."""
         return (self._by_label.get(label) or {}).get("why")
 
-    def name_symbols(self):
-        """이름 심볼 {이름: [종목…]} (펼치기 전 원본 — 검사기가 "?" 남음을 본다)."""
-        return {k: list((v or {}).get("syms") or []) for k, v in self._names.items()}
 
     def conditions(self):
         """트리에 적힌 조건식 전부(펼치기 전, 적힌 그대로) — 규칙의 value·갈래 when·qty 식. 검사기가 수동 잎의

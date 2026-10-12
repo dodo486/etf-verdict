@@ -90,7 +90,7 @@ _FLIP = {"lt": "gt", "le": "ge"}
 
 
 def _canon(node):
-    """모양만 다르고 뜻이 같은 식을 같은 글자로 — 시세 기본값(sym $self·tf 1d) 생략, a<b → b>a, a≤b → b≥a, all/any/atleast 안의 순서 정렬
+    """모양만 다르고 뜻이 같은 식을 같은 글자로 — 시세 기본값(tf 1d) 생략, a<b → b>a, a≤b → b≥a, all/any/atleast 안의 순서 정렬
     (3값 논리에서 순서는 결과에 영향이 없다). META 는 이미 뗀 식을 받는다. 그 밖의 목록(판다·분할 규칙 등)은
     순서를 그대로 둔다."""
     if isinstance(node, list):
@@ -99,8 +99,6 @@ def _canon(node):
         return node
     out = {k: _canon(v) for k, v in node.items()}
     if "px" in out:                                  # 시세 노드의 기본값은 적든 안 적든 같은 뜻 — 생략형으로 통일
-        if out.get("sym") == "$self":
-            del out["sym"]
         if out.get("tf") == "1d":
             del out["tf"]
     for op, to in _FLIP.items():
@@ -286,9 +284,9 @@ def _descendant_keys(node, acc=None):
 
 
 def _shape(node):
-    """심볼을 뺀 식 모양 — 짝 찾기 전용(a 는 지수, b 는 상품 자신을 본 같은 갈래도 짝으로 맞춰 차이를 보이게)."""
+    """티커(sym)를 뺀 식 모양 — 짝 찾기 전용(a 는 지수, b 는 상품 자신을 본 같은 갈래도 짝으로 맞춰 차이를 보이게)."""
     if isinstance(node, dict):
-        return {k: _shape(v) for k, v in node.items() if k not in Cond.META and k not in ("sym", "syms")}
+        return {k: _shape(v) for k, v in node.items() if k not in Cond.META and k != "sym"}
     if isinstance(node, list):
         return [_shape(x) for x in node]
     return node

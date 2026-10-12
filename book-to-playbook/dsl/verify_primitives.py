@@ -12,7 +12,7 @@
 무엇을 하나 (기준은 전부 cond.py 와 독립적으로 구한다)
   1. 수치 연산 — pandas rolling/shift 로 계산한 값과 무작위 시계열(결측 포함)에서 대조
   2. 3값 논리 — '모름' 자리에 참/거짓을 전부 넣어 본 결과로 정답을 정의해 전수 대조
-  3. 시간 연산(barssince·valuewhen·across, 조합: 최근 참 일수·연속 참 일수) — 단순 반복 구현과 대조
+  3. 시간 연산(barssince·valuewhen, 조합: 최근 참 일수·연속 참 일수 · 여러 종목 중 N개 = atleast·of) — 단순 반복 구현과 대조
   4. 인과성 — 미래 데이터를 잘라도 과거 날짜 값이 같아야 한다(미래 참조 금지)
   5. 문법 — 모르는 키·인자 수·빈 구역은 거부, 올바른 트리는 통과
   6. 표현력 회귀 — 이번에 발견된 버그 유형을 트리로 적어 원문 뜻대로 나오는지
@@ -75,7 +75,7 @@ def rand_series(rng, n, miss=0.05):
     return out
 
 
-C = {"px": "close"}
+C = {"px": "close", "sym": "X"}
 
 
 def AVG(s, n):
@@ -249,13 +249,13 @@ def t_time(rng):
             check(same(got[i], exp), "barssince@%d" % i)
             check(same(vw[i], ev), "valuewhen@%d" % i)
             check(same(mn[i], emn) and same(mx[i], emx), "min/maxsince@%d" % i)
-    # across
+    # 여러 종목 중 N개 = atleast·of(각 잎 sym = 그 티커 — across 폐지)
     ctx = make_ctx([1.0, 1.0], extra={"A": [1.0, 2.0], "B": [3.0, 1.0], "D": [None, 5.0]})
-    up = {"gt": [{"px": "close", "sym": "$s"}, {"lag": [{"px": "close", "sym": "$s"}, 1]}]}
-    got = Cond.series({"across": {"syms": ["A", "B"], "cond": up}}, ctx)
-    check(got == [None, 1.0], "across A·B 상승 수 %r" % got)
-    got = Cond.series({"across": {"syms": ["A", "D"], "cond": up}}, ctx)
-    check(got == [None, None], "across 결측 종목 → None %r" % got)
+    up = lambda t: {"gt": [{"px": "close", "sym": t}, {"lag": [{"px": "close", "sym": t}, 1]}]}
+    got = Cond.series({"atleast": 1, "of": [up("A"), up("B")]}, ctx)
+    check(got == [None, True], "A·B 중 1개 상승 %r" % got)
+    got = Cond.series({"atleast": 2, "of": [up("A"), up("B")]}, ctx)
+    check(got == [None, False], "A·B 중 2개 상승 %r" % got)
 
 
 def t_bounds():
@@ -361,8 +361,9 @@ def t_syntax():
     bad = [
         {"gt": [C]}, {"sum": [C, 0]}, {"sum": [C, 2.5]}, {"ma": [C, 20]}, {"px": "price"}, {"foo": 1},
         {"gt": [C, 1], "lt": [C, 2]}, True, {"atleast": 2}, {"def": "없음"},
-        {"across": {"syms": [], "cond": C}}, {"manual": ""}, {"gt": [C, 1], "op": "above"},
-        {"px": "close", "tf": "1h"}, {"abs": [C, 1]}, {"case": [[C, 1]]}, {"case": [C, 1], "else": 0},
+        {"across": {"syms": ["A"], "cond": C}}, {"manual": ""}, {"gt": [C, 1], "op": "above"},
+        {"px": "close", "sym": "X", "tf": "1h"}, {"px": "close"}, {"px": "close", "sym": "$self"},
+        {"px": "close", "sym": "$index"}, {"abs": [C, 1]}, {"case": [[C, 1]]}, {"case": [C, 1], "else": 0},
         {"max": [C]},
     ]
     for b in bad:
@@ -372,17 +373,17 @@ def t_syntax():
         except Cond.CondError:
             pass
     good = {"all": [{"gt": [C, AVG(C, 20)], "label": "20일선 위", "ref": "3-2"},
-                    {"atleast": 2, "of": [{"manual": "장중"}, {"ge": [{"px": "volume"}, 1]}]}]}
+                    {"atleast": 2, "of": [{"manual": "장중"}, {"ge": [{"px": "volume", "sym": "X"}, 1]}]}]}
     try:
         Cond.validate(good)
     except Cond.CondError as e:
         FAILS.append("올바른 노드가 거부: %s" % e)
     try:
-        Cond.validate({"case": [[{"gt": [C, 1]}, 2]], "else": {"px": "close", "tf": "1d"}})
+        Cond.validate({"case": [[{"gt": [C, 1]}, 2]], "else": {"px": "close", "sym": "X", "tf": "1d"}})
     except Cond.CondError as e:
         FAILS.append("올바른 case·tf 가 거부: %s" % e)
     W = {"gt": [C, 1]}
-    good = synthetic({"X": None}, rule("비중", Cond.BUY, None, ("cash", {"case": [[W, 14]], "else": 34})),
+    good = synthetic(["X"], rule("비중", Cond.BUY, None, ("cash", {"case": [[W, 14]], "else": 34})),
                      rule("1차", Cond.BUY, None, ("budget", 0.25)),
                      rule("2차", Cond.BUY, {"ge": [{"pos": "ret"}, 3]}, ("budget", 0.75)),
                      rule("모름", Cond.BUY, {"manual": "저자 미명시: x"}, ("budget", "?")))
@@ -413,22 +414,22 @@ def t_asof():
     md = {"202610021320": {"open": 10, "high": 12, "low": 9, "close": 11, "volume": 500}}
     check(Cond.minute_series(md, cal, "high", asof) == [None, 12.0], "dict 분봉 필드 선택")
     # 문법: tf 는 "1d"/"1m"/"5m" 만, 그 밖은 거부. px 에 모르는 보조 키가 붙으면 '노드에 연산 둘'로 거부된다.
-    for b in ({"px": "close", "tf": "1h"}, {"px": "close", "tf": "15m"},
-              {"px": "close", "offset": -10}):
+    for b in ({"px": "close", "sym": "X", "tf": "1h"}, {"px": "close", "sym": "X", "tf": "15m"},
+              {"px": "close", "sym": "X", "offset": -10}):
         try:
             Cond.validate(b)
             FAILS.append("잘못된 tf 통과: %r" % b)
         except Cond.CondError:
             pass
-    Cond.validate({"px": "close", "tf": "1m"})      # 분봉 노드는 통과
-    Cond.validate({"px": "close", "tf": "5m"})      # 5분봉 노드도 통과
+    Cond.validate({"px": "close", "sym": "X", "tf": "1m"})      # 분봉 노드는 통과
+    Cond.validate({"px": "close", "sym": "X", "tf": "5m"})      # 5분봉 노드도 통과
     # 평가: 장중 분봉 값 > 전일 종가(선물이 전일 종가 위). tf="1m" 를 asof 로 자른다.
     hist = {"X": [Candle(d, 100, 100, 100, 100, 1000) for d in cal]}
 
     class H(dict):
         minutes = {"X": {"202610021320": 101.0}}
     ctx = Cond.Ctx(H(hist), cal, "X", asof=asof)
-    v = Cond.series({"gt": [{"px": "close", "sym": "X", "tf": "1m"}, {"px": "close"}]}, ctx)
+    v = Cond.series({"gt": [{"px": "close", "sym": "X", "tf": "1m"}, {"px": "close", "sym": "X"}]}, ctx)
     check(v == [None, True], "장중 분봉 값 > 전일 종가(그날만 분봉 있음) %r" % v)
     try:
         Cond.validate({"observe": {"gt": [C, 1]}, "manual": "데이터 없음: x"})
@@ -562,7 +563,7 @@ def t_grade():
     xs = [100.0] * 30 + [130.0]
     cal = ["2022%04d" % i for i in range(len(xs))]
     hist = {"X": [Candle(d, c, c, c, c, 1000) for d, c in zip(cal, xs)]}
-    tree = TreeGateway.of(synthetic({"X": None},
+    tree = TreeGateway.of(synthetic(["X"],
                                     rule("비중", Cond.BUY, None, ("cash", {"case": [[{"manual": "모드"}, 14]], "else": 34}))))
     pe = Grade.RuleSeries(tree.product("X"), hist, cal)
     w, alt = pe.weight_of(len(xs) - 1)
@@ -579,7 +580,7 @@ def t_answers():
     unk = {"ge": [{"px": "close", "sym": "M"}, "?"], "label": "M 높음"}
 
     def v(node, ma, answers):
-        return Cond.series(node, Cond.Ctx(hist, cal, "A", None, manual_as=ma, answers=answers))[0]
+        return Cond.series(node, Cond.Ctx(hist, cal, "A", manual_as=ma, answers=answers))[0]
     k = Cond.answer_key
     check(k(m, "A") == "A|실적 좋음", "답 열쇠(상품)")
     check(k(unk, "A") == "A|?" + json.dumps({"ge": [{"px": "close", "sym": "M"}, "?"]}, ensure_ascii=False,
@@ -591,7 +592,7 @@ def t_answers():
         check(v({"not": m}, ma, {}) is ma and v({"not": m}, ma, None) is ma, "답 없으면 극성 규칙 그대로(%r)" % ma)
     check(v(m, None, {"B|실적 좋음": True}) is None, "다른 상품의 답은 안 먹는다")
     check(v(unk, True, {k(unk, "A"): False}) is False, "\"?\" 식도 답으로 풀린다")
-    tree = TreeGateway.of(synthetic({"A": None}, rule("실적", Cond.BUY, {"all": [m]})))
+    tree = TreeGateway.of(synthetic(["A"], rule("실적", Cond.BUY, {"all": [m]})))
     got = [Grade.RuleSeries(tree.product("A"), hist, cal, answers=a).grade_key(2)
            for a in (None, {"A|실적 좋음": True}, {"A|실적 좋음": False})]
     check(got == ["confirm", "buy", "wait"], "등급까지 답으로 풀린다(확인 대기 → 매수 후보·관망) %r" % got)
@@ -613,7 +614,7 @@ def t_warmup_guard():
 
     # 1) warmup_of / 출입구 warmup 산식 — 손으로 셀 수 있는 노드들로 전수 대조.
     cases = [
-        (C, 0), ({"px": "close"}, 0), ({"manual": "x"}, 0), (5, 0),
+        (C, 0), ({"px": "close", "sym": "Y"}, 0), ({"manual": "x"}, 0), (5, 0),
         (AVG(C, 20), 19), ({"highest": [C, 60]}, 59), ({"sum": [C, 10]}, 9),
         ({"lag": [C, 5]}, 5), (PCT(C, 3), 3), (COUNT({"gt": [C, 0]}, 10), 9),
         (AVG({"lag": [C, 5]}, 20), 24),                          # 중첩: lag5 안에 평균20 → 5 + 19
@@ -630,7 +631,7 @@ def t_warmup_guard():
         check(got == exp, "warmup_of %r → %d (기대 %d)" % (node, got, exp))
 
     # 트리 상품 워밍업 = 등급을 내는 갈래(산다·안 산다) 전체의 최댓값.
-    tree = TreeGateway.of(synthetic({"P": None}, rule("신고가", Cond.BUY, {"gt": [C, {"highest": [C, 60]}]}),
+    tree = TreeGateway.of(synthetic(["P"], rule("신고가", Cond.BUY, {"gt": [C, {"highest": [C, 60]}]}),
                                     rule("10일선 아래", Cond.BLOCK, {"lt": [C, AVG(C, 10)]})))
     check(tree.warmup("P") == 59, "warmup = 등급 갈래 최댓값(highest60 → 59)")
 
@@ -706,20 +707,20 @@ def t_regress():
 
 # ------------------------------------------------------------------ 7. 트리 출입구(TreeGateway) 계약
 def t_gateway():
-    """판정·백테스트·검사기가 트리(v3 규칙 목록)에 묻는 질문의 답 모양 — {"rule"}·이름 심볼은 펼쳐서 건넨다."""
+    """판정·백테스트·검사기가 트리(v3 규칙 목록)에 묻는 질문의 답 모양 — {"rule"} 은 펼쳐서 건넨다.
+    종목 모델은 on(어느 상품) + sym(구체 티커) 둘뿐 — 폐지된 표기(names·products.index·$ 심볼·across)는 거부."""
     W = {"gt": [C, AVG(C, 20)]}
     M = {"gt": [{"px": "close", "sym": "NQ=F", "tf": "1m"}, 0]}
-    UP = {"gt": [{"px": "close", "sym": "$s"}, 0]}
+    UP = lambda t: {"gt": [{"px": "close", "sym": t}, 0]}
     data = {
         "version": 3,
-        "products": {"A": {"index": "^NDX", "note": "a 노트", "ref": "0-1"}, "B": {}},
-        "names": {"$묶음": {"syms": ["N1", "N2"], "ref": "0-2"}},
+        "products": {"A": {"note": "a 노트", "ref": "0-1"}, "B": {}},
         "rules": [
             {"label": "20일선 위", "ref": "1-1", "value": W},
             {"label": "선물 양", "ref": "1-2", "on": ["A"],
              "then": [{"when": {"all": [{"rule": "20일선 위"}, M]}, "do": Cond.BUY}]},
             {"label": "지수 음", "ref": "2-1",
-             "then": [{"when": {"lt": [{"px": "close", "sym": "$index"}, 0]}, "do": Cond.BLOCK}]},
+             "then": [{"when": {"lt": [{"px": "close", "sym": "^NDX"}, 0]}, "do": Cond.BLOCK}]},
             {"label": "비중", "ref": "4-1", "then": [{"do": Cond.BUY, "qty": {"of": "cash", "x": 30}}]},
             {"label": "1차", "ref": "4-2", "on": ["A"], "then": [{"do": Cond.BUY, "qty": {"of": "budget", "x": 0.5}}]},
             {"label": "2차", "on": ["A"], "then": [{"when": {"ge": [{"pos": "filled", "rule": "1차"}, 1]},
@@ -727,17 +728,17 @@ def t_gateway():
             {"label": "익절", "ref": "5-1",
              "then": [{"when": {"ge": [{"pos": "ret"}, 9]}, "do": Cond.SELL, "qty": {"of": "held", "x": 1}}]},
             {"label": "묶음 상승", "ref": "6-1", "on": ["A"],
-             "then": [{"when": {"ge": [{"across": {"syms": ["$묶음"], "cond": UP}}, 1]}, "do": Cond.BUY}]},
+             "then": [{"when": {"atleast": 1, "of": [UP("N1"), UP("N2")]}, "do": Cond.BUY}]},
             {"label": "못 옮김", "ref": "9-9", "skip": "데이터 없음: x"}]}
     g = TreeGateway.of(data)
     check(g.products() == ["A", "B"] and g.has("A") and not g.has("Z"), "products/has")
-    check(g.index("A") == "^NDX" and g.index("B") is None and g.note("A") == "a 노트", "index/note")
+    check(g.note("A") == "a 노트" and g.note("B") is None, "note")
     ent = g.gate("A", Cond.BUY)["any"]
     check([n["label"] for n in ent] == ["선물 양", "묶음 상승"] and g.gate("B", Cond.BUY) == {"any": []},
           "gate(산다) = 산다 갈래(포지션·조건 없는 갈래 제외, on 반영) %r" % ent)
     check(ent and ent[0]["all"][0] == dict(W, label="20일선 위", ref="1-1") and ent[0]["allprod"] is False,
           "{rule} 는 그 규칙 value 로 펼치고 이름·소절을 싣는다 %r" % (ent[:1],))
-    check(len(ent) > 1 and ent[1]["ge"][0]["across"]["syms"] == ["N1", "N2"], "이름 심볼은 실제 티커로 펼친다")
+    check(len(ent) > 1 and ent[1]["of"] == [UP("N1"), UP("N2")], "여러 종목 = atleast·of 그대로(각 잎 구체 티커)")
     av = g.gate("A", Cond.BLOCK)["any"]
     check([(n["label"], n["allprod"]) for n in av] == [("지수 음", True)], "gate(안 산다) %r" % av)
     try:
@@ -754,25 +755,25 @@ def t_gateway():
           % [(t.label, t.when) for t in trs])
     e = g.sells("A")
     check([(r.label, r.qty) for r in e] == [("익절", ("held", 1))], "sells = 판다 %r" % [(r.label, r.qty) for r in e])
-    check(g.symbols() == {"A", "B", "^NDX", "NQ=F", "N1", "N2"} and g.symbols(["B"]) == {"B"}, "symbols %r" % g.symbols())
+    check(g.symbols() == {"A", "B", "X", "^NDX", "NQ=F", "N1", "N2"} and g.symbols(["B"]) == {"B", "^NDX"},
+          "symbols = 상품 + 식의 sym %r · %r" % (g.symbols(), g.symbols(["B"])))
     check(g.minute_symbols() == {"NQ=F"} and g.timeframes() == {"1d", "1m"}, "minute_symbols/timeframes")
     check(g.warmup("A") == 19 and g.warmup("B") == 0 and g.warmup() == 19, "warmup")
-    check(g.refs() == {"0-1", "0-2", "1-1", "1-2", "2-1", "4-1", "4-2", "5-1", "6-1", "9-9"}, "refs %r" % g.refs())
+    check(g.refs() == {"0-1", "1-1", "1-2", "2-1", "4-1", "4-2", "5-1", "6-1", "9-9"}, "refs %r" % g.refs())
     check(g.skips() == [{"rule": "못 옮김", "ref": "9-9", "reason": "데이터 없음: x"}], "skip 규칙")
     check(not TreeGateway({}) and bool(g) and TreeGateway.load("__없는책__") is None, "빈·없는 트리")
     check(W in g.conditions() and {"all": [{"rule": "20일선 위"}, M]} in g.conditions(), "conditions = 적힌 그대로의 조건식")
-    # on 의 이름 심볼은 실제 종목으로 · qty 식의 {"rule"} 은 펼친다 · 규칙 note 는 갈래까지
-    g2 = TreeGateway.of(dict(data, names={"$묶음": {"syms": ["N1", "N2"], "ref": "0-2"}, "$A": {"syms": ["A"]}},
-                             rules=data["rules"] + [rule("A 전용 익절", Cond.SELL, W, ("held", 0.5), on=["$A"], note="메모"),
-                                                    rule("식 비중", Cond.BUY, None, ("cash", {"rule": "20일선 위"}))]))
+    # on 은 상품만 · qty 식의 {"rule"} 은 펼친다 · 규칙 note 는 갈래까지
+    g2 = TreeGateway.of(dict(data, rules=data["rules"] + [rule("A 전용 익절", Cond.SELL, W, ("held", 0.5), on=["A"], note="메모"),
+                                                          rule("식 비중", Cond.BUY, None, ("cash", {"rule": "20일선 위"}))]))
     s2 = [r for r in g2.sells("A") if r.label == "A 전용 익절"]
     check(s2 and s2[0].note == "메모" and not [r for r in g2.sells("B") if r.label == "A 전용 익절"],
-          "on 이름 심볼 펼침 · note 전달")
+          "on 반영 · note 전달")
     check(TreeGateway.of(dict(data, rules=[rule("식", Cond.BUY, None, ("cash", {"rule": "w"})),
                                            {"label": "w", "value": W}])).weight("A").qty.x == dict(W, label="w"),
           "qty 식의 {rule} 펼침")
-    check(g.refs() >= {"0-1", "0-2"}, "refs 에 상품·이름 심볼 ref 포함")
-    # 규칙 단위 질문(구간② 검사기) — 이름 목록 · 뜻(펼침/그대로) · 측정 · why · 이름 심볼 · 옛 양식 키
+    check(g.refs() >= {"0-1"}, "refs 에 상품 ref 포함")
+    # 규칙 단위 질문(구간② 검사기) — 이름 목록 · 뜻(펼침/그대로) · 측정 · why · 옛 양식 키
     check(g.labels()[:2] == ["20일선 위", "선물 양"] and g.body("없음") is None, "labels/body 없는 이름")
     b2 = g.body("선물 양")
     check(b2["products"] == ["A"] and b2["branches"][0]["do"] == Cond.BUY
@@ -782,16 +783,23 @@ def t_gateway():
     check(g.value("20일선 위") == W and g.value("선물 양") is None and g.why("선물 양") is None
           and TreeGateway.of(dict(data, rules=data["rules"] + [dict(rule("w", Cond.BUY, W), why="원문 3-1")])).why("w") == "원문 3-1",
           "value/why")
-    check(g.name_symbols() == {"$묶음": ["N1", "N2"]}, "name_symbols")
     bad = dict(data, rules=data["rules"] + [rule("x", Cond.BUY, {"rule": "없는 이름"})])
     check(TreeGateway.of(bad).gate("A", Cond.BUY)["any"][-1].get("manual", "").startswith("연산 없음: 미해결 참조"),
           "없는 이름 참조는 수동(연산 없음)으로 드러낸다")
     R0 = {"label": "r", "then": [{"when": W, "do": Cond.SELL}]}
+    old_sym = lambda sym: dict(data, rules=[{"label": "r", "then": [{"when": {"lt": [{"px": "close", "sym": sym}, 0]},
+                                                                      "do": Cond.BLOCK}]}])
     for broken in (dict(data, version=2), dict(data, products={}), dict(data, rules=[]),
                    dict(data, rules=data["rules"] + [data["rules"][0]]),
                    dict(data, rules=data["rules"] + [rule("y", "쉰다", {"all": []})]),
                    dict(data, review={}),                                         # 옛 양식 키
-                   dict(data, products={"A": {"index": "^NDX", "exit_note": "x"}}),
+                   dict(data, products={"A": {"ref": "0-1", "exit_note": "x"}}),
+                   dict(data, names={"$묶음": {"syms": ["N1"]}}),                    # 폐지: 이름 심볼
+                   dict(data, products={"A": {"index": "^NDX"}, "B": {}}),          # 폐지: 상품의 기준지수 칸
+                   old_sym("$self"), old_sym("$index"),                            # 폐지: $ 심볼
+                   dict(data, rules=[{"label": "r", "then": [{"when": {"lt": [{"px": "close"}, 0]}, "do": Cond.BLOCK}]}]),  # sym 생략
+                   dict(data, rules=[{"label": "r", "then": [{"when": {"ge": [{"across": {"syms": ["N1"], "cond": UP("N1")}}, 1]},
+                                                              "do": Cond.BUY}]}]),     # 폐지: across
                    dict(data, rules=[dict(R0, scale=0.5)]),                         # 규칙에 모르는 키
                    dict(data, rules=[{"label": "r", "then": [{"when": W, "do": Cond.SELL, "sell": "all"}]}]),
                    dict(data, rules=[{"label": "r", "then": [{"when": W, "do": Cond.SELL, "qty": {"of": "cash", "x": 1}}]}]),

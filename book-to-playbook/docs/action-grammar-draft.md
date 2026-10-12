@@ -15,7 +15,7 @@
 ## 2. 최종 모양
 
 ```
-{ version, products, names,
+{ version, products,
   rules: [ {label, ref, note?, on?, value?, then: [{when, do, qty?, repeat?}] | cond | skip, why?} ] }
 ```
 
@@ -27,15 +27,14 @@
 | 맨 위 | 하는 일 |
 |---|---|
 | `version` | 양식 버전(3) — 코드가 옛 양식을 거부 |
-| `products` | 판정할 종목 : `{index, ref | note}` — 기준지수(`$index`). 원문이 말했으면 `ref`, 아니면 `note` "운영 판단", 근거 없으면 `"?"`(검사기 정지 → 사용자 확인) |
-| `names` | 이름 심볼(`$반도체대표주`) : `{syms, ref, note}` — 실제 종목은 여기 한 곳 |
+| `products` | 판정할 상품(티커) : `{ref | note}` — 원문이 말했으면 `ref`, 아니면 `note` "운영 판단". 지수 칸·이름 심볼 없음 — 종목 모델은 `on`(어느 상품) + `sym`(구체 티커) 둘뿐(COND_DSL §3, 2026-10-12 반영) |
 | `rules` | **원문 판단 하나 = 규칙 하나** |
 
 | 규칙 필드 | 하는 일 |
 |---|---|
 | `label` | **조건의 이름**(대상 + 상태, 행동 단어 넣지 않음). 다른 규칙이 이 이름으로 부른다. 책 안에서 유일 |
 | `ref` · `note` | 원문 소절(여럿이면 `·`) · 해석/운영 판단 메모(판정엔 안 씀) |
-| `on` | 원문이 **이름으로 지목한** 종목·이름 심볼. 생략 = `products` 전부 |
+| `on` | 이 규칙이 **판정을 내는 상품**. 생략 = `products` 전부. 상품 전용이면 반드시 |
 | `value` | 갈래들이 같이 보는 값(있을 때만). 갈래 안에서 `"$value"` |
 | `then` | 갈래 목록 `[{when, do, qty?, repeat?}]` — **맞는 갈래 전부** 실행(각 갈래 한 번) |
 | `cond` | **이름 조건** — `value`/`when` 만 있고 행동 없음(저자가 측정만 주고 행동 미명시). `then`·`skip` 둘 다 없는 규칙이 곧 이름 조건. 다른 규칙이 `{"rule": 이름}` 으로 참조. 판정 등급엔 직접 안 쓰임(참조될 때만) |
@@ -114,7 +113,7 @@
 | 식은 다른데 매일 결과가 같음 | "VIX ≥ 10%" vs "VIX ÷ 어제 ≥ 1.1" | 시세로 돌려 봄 → 심판 확인 |
 | 다른 규칙에 포함돼 효과 없음 | "달러·금리·VIX 동시 불편" ⊂ 장전 2점 이하 | 시세로 돌려 결과를 바꾼 날 0일 → 심판 확인 |
 | 이름 | 겹침 · 없는 이름 부름 · 순환 · 행동 단어 섞임 | 정지 |
-| 종목·심볼 | `products`/`names` 에 `"?"` 남음 · 이름 심볼이 `names` 에 없음 · `on` 종목이 `products` 에 없음 | 정지 |
+| 종목·티커 | 시세 잎 `sym` 에 `"?"` 남음 · `on` 종목이 `products` 에 없음 · 폐지된 `$` 심볼·`names`·`index` 칸·`across` | 정지 |
 | 누락 | 원문 판단 소절인데 어떤 규칙(`skip`·`cond` 포함)의 `ref` 에도 없음 | 정지 |
 | **충실성 — 식 되는데 skip** | "20일 중 상승일 13일↑" 를 `skip:저자 미명시` 로(사실은 `sum(case)` 식) · `skip:데이터 없음` 인데 가격·분봉만 쓰는 식 | 정지 — 이름 조건/행동 규칙으로 뽑아라. skip 은 `데이터 없음`·`연산 없음` 잔여에만 |
 | **반쪽 skip** | 한 소절에 식 되는 조각 + 안 되는 조각을 통째로 skip | 정지 — 식 조각은 추출, 안 되는 조각만 쪼개 skip |
@@ -171,9 +170,7 @@ smooth=`ewm(alpha)` · since 계열=구간별 `cumsum/cummax/cummin` · 순위=`
 ```json
 {
   "version": 3,
-  "products": {"TQQQ": {"index": "^NDX", "ref": "1-1"}, "SOXL": {"index": "^SOX", "ref": "1-1"},
-               "UPRO": {"index": "^GSPC", "ref": "1-1"}},
-  "names": {"$반도체대표주": {"syms": ["NVDA", "AMD", "AVGO"], "ref": "4-2", "note": "운영 판단: 원문 '대표주' — 4-2·7-2 의 3종"}},
+  "products": {"TQQQ": {"ref": "1-1"}, "SOXL": {"ref": "1-1"}, "UPRO": {"ref": "1-1"}},
   "rules": [
     {"label": "VIX 전일 대비", "ref": "2-4·6-2",
      "value": {"mul": [{"sub": [{"div": [{"px": "close", "sym": "^VIX"}, {"lag": [{"px": "close", "sym": "^VIX"}, 1]}]}, 1]}, 100]},
@@ -191,14 +188,14 @@ smooth=`ewm(alpha)` · since 계열=구간별 `cumsum/cummax/cummin` · 순위=`
               {"when": {"le": ["$value", 2]}, "do": "안 산다"}],
      "note": "3점 '소액만'은 입장(관망 — 갈래 없음, 2절 A). 2-6 '달러·금리·VIX 동시 불편하면 크게 들어갈 장 아님'은 이 점수의 풀이 — 따로 규칙 아님"},
 
-    {"label": "기준지수 20일선 아래", "ref": "2-2",
-     "then": [{"when": {"lt": [{"px": "close", "sym": "$index"}, {"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}]}, "do": "안 산다"}],
-     "note": "원문 '쉬거나 아주 작게' — 보수적인 쪽"},
+    {"label": "나스닥 20일선 아래", "ref": "2-2", "on": ["TQQQ"],
+     "then": [{"when": {"lt": [{"px": "close", "sym": "^NDX"}, {"div": [{"sum": [{"px": "close", "sym": "^NDX"}, 20]}, 20]}]}, "do": "안 산다"}],
+     "note": "원문 '쉬거나 아주 작게' — 보수적인 쪽. SOXL(^SOX)·UPRO(^GSPC)도 같은 모양으로 상품마다 규칙 하나"},
 
     {"label": "장 초반 세 줄 2개 이상", "ref": "7-1", "on": ["SOXL"],
      "then": [{"when": {"atleast": 2, "of": [{"label": "상품 시초가 위", "gt": ["…"]},
                                             {"label": "첫 눌림 저점 지킴", "ge": ["…"]},
-                                            {"label": "반도체 대표주 모두 상승", "eq": [{"across": {"syms": "$반도체대표주", "cond": "…"}}, 3]}]},
+                                            {"label": "반도체 대표주 모두 상승", "atleast": 3, "of": ["…NVDA…", "…AMD…", "…AVGO…"]}]},
                "do": "산다"}]},
 
     {"label": "1차 탐색", "ref": "3-1", "then": [{"when": {"all": []}, "do": "산다", "qty": {"of": "budget", "x": 0.25}}]},
@@ -213,7 +210,7 @@ smooth=`ewm(alpha)` · since 계열=구간별 `cumsum/cummax/cummin` · 순위=`
      "note": "구간 10~12%·15~20% 는 하한"},
 
     {"label": "반도체 4종목 중 약세 수", "ref": "7-6", "on": ["SOXL"],
-     "then": [{"when": {"ge": [{"across": {"syms": ["AMD", "AVGO", "MU", "AMAT"], "cond": "…"}}, 3]},
+     "then": [{"when": {"atleast": 3, "of": ["…AMD…", "…AVGO…", "…MU…", "…AMAT…"]},
                "do": "판다", "qty": {"of": "held", "x": "?"}}],
      "note": "운영 판단: 원문 '장비주' = AMAT"},
 

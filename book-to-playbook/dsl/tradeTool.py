@@ -27,7 +27,7 @@ TIMEFRAMES = ("1d", "1m", "5m")  # 봉 길이 — asof 축에서 자른다. 일�
                            # 마지막 분봉, 5분봉은 1분봉을 세션 안에서 5분 OHLC 로 집계한 뒤 asof 이하 마지막.
                            # 데이터가 없으면 None(모름).
 WINDOW = ("highest", "lowest", "sum")   # 창(n거래일) 집계 — 평균 등 지표는 전용 연산 없이 조합(COND_DSL 6절)
-GONE_OPS = ("ma", "ema", "stdev", "rsi", "pct", "count", "streak")   # 지운 전용 연산 — 조합으로 쓴다(entry.verify_rules 주인 표가 되살림을 막는다)
+GONE_OPS = ("ma", "ema", "stdev", "rsi", "pct", "count", "streak", "across")   # 지운 전용 연산 — 조합으로 쓴다(across → atleast·of · entry.verify_rules 주인 표가 되살림을 막는다)
 CMP = ("gt", "ge", "lt", "le")
 STREAK_CAP = 400          # 연속·경과일을 거꾸로 셀 때의 상한(데이터 길이보다 길면 무의미)
 
@@ -117,13 +117,9 @@ def answer_key(node, prod):
 
 
 def product_specific(node):
-    """$self/$index/pos 를 쓰는 식은 상품마다 값이 달라진다 — 여러 상품이 '같이 보는' 판단이 아니다."""
-    for n in labeled_all(node):
-        if "px" in n and n.get("sym", "$self") in ("$self", "$index"):
-            return True
-        if "pos" in n:
-            return True
-    return False
+    """pos(그 상품 보유분)·노드 레벨 on(그 밖의 상품에선 항상 참)을 쓰는 식은 상품마다 값이 달라진다 — 여러 상품이
+    '같이 보는' 판단이 아니다. 시세 잎은 늘 구체 티커(sym)라 상품과 무관하다."""
+    return any(isinstance(n, dict) and ("pos" in n or n.get("on")) for n in labeled_all(node))
 
 
 def validate(node, path="$"):
@@ -150,8 +146,11 @@ def validate(node, path="$"):
     if op == "px":
         if v not in PX_FIELDS:
             raise CondError("%s.px: 모르는 시세 필드 %r" % (path, v))
-        if "sym" in node and not isinstance(node["sym"], str):
-            raise CondError("%s.sym: 문자열이어야 한다" % path)
+        sym = node.get("sym")
+        if not (isinstance(sym, str) and sym.strip()):
+            raise CondError("%s.sym: 구체 티커가 필요하다(생략 금지 — 상품 자신이면 그 티커, 지수면 지수 티커)" % path)
+        if sym.startswith("$"):
+            raise CondError("%s.sym: %r — $ 심볼($self·$index·$s·이름 심볼)은 폐지됐다. 구체 티커를 쓴다" % (path, sym))
         if "tf" in node and node["tf"] not in TIMEFRAMES:
             raise CondError("%s.tf: 모르는 봉 %r (허용 %s)" % (path, node["tf"], "/".join(TIMEFRAMES)))
     elif op == "abs":
@@ -197,12 +196,6 @@ def validate(node, path="$"):
         two(op)
         validate(v[0], path + ".valuewhen[0]")
         validate(v[1], path + ".valuewhen[1]")
-    elif op == "across":
-        if not (isinstance(v, dict) and set(v) == {"syms", "cond"}
-                and isinstance(v["syms"], list) and v["syms"]
-                and all(isinstance(s, str) for s in v["syms"])):
-            raise CondError("%s.across: {syms:[...], cond:...} 형식이어야 한다" % path)
-        validate(v["cond"], path + ".across.cond")
     elif op == "manual":
         if not (isinstance(v, str) and v.strip()):
             raise CondError("%s.manual: 사유 문자열이 필요하다" % path)
@@ -219,9 +212,10 @@ def validate(node, path="$"):
 class Ctx:
     """평가 문맥. hist={심볼: [Candle(date,open,high,low,close,volume)]}, cal=날짜 목록."""
 
-    def __init__(self, hist, cal, self_sym, index_sym=None, manual_as=None, pos=None, asof=None,
+    def __init__(self, hist, cal, self_sym, manual_as=None, pos=None, asof=None,
                  session_close=None, answers=None):
-        """pos = (첫 매수일 인덱스, 평균 매입가 | 날짜별 평균 매입가 목록[, 장부]) — 판다·분할 갈래 평가 때만.
+        """self_sym = 평가 중인 상품(포지션 pos 의 종가·수동 답 열쇠·노드 레벨 on 에만 — 시세 잎은 늘 구체 sym).
+        pos = (첫 매수일 인덱스, 평균 매입가 | 날짜별 평균 매입가 목록[, 장부]) — 판다·분할 갈래 평가 때만.
         장부 = {"filled": {규칙 이름 | None(전체): 날짜별 산 횟수}, "sold": 날짜별 판 비율} — 없으면 filled·sold 는 모름.
         asof = 관측 시각(UTC datetime) — 분봉(tf="1m"/"5m") 필드를 이 시각 이하로 자른다. None 이면 실제 지금.
         session_close = {심볼: {YYYYMMDD: 그날 정규장 마감(UTC datetime, tz-aware)}} — 일봉 확정(settled) 경계.
@@ -234,7 +228,6 @@ class Ctx:
         self.hist = hist
         self.cal = list(cal)
         self.self_sym = self_sym
-        self.index_sym = index_sym
         self.manual_as = manual_as
         self.session_close = session_close or {}  # {심볼: {YYYYMMDD: 마감 UTC datetime}} — 일봉 확정 경계
         self._px = {}
@@ -248,7 +241,7 @@ class Ctx:
         if self.manual_as is None:
             return self
         if self._flip is None:
-            f = Ctx(self.hist, self.cal, self.self_sym, self.index_sym, not self.manual_as, self.pos,
+            f = Ctx(self.hist, self.cal, self.self_sym, not self.manual_as, self.pos,
                     self.asof, self.session_close, self.answers)
             f._px, f._smap, f._flip = self._px, self._smap, self
             self._flip = f
@@ -261,15 +254,6 @@ class Ctx:
             if a is not None:
                 return a
         return self.manual_as
-
-    def bind(self, sym):
-        if sym == "$self":
-            return self.self_sym
-        if sym == "$index":
-            if not self.index_sym:
-                raise CondError("$index 가 정의되지 않은 상품: %s" % self.self_sym)
-            return self.index_sym
-        return sym
 
     def px(self, sym, field, tf="1d"):
         """심볼·필드의 asof 축 시계열(달력 길이). 일봉(tf="1d")은 날짜별 '확정(settled)' 일봉(장중 asof 면 아직
@@ -436,12 +420,11 @@ def _or3(vals):
 # 일봉축 조회(asof 이하 마지막 확정봉) 대상이 아닌 잎 — 하나라도 있으면 그 식은 '1d-순수'가 아니다.
 #   · 분봉/5분봉 px(tf 1m/5m) : asof 이하 '살아 있는' 축(오늘 재생) — 일봉 확정 경계로 당기면 안 된다.
 #   · manual/pos              : 일봉 봉이 아닌 값(수동·포지션).
-#   · across                  : $s 가 across 안에서만 풀려(심볼이 확정되지 않음) — 안전하게 비-1d 로 둔다.
-_NON_DAILY = ("manual", "pos", "across")
+_NON_DAILY = ("manual", "pos")
 
 
-def _daily_axis(node, ctx, s_sym):
-    """node 가 '1d-순수'(모든 px 잎이 tf=1d 이고 분봉·수동·pos·across 잎이 없음)면, 그 1d 심볼들의 settled_map 을
+def _daily_axis(node, ctx):
+    """node 가 '1d-순수'(모든 px 잎이 tf=1d 이고 분봉·수동·pos 잎이 없음)면, 그 1d 심볼들의 settled_map 을
     돌려준다(일봉축 '마지막 확정봉' 지도). 아니거나, 심볼들의 지도가 엇갈리거나, 지도가 no-op(asof 없음·캘린더 없음)이면
     None — 그 경우 gather 를 건너뛴다(기존 동작 그대로). 같은 시장 심볼은 지도가 같으므로(세션 경계가 시장별) 한 지도로
     모은다 — 서로 다른 시장이 한 1d-순수 식에 섞이면(지도 엇갈림) 당기지 않는다(조용히 잘못 당기느니 기존 masked-None)."""
@@ -453,12 +436,9 @@ def _daily_axis(node, ctx, s_sym):
         if op == "px":
             if n.get("tf", "1d") != "1d":
                 return None                 # 분봉/5분봉 잎 — 1d-순수 아님
-            sym = n.get("sym", "$self")
-            if sym == "$s":
-                return None                 # across 안 — 심볼 미확정, 안전하게 당기지 않음
-            syms.add(ctx.bind(sym))
+            syms.add(n["sym"])
         elif op in _NON_DAILY or is_unknown(n):
-            return None                     # 수동("?" 식 포함)·포지션·across — 1d-순수 아님
+            return None                     # 수동("?" 식 포함)·포지션 — 1d-순수 아님
     if not syms:
         return None                         # px 잎이 없는 순수 숫자/비교식 — 당길 일봉축이 없음
     maps = [ctx.settled_map(sym) for sym in syms]
@@ -468,16 +448,16 @@ def _daily_axis(node, ctx, s_sym):
     return first
 
 
-def series(node, ctx, s_sym=None):
+def series(node, ctx):
     """노드 → 달력 길이 시계열.
 
-    일봉축 재해석(장중 asof): 노드가 '1d-순수'면(모든 px 잎 tf=1d·분봉/수동/pos/across 없음), 평가 결과의 각 index i 를
+    일봉축 재해석(장중 asof): 노드가 '1d-순수'면(모든 px 잎 tf=1d·분봉/수동/pos 없음), 평가 결과의 각 index i 를
     'asof 이하 마지막 확정 일봉' 값으로 당긴다(_daily_axis·settled_map). 장중 asof 면 오늘 봉은 미확정이라 m[i]=어제 →
     일봉 잎·ma20 등이 '어제까지 실제값'(None 아님)으로 나온다. 당김은 settled index 에서만 읽으므로 오늘 미확정 종가는
     어떤 파생값에도 새지 않는다(look-ahead 0). 당김은 멱등(m[m[i]]==m[i])이라 잎·그 위 1d 노드 어디서 걸어도 결과가
     같다 — 그래서 '가장 바깥 1d 노드'를 따로 찾지 않고 모든 노드에서 한 번씩 안전하게 건다. EOD/장후 asof·asof None·캘린더
     없음에선 m[i]==i(또는 no-op)라 항등 → 일봉 파리티·기존 동작 그대로."""
-    key = (repr(node), s_sym, ctx.manual_as)
+    key = (repr(node), ctx.manual_as)
     if key in ctx._memo:
         return ctx._memo[key]
     # 노드 레벨 on: 평가 중 상품이 그 노드의 on 에 없으면 그 노드는 '항상 참'(제약 안 함 — all/atleast 안에서 투명).
@@ -488,15 +468,15 @@ def series(node, ctx, s_sym=None):
             out = [True] * len(ctx.cal)
             ctx._memo[key] = out
             return out
-    out = _series(node, ctx, s_sym)
-    m = _daily_axis(node, ctx, s_sym)
+    out = _series(node, ctx)
+    m = _daily_axis(node, ctx)
     if m is not None:
         out = [out[m[i]] if m[i] is not None else None for i in range(len(out))]
     ctx._memo[key] = out
     return out
 
 
-def _series(node, ctx, s_sym):
+def _series(node, ctx):
     L = len(ctx.cal)
     if isinstance(node, (int, float)) and not isinstance(node, bool):
         return [float(node)] * L
@@ -508,15 +488,10 @@ def _series(node, ctx, s_sym):
         return [ctx.manual_value(node)] * L  # 저자가 숫자를 안 준 판단 — 사람이 정한다(수동과 같은 규칙)
     if op in WINDOW + ("lag",) and v[1] == UNKNOWN:
         return [None] * L                    # 기간을 모름 — 값도 모름
-    S = lambda n: series(n, ctx, s_sym)
+    S = lambda n: series(n, ctx)
 
     if op == "px":
-        sym = node.get("sym", "$self")
-        if sym == "$s":
-            if s_sym is None:
-                raise CondError("$s 는 across 안에서만 쓴다")
-            sym = s_sym
-        return ctx.px(ctx.bind(sym), v, node.get("tf", "1d"))
+        return ctx.px(node["sym"], v, node.get("tf", "1d"))
 
     if op in ARITH:
         a, b = S(v[0]), S(v[1])
@@ -595,7 +570,7 @@ def _series(node, ctx, s_sym):
         return out
 
     if op == "not":
-        return [x if x is None else (not x) for x in series(v, ctx.flipped(), s_sym)]
+        return [x if x is None else (not x) for x in series(v, ctx.flipped())]
 
     if op == "barssince":
         c = S(v)
@@ -645,14 +620,6 @@ def _series(node, ctx, s_sym):
                     break
                 j -= 1
             out.append(val if seen is not None else None)
-        return out
-
-    if op == "across":
-        cols = [series(v["cond"], ctx, sym) for sym in v["syms"]]
-        out = []
-        for i in range(L):
-            vals = [c[i] for c in cols]
-            out.append(None if any(x is None for x in vals) else float(sum(1 for x in vals if x)))
         return out
 
     if op == "manual":
@@ -803,7 +770,7 @@ def warmup_of(node):
       · barssince/valuewhen/minsince/maxsince : 안쪽만. 이들은 데이터 시작에 닿으면 조용히
         틀리지 않고 AtLeast/None(모름)으로 스스로 불확실을 드러내므로(STREAK_CAP 는 fetch 버퍼가
         아닌 역방향 상한일 뿐) 워밍업 기준에 넣지 않는다 — 넣으면 정상 데이터의 짧은 창도 오탐한다.
-      · 산술·비교·abs·case·논리(all/any/atleast/not)·across : 자식 중 최댓값
+      · 산술·비교·abs·case·논리(all/any/atleast/not) : 자식 중 최댓값
       · px/manual/pos/상수                   : 0
     """
     if isinstance(node, (int, float)) and not isinstance(node, bool):
@@ -839,8 +806,6 @@ def warmup_of(node):
         return max([w(c) for c in node["of"]] + [0])
     if op == "not":
         return w(v)
-    if op == "across":
-        return w(v["cond"])
     # manual · pos — lookback 없음
     return 0
 
@@ -922,10 +887,10 @@ class RuleSeries:
         확정(settled) 봉만 본다(미확정 그날 일봉은 None). None 이면 실제 지금(일봉은 마지막 확정봉).
         answers = 사람이 답한 수동 {answer_key: 참/거짓} — 등급·금액·비중이 그 답으로 풀린다(서버 권위).
         None 이면 옛 동작 그대로."""
-        product, index = rules.product, rules.index
-        self.rules, self.product, self.index, self.days, self.prices = rules, product, index, list(days), prices
+        product = rules.product
+        self.rules, self.product, self.days, self.prices = rules, product, list(days), prices
         sc = session_closes(rules.symbols(), list(days), asof)
-        mk = lambda m: Ctx(prices, days, product, index, manual_as=m, asof=asof, session_close=sc, answers=answers)
+        mk = lambda m: Ctx(prices, days, product, manual_as=m, asof=asof, session_close=sc, answers=answers)
         self.ctx = {True: mk(True), False: mk(False), None: mk(None)}
         s = lambda node, m: series(node, self.ctx[m])
         self.opt = {do: s(rules.gate(do), BUY_SIDE[do]) for do in GATES}
@@ -945,9 +910,7 @@ class RuleSeries:
         아직 확정 못 했으면(지연된 feed·asof 장중 미확정) 그 심볼 기준으로 낮춘다. 확정봉이 하나도 없으면 -1.
         캘린더가 없거나 asof 가 없으면(라이브 지금) settled_map 이 no-op(None) → 날짜 index 그대로(항등)."""
         ctx = self.ctx[None]
-        syms = sorted({ctx.bind(s) for s in self.rules.symbols()
-                       if not s.startswith("$")} | {self.product}
-                      | ({ctx.bind("$index")} if self.index else set()))
+        syms = sorted(set(self.rules.symbols()) | {self.product})
         maps = [ctx.settled_map(s) for s in syms]
         out = []
         for day in range(len(self.days)):
@@ -1071,7 +1034,8 @@ class Cond:
 
 문법 (JSON) — 허용 키 밖은 전부 오류(조용히 무시하지 않는다):
   숫자          3, 1.5            (상수)   "?" = 저자가 안 준 숫자(모르는 값) — 숫자가 들어갈 자리 어디든
-  시세          {"px": "close"|"open"|"high"|"low"|"volume", "sym": 심볼?, "tf": 봉?}   sym 기본 "$self",
+  시세          {"px": "close"|"open"|"high"|"low"|"volume", "sym": 티커, "tf": 봉?}   sym = 구체 티커(필수 —
+                상품 자신이면 그 티커, 지수면 지수 티커. $ 심볼 없음),
                 tf 기본 "1d"(일봉 — asof 이하 '확정(settled)' 일봉; 장중 asof 면 아직 마감 안 된 그날 일봉은
                 None, 즉 전일 종가까지만 본다). tf "1m"(분봉 — asof 이하 마지막 분봉, 장중 값). tf "5m"(5분봉 —
                 세션 안 1분봉을 5분 OHLC 로 집계한 뒤 asof 이하 마지막 5분봉). 데이터가 없으면 모름(None).
@@ -1087,16 +1051,16 @@ class Cond:
                                         (연속 참 일수 = barssince(not c) · 최근 n일 중 참인 날 수 = sum(case(c,1,0), n))
                 {"valuewhen": [c, s]}   c 가 마지막으로 참이었던 날의 s 값
                 {"minsince"|"maxsince": [c, s]}  c 가 마지막으로 참이었던 날부터 오늘까지 s 의 최저/최고
-  여러 종목     {"across": {"syms": [...], "cond": c}}   c 가 참인 종목 수(c 안에서 "$s" = 그 종목)
   수동          {"manual": "사유"}
   포지션        {"pos": "ret"|"days"|"maxret"|"minret"|"filled"|"sold"}   판다·2차 이후 분할(산다) 갈래 안에서만.
                 ret = 평균 매입가 대비 오늘 종가 수익률(%), days = 첫 매수일부터 지난 봉(첫 매수일 0),
                 maxret/minret = 첫 매수일~오늘 종가 수익률의 최고/최저. 매수 전 날은 None.
                 filled = 산 횟수({"pos": "filled", "rule": "1차"} = 그 규칙으로 산 횟수, rule 없으면 전체) ·
                 sold = 지금까지 판 비율(판 물량 ÷ 산 물량). 둘은 체결 장부가 있어야 안다(없으면 모름).
-  메타(아무 노드에) "label", "ref", "id", "note"
+  메타(아무 노드에) "label", "ref", "id", "note", "on"(노드 레벨 대상 상품 — 그 밖의 상품에선 항상 참)
 
-심볼: "$self"(그 상품) · "$index"(상품의 기준 지수) · "$s"(across 안의 종목) · 그 외 문자 그대로."""
+종목 모델: 규칙·노드가 어느 상품에 판정을 내나 = on · 시세 잎이 읽는 티커 = sym. 둘뿐이다
+  ("여러 종목 중 N개" = {"atleast": N, "of": [종목별 비교 …]}, 각 잎 sym = 그 티커)."""
     META = META
     UNKNOWN = UNKNOWN
     UNKNOWN_REASON = UNKNOWN_REASON

@@ -1050,7 +1050,7 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
   }
   // 공통(allprod) 규칙만 걸러낸다 — 상품 카드에선 빼고, 화면 맨 위 "공통 시장 신호" 섹션에 한 번만 그린다.
   const isAllprod = it => !!(it && it.allprod);
-  // 공통 섹션 — on 없는 규칙(모든 상품에 같은 규칙)을 동사별로 한 번만. 단, $index/$self 를 쓰면 값이 상품마다
+  // 공통 섹션 — on 없는 규칙(모든 상품에 같은 규칙)을 동사별로 한 번만. 단, 포지션(pos)·노드 레벨 on 을 쓰면 값이 상품마다
   //   다르므로 각 규칙에 상품별 결과 칩(prod● / prod○ / prod?)을 붙이고, 수동(✋)은 상품별 토글로 그린다
   //   (답 열쇠 mkey 는 지금 규칙 그대로 — 상품마다 자기 답을 가진다. 값 손실·답 혼선 없음).
   function prodChips(pv){            // pv = [[prod, v], …] — 값이 다 같으면 칩 하나로 합친다
@@ -1102,7 +1102,7 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
         const chips = '<div class="ck-cm-chips">'+prodChips(pv)+'</div>';
         const allProds = perProd.map(x=>x[0]);
         // allsame = 상품에 안 기대는 공통 규칙(값·질문이 상품마다 같음) → 한 줄로 합친다. 수동 토글은 한 번 누르면
-        //   세 상품 열쇠에 같은 답을 넣는다(mkey 는 상품별 그대로, 서버 무변). $index/$self 규칙은 상품마다 달라 따로.
+        //   세 상품 열쇠에 같은 답을 넣는다(mkey 는 상품별 그대로, 서버 무변). 상품마다 값이 다른 규칙은 따로.
         let inner;
         if(perProd[0][1].allsame){
           let html = node(perProd[0][1], allProds[0]+'.common', ans, 0);
@@ -1117,7 +1117,7 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
           });
           inner = html;
         } else {
-          // 상품마다 값·답이 다른 공통 규칙($index/$self) — 상품별로 node() 로 그린다(각자 자기 열쇠).
+          // 상품마다 값·답이 다른 공통 규칙(allsame 아님) — 상품별로 node() 로 그린다(각자 자기 열쇠).
           inner = perProd.map(([p,it])=>'<div class="ck-cm-prod"><div class="ck-cm-pl">'+esc(p)+' 기준</div>'+node(it, p+'.common', ans, 0)+'</div>').join('');
         }
         body += '<div class="ck-cm">'+chips+inner+'</div>';
@@ -1125,14 +1125,14 @@ IWM은 소형주 지수인 러셀2000을 따라간다. 위험선호가 강해질
     });
     if(!body) return '';
     return '<h2 id="sheet-common2"><span class="step">공통</span>공통 시장 신호 — 모든 상품에 같이 적용</h2><div class="card">'
-      + '<p class="subtle" style="margin:0 0 10px">아래는 특정 상품용이 아니라 시장 전체에 거는 규칙입니다. 상품마다 결과가 다를 수 있어 상품별 ●/○/? 를 함께 보여줍니다(예: 기준 지수가 상품마다 달라 값이 갈립니다).</p>'
+      + '<p class="subtle" style="margin:0 0 10px">아래는 특정 상품용이 아니라 시장 전체에 거는 규칙입니다. 상품마다 결과가 다를 수 있어 상품별 ●/○/? 를 함께 보여줍니다(예: 보유분·상품별 조건이 붙어 값이 갈립니다).</p>'
       + body + '</div>';
   }
   function renderProduct(v){
     const ans = answers();
     const key = v.key;                          // 서버 판정(답한 수동까지 반영) 그대로
     const P = s => v.prod+'.'+s;
-    let h = '<div class="ck-head"><h3><span class="tk">'+esc(v.prod)+'</span>'+(v.index?' <span class="subtle">기준 지수 '+esc(v.index)+'</span>':'')+'</h3>'
+    let h = '<div class="ck-head"><h3><span class="tk">'+esc(v.prod)+'</span>'+'</h3>'
           + '<span class="verdict '+(GCLS[key]||'')+'" style="margin:0;padding:4px 11px;font-size:13.5px">'+GR(key)+'</span></div>';
     if(v.close != null) h += '<p class="subtle" style="margin:4px 0 2px">'+esc(v.date)+' 종가 <b style="color:var(--head)">'+v.close.toFixed(2)+'</b>'+(v.chg!=null?' · 당일 '+(v.chg>=0?'+':'')+v.chg.toFixed(2)+'%':'')+'</p>';
     const nAns = Object.keys((VD && VD.answers) || {}).length;

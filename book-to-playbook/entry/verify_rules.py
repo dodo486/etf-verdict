@@ -199,7 +199,7 @@ def _js_hits(src, regex):
 # ------------------------------------------------------------------ 주인 표의 매처 — Src → [(줄, 함수, 표식)]
 # 트리 원본 키 — tree.json(v3)의 구조 키(COND_DSL 파일 형식)를 첨자([..])·.get/.pop/.setdefault 로 읽는 자리.
 #   label·ref·note·when·qty·on 처럼 트리 밖 dict 에도 흔한 이름은 뺀다(오탐) — 트리에만 있는 키로 본다.
-TREE_KEYS = {"version", "products", "names", "rules", "then", "do", "value", "skip", "why", "review"}
+TREE_KEYS = {"version", "products", "rules", "then", "do", "value", "skip", "why", "review"}
 
 
 def m_tree_keys(src):
@@ -404,7 +404,7 @@ def m_grade_ladder(src):
 # concept · owners(주인 파일 — 그 안에선 자유) · match(매처) · why(한 줄 사유) · hint(고칠 길) · allow(명시 예외, 사유 필수).
 OWNERS = [
     dict(concept="트리 원본 키", owners=("dsl/tree_gateway.py",), match=m_tree_keys,
-         why="tree.json 키 배치(products·names·rules·then·do…)를 아는 코드는 출입구 하나 — 형식 교체 시 한 파일만",
+         why="tree.json 키 배치(products·rules·then·do…)를 아는 코드는 출입구 하나 — 형식 교체 시 한 파일만",
          hint="TreeGateway 에 물어볼 것",
          allow={   # 같은 이름 키를 쓰는 '트리 아닌' dict
              ("consumers/backtest/verify_trading.py", "parity_text"): ({"products"}, "파리티 보고 dict"),
@@ -449,10 +449,12 @@ OWNERS = [
                 ("consumers/display/verdict_view.py", None): ({".close"}, "판단자가 낸 Decision.close(가공된 종가)"),
                 ("authoring/playbook/book_source.py", None): (None, "원문 파일 읽기(시세 아님)")}),
     dict(concept="지운 연산", owners=(), match=lambda src: [], everywhere=m_gone_ops,
-         why="전용 지표 연산(ma·ema·stdev·rsi)은 지웠다 — 지표는 기본 부품(sum·lag·pct·case…) 조합으로 쓴다. 정본 목록 Cond.GONE_OPS",
-         hint="COND_DSL 6절 조합 예시로(평균 = sum ÷ n)",
+         why="전용 연산(ma·ema·stdev·rsi·pct·count·streak·across)은 지웠다 — 기본 부품(sum·lag·case·atleast…) 조합으로 쓴다. "
+             "정본 목록 Cond.GONE_OPS",
+         hint="COND_DSL 6절 조합 예시로(평균 = sum ÷ n · 여러 종목 중 N개 = atleast·of)",
          allow={("dsl/tradeTool.py", None): (None, "지운 연산 목록 정본(GONE_OPS)"),
-                ("dsl/verify_primitives.py", "t_syntax"): ({"ma"}, "지운 연산이 문법에서 거부되는지 보는 자리")}),
+                ("dsl/verify_primitives.py", "t_syntax"): ({"ma", "across"}, "지운 연산이 문법에서 거부되는지 보는 자리"),
+                ("dsl/verify_primitives.py", "t_gateway"): ({"across"}, "폐지된 across 트리를 출입구가 거부하는지 보는 자리")}),
     dict(concept="동사·등급 이름표", owners=("dsl/tradeTool.py",), match=m_labels,
          why="Cond.VERBS(안 산다·산다·판다) · Grade.GRADES · grade_rules.json 이 정본 — 화면은 판정 JSON(verbs·grades)으로 받는다",
          hint="파이썬은 Cond.BLOCK·BUY·SELL·VERBS, 화면은 판정 JSON 의 verbs·grades 로", allow={}),

@@ -18,7 +18,7 @@ from dsl.tree_gateway import synthetic
 from signals.judge import Judge
 
 Candle = namedtuple("Candle", "date open high low close volume")
-C = {"px": "close"}
+C = {"px": "close", "sym": "X"}
 FAILS = []
 
 
@@ -33,7 +33,7 @@ def t_view():
     cal = ["2022%04d" % i for i in range(len(xs))]
     hist = {"X": [Candle(d, c, c, c, c, 1000) for d, c in zip(cal, xs)]}
     jump = {"ge": [{"mul": [{"sub": [{"div": [C, {"lag": [C, 1]}]}, 1]}, 100]}, 20]}   # 전일 대비 +20% 이상
-    judge = Judge.of(synthetic({"X": None})).product("X", hist, days=cal)
+    judge = Judge.of(synthetic(["X"])).product("X", hist, days=cal)
     node = {"all": [dict(jump, label="급등", ref="1"), {"not": {"label": "수동", "manual": "x"}}]}
     v = judge.view(node, len(xs) - 1)
     check(v["op"] == "all" and v["kids"][0]["v"] is True and v["kids"][0]["label"] == "급등"
@@ -44,7 +44,7 @@ def t_view():
     # 창 길이·lag 가 "?"(저자 미명시)인 식도 근거 설명이 죽지 않는다 — "?일" 로 보인다
     unk = {"label": "최근 ?일 급등", "ge": [{"lag": [C, "?"]}, {"lowest": [C, "?"]}]}
     d = judge.view(unk, len(xs) - 1).get("detail") or []
-    check(d and d[0]["lhsd"] == "종가 ?일 전" and d[0]["rhsd"] == "?일 최저", "\"?\" 창 설명 %r" % d)
+    check(d and d[0]["lhsd"] == "X 종가 ?일 전" and d[0]["rhsd"] == "?일 최저", "\"?\" 창 설명 %r" % d)
 
 
 def main(argv=()):

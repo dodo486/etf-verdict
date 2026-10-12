@@ -10,7 +10,7 @@
 출력 계약(알림 · 화면 · /api/verdict 가 소비):
   top     : {slug, title, ts, date, source, cash, verbs[], grades{}, verdicts[], refs{}, missing{}, positions_note}
             verbs = 동사 셋(정본 Cond.VERBS — 화면 머리글) · grades = 등급 글자표(정본 Grade.GRADES)
-  verdict : {prod, index, note, date, close, chg, key, grade, reason,
+  verdict : {prod, note, date, close, chg, key, grade, reason,
              gates{안 산다, 산다: view}, opt{..}, pes{..},     등급 동사 둘의 중첩 설명 + 낙관·비관 값
              size{label, ref, weight, weight_range, units, tranches[{label, ref, frac, units, view?}]},   얼마나(산다 qty)
                                                      units = 오늘 물량(시작자본 1.0 기준 — trades.to_units, 비중 모르면 None)
@@ -81,7 +81,7 @@ def _rule_views(judge, a=None):
 def product_verdict(judge, d, mine):
     """상품 하나의 판정 JSON — 판정(Decision d)과 설명은 판단자(signals/judge)가 내고, 여기는 화면 모양으로 빚기만 한다.
     mine = 이 상품의 내 포지션(로컬 파일)."""
-    base = {"prod": judge.product, "index": judge.index, "note": judge.note}
+    base = {"prod": judge.product, "note": judge.note}
     if not d.has_data:
         # 시세가 없어도 체크리스트 '구조'(규칙·조건 항목)는 정적으로 보여준다 — 값은 모름(❔), 지어내지 않는다.
         req = md_feed.requested().get(judge.product, "-")

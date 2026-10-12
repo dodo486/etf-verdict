@@ -62,7 +62,7 @@ def t_trades():
 
     def bt(_tree, hist, cal, starts, ex, trs=None):
         """판다·산다(분할) 규칙(합성 v3 트리) → 상품 판단자가 건넨 갈래로 build_trades 에."""
-        judge = Judge.of(synthetic({"X": None}, *(ex + (trs or [])))).product("X", hist, days=cal)
+        judge = Judge.of(synthetic(["X"], *(ex + (trs or [])))).product("X", hist, days=cal)
         return trades_mod.build_trades(judge, starts, judge.sells(), None if trs is None else judge.tranches())
 
     def sell(label, when, of, x):
@@ -116,7 +116,7 @@ def t_trades():
     ex = [sell("축소", {"ge": [R, 7]}, "held", "?")]
     t = bt(tree, hist, cal, [0], ex)[0]
     check(t["sells"] == [] and not t["closed"], "비율 미명시 매도는 팔지 않음 %r" % t["sells"])
-    tx = Judge.of(synthetic({"X": None}, *ex)).product("X", hist, days=cal)
+    tx = Judge.of(synthetic(["X"], *ex)).product("X", hist, days=cal)
     check("「축소」" in (trades_mod.unsized_note(tx.tranches(), tx.sells()) or ""), "비율 미명시 매도 문구")
     # (5) 마지막 날 신호 → 다음 날이 없어 체결 못 함(미청산), fixed20 은 20거래일 모자라면 None
     rows = [(100, 100), (100, 100), (100, 120)]
@@ -184,7 +184,7 @@ def t_no_exit():
     hist = {"X": [Candle(d, 100 + k, 101 + k, 99 + k, 100 + k, 1000) for k, d in enumerate(cal)]}
     ex = [rule("익절", Cond.SELL, {"ge": [{"pos": "ret"}, 5]}, ("held", 1))]
     for exits, pol in (([], "none"), (ex, "book")):
-        book = Judge.of(synthetic({"X": None}, rule("늘", Cond.BUY, {"all": []}), *exits))   # 매수 신호는 늘 참
+        book = Judge.of(synthetic(["X"], rule("늘", Cond.BUY, {"all": []}), *exits))   # 매수 신호는 늘 참
         check(trades_mod.exit_policy(book.product("X", hist).sells()) == pol, "exit_policy %r" % pol)
         res = runner.run("x", 365, prices=hist, book=book)
         t = res["trades"]["X"]
@@ -201,7 +201,7 @@ def t_sizing():
     """금액 정책(trades.size_of) — 매수 크기 = 분할 비율 × 비중(%)/100. 크기는 그날 판정의 Judge.amount
     (라이브 화면과 같은 경로)에서 온다. 비중 미명시·모름은 ×1 로 두고 횟수를 센다."""
     R = {"pos": "ret"}
-    ON = {"gt": [{"px": "close"}, 0]}                     # 늘 참
+    ON = {"gt": [{"px": "close", "sym": "X"}, 0]}                     # 늘 참
     rows = [(100, 100), (100, 100), (100, 106), (106, 106), (106, 108), (108, 108)]
     cal = ["2021%04d" % i for i in range(len(rows))]
     hist = {"X": [Candle(d, o, max(o, c), min(o, c), c, 1000) for d, (o, c) in zip(cal, rows)]}
@@ -209,7 +209,7 @@ def t_sizing():
 
     def run(weight):
         cash = [] if weight is None else [rule("비중", Cond.BUY, None, ("cash", weight))]
-        judge = Judge.of(synthetic({"X": None}, *(cash + trs))).product("X", hist, days=cal)
+        judge = Judge.of(synthetic(["X"], *(cash + trs))).product("X", hist, days=cal)
         tl = trades_mod.build_trades(judge, [0], [], amount=judge.amount)
         return tl[0]["buys"], trades_mod._parity_stats(tl)["size_counts"]
 
@@ -237,7 +237,7 @@ def t_sizing():
     trades_mod.to_units = lambda q, ld: seen.append(q.of) or orig(q, ld)
     try:
         ex = [rule("반", Cond.SELL, {"ge": [R, 5]}, ("bought", 0.5)), rule("끝", Cond.SELL, {"ge": [R, 5]}, ("held", 1))]
-        judge = Judge.of(synthetic({"X": None}, rule("비중", Cond.BUY, None, ("cash", 40)), *(trs + ex))).product("X", hist, days=cal)
+        judge = Judge.of(synthetic(["X"], rule("비중", Cond.BUY, None, ("cash", 40)), *(trs + ex))).product("X", hist, days=cal)
         trades_mod.build_trades(judge, [0], judge.sells(), amount=judge.amount)
     finally:
         trades_mod.to_units = orig
