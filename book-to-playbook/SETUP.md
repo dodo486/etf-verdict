@@ -178,7 +178,7 @@ PLAYBOOK_PORT=9000 python3 -m entry.serve   # 포트 변경
 | 경로 | 내용 |
 |------|------|
 | `GET /` | 최신 판정을 구워 넣은 플레이북 페이지(이후 스스로 갱신) |
-| `GET /api/verdict` | 판정 JSON(라이브) — `consumers.display.verdict_view` 로 계산, 8초 TTL 캐시, CORS 허용. `?force=1` 이면 캐시 무시 |
+| `GET /api/verdict` | 판정 JSON(라이브) — `web.verdict_view` 로 계산, 8초 TTL 캐시, CORS 허용. `?force=1` 이면 캐시 무시 |
 | `GET /events` | SSE — tick 마다 브라우저가 `/api/verdict` 를 다시 당겨 그림 |
 
 **폰에서 보기**: 서버는 `0.0.0.0` 바인딩이라 같은 와이파이면 데스크톱 LAN IP 로 바로 붙는다

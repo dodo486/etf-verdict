@@ -3,7 +3,7 @@
 > 2026-10-08 합의 + 2026-10-09 사용자 검토로 **양식의 모양 잠김**: 규칙(칸 폐지)·동사 셋·`qty`·`skip`·**이름 조건(`cond`)**·
 > **충실성 원칙**·`ma` 삭제. UPRO 소절 시험 추출로 모양 검증(조건은 충실히 담김, 상대 사이징만 `"?"`로 뭉개짐 → 결정 C, §2 넓힐 거리).
 > 남은 세부(qty 종류·기본 부품 집합 등)는 **run3 에서 실제 책과 부딪혀 기운다**(원칙 7). 코드 반영은 작업 순서 5.
-> 반영 때 `authoring/checklist/COND_DSL.md`·`EXTRACTOR.md`·`JUDGE.md`·`SCENARIO.md` 로 옮기고 이 파일은 지운다.
+> 반영 때 `authoring/extract/COND_DSL.md`·`EXTRACTOR.md`·`JUDGE.md`·`SCENARIO.md` 로 옮기고 이 파일은 지운다.
 
 ## 1. 왜 바꾸나
 
@@ -98,7 +98,7 @@
 ## 4. 판정·백테스트·화면
 
 - 등급: **⛔ 안 산다**(안 산다 하나라도 걸림 — 옛 🚫·⛔ 합침, 사유는 규칙 이름) · **✅ 산다** · **⚪ 관망** · **🟡 확인 대기**(사람 확인) · **❔ 판정 불가**(데이터 부족).
-  이 사다리의 유일한 주인은 `dsl/grade_rules.json`(화면·검사 다 여기 등급을 그대로 씀) — 동사 기준(안 산다·산다)으로 반영됨(2026-10-12).
+  이 사다리의 유일한 주인은 `tree/grade_rules.json`(화면·검사 다 여기 등급을 그대로 씀) — 동사 기준(안 산다·산다)으로 반영됨(2026-10-12).
 - 산다가 여럿 걸리면 그냥 **산다**(사는 양은 각 산다 규칙의 `qty` 그대로 — 상대적 확대/축소 `order` 는 폐지, 크기는 입장/등급으로).
 - 백테스트: 안 산 날은 **어느 규칙 때문인지** 규칙 이름별로 집계(옛 🚫/⛔ 두 칸보다 자세함).
 - **표준 매도 없음**(C안): 판다 규칙이 하나도 없는 책은 매매 시뮬레이션 대신 **매수 신호 후 N일 보유 수익률**로만 평가, 화면에 "책에 매도 규칙 없음 — 매수 신호만 평가".
@@ -155,12 +155,12 @@ a·b 비교는 **규칙 식으로만**(매매 시뮬레이션 비교 없음, A�
 sumsince(세션 시작, 거래량) · 당일 고·저 = maxsince/minsince(세션 시작, …) · 시초가 = valuewhen(세션 시작, 시가) ·
 첫 N분 고가 = valuewhen(세션 시작 후 N번째 봉, maxsince(세션 시작, 고가)) · 첫 눌림 저점 = valuewhen(첫 반등, minsince(세션 시작, 저가)).
 
-**지울 흔적(5번 작업 때 전부)**: `dsl/tradeTool.py`(계산·문법 목록·워밍업) · `authoring/checklist/COND_DSL.md`(문법·조합 표) ·
-`authoring/checklist/EXTRACTOR.md`(예시) · `dsl/verify_primitives.py`(테스트) · `signals/explain.py`(설명 문구 "20일선"·"RSI14"·
-"k일 전 대비 변화율") · `signals/verify_view.py` · `books/*/tree_candidates/`(run3 로 대체). `signals/`·`consumers/backtest/` 에는 없음.
+**지울 흔적(5번 작업 때 전부)**: `tree/tradeTool.py`(계산·문법 목록·워밍업) · `authoring/extract/COND_DSL.md`(문법·조합 표) ·
+`authoring/extract/EXTRACTOR.md`(예시) · `tree/verify_primitives.py`(테스트) · `judge/explain.py`(설명 문구 "20일선"·"RSI14"·
+"k일 전 대비 변화율") · `judge/verify_view.py` · `books/*/tree_candidates/`(run3 로 대체). `judge/`·`backtest/` 에는 없음.
 주인 표(entry.verify_rules)에 "지운 연산 이름이 어디든 나오면 정지" 줄을 넣어 남김 없이.
 
-**구현은 pandas 로** — 지금 dsl/tradeTool.py(Cond)는 순수 파이썬 반복문. 기본 부품은 pandas 에 1:1(lag=`shift` · sum/highest/lowest=`rolling` ·
+**구현은 pandas 로** — 지금 tree/tradeTool.py(Cond)는 순수 파이썬 반복문. 기본 부품은 pandas 에 1:1(lag=`shift` · sum/highest/lowest=`rolling` ·
 smooth=`ewm(alpha)` · since 계열=구간별 `cumsum/cummax/cummin` · 순위=`rank` · 3값 논리=nullable `boolean`(Kleene, NA=모름)).
 우리 코드로 남는 것: `"?"`·수동·극성, asof·확정 일봉·일봉/분봉 혼합·워밍업. 지표 라이브러리(TA-Lib·pandas-ta)는 쓰지 않음
 (지표 하나씩 들여오기 = 같은 실수, 계산 관례도 제각각) — 단 조합 예시가 맞는지 대조하는 **테스트 정답지**로만.

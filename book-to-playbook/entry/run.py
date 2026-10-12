@@ -2,9 +2,8 @@
 # -*- coding: utf-8 -*-
 """스케줄 실행 러너 — macOS / Windows / Linux 공용.
 
-run.sh(bash + /opt/homebrew/bin/python3 하드코딩)를 대체한다.
-파이썬은 항상 '지금 이 스크립트를 돌린 인터프리터'(sys.executable)를 쓰므로
-homebrew·python.org·Microsoft Store 어느 설치본이든 그대로 동작한다.
+run.sh·run.cmd 는 파이썬을 골라 이 모듈을 부르는 얇은 껍데기다. 단계는 '지금 이 스크립트를 돌린 인터프리터'
+(sys.executable)로 돌리므로 설치본(homebrew·python.org·Microsoft Store)에 상관없이 그대로 동작한다.
 
 사용법
   python -m entry.run daily        # 판정(체크리스트 = 조건 트리) → 알림 → 백테스트 (장 마감 후). 화면은 라이브 서버가 맡는다.
@@ -16,14 +15,13 @@ homebrew·python.org·Microsoft Store 어느 설치본이든 그대로 동작한
 
 옵션
   --quiet      콘솔 출력 최소화(로그 파일에는 그대로 남음)
-  --parity     (check 만) 선택 검사(opt) — 신호 패리티(consumers.backtest.verify_trading --parity)도 돈다(시세 필요).
+  --parity     (check 만) 선택 검사(opt) — 신호 패리티(backtest.verify_trading --parity)도 돈다(시세 필요).
 
 경로·크레덴셜은 shared/paths.py 규칙을 따른다. telegram.env · local.env 가 BASE에 있으면
 자동으로 환경변수에 주입한다(없으면 그냥 건너뜀). 스케줄러로 돌릴 때 jhts 시세 패키지 경로는
 local.env 의 PYTHONPATH 로 준다(local.env.example 참고).
 
-팀 구조: 실행 대상은 전부 패키지 모듈(python -m <팀>.<모듈>)이다 — playbook(구간①)
-· checklist(구간②) · trading(구간③ 판정·백테스트·장중) · web(화면) · shared(공통).
+실행 대상은 전부 패키지 모듈(python -m <층>.<모듈>)이다 — 층 지도는 entry/verify_rules.py 머리말.
 """
 import os
 import subprocess
@@ -37,21 +35,21 @@ from shared.paths import BASE, LOGS, ensure_dir, load_env_file, write_text
 PY = sys.executable or "python3"
 
 # ---- 검사 목록 — 한 곳(run check 가 돈다). 검사는 대상이 바뀔 때 돈다 — 매일 돌지 않는다(daily·verdict·watch 에는 없음).
-#   트리 검사는 트리가 바뀔 때만이 아니라 트리를 실행하는 엔진 코드(dsl·signals)가 바뀔 때도 다시 돌아야 해서
+#   트리 검사는 트리가 바뀔 때만이 아니라 트리를 실행하는 엔진 코드(tree·judge)가 바뀔 때도 다시 돌아야 해서
 #   목록을 나누지 않고 한 번에 전부 돈다.
 #   opt   시세로 오래 도는 선택 검사 — run check --parity 일 때만
 #   warn2 종료코드 2 를 '경고(정지 아님)'로 보나. 아니면 0 외에는 전부 정지.
 Check = namedtuple("Check", "module args opt warn2 what")
 CHECKS = [
     Check("entry.verify_rules", (), False, False, "코드 규칙 — 폴더 경계·주인 표"),
-    Check("authoring.playbook.verify_source", (), False, False, "플레이북 본문 해시"),
-    Check("authoring.checklist.verify_tree", ("--quick",), False, False, "트리 계약 — 소절 인덱스·트리 문법·ref"),
-    Check("consumers.display.verify_page", (), False, False, "책 페이지 — 구획·UI 사본"),
-    Check("dsl.verify_primitives", (), False, True, "원시함수 계산"),
-    Check("consumers.backtest.verify_trading", (), False, True, "거래 시뮬레이터·실전 경로"),
-    Check("signals.verify_view", (), False, True, "화면 설명 구조"),
-    Check("authoring.checklist.verify_tree", (), False, True, "규칙 동작(트리 없음·미심판 불일치·원문 사례 불일치 등)"),
-    Check("consumers.backtest.verify_trading", ("--parity",), True, False, "신호 패리티 — 백테스트 == 실시간(일봉)"),
+    Check("authoring.transcribe.verify_source", (), False, False, "플레이북 본문 해시"),
+    Check("authoring.extract.verify_tree", ("--quick",), False, False, "트리 계약 — 소절 인덱스·트리 문법·ref"),
+    Check("web.verify_page", (), False, False, "책 페이지 — 구획·UI 사본"),
+    Check("tree.verify_primitives", (), False, True, "원시함수 계산"),
+    Check("backtest.verify_trading", (), False, True, "거래 시뮬레이터·실전 경로"),
+    Check("judge.verify_view", (), False, True, "화면 설명 구조"),
+    Check("authoring.extract.verify_tree", (), False, True, "규칙 동작(트리 없음·미심판 불일치·원문 사례 불일치 등)"),
+    Check("backtest.verify_trading", ("--parity",), True, False, "신호 패리티 — 백테스트 == 실시간(일봉)"),
 ]
 
 
@@ -104,7 +102,7 @@ class Runner:
             pass
 
     def step(self, module, args=(), capture_to=None, required=True):
-        """팀 패키지 모듈 하나 실행(python -m <팀>.<모듈>, cwd=BASE).
+        """패키지 모듈 하나 실행(python -m <층>.<모듈>, cwd=BASE).
 
         capture_to 가 있으면 stdout 을 그 파일에 UTF-8로 저장한다
         (bash의 `> 파일` 리다이렉트 대체 — Windows 콘솔
@@ -150,7 +148,7 @@ def main(argv):
     modes = [a for a in argv if not a.startswith("-")]
     mode = modes[0] if modes else "daily"
     if mode == "watch":
-        from feed.feed import watch                 # 장중 주기 재판정 루프(구간③) — 한 회차 = 이 러너의 verdict 모드
+        from market.feed import watch                 # 장중 주기 재판정 루프(구간③) — 한 회차 = 이 러너의 verdict 모드
         return watch(argv, lambda rest: main(["verdict"] + rest))
     if mode == "check":
         return check_main(argv)
@@ -181,7 +179,7 @@ def main(argv):
             r.step(daily, [slug])                                              # 알림 포함 본 실행 — 화면은 라이브 서버가 맡는다
             # 책 페이지 '백테스트' 탭 데이터(1년·3년) — 장 마감 후(daily)만. 실패해도 막지 않는다.
             if mode == "daily":
-                r.step("consumers.display.backtest_page", [slug], required=False)
+                r.step("web.backtest_page", [slug], required=False)
 
     # 정적 발행(GitHub Pages)은 폐지됐다 — 화면은 라이브 서버(entry.serve)가 매 요청 엔진을
     # 새로 돌려 그린다(오래된 값이 '지금 값'처럼 안 보이게). 파일로 굽지도, 레포에 push 하지도 않는다.

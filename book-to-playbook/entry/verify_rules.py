@@ -7,13 +7,13 @@
 ① 폴더 = 조직도. 한 층의 코드가 다른 층의 '속'을 import 하는 순간 "한 검사기 안의 정의를 다른 검사기가 몰래 빌려 쓰다
 갈라지는" 사고로 돌아간다. 그래서 무엇을 import 해도 되는지를 층마다 한 줄로 정해 둔다(IMPORTS). 층은 아래에서 위로:
   · shared/      경로(paths)·인코딩·책 레지스트리 — 뜻은 두지 않는다
-  · market/      시세 창구(md_feed)·개발 캐시 — jhts 는 여기서만
-  · dsl/         조건 트리(tree.json)의 언어 — 출입구(tree_gateway)·문법/등급(tradeTool)
-  · signals/      tree+시세 → 판정 데이터(Judge·라이브 엔진·공통 책열기)
-  · feed/        라이브 틱 피더(in-process pub-sub 트리거)
-  · consumers/   신호를 받아 쓰는 소비자 — backtest(체결·돈·러너)·notify(알림)·display(화면 모양·UI JS)
-  · entry/       진입점 — run(스케줄 러너·check)·serve(로컬 서버)·live(라이브 버스 조립) · verify_rules(이 검사 — 전 층을 보므로 여기)
-  · authoring/   책 → 플레이북 → 트리를 '만드는' 쪽 — playbook(원문 인덱스)·checklist(지침 md·비교 도구)
+  · market/      시세 창구(md_feed)·개발 캐시·틱 버스(bus) — jhts 는 여기서만
+  · tree/        조건 트리(tree.json)의 언어 — 출입구(gateway)·문법/등급(tradeTool)
+  · judge/       tree+시세 → 판정 데이터(Judge)
+  · backtest/    판정을 받아 과거를 시뮬레이션 — 체결·돈·러너
+  · web/         화면 모양(판정 JSON·책 페이지·UI JS) — 판정 안 함
+  · entry/       진입점 — run(스케줄 러너·check)·serve(로컬 서버)·live(라이브 버스 조립)·notify(알림) · verify_rules(이 검사 — 전 층을 보므로 여기)
+  · authoring/   책 → 전사 → 트리를 '만드는' 쪽 — transcribe(책 → 전사)·extract(전사 → 트리: 지침 md·비교 도구)
   검사는 따로 층이 없다 — 검사하는 대상 옆에 verify_*.py 로 둔다(그 층의 import 규칙을 그대로 따른다).
 
 ② 결정 하나 = 주인 하나. 같은 결정(트리 키 배치·책 산출물 경로·매도 정책·칸/등급 이름표·등급 사다리…)이 두 곳에
@@ -26,20 +26,20 @@
           아래를 부른다:
             shared    → shared
             market    → market · shared
-            dsl       → dsl · shared · market
-            signal    → signal · shared · market · dsl
-            feed      → feed · shared
-            consumers → consumers · shared · market · dsl · signal · feed
+            tree      → tree · shared · market
+            judge     → judge · shared · market · tree
+            backtest  → backtest · shared · market · tree · judge
+            web       → web · shared · market · tree · judge · backtest
             entry     → 전부
-            authoring → authoring · shared · market · dsl · signals(심판 비교 도구가 후보 트리를 판단자로 평가)
-          dsl 은 tree_gateway·tradeTool 둘뿐이고 둘 다 공개다 — 다른 층이 직접 import 해도 된다(별도 제약 없음).
+            authoring → authoring · shared · market · tree · judge(심판 비교 도구가 후보 트리를 판단자로 평가)
+          tree 는 gateway·tradeTool 둘뿐이고 둘 다 공개다 — 다른 층이 직접 import 해도 된다(별도 제약 없음).
   규칙 2  `import jhts` 는 **market/md_feed.py 하나**에서만 허용된다 — 파이프라인의 시세는 jhts 창구로만 들어온다.
   규칙 3  네트워크 모듈(urllib·http·requests·socket·aiohttp·httpx) import 금지 — 시세 자가수집이 다시 자라나는
-          길목을 막는다. 명시 예외(ALLOW)만: 알림 송신 consumers/notify/telegram.py, 로컬 서빙 entry/serve.py.
+          길목을 막는다. 명시 예외(ALLOW)만: 알림 송신 entry/notify.py, 로컬 서빙 entry/serve.py.
 
   주인 표(OWNERS) — 한 줄 = 개념 · 주인 파일 · 주인 밖 금지 표식(매처) · 사유 · 명시 예외
           (everywhere = 주인 안까지 포함해 어디서도 안 되는 표식 — 폐지된 결정이 되살아나지 않게).
-          파이썬은 AST(식별자·docstring 아닌 문자열 상수)로, consumers/display/ui/*.js 는 주석을 뗀 코드·문자열 리터럴로 본다
+          파이썬은 AST(식별자·docstring 아닌 문자열 상수)로, web/ui/*.js 는 주석을 뗀 코드·문자열 리터럴로 본다
           (주석·docstring 의 설명 글은 걸리지 않는다). 이 파일은 표 자신이라 표식 검사에서 뺀다.
           예외는 행의 allow 한 곳에만 — {(파일, 함수|None): (표식 묶음|None=전부, 사유)}.
 
@@ -55,18 +55,18 @@ import sys
 from shared import paths  # noqa: F401  (경로·UTF-8 출력 고정)
 from shared.paths import BASE
 
-LAYERS = ("shared", "market", "dsl", "signals", "feed", "consumers", "entry", "authoring")
+LAYERS = ("shared", "market", "tree", "judge", "backtest", "web", "entry", "authoring")
 
 # 규칙 1 — 층마다 import 해도 되는 층. 흐름은 아래→위 한 방향, 소비·진입만 위에서 아래를 부른다.
 IMPORTS = {
     "shared": {"shared"},
     "market": {"market", "shared"},
-    "dsl": {"dsl", "shared", "market"},
-    "signals": {"signals", "shared", "market", "dsl"},
-    "feed": {"feed", "shared"},
-    "consumers": {"consumers", "shared", "market", "dsl", "signals", "feed"},
+    "tree": {"tree", "shared", "market"},
+    "judge": {"judge", "shared", "market", "tree"},
+    "backtest": {"backtest", "shared", "market", "tree", "judge"},
+    "web": {"web", "shared", "market", "tree", "judge", "backtest"},
     "entry": set(LAYERS),
-    "authoring": {"authoring", "shared", "market", "dsl", "signals"},
+    "authoring": {"authoring", "shared", "market", "tree", "judge"},
 }
 
 # 시세 자가수집에 쓰이는 모듈들 — 보이면 그 자체로 위반.
@@ -75,14 +75,14 @@ NET_MODULES = {"urllib", "http", "requests", "socket", "aiohttp", "httpx"}
 # 규칙 2·3 의 명시적 예외 — 예외는 여기 한 곳에만 적는다(코드 곳곳에 흩지 않는다).
 ALLOW = {
     ("market", "md_feed.py"): {"jhts"},                     # 유일한 시세 창구
-    ("consumers", "notify/telegram.py"): {"urllib"},        # 알림 '송신' 전용(수집 아님) — 소비층, 이 한 파일만
+    ("entry", "notify.py"): {"urllib"},                     # 알림 '송신' 전용(수집 아님) — 이 한 파일만
     ("entry", "serve.py"): {"http", "urllib"},              # 로컬 서버(서빙·URL 파싱)
 }
 
 
 # ------------------------------------------------------------------ 소스 읽기(파이썬 AST · JS 토큰)
 class Src:
-    """검사 대상 파일 하나 — rel("consumers/display/ui/x.js"), kind("py"|"js"), py 면 tree(AST), js 면 code(주석 뗀 코드)·lits[(줄, 문자열)]."""
+    """검사 대상 파일 하나 — rel("web/ui/x.js"), kind("py"|"js"), py 면 tree(AST), js 면 code(주석 뗀 코드)·lits[(줄, 문자열)]."""
 
     def __init__(self, rel, kind, text):
         self.rel, self.kind = rel, kind
@@ -270,8 +270,8 @@ AMOUNT_FACTS = {"weight_of"}
 
 
 def m_amount_policy(src):
-    """매수 크기를 다루는 층(signals·consumers·entry)만 본다 — dsl 은 트리의 뜻을 검사하려고 사실을 직접 읽는다."""
-    if not src.rel.startswith(("signals/", "consumers/", "entry/")):
+    """매수 크기를 다루는 층(judge·backtest·web·entry)만 본다 — tree 는 트리의 뜻을 검사하려고 사실을 직접 읽는다."""
+    if not src.rel.startswith(("judge/", "backtest/", "web/", "entry/")):
         return []
     if src.kind == "py":
         return ([(ln, f, x) for ln, f, x in _py_names(src) if x in AMOUNT_FACTS]
@@ -309,7 +309,7 @@ def m_qty_convert(src):
 def m_gone_ops(src):
     """어디서든(주인 포함) — 지운 전용 지표 연산(Cond.GONE_OPS: ma·ema·stdev·rsi)을 연산 이름으로 다시 쓰는 자리.
     dict 키·비교·튜플 원소로 쓴 문자열 상수를 본다(조합으로 쓴다 — COND_DSL 6절)."""
-    from dsl.tradeTool import Cond
+    from tree.tradeTool import Cond
     if src.kind != "py":
         return []
     out = []
@@ -326,7 +326,7 @@ def m_gone_ops(src):
     return out
 
 
-# 판단자 — 트리 원본·시세 원본·조건 평가를 쓰는 곳은 판단자(signals/judge) 하나와 그 도구(dsl)뿐.
+# 판단자 — 트리 원본·시세 원본·조건 평가를 쓰는 곳은 판단자(judge/judge) 하나와 그 도구(tree)뿐.
 GATEWAY_NAMES = {"TreeGateway"}
 EVAL_ATTRS = {"series", "Ctx", "RuleSeries"}                       # Cond.series·Cond.Ctx·Grade.RuleSeries
 FETCH_ATTRS = {"history", "history_back", "History", "histories", "minutes", "sessions"}   # Grade.·md_feed. 시세 받기
@@ -343,7 +343,7 @@ def m_gateway_use(src):
         return []
     out = [(ln, f, x) for ln, f, x in _py_names(src) if x in GATEWAY_NAMES]
     for n, fn in _py_nodes(src.tree):
-        if isinstance(n, ast.ImportFrom) and n.module == "dsl.tree_gateway":
+        if isinstance(n, ast.ImportFrom) and n.module == "tree.gateway":
             out.extend((n.lineno, fn, a.name) for a in n.names if a.name in GATEWAY_NAMES)
     return out
 
@@ -376,7 +376,7 @@ def m_raw_prices(src):
 
 def _labels():
     """동사·등급 이름표 글자 — 정본(Cond.VERBS · Grade.GRADES)에서 읽는다(여기 다시 적지 않는다)."""
-    from dsl.tradeTool import Cond, Grade
+    from tree.tradeTool import Cond, Grade
     return set(Cond.VERBS) | set(Grade.GRADES.values())
 
 
@@ -403,62 +403,62 @@ def m_grade_ladder(src):
 # ------------------------------------------------------------------ 주인 표 — 개념 하나 = 주인 하나(여기 한 곳)
 # concept · owners(주인 파일 — 그 안에선 자유) · match(매처) · why(한 줄 사유) · hint(고칠 길) · allow(명시 예외, 사유 필수).
 OWNERS = [
-    dict(concept="트리 원본 키", owners=("dsl/tree_gateway.py",), match=m_tree_keys,
+    dict(concept="트리 원본 키", owners=("tree/gateway.py",), match=m_tree_keys,
          why="tree.json 키 배치(products·rules·then·do…)를 아는 코드는 출입구 하나 — 형식 교체 시 한 파일만",
          hint="TreeGateway 에 물어볼 것",
          allow={   # 같은 이름 키를 쓰는 '트리 아닌' dict
-             ("consumers/backtest/verify_trading.py", "parity_text"): ({"products"}, "파리티 보고 dict"),
-             ("dsl/tradeTool.py", "grade_key"): ({"rules"}, "등급 사다리 grade_rules.json(트리 아님)"),
-             ("dsl/verify_primitives.py", "raw_grade"): ({"rules"}, "등급 사다리 grade_rules.json(트리 아님)"),
-             ("dsl/verify_primitives.py", "t_gateway"): ({"rules", "products", "do", "then"}, "출입구 계약 검사 — 합성 트리 픽스처·출입구 답 모양을 보는 자리"),
-             ("authoring/checklist/verify_tree.py", "scenario_result"): ({"do"}, "사례 기대값 {do, pct}(scenarios.json — 트리 아님)"),
-             ("authoring/checklist/compare.py", "render_zone"): ({"rules"}, "zone_diff 결과(심판 덤프) dict"),
+             ("backtest/verify_trading.py", "parity_text"): ({"products"}, "파리티 보고 dict"),
+             ("tree/tradeTool.py", "grade_key"): ({"rules"}, "등급 사다리 grade_rules.json(트리 아님)"),
+             ("tree/verify_primitives.py", "raw_grade"): ({"rules"}, "등급 사다리 grade_rules.json(트리 아님)"),
+             ("tree/verify_primitives.py", "t_gateway"): ({"rules", "products", "do", "then"}, "출입구 계약 검사 — 합성 트리 픽스처·출입구 답 모양을 보는 자리"),
+             ("authoring/extract/verify_tree.py", "scenario_result"): ({"do"}, "사례 기대값 {do, pct}(scenarios.json — 트리 아님)"),
+             ("authoring/extract/compare.py", "render_zone"): ({"rules"}, "zone_diff 결과(심판 덤프) dict"),
          }),
     dict(concept="책 산출물 경로", owners=("shared/paths.py",), match=m_book_paths,
          why="books/<slug>/ 아래 산출물 경로를 짓는 곳은 하나 — 옛 루트 산출물로 되돌아가지 않게",
          hint="shared/paths.py(book_dir·book_file…)로", allow={}),
-    dict(concept="매도 정책", owners=("consumers/backtest/trades.py",), match=m_exit_policy, everywhere=m_std_exit_gone,
+    dict(concept="매도 정책", owners=("backtest/trades.py",), match=m_exit_policy, everywhere=m_std_exit_gone,
          why="책에 매도 규칙이 없을 때의 정책은 trades.exit_policy 하나(\"none\" = 대체 규칙 없이 매수 신호만 평가) — "
              "폐지된 표준 매도(대체 규칙·숫자 파일·출처 글자·플래그)는 주인 포함 어디서도 되살리지 않는다",
          hint="trades.exit_policy · 화면은 exit_policy 필드와 no_exit_note 문구로", allow={}),
-    dict(concept="금액 정책", owners=("consumers/backtest/trades.py",), match=m_amount_policy,
+    dict(concept="금액 정책", owners=("backtest/trades.py",), match=m_amount_policy,
          why="매수 크기(비중 × 분할)와 모름(비중 미명시·모름)을 어떻게 셀지는 trades.size_of 하나 — "
              "그 사실은 Judge.amount 한 경로로만(라이브 화면 = 백테스트)",
          hint="Judge.amount 로 사실을, trades.size_of 로 크기를",
-         allow={("signals/judge.py", "amount"): (AMOUNT_FACTS, "ProductJudge.amount — 그날 사실(Amount)을 꺼내는 한 경로"),
-                ("signals/judge.py", "weight_at"): (AMOUNT_FACTS, "검사기용 그날 비중 사실(매수 크기 정책 아님)")}),
-    dict(concept="수량 변환", owners=("consumers/backtest/trades.py",), match=m_qty_convert,
+         allow={("judge/judge.py", "amount"): (AMOUNT_FACTS, "ProductJudge.amount — 그날 사실(Amount)을 꺼내는 한 경로"),
+                ("judge/judge.py", "weight_at"): (AMOUNT_FACTS, "검사기용 그날 비중 사실(매수 크기 정책 아님)")}),
+    dict(concept="수량 변환", owners=("backtest/trades.py",), match=m_qty_convert,
          why="'얼마나'(Qty: cash·budget·bought·held)를 물량으로 바꾸는 곳은 trades.to_units 하나 — 매수(분할)·매도·"
              "비중이 같은 변환을 지난다. 밖은 Qty 를 건네기만 하고 basis 를 가르거나 셈하지 않는다",
          hint="trades.to_units(Qty, Ledger) · 화면은 엔진이 낸 units·sell 문장으로", allow={}),
-    dict(concept="트리 출입구 사용", owners=("dsl/tree_gateway.py", "dsl/tradeTool.py", "signals/judge.py"),
+    dict(concept="트리 출입구 사용", owners=("tree/gateway.py", "tree/tradeTool.py", "judge/judge.py"),
          match=m_gateway_use,
-         why="트리 원본을 쓰는 곳은 판단자(signals/judge) 하나 — 다른 층(체결·화면·라이브·검사)은 판단자에게 묻는다",
-         hint="signals.judge.Judge(책)·ProductJudge(상품)에 물을 것",
-         allow={("dsl/verify_primitives.py", None): (None, "도구 단위 검사 — 출입구 자체의 계약을 시험한다")}),
-    dict(concept="조건 평가(판단)", owners=("dsl/tradeTool.py", "dsl/tree_gateway.py", "signals/judge.py", "signals/explain.py"),
+         why="트리 원본을 쓰는 곳은 판단자(judge/judge) 하나 — 다른 층(체결·화면·라이브·검사)은 판단자에게 묻는다",
+         hint="judge.judge.Judge(책)·ProductJudge(상품)에 물을 것",
+         allow={("tree/verify_primitives.py", None): (None, "도구 단위 검사 — 출입구 자체의 계약을 시험한다")}),
+    dict(concept="조건 평가(판단)", owners=("tree/tradeTool.py", "tree/gateway.py", "judge/judge.py", "judge/explain.py"),
          match=m_evaluate,
          why="책의 내용대로 시세를 판단하는 곳은 판단자 하나 — 체결 워크·화면·검사기는 판단자가 낸 값만 쓴다",
          hint="ProductJudge.decide·conditions·evaluate·view 로",
-         allow={("dsl/verify_primitives.py", None): (None, "도구 단위 검사 — 평가기 자체를 시험한다")}),
-    dict(concept="시세 원본", owners=("dsl/tradeTool.py", "signals/judge.py", "market/md_feed.py", "market/_dev_cache.py"),
+         allow={("tree/verify_primitives.py", None): (None, "도구 단위 검사 — 평가기 자체를 시험한다")}),
+    dict(concept="시세 원본", owners=("tree/tradeTool.py", "judge/judge.py", "market/md_feed.py", "market/_dev_cache.py"),
          match=m_raw_prices,
          why="시세 원본(받기·캔들 필드)을 만지는 곳은 판단자 하나(+ 도구 평가기·시세 창구) — 다른 층은 판단자의 가격·판정만",
          hint="Judge.prices·shared_prices·recent, ProductJudge.price·days 로",
-         allow={("dsl/verify_primitives.py", None): (None, "도구 단위 검사 — 평가기에 넣을 합성 캔들을 만든다"),
-                ("consumers/display/verdict_view.py", None): ({".close"}, "판단자가 낸 Decision.close(가공된 종가)"),
-                ("authoring/playbook/book_source.py", None): (None, "원문 파일 읽기(시세 아님)")}),
+         allow={("tree/verify_primitives.py", None): (None, "도구 단위 검사 — 평가기에 넣을 합성 캔들을 만든다"),
+                ("web/verdict_view.py", None): ({".close"}, "판단자가 낸 Decision.close(가공된 종가)"),
+                ("authoring/transcribe/book_source.py", None): (None, "원문 파일 읽기(시세 아님)")}),
     dict(concept="지운 연산", owners=(), match=lambda src: [], everywhere=m_gone_ops,
          why="전용 연산(ma·ema·stdev·rsi·pct·count·streak·across)은 지웠다 — 기본 부품(sum·lag·case·atleast…) 조합으로 쓴다. "
              "정본 목록 Cond.GONE_OPS",
          hint="COND_DSL 6절 조합 예시로(평균 = sum ÷ n · 여러 종목 중 N개 = atleast·of)",
-         allow={("dsl/tradeTool.py", None): (None, "지운 연산 목록 정본(GONE_OPS)"),
-                ("dsl/verify_primitives.py", "t_syntax"): ({"ma", "across"}, "지운 연산이 문법에서 거부되는지 보는 자리"),
-                ("dsl/verify_primitives.py", "t_gateway"): ({"across"}, "폐지된 across 트리를 출입구가 거부하는지 보는 자리")}),
-    dict(concept="동사·등급 이름표", owners=("dsl/tradeTool.py",), match=m_labels,
+         allow={("tree/tradeTool.py", None): (None, "지운 연산 목록 정본(GONE_OPS)"),
+                ("tree/verify_primitives.py", "t_syntax"): ({"ma", "across"}, "지운 연산이 문법에서 거부되는지 보는 자리"),
+                ("tree/verify_primitives.py", "t_gateway"): ({"across"}, "폐지된 across 트리를 출입구가 거부하는지 보는 자리")}),
+    dict(concept="동사·등급 이름표", owners=("tree/tradeTool.py",), match=m_labels,
          why="Cond.VERBS(안 산다·산다·판다) · Grade.GRADES · grade_rules.json 이 정본 — 화면은 판정 JSON(verbs·grades)으로 받는다",
          hint="파이썬은 Cond.BLOCK·BUY·SELL·VERBS, 화면은 판정 JSON 의 verbs·grades 로", allow={}),
-    dict(concept="등급 사다리", owners=("dsl/tradeTool.py",), match=m_grade_ladder,
+    dict(concept="등급 사다리", owners=("tree/tradeTool.py",), match=m_grade_ladder,
          why="날짜별 등급을 내는 곳은 Grade 하나 — 두 벌이면 엔진과 화면 등급이 갈라진다",
          hint="판정 JSON 의 key 를 그대로(수동 답은 POST /api/verdict — 서버가 Cond.Ctx answers 로 낸다)", allow={}),
 ]
@@ -533,12 +533,12 @@ def boundary_hits(srcs):
         net = (NET_MODULES & mods) - allow
         if net:
             bad.append((src.rel, "네트워크 모듈 import: %s — 시세 자가수집 금지"
-                        " (수집은 jhts, 알림은 consumers/notify)" % ", ".join(sorted(net))))
+                        " (수집은 jhts, 알림은 entry/notify.py)" % ", ".join(sorted(net))))
     return bad
 
 
 def _sources():
-    """검사 대상 — 층 폴더(하위 폴더 포함)의 *.py 와 consumers/display/ui/*.js.
+    """검사 대상 — 층 폴더(하위 폴더 포함)의 *.py 와 web/ui/*.js.
     → ([Src], [(파일, 사유)] 층 폴더 없음·파싱 실패)."""
     srcs, bad = [], []
     for layer in LAYERS:
@@ -556,10 +556,10 @@ def _sources():
                         srcs.append(Src(rel, "py", open(full, encoding="utf-8").read()))
                     except SyntaxError as e:
                         bad.append((rel, "파이썬 파싱 실패: %s" % e))
-    ui = os.path.join(BASE, "consumers", "display", "ui")
+    ui = os.path.join(BASE, "web", "ui")
     for fn in sorted(os.listdir(ui)) if os.path.isdir(ui) else ():
         if fn.endswith(".js"):
-            srcs.append(Src("consumers/display/ui/" + fn, "js", open(os.path.join(ui, fn), encoding="utf-8").read()))
+            srcs.append(Src("web/ui/" + fn, "js", open(os.path.join(ui, fn), encoding="utf-8").read()))
     return srcs, bad
 
 
@@ -589,7 +589,7 @@ def main():
         print("코드 규칙 위반 %d건" % len(bad))
         for rel, why in bad:
             print("  ✗ %-28s %s" % (rel, why))
-        print("\n흐름은 한 방향이다: shared ← market ← dsl ← signal · feed ← consumers (entry 는 전부, authoring 은 signals 까지 — 검사는 대상 옆 verify_*.py)."
+        print("\n흐름은 한 방향이다: shared ← market ← tree ← judge ← backtest ← web (entry 는 전부, authoring 은 judge 까지 — 검사는 대상 옆 verify_*.py)."
               " 결정 하나 = 주인 하나(주인 표 OWNERS).")
         return 1
     print("코드 규칙 통과 — 층 import 방향 위반 0 · jhts 창구 단일 · 자가수집 네트워크 코드 0"

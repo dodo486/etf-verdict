@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """라이브 2단 pub-sub 조립(진입층) — 시세→신호→소비자를 버스 두 단으로 잇는다. '책 등록 = 구독'.
 
-feed/ 는 어느 책도 모르는 순수 부품(Bus·Poller)이고, signals/·consumers/ 는 feed 를 모른다(의존성 주입 —
+market/bus 는 어느 책도 모르는 순수 부품(Bus·Poller)이고, judge/·web/ 은 버스를 모른다(의존성 주입 —
 평범한 함수만 내놓는다). 그 둘을 아는 유일한 자리가 여기(entry 는 전 층 import 허용) — 버스를 만들고 핸들러를
 엮는 조립 뿌리다.
 
@@ -20,9 +20,9 @@ feed/ 는 어느 책도 모르는 순수 부품(Bus·Poller)이고, signals/·co
 import threading
 
 from shared.paths import live_slugs
-from signals.judge import Judge
-from consumers.display.verdict_view import _format
-from feed.bus import Bus, Poller
+from judge.judge import Judge
+from web.verdict_view import _format
+from market.bus import Bus, Poller
 
 
 class LiveHub:
@@ -55,7 +55,7 @@ class LiveHub:
 
     def _signal_handler(self, slug):
         """1단 → 2단: price_bus 틱(공유 시세 실림)을 받아 그 책 판정을 계산해 verdict_bus 에 올린다
-        (판단자 호출만 — feed 를 모른다). 틱의 판단자(books[slug])·공유 시세(prices)를 그대로 써 시세를 다시 조회하지 않는다."""
+        (판단자 호출만 — 버스를 모른다). 틱의 판단자(books[slug])·공유 시세(prices)를 그대로 써 시세를 다시 조회하지 않는다."""
         bus = self.verdict_bus[slug]
 
         def on_tick(ev):

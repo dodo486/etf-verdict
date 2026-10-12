@@ -13,7 +13,7 @@
   GET /api/verdict?slug=<책>  판정 JSON(라이브). 엔진(books.json engine.daily) --json 재사용 + 짧은
                      TTL 캐시(기본 8초, 책별)로 잦은 폴링이 시세 창구를 안 두드리게. CORS 허용.
   POST /api/verdict   body {slug, answers:{답 열쇠: true|false}} — 화면에서 사람이 답한 수동 조건까지 반영한 판정
-                     (서버 권위: 화면은 등급을 다시 계산하지 않는다). consumers.display.verdict_view.render(answers=) 를 in-process 로
+                     (서버 권위: 화면은 등급을 다시 계산하지 않는다). web.verdict_view.render(answers=) 를 in-process 로
                      부른다(토글 지연 줄이기). 답마다 결과가 달라 캐시하지 않는다(무답 GET 캐시와 섞이지 않게).
   GET /events?slug=<책>       SSE — ~15초마다 tick(브라우저가 받으면 /api/verdict 를 다시 당겨 재렌더).
   기타 정적 파일       BASE 디렉터리에서 그대로 서빙(폰트·이미지 등).
@@ -105,8 +105,8 @@ _render_lock = threading.Lock()
 
 
 def compute_verdict_answers(slug, answers):
-    """사람이 답한 수동까지 반영한 판정 — in-process(consumers.display.verdict_view.render). 캐시하지 않는다(답마다 다르다)."""
-    from consumers.display.verdict_view import render
+    """사람이 답한 수동까지 반영한 판정 — in-process(web.verdict_view.render). 캐시하지 않는다(답마다 다르다)."""
+    from web.verdict_view import render
     with _render_lock:                        # 시세 창구·평가를 한 번에 하나씩(스레드 서버)
         data = render(slug, answers=answers)
     data["live"] = True
@@ -125,7 +125,7 @@ def _answers_of(body):
 def render_page(slug, tree=None):
     """책 slug 페이지 HTML — 요청 시점의 라이브 판정(내 포지션 포함)을 구워 넣는다. 조립은 assemble 하나로.
     판정 계산이 실패해도 페이지는 내보낸다(프런트가 폴링으로 재시도). tree = 원시 트리 보기에 쓸 후보("a"·"b", ?tree=)."""
-    from consumers.display.book_page import assemble
+    from web.book_page import assemble
     try:
         data, _ = compute_verdict(slug)
     except Exception:
@@ -135,7 +135,7 @@ def render_page(slug, tree=None):
 
 def render_shell():
     """책 선택 셸(홈) — books.json 의 모든 책을 좌측 목록에, 본문은 /<slug>/ 를 라이브로 띄운다."""
-    from consumers.display.build_home import render_home
+    from web.build_home import render_home
     return render_home(load_manifest()).encode("utf-8")
 
 
