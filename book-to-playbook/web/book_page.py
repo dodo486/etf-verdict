@@ -28,17 +28,16 @@ def _source_sections(slug):
     p = sf if os.path.isabs(sf) else book_file(slug, sf)     # 원문 파일 이름은 책 폴더 기준
     if not sf or not os.path.exists(p):
         return {}
-    secs, key, buf = {}, None, []
-    for line in read_text(p).split("\n"):
-        m = re.match(r"^\s*(%s)[.\s]" % sections.KEY, line)   # 키는 sections, 끝맺음 [.\s] 는 sections.marks 와 다르다
-        if m:
-            if key:
-                secs[key] = "\n".join(buf).strip()
-            key, buf = m.group(1), [line]
-        elif key is not None:
-            buf.append(line)
-    if key:
-        secs[key] = "\n".join(buf).strip()
+    lines = read_text(p).split("\n")
+    marks = sections.marks(lines)          # 원문 인덱스(book_source)와 같은 표지·같은 경계
+    secs = {}
+    for n, (i, kind, key, _rest) in enumerate(marks):
+        if kind == "chapter":
+            continue                       # 장 표지는 앞 소절을 끝낼 뿐 소절이 아니다
+        stop = marks[n + 1][0] if n + 1 < len(marks) else len(lines)
+        text = "\n".join(lines[i:stop]).strip()
+        if len(text) > len(secs.get(key, "")):
+            secs[key] = text               # 같은 키가 여럿(목차·쪽 반복)이면 본문이 가장 긴 것 — 인덱스의 정본과 같다
     return secs
 
 
