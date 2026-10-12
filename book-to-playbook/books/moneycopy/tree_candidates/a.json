@@ -5,162 +5,647 @@
   "SOXL": {"index": "^SOX", "ref": "1-1"},
   "UPRO": {"index": "^GSPC", "ref": "1-1"}
  },
- "names": {
-  "$빅테크": {
-   "syms": ["NVDA", "MSFT", "AAPL", "AMZN", "META", "GOOGL", "TSLA"],
-   "ref": "2-1",
-   "note": "엔비디아·MS·애플·아마존·메타·구글·테슬라"
-  },
-  "$반도체대표주": {"syms": ["NVDA", "AMD", "AVGO"], "ref": "4-2", "note": "운영 판단: SOXL 핵심 대표 3종(엔비디아·AMD·브로드컴)"}
- },
  "rules": [
   {
-   "label": "VIX 전일 대비",
-   "ref": "2-4·2-6·1-5·6-3·9-4·9-5·3-5·5-5",
-   "note": "'VIX가 튄다'=전일 종가 대비 변화율. +10% 안 산다·+20% 판다. 삼켜지는 회피 접음(§4-3): 2-4 '+20%+갭상승'·2-5 세방향·1-5 바닥권+20%는 VIX≥10 을 품어 행동 바꾸는 날 없음. +20% 판다는 do 달라 남김. 축소 비율 미명시.",
-   "value": {"pct": [{"px": "close", "sym": "^VIX"}, 1]},
-   "then": [
-    {"when": {"ge": ["$value", 20]}, "do": "판다", "qty": {"of": "held", "x": "?"}},
-    {"when": {"ge": ["$value", 10]}, "do": "안 산다"}
-   ]
-  },
-  {
-   "label": "VIX 전일보다 꺾임",
-   "ref": "9-5",
-   "note": "이름 조건 — 재진입 재료. 전일 대비 변화율 <0.",
-   "value": {"lt": [{"pct": [{"px": "close", "sym": "^VIX"}, 1]}, 0]}
-  },
-  {
-   "label": "레버리지 힘받는 장 (20일 추세)",
-   "ref": "1-2",
-   "note": "이름 조건 — 저자가 측정만 주고 '사라' 안 붙임. 상승일 수는 식, '하락일 낙폭 작다'는 기준 미명시 수동. $index.",
+   "label": "지수 20일선 위",
+   "ref": "2-2·3-2·5-1·5-2·5-4·9-5·10-1",
+   "note": "상품마다 자기 지수($index: TQQQ→^NDX, SOXL→^SOX, UPRO→^GSPC) 종가가 20일 평균 위",
    "value": {
-    "all": [
+    "gt": [{"px": "close", "sym": "$index"}, {"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}]
+   }
+  },
+  {
+   "label": "지수 60일선 위",
+   "ref": "2-2·3-2·5-2",
+   "value": {
+    "gt": [{"px": "close", "sym": "$index"}, {"div": [{"sum": [{"px": "close", "sym": "$index"}, 60]}, 60]}]
+   }
+  },
+  {
+   "label": "지수 20일선 아래 연속 일수",
+   "ref": "6-5·7-6",
+   "note": "지수가 20일선 위였던 마지막 날부터 지난 거래일 수(오늘 위면 0)",
+   "value": {"barssince": {"rule": "지수 20일선 위"}}
+  },
+  {
+   "label": "상품 5일 상승률",
+   "ref": "2-7·3-1·4-5",
+   "value": {
+    "mul": [
      {
-      "ge": [
-       {
-        "count": [{"gt": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]}, 20]
-       },
-       13
-      ]
+      "sub": [{"div": [{"px": "close", "sym": "$self"}, {"lag": [{"px": "close", "sym": "$self"}, 5]}]}, 1]
      },
-     {"manual": "하락일 낙폭이 작다 (저자 미명시: '작다'의 기준)"}
+     100
     ]
    }
   },
   {
-   "label": "돈삭제 가능 구간 (4재료 중 2)",
-   "ref": "1-5",
-   "note": "4재료 중 2 이상→돈삭제(안 산다). ④ VIX는 '바닥권 대비'라 전일 대비와 다른 측정, pct 1일 직접. $index.",
+   "label": "상품 5일선 이격",
+   "ref": "2-7",
+   "note": "(종가 ÷ 5일 평균 − 1) × 100",
+   "value": {
+    "mul": [
+     {
+      "sub": [
+       {
+        "div": [{"px": "close", "sym": "$self"}, {"div": [{"sum": [{"px": "close", "sym": "$self"}, 5]}, 5]}]
+       },
+       1
+      ]
+     },
+     100
+    ]
+   }
+  },
+  {
+   "label": "상품 윗꼬리 길이",
+   "ref": "3-1·4-3·4-5·5-5·7-1",
+   "note": "(고가 − max(시가, 종가)) ÷ 종가 × 100 — '긴 윗꼬리' 기준 폭은 저자 미명시라 쓰는 곳에서 '?'",
+   "value": {
+    "mul": [
+     {
+      "div": [
+       {
+        "sub": [
+         {"px": "high", "sym": "$self"},
+         {"max": [{"px": "open", "sym": "$self"}, {"px": "close", "sym": "$self"}]}
+        ]
+       },
+       {"px": "close", "sym": "$self"}
+      ]
+     },
+     100
+    ]
+   }
+  },
+  {
+   "label": "상품 갭상승",
+   "ref": "4-5·7-1·7-3",
+   "note": "시가가 전일 종가보다 높게 시작",
+   "value": {"gt": [{"px": "open", "sym": "$self"}, {"lag": [{"px": "close", "sym": "$self"}, 1]}]}
+  },
+  {
+   "label": "지수 전고점 돌파",
+   "ref": "2-2·3-3",
+   "note": "종가가 전고점(최근 N일 최고 종가, N 저자 미명시) 위 — 종가 기준이라 장중만 뚫은 '뚫은 척'은 돌파가 아님",
+   "value": {
+    "gt": [
+     {"px": "close", "sym": "$index"},
+     {"highest": [{"lag": [{"px": "close", "sym": "$index"}, 1]}, "?"]}
+    ]
+   }
+  },
+  {
+   "label": "지수 돌파선",
+   "ref": "2-2·3-3",
+   "note": "마지막 돌파일의 전고점 값",
+   "value": {
+    "valuewhen": [{"rule": "지수 전고점 돌파"}, {"highest": [{"lag": [{"px": "close", "sym": "$index"}, 1]}, "?"]}]
+   }
+  },
+  {
+   "label": "지수 돌파 후 2거래일 버팀",
+   "ref": "2-2·3-3·3-1",
+   "note": "'2~3거래일' → 하한 2. 돌파 뒤 종가 최저가 돌파선 위를 지킴",
+   "value": {
+    "all": [
+     {"ge": [{"barssince": {"rule": "지수 전고점 돌파"}}, 2]},
+     {
+      "gt": [{"minsince": [{"rule": "지수 전고점 돌파"}, {"px": "close", "sym": "$index"}]}, {"rule": "지수 돌파선"}]
+     }
+    ]
+   }
+  },
+  {
+   "label": "지수 돌파 후 2거래일 안에 밀림",
+   "ref": "2-2",
+   "value": {
+    "all": [
+     {"le": [{"barssince": {"rule": "지수 전고점 돌파"}}, 2]},
+     {"lt": [{"px": "close", "sym": "$index"}, {"rule": "지수 돌파선"}]}
+    ]
+   }
+  },
+  {
+   "label": "빅테크 3개 이상 플러스",
+   "ref": "2-1·7-1·3-5",
+   "note": "7종목 중 전일 대비 상승 3개 이상",
+   "value": {
+    "atleast": 3,
+    "of": [
+     {"gt": [{"px": "close", "sym": "NVDA"}, {"lag": [{"px": "close", "sym": "NVDA"}, 1]}]},
+     {"gt": [{"px": "close", "sym": "MSFT"}, {"lag": [{"px": "close", "sym": "MSFT"}, 1]}]},
+     {"gt": [{"px": "close", "sym": "AAPL"}, {"lag": [{"px": "close", "sym": "AAPL"}, 1]}]},
+     {"gt": [{"px": "close", "sym": "AMZN"}, {"lag": [{"px": "close", "sym": "AMZN"}, 1]}]},
+     {"gt": [{"px": "close", "sym": "META"}, {"lag": [{"px": "close", "sym": "META"}, 1]}]},
+     {"gt": [{"px": "close", "sym": "GOOGL"}, {"lag": [{"px": "close", "sym": "GOOGL"}, 1]}]},
+     {"gt": [{"px": "close", "sym": "TSLA"}, {"lag": [{"px": "close", "sym": "TSLA"}, 1]}]}
+    ]
+   }
+  },
+  {
+   "label": "지수 시초가 위",
+   "ref": "2-1·7-1·7-2",
+   "note": "일봉 확정값(종가 > 시가)으로 잰다 — 원문의 '30분 뒤' 시점은 분봉 시세 경로가 없어 일봉으로 대신",
+   "value": {"gt": [{"px": "close", "sym": "$index"}, {"px": "open", "sym": "$index"}]}
+  },
+  {
+   "label": "장 초반 첫 눌림 저점 유지",
+   "ref": "2-1·7-1·7-2·7-3",
+   "value": {"manual": "연산 없음: 장 초반 30분 첫 눌림 저점(분봉 세션 구간 연산 없음)"}
+  },
+  {
+   "label": "VIX 상승",
+   "ref": "2-5·3-5",
+   "note": "전일 대비 상승(방향)",
+   "value": {"gt": [{"px": "close", "sym": "^VIX"}, {"lag": [{"px": "close", "sym": "^VIX"}, 1]}]}
+  },
+  {
+   "label": "10년물 금리 상승",
+   "ref": "2-5",
+   "note": "^TNX 전일 대비 상승(방향)",
+   "value": {"gt": [{"px": "close", "sym": "^TNX"}, {"lag": [{"px": "close", "sym": "^TNX"}, 1]}]}
+  },
+  {
+   "label": "달러 강세",
+   "ref": "2-5·2-6",
+   "note": "달러인덱스(DX-Y.NYB) 전일 대비 상승을 '강세'로 읽음",
+   "value": {"gt": [{"px": "close", "sym": "DX-Y.NYB"}, {"lag": [{"px": "close", "sym": "DX-Y.NYB"}, 1]}]}
+  },
+  {
+   "label": "10년물 금리 하루 0.1%p 이상 상승",
+   "ref": "2-5·2-6",
+   "note": "^TNX 값은 % — 전일 대비 차 ≥ 0.1",
+   "value": {
+    "ge": [{"sub": [{"px": "close", "sym": "^TNX"}, {"lag": [{"px": "close", "sym": "^TNX"}, 1]}]}, 0.1]
+   }
+  },
+  {
+   "label": "섹터 5개 중 3개 이상 플러스",
+   "ref": "5-1·5-2·5-4",
+   "note": "섹터 → SPDR 섹터 ETF(XLK·XLF·XLI·XLV·XLY)로 잼(운영 판단 — 저자는 섹터 이름만 줌)",
+   "value": {
+    "atleast": 3,
+    "of": [
+     {"gt": [{"px": "close", "sym": "XLK"}, {"lag": [{"px": "close", "sym": "XLK"}, 1]}]},
+     {"gt": [{"px": "close", "sym": "XLF"}, {"lag": [{"px": "close", "sym": "XLF"}, 1]}]},
+     {"gt": [{"px": "close", "sym": "XLI"}, {"lag": [{"px": "close", "sym": "XLI"}, 1]}]},
+     {"gt": [{"px": "close", "sym": "XLV"}, {"lag": [{"px": "close", "sym": "XLV"}, 1]}]},
+     {"gt": [{"px": "close", "sym": "XLY"}, {"lag": [{"px": "close", "sym": "XLY"}, 1]}]}
+    ]
+   }
+  },
+  {
+   "label": "반도체 대표주 2개 이상 전일 저점 이탈",
+   "ref": "4-3·7-6",
+   "note": "대표주 = 엔비디아·AMD·브로드컴(4-2·7-2) · 이탈 = 종가 < 전일 저가",
    "value": {
     "atleast": 2,
     "of": [
-     {
-      "ge": [
-       {
-        "count": [{"gt": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]}, 10]
-       },
-       6
-      ]
-     },
-     {"rule": "하락낙폭 > 상승폭"},
-     {"rule": "전고점 돌파 후 3일내 되밀림"},
-     {"ge": [{"pct": [{"px": "close", "sym": "^VIX"}, 1]}, 20]}
+     {"lt": [{"px": "close", "sym": "NVDA"}, {"lag": [{"px": "low", "sym": "NVDA"}, 1]}]},
+     {"lt": [{"px": "close", "sym": "AMD"}, {"lag": [{"px": "low", "sym": "AMD"}, 1]}]},
+     {"lt": [{"px": "close", "sym": "AVGO"}, {"lag": [{"px": "low", "sym": "AVGO"}, 1]}]}
     ]
-   },
-   "then": [{"when": "$value", "do": "안 산다"}]
+   }
   },
   {
-   "label": "하락낙폭 > 상승폭",
-   "ref": "1-5·2-3·4-3",
-   "note": "이름 조건 — 낙폭 합 > 상승폭 합. 창 미명시, 1-5 맥락 10일. $index.",
+   "label": "엔비디아 독주",
+   "ref": "4-2·4-5·6-5",
+   "note": "엔비디아 상승 + 나머지(AMD·브로드컴·마이크론·장비주) 전부 상승 아님",
+   "value": {
+    "all": [
+     {"gt": [{"px": "close", "sym": "NVDA"}, {"lag": [{"px": "close", "sym": "NVDA"}, 1]}]},
+     {
+      "not": {
+       "any": [
+        {"gt": [{"px": "close", "sym": "AMD"}, {"lag": [{"px": "close", "sym": "AMD"}, 1]}]},
+        {"gt": [{"px": "close", "sym": "AVGO"}, {"lag": [{"px": "close", "sym": "AVGO"}, 1]}]},
+        {"gt": [{"px": "close", "sym": "MU"}, {"lag": [{"px": "close", "sym": "MU"}, 1]}]},
+        {
+         "gt": [{"px": "close", "sym": "?"}, {"lag": [{"px": "close", "sym": "?"}, 1]}],
+         "label": "장비주 상승(티커 저자 미명시)"
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "label": "SOXL 급등일",
+   "ref": "2-3·4-3",
+   "note": "SOXL 전일 대비 상승률 — '급등' 폭 저자 미명시",
+   "on": ["SOXL"],
+   "value": {
+    "ge": [
+     {
+      "mul": [
+       {
+        "sub": [{"div": [{"px": "close", "sym": "$self"}, {"lag": [{"px": "close", "sym": "$self"}, 1]}]}, 1]
+       },
+       100
+      ]
+     },
+     "?"
+    ]
+   }
+  },
+  {
+   "label": "지수 급등일",
+   "ref": "9-3",
+   "note": "지수 전일 대비 상승률 — '크게' 폭 저자 미명시",
+   "value": {
+    "ge": [
+     {
+      "mul": [
+       {
+        "sub": [{"div": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]}, 1]
+       },
+       100
+      ]
+     },
+     "?"
+    ]
+   }
+  },
+  {
+   "label": "거래량 전일 1.5배 이상",
+   "ref": "7-4·4-3",
+   "value": {
+    "ge": [{"div": [{"px": "volume", "sym": "$self"}, {"lag": [{"px": "volume", "sym": "$self"}, 1]}]}, 1.5]
+   }
+  },
+  {
+   "label": "종가 고점 근처 마감",
+   "ref": "7-4",
+   "note": "(고가 − 종가) ÷ 고가 × 100 ≤ ? — '근처' 폭 저자 미명시",
+   "value": {
+    "le": [
+     {
+      "mul": [
+       {
+        "div": [
+         {"sub": [{"px": "high", "sym": "$self"}, {"px": "close", "sym": "$self"}]},
+         {"px": "high", "sym": "$self"}
+        ]
+       },
+       100
+      ]
+     },
+     "?"
+    ]
+   }
+  },
+  {
+   "label": "하락일 거래량이 상승일보다 큼",
+   "ref": "7-4",
+   "note": "최근 N일(저자 미명시) 하락일 거래량 합 > 상승일 거래량 합 — 저자가 행동을 주지 않은 측정",
    "value": {
     "gt": [
      {
-      "abs": {
-       "sum": [
-        {
-         "case": [
-          [
-           {"lt": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]},
-           {"sub": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]}
-          ]
-         ],
-         "else": 0
-        },
-        10
-       ]
-      }
+      "sum": [
+       {
+        "case": [
+         [
+          {"lt": [{"px": "close", "sym": "$self"}, {"lag": [{"px": "close", "sym": "$self"}, 1]}]},
+          {"px": "volume", "sym": "$self"}
+         ]
+        ],
+        "else": 0
+       },
+       "?"
+      ]
      },
      {
       "sum": [
        {
         "case": [
          [
-          {"gt": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]},
-          {"sub": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]}
+          {"gt": [{"px": "close", "sym": "$self"}, {"lag": [{"px": "close", "sym": "$self"}, 1]}]},
+          {"px": "volume", "sym": "$self"}
          ]
         ],
         "else": 0
        },
-       10
+       "?"
       ]
      }
     ]
    }
   },
   {
-   "label": "전고점 돌파 후 3일내 되밀림",
-   "ref": "1-5",
-   "note": "이름 조건 — 돌파 후 3봉 이내 + 현재가 돌파 당시 종가 아래. 전고점 창 '?'. $index.",
+   "label": "전고점 근처 위치",
+   "ref": "3-1·5-5",
+   "note": "상품 종가의 전고점(최근 N일 최고 종가) 대비 거리 ≥ ? — N·폭 저자 미명시",
+   "value": {
+    "ge": [
+     {
+      "mul": [
+       {
+        "sub": [
+         {
+          "div": [{"px": "close", "sym": "$self"}, {"highest": [{"lag": [{"px": "close", "sym": "$self"}, 1]}, "?"]}]
+         },
+         1
+        ]
+       },
+       100
+      ]
+     },
+     "?"
+    ]
+   }
+  },
+  {
+   "label": "잔량 추세 유지",
+   "ref": "7-5",
+   "note": "저자가 '끌고 간다'만 말하고 깨질 때의 매도 행동은 주지 않음 → 이름 조건. 생존 = 전일 대비 상승으로 읽음",
    "value": {
     "all": [
      {
-      "le": [
+      "all": [
        {
-        "barssince": {
-         "gt": [
-          {"px": "close", "sym": "$index"},
-          {"highest": [{"lag": [{"px": "close", "sym": "$index"}, 1]}, "?"]}
-         ]
-        }
+        "gt": [{"px": "close", "sym": "$self"}, {"div": [{"sum": [{"px": "close", "sym": "$self"}, 5]}, 5]}]
        },
-       3
+       {
+        "gt": [{"px": "close", "sym": "$self"}, {"div": [{"sum": [{"px": "close", "sym": "$self"}, 10]}, 10]}]
+       }
+      ],
+      "on": ["TQQQ"]
+     },
+     {
+      "atleast": 2,
+      "of": [
+       {"gt": [{"px": "close", "sym": "NVDA"}, {"lag": [{"px": "close", "sym": "NVDA"}, 1]}]},
+       {"gt": [{"px": "close", "sym": "AMD"}, {"lag": [{"px": "close", "sym": "AMD"}, 1]}]},
+       {"gt": [{"px": "close", "sym": "AVGO"}, {"lag": [{"px": "close", "sym": "AVGO"}, 1]}]}
+      ],
+      "on": ["SOXL"]
+     },
+     {"all": [{"rule": "지수 20일선 위"}, {"rule": "섹터 5개 중 3개 이상 플러스"}], "on": ["UPRO"]}
+    ]
+   }
+  },
+  {
+   "label": "레버리지가 힘 받는 장",
+   "ref": "1-2",
+   "note": "저자가 판정만 주고 행동은 주지 않음 → 이름 조건. '하락일 낙폭이 작다' = 20일 하락일 낙폭(%) 합 ≤ ?",
+   "value": {
+    "all": [
+     {
+      "ge": [
+       {
+        "sum": [
+         {
+          "case": [[{"gt": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]}, 1]],
+          "else": 0
+         },
+         20
+        ]
+       },
+       13
       ]
      },
      {
-      "lt": [
-       {"px": "close", "sym": "$index"},
+      "le": [
        {
-        "valuewhen": [
+        "sum": [
          {
-          "gt": [
-           {"px": "close", "sym": "$index"},
-           {"highest": [{"lag": [{"px": "close", "sym": "$index"}, 1]}, "?"]}
-          ]
+          "case": [
+           [
+            {"lt": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]},
+            {
+             "abs": {
+              "mul": [
+               {
+                "sub": [{"div": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]}, 1]
+               },
+               100
+              ]
+             }
+            }
+           ]
+          ],
+          "else": 0
          },
-         {"px": "close", "sym": "$index"}
+         20
         ]
-       }
+       },
+       "?"
       ]
      }
     ]
    }
   },
   {
-   "label": "장전 점수 (5지표 중)",
-   "ref": "2-6",
-   "note": "메인 결정(§4-3 흡수) — 5지표 점수. 4점↑=산다, 2점↓(=3점 미만)=안 산다. '3점 소액만'=관망. 재료는 이름조건 참조.",
+   "label": "지수 횡보(상승일·하락일 비슷)",
+   "ref": "1-2",
+   "note": "|상승일×2 − 20| ≤ ? (보합일 무시) — '비슷' 폭 저자 미명시, 행동 미명시 → 이름 조건",
+   "value": {
+    "le": [
+     {
+      "abs": {
+       "sub": [
+        {
+         "mul": [
+          {
+           "sum": [
+            {
+             "case": [[{"gt": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]}, 1]],
+             "else": 0
+            },
+            20
+           ]
+          },
+          2
+         ]
+        },
+        20
+       ]
+      }
+     },
+     "?"
+    ]
+   }
+  },
+  {
+   "label": "돈삭제 신호 4개 중 2개 이상",
+   "ref": "1-5",
+   "note": "'가능성을 열어둔다'는 행동이 아님 → 이름 조건. ①은 걸림 방향 저자 미명시 — 원문 표현 '6일 이상'을 그대로 잎으로 둠(방향 확인 필요). ②의 기간·④의 '바닥권' 기간은 저자 미명시 '?'. 대상은 지수($index)",
+   "value": {
+    "atleast": 2,
+    "of": [
+     {
+      "ge": [
+       {
+        "sum": [
+         {
+          "case": [[{"gt": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]}, 1]],
+          "else": 0
+         },
+         10
+        ]
+       },
+       6
+      ],
+      "label": "10거래일 중 상승일 6일 이상(걸림 방향 저자 미명시)"
+     },
+     {
+      "gt": [
+       {
+        "sum": [
+         {
+          "case": [
+           [
+            {"lt": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]},
+            {
+             "abs": {
+              "mul": [
+               {
+                "sub": [{"div": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]}, 1]
+               },
+               100
+              ]
+             }
+            }
+           ]
+          ],
+          "else": 0
+         },
+         "?"
+        ]
+       },
+       {
+        "sum": [
+         {
+          "case": [
+           [
+            {"gt": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]},
+            {
+             "mul": [
+              {
+               "sub": [{"div": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]}, 1]
+              },
+              100
+             ]
+            }
+           ]
+          ],
+          "else": 0
+         },
+         "?"
+        ]
+       }
+      ],
+      "label": "하락일 낙폭 합 > 상승일 상승폭 합"
+     },
+     {
+      "all": [
+       {"le": [{"barssince": {"rule": "지수 전고점 돌파"}}, 3]},
+       {"lt": [{"px": "close", "sym": "$index"}, {"rule": "지수 돌파선"}]}
+      ],
+      "label": "돌파 후 3거래일 안에 다시 밀림"
+     },
+     {
+      "ge": [
+       {
+        "mul": [
+         {
+          "sub": [{"div": [{"px": "close", "sym": "^VIX"}, {"lowest": [{"px": "close", "sym": "^VIX"}, "?"]}]}, 1]
+         },
+         100
+        ]
+       },
+       20
+      ],
+      "label": "VIX 바닥권 대비 20% 이상"
+     }
+    ]
+   }
+  },
+  {
+   "label": "변동성 기준 비중·하루 손실 감당액",
+   "ref": "1-1·1-3·5-1·6-2",
+   "skip": "데이터 없음: 투자자 본인의 하루 손실 감당액·계좌 금액"
+  },
+  {
+   "label": "보유 기간 만료·움직임 없음",
+   "ref": "1-3·4-1",
+   "note": "기간은 매매마다 사람이 고르는 유형(저자 구간: 짧은 3~5·중간 10~20·긴 40~60, SOXL 단타 3·스윙 5~8·추세 20 '재판단')이라 '?'. '원하는 움직임'의 수익 기준도 미명시 '?'. 축소/현금화 비율 미명시 → held '?'",
+   "then": [
+    {
+     "when": {"all": [{"ge": [{"pos": "days"}, "?"]}, {"lt": [{"pos": "ret"}, "?"]}]},
+     "do": "판다",
+     "qty": {"of": "held", "x": "?"}
+    }
+   ]
+  },
+  {"label": "장기·구간 자산 칸 구분", "ref": "1-4", "skip": "연산 없음: 계좌 구조(자산 칸·이름표)와 투자자 행동은 상품 시세로 계산 못 함"},
+  {
+   "label": "VIX 전일 대비",
+   "ref": "2-4·2-6·4-5·9-4·10-1",
+   "note": "'20%+지수 갭상승 더 조심'(2-4)·SOXL '사면 안 되는 날: VIX가 같이 튀는 날'(4-5)·'VIX 튀는데 지수 버틸 때 현금'(9-4)은 ≥10 안 산다에 포함돼 접음. 20% 축소 비율 미명시 → held '?'",
+   "value": {
+    "mul": [
+     {
+      "sub": [{"div": [{"px": "close", "sym": "^VIX"}, {"lag": [{"px": "close", "sym": "^VIX"}, 1]}]}, 1]
+     },
+     100
+    ]
+   },
+   "then": [
+    {"when": {"ge": ["$value", 20]}, "do": "판다", "qty": {"of": "held", "x": "?"}},
+    {"when": {"ge": ["$value", 10]}, "do": "안 산다"}
+   ]
+  },
+  {
+   "label": "금리·달러·VIX 동시 상승",
+   "ref": "2-5·2-6",
+   "note": "'크게 들어갈 장이 아니다' → 원칙 2 보수 입장 안 산다",
+   "then": [{"when": {"all": [{"rule": "10년물 금리 상승"}, {"rule": "달러 강세"}, {"rule": "VIX 상승"}]}, "do": "안 산다"}]
+  },
+  {
+   "label": "장전 5지표 점수",
+   "ref": "2-6·10-1",
+   "note": "4점↑ 산다 · 2점 이하 관망 → 안 산다 · 3점 '소액만' → 원칙 2 크기 말이라 갈래 없음(관망). 10년물 하루 변화폭 기준은 2-5의 0.1%p. SOXL만 대표주(엔비디아 + 브로드컴 또는 AMD 상승) 노드 추가",
    "then": [
     {
      "when": {
-      "atleast": 4,
-      "of": [
-       {"rule": "나스닥선물 고점 안낮춤"},
-       {"rule": "S&P선물 전일종가 위 버팀"},
-       {"rule": "VIX 안정"},
-       {"rule": "10년물 금리 안정"},
-       {"rule": "달러 약세/중립"}
+      "all": [
+       {
+        "atleast": 4,
+        "of": [
+         {
+          "ge": [{"px": "high", "sym": "NQ=F"}, {"lag": [{"px": "high", "sym": "NQ=F"}, 1]}],
+          "label": "나스닥 선물 고점 안 낮춤"
+         },
+         {
+          "gt": [{"px": "close", "sym": "ES=F"}, {"lag": [{"px": "close", "sym": "ES=F"}, 1]}],
+          "label": "S&P500 선물 전일 종가 위"
+         },
+         {"lt": [{"rule": "VIX 전일 대비"}, 10], "label": "VIX 전일 대비 10% 미만"},
+         {
+          "not": {
+           "any": [{"rule": "10년물 금리 하루 0.1%p 이상 상승"}, {"ge": [{"barssince": {"not": {"rule": "10년물 금리 상승"}}}, 2]}]
+          },
+          "label": "10년물 금리 안정(0.1%p 미만·이틀 연속 상승 아님)"
+         },
+         {"not": {"rule": "달러 강세"}, "label": "달러인덱스 강세 아님"}
+        ]
+       },
+       {
+        "all": [
+         {"gt": [{"px": "close", "sym": "NVDA"}, {"lag": [{"px": "close", "sym": "NVDA"}, 1]}]},
+         {
+          "any": [
+           {"gt": [{"px": "close", "sym": "AVGO"}, {"lag": [{"px": "close", "sym": "AVGO"}, 1]}]},
+           {"gt": [{"px": "close", "sym": "AMD"}, {"lag": [{"px": "close", "sym": "AMD"}, 1]}]}
+          ]
+         }
+        ],
+        "label": "엔비디아와 브로드컴 또는 AMD 상승",
+        "on": ["SOXL"]
+       }
       ]
      },
      "do": "산다"
@@ -170,11 +655,22 @@
       "not": {
        "atleast": 3,
        "of": [
-        {"rule": "나스닥선물 고점 안낮춤"},
-        {"rule": "S&P선물 전일종가 위 버팀"},
-        {"rule": "VIX 안정"},
-        {"rule": "10년물 금리 안정"},
-        {"rule": "달러 약세/중립"}
+        {
+         "ge": [{"px": "high", "sym": "NQ=F"}, {"lag": [{"px": "high", "sym": "NQ=F"}, 1]}],
+         "label": "나스닥 선물 고점 안 낮춤"
+        },
+        {
+         "gt": [{"px": "close", "sym": "ES=F"}, {"lag": [{"px": "close", "sym": "ES=F"}, 1]}],
+         "label": "S&P500 선물 전일 종가 위"
+        },
+        {"lt": [{"rule": "VIX 전일 대비"}, 10], "label": "VIX 전일 대비 10% 미만"},
+        {
+         "not": {
+          "any": [{"rule": "10년물 금리 하루 0.1%p 이상 상승"}, {"ge": [{"barssince": {"not": {"rule": "10년물 금리 상승"}}}, 2]}]
+         },
+         "label": "10년물 금리 안정(0.1%p 미만·이틀 연속 상승 아님)"
+        },
+        {"not": {"rule": "달러 강세"}, "label": "달러인덱스 강세 아님"}
        ]
       }
      },
@@ -183,232 +679,253 @@
    ]
   },
   {
-   "label": "나스닥선물 고점 안낮춤",
-   "ref": "2-6·2-5",
-   "note": "이름 조건 — 장전 재료. 당일 고점 ≥ 전일 고점. NQ=F.",
-   "value": {"ge": [{"px": "high", "sym": "NQ=F"}, {"lag": [{"px": "high", "sym": "NQ=F"}, 1]}]}
-  },
-  {
-   "label": "S&P선물 전일종가 위 버팀",
-   "ref": "2-6",
-   "note": "이름 조건 — 장전 재료. ES=F 전일 종가 위.",
-   "value": {"gt": [{"px": "close", "sym": "ES=F"}, {"lag": [{"px": "close", "sym": "ES=F"}, 1]}]}
-  },
-  {
-   "label": "VIX 안정",
-   "ref": "2-6·2-4",
-   "note": "이름 조건 — 장전 재료(VIX 1점). 전일 대비 +10% 미만.",
-   "value": {"lt": [{"pct": [{"px": "close", "sym": "^VIX"}, 1]}, 10]}
-  },
-  {
-   "label": "10년물 금리 안정",
-   "ref": "2-6·2-5",
-   "note": "이름 조건 — 장전 재료. 하루 변화폭 안정(기준 '?') AND 이틀 연속 상승 아님. ^TNX 값=%.",
-   "value": {
-    "all": [
-     {"lt": [{"abs": {"pct": [{"px": "close", "sym": "^TNX"}, 1]}}, "?"]},
-     {
-      "not": {
-       "ge": [
-        {"streak": {"gt": [{"px": "close", "sym": "^TNX"}, {"lag": [{"px": "close", "sym": "^TNX"}, 1]}]}},
-        2
-       ]
-      }
-     }
-    ]
-   }
-  },
-  {
-   "label": "달러 약세/중립",
-   "ref": "2-6·2-5",
-   "note": "이름 조건 — 장전 재료. 달러인덱스 전일 대비 ≤0. DX-Y.NYB.",
-   "value": {"le": [{"pct": [{"px": "close", "sym": "DX-Y.NYB"}, 1]}, 0]}
-  },
-  {
-   "label": "금리 급등 (0.1%p)",
-   "ref": "2-5",
-   "note": "이름 조건 — 저자가 측정만(경고). ^TNX 값=% 이므로 전일 대비 절대 변화(%p) ≥0.1.",
-   "value": {
-    "ge": [
-     {"abs": {"sub": [{"px": "close", "sym": "^TNX"}, {"lag": [{"px": "close", "sym": "^TNX"}, 1]}]}},
-     0.1
-    ]
-   }
-  },
-  {
-   "label": "나스닥 살아나는 날 (30분 3줄)",
+   "label": "장 초반 30분 세 줄",
    "ref": "2-1·7-1·7-2",
-   "on": ["TQQQ"],
-   "note": "30분 뒤 3줄 중 2↑이면 산다. 시초가 위(장중>시가), 빅테크 3개 플러스(across), 첫 눌림 저점은 연산없음 수동. 7-1·7-2도 같은 내용.",
+   "note": "세 줄 중 2개 미만 → 안 산다(2개 이상은 '후보'일 뿐 산다 아님). 주도주 줄은 상품별(7-2) — 같은 방향 = 전일 대비 상승. 속임수 반등은 둘째 갈래(상승 종목 폭은 데이터 없음). 첫 30분봉 윗꼬리·거래량은 '갭상승 후 긴 윗꼬리'·7-4 측정으로",
    "then": [
-    {
-     "when": {
-      "atleast": 2,
-      "of": [
-       {"gt": [{"px": "close", "sym": "$index", "tf": "1m"}, {"px": "open", "sym": "$index", "tf": "1d"}]},
-       {"manual": "첫 눌림 저점을 지켰는가 (장중 첫 눌림 저점 — 연산 없음)"},
-       {
-        "ge": [
-         {
-          "across": {
-           "syms": ["NVDA", "MSFT", "AAPL", "AMZN", "META", "GOOGL", "TSLA"],
-           "cond": {"gt": [{"px": "close", "sym": "$s", "tf": "1m"}, {"lag": [{"px": "close", "sym": "$s"}, 1]}]}
-          }
-         },
-         3
-        ]
-       }
-      ]
-     },
-     "do": "산다"
-    },
     {
      "when": {
       "not": {
        "atleast": 2,
        "of": [
-        {"gt": [{"px": "close", "sym": "$index", "tf": "1m"}, {"px": "open", "sym": "$index", "tf": "1d"}]},
-        {"manual": "첫 눌림 저점을 지켰는가 (장중 첫 눌림 저점 — 연산 없음)"},
+        {"rule": "지수 시초가 위"},
+        {"rule": "장 초반 첫 눌림 저점 유지"},
         {
-         "ge": [
+         "all": [
+          {"all": [{"rule": "빅테크 3개 이상 플러스"}], "on": ["TQQQ"]},
           {
-           "across": {
-            "syms": ["NVDA", "MSFT", "AAPL", "AMZN", "META", "GOOGL", "TSLA"],
-            "cond": {"gt": [{"px": "close", "sym": "$s", "tf": "1m"}, {"lag": [{"px": "close", "sym": "$s"}, 1]}]}
-           }
+           "atleast": 3,
+           "of": [
+            {"gt": [{"px": "close", "sym": "NVDA"}, {"lag": [{"px": "close", "sym": "NVDA"}, 1]}]},
+            {"gt": [{"px": "close", "sym": "AMD"}, {"lag": [{"px": "close", "sym": "AMD"}, 1]}]},
+            {"gt": [{"px": "close", "sym": "AVGO"}, {"lag": [{"px": "close", "sym": "AVGO"}, 1]}]}
+           ],
+           "label": "엔비디아·AMD·브로드컴 3개 상승",
+           "on": ["SOXL"]
           },
-          3
+          {
+           "atleast": 3,
+           "of": [
+            {"gt": [{"px": "close", "sym": "XLK"}, {"lag": [{"px": "close", "sym": "XLK"}, 1]}]},
+            {"gt": [{"px": "close", "sym": "XLF"}, {"lag": [{"px": "close", "sym": "XLF"}, 1]}]},
+            {"gt": [{"px": "close", "sym": "XLI"}, {"lag": [{"px": "close", "sym": "XLI"}, 1]}]}
+           ],
+           "label": "기술·금융·산업재 3개 상승",
+           "on": ["UPRO"]
+          }
          ]
         }
        ]
       }
      },
      "do": "안 산다"
+    },
+    {
+     "when": {
+      "all": [
+       {"gt": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]},
+       {
+        "not": {
+         "all": [
+          {"all": [{"rule": "빅테크 3개 이상 플러스"}], "on": ["TQQQ"]},
+          {
+           "atleast": 3,
+           "of": [
+            {"gt": [{"px": "close", "sym": "NVDA"}, {"lag": [{"px": "close", "sym": "NVDA"}, 1]}]},
+            {"gt": [{"px": "close", "sym": "AMD"}, {"lag": [{"px": "close", "sym": "AMD"}, 1]}]},
+            {"gt": [{"px": "close", "sym": "AVGO"}, {"lag": [{"px": "close", "sym": "AVGO"}, 1]}]}
+           ],
+           "label": "엔비디아·AMD·브로드컴 3개 상승",
+           "on": ["SOXL"]
+          },
+          {
+           "atleast": 3,
+           "of": [
+            {"gt": [{"px": "close", "sym": "XLK"}, {"lag": [{"px": "close", "sym": "XLK"}, 1]}]},
+            {"gt": [{"px": "close", "sym": "XLF"}, {"lag": [{"px": "close", "sym": "XLF"}, 1]}]},
+            {"gt": [{"px": "close", "sym": "XLI"}, {"lag": [{"px": "close", "sym": "XLI"}, 1]}]}
+           ],
+           "label": "기술·금융·산업재 3개 상승",
+           "on": ["UPRO"]
+          }
+         ]
+        }
+       },
+       {"manual": "데이터 없음: 상승 종목 폭(등락 종목 수)이 좁음", "label": "상승 종목 폭 좁음"}
+      ]
+     },
+     "do": "안 산다"
     }
    ]
   },
   {
-   "label": "S&P500 위치 (UPRO 진입)",
-   "ref": "2-2",
-   "on": ["UPRO"],
-   "note": "전고점 돌파 후 2~3일 버티면(돌파 후 ≥2봉 + 돌파 후 최저가>돌파종가) 산다. 20일선 아래=안 산다('쉬거나 작게'→크기말 보수, 원칙2). 전고점 창 '?'.",
+   "label": "장 시작 후 30분",
+   "ref": "7-1·7-2·2-1",
+   "note": "갭상승 후 윗꼬리는 별도 규칙, 지수·주도주 엇갈림은 '장 초반 30분 세 줄'에 있음",
+   "skip": "연산 없음: 장중 시각(장 시작 후 30분)·프리마켓·첫 15분 거래량 — 분봉·시각 연산 없음"
+  },
+  {
+   "label": "갭상승 후 긴 윗꼬리",
+   "ref": "4-5·7-1·7-2",
+   "note": "일봉 윗꼬리로 잼(첫 30분봉은 분봉 경로 없음). 4-5는 SOXL '사면 안 되는 날'이지만 7-1이 공통 패턴이라 공통 규칙",
+   "then": [{"when": {"all": [{"rule": "상품 갭상승"}, {"ge": [{"rule": "상품 윗꼬리 길이"}, "?"]}]}, "do": "안 산다"}]
+  },
+  {
+   "label": "뉴스 후 가격 위치 3가지",
+   "ref": "2-7",
+   "note": "'조심 신호' → 안 산다. 불편 기준 숫자 미명시 '?'",
    "then": [
     {
      "when": {
       "all": [
+       {"manual": "데이터 없음: 매수 근거가 된 뉴스 발생", "label": "뉴스 발생"},
        {
-        "gt": [{"px": "close", "sym": "$index"}, {"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}]
-       },
+        "atleast": 2,
+        "of": [
+         {"ge": [{"rule": "상품 5일 상승률"}, "?"]},
+         {"ge": [{"rule": "상품 5일선 이격"}, "?"]},
+         {"manual": "연산 없음: 뉴스 후 첫 30분 고점을 못 지킴(분봉 세션 연산 없음)", "label": "뉴스 후 첫 30분 고점 이탈"}
+        ]
+       }
+      ]
+     },
+     "do": "안 산다"
+    }
+   ]
+  },
+  {
+   "label": "지수 20일선 아래 위치",
+   "ref": "2-2·3-2·3-1·4-4·5-2",
+   "note": "원문 '쉬거나 아주 작게' → 원칙 2 안 산다. '20일선 아래 첫 양봉'(3-1)·'첫 반등'(4-4)·60일선까지 아래(3-2)는 이 발동에 포함돼 접음",
+   "then": [{"when": {"not": {"rule": "지수 20일선 위"}}, "do": "안 산다"}]
+  },
+  {
+   "label": "지수 상승 초입",
+   "ref": "3-2·5-1·5-2",
+   "note": "회복일 + 이후 2거래일 = 연속 3일 위. 기울기(TQQQ, 3-2)·섹터 폭(UPRO, 5-1·5-2)은 상품 델타 노드. '20일선 위·60일선 아래 짧게만'은 크기/기간 말 → 산다 갈래 밖(관망)",
+   "on": ["TQQQ", "UPRO"],
+   "then": [
+    {
+     "when": {
+      "all": [
+       {"ge": [{"barssince": {"not": {"rule": "지수 20일선 위"}}}, 3]},
+       {"rule": "지수 60일선 위"},
        {
-        "ge": [
-         {
-          "barssince": {
-           "gt": [
-            {"px": "close", "sym": "$index"},
-            {"highest": [{"lag": [{"px": "close", "sym": "$index"}, 1]}, "?"]}
+        "not": {
+         "any": [
+          {
+           "lt": [
+            {"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]},
+            {"lag": [{"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}, 1]}
+           ]
+          },
+          {
+           "lt": [
+            {"div": [{"sum": [{"px": "close", "sym": "$index"}, 60]}, 60]},
+            {"lag": [{"div": [{"sum": [{"px": "close", "sym": "$index"}, 60]}, 60]}, 1]}
            ]
           }
-         },
-         2
-        ]
+         ]
+        },
+        "label": "20일선·60일선 아래로 꺾이지 않음",
+        "on": ["TQQQ"]
        },
-       {
-        "gt": [
-         {
-          "minsince": [
-           {
-            "gt": [
-             {"px": "close", "sym": "$index"},
-             {"highest": [{"lag": [{"px": "close", "sym": "$index"}, 1]}, "?"]}
-            ]
-           },
-           {"px": "close", "sym": "$index"}
-          ]
-         },
-         {
-          "valuewhen": [
-           {
-            "gt": [
-             {"px": "close", "sym": "$index"},
-             {"highest": [{"lag": [{"px": "close", "sym": "$index"}, 1]}, "?"]}
-            ]
-           },
-           {"px": "close", "sym": "$index"}
-          ]
-         }
-        ]
-       }
+       {"all": [{"rule": "섹터 5개 중 3개 이상 플러스"}], "on": ["UPRO"]}
       ]
      },
      "do": "산다"
-    },
+    }
+   ]
+  },
+  {
+   "label": "UPRO 전고점 위치",
+   "ref": "2-2",
+   "note": "'비중을 키운다' → 산다(크기 말, qty 없음). '확인 매수만'은 크기 말이라 갈래 없음. 돌파 후 2거래일 안 밀림 → '준비 안 된 신호' 안 산다",
+   "on": ["UPRO"],
+   "then": [
+    {"when": {"rule": "지수 돌파 후 2거래일 버팀"}, "do": "산다"},
+    {"when": {"rule": "지수 돌파 후 2거래일 안에 밀림"}, "do": "안 산다"}
+   ]
+  },
+  {
+   "label": "UPRO 얇은 상승",
+   "ref": "2-2·5-1",
+   "note": "'크게 싣지 않는다/관망' → 안 산다. 지수 상승인데 섹터 5개 중 3개 미만 상승",
+   "on": ["UPRO"],
+   "then": [
     {
      "when": {
-      "lt": [{"px": "close", "sym": "$index"}, {"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}]
+      "all": [
+       {"gt": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]},
+       {"not": {"rule": "섹터 5개 중 3개 이상 플러스"}}
+      ]
      },
      "do": "안 산다"
     }
    ]
   },
   {
-   "label": "SOXL 과열 (4재료 중 2)",
+   "label": "SOXL 과열 4신호",
    "ref": "2-3",
+   "note": "'손을 늦춘다' → 안 산다. 6-2 '반도체 과열이면 균형형'이 참조하므로 구체 티커(^SOX·SOXL). ③ 걸림 = 6개 중 상승 3개 미만('1~2개만')",
    "on": ["SOXL"],
-   "note": "4재료 중 2↑→안 산다. ① ^SOX 10일중 상승 7일 + SOXL 5일 20% ② 5일선 이격 수동 ③ 분산(참조) ④ 뉴스 온도 수동.",
-   "value": {
-    "atleast": 2,
-    "of": [
-     {
-      "all": [
-       {
-        "ge": [
-         {
-          "count": [{"gt": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]}, 10]
-         },
-         7
-        ]
-       },
-       {"ge": [{"pct": [{"px": "close"}, 5]}, 20]}
-      ]
-     },
-     {"manual": "5일선과 가격이 너무 벌어짐 (폭 저자 미명시)"},
-     {"rule": "반도체 주도주 분산 (6중 4)"},
-     {"manual": "좋은 뉴스가 가격보다 먼저 (뉴스 온도 — 연산 없음)"}
-    ]
-   },
-   "then": [{"when": "$value", "do": "안 산다"}]
-  },
-  {
-   "label": "반도체 주도주 분산 (6중 4)",
-   "ref": "2-3",
-   "on": ["SOXL"],
-   "note": "이름 조건 — 좁은 장(분산)=6종 중 상승 4개 미만. 장비주=LRCX.",
-   "value": {
-    "not": {
-     "ge": [
-      {
-       "across": {
-        "syms": ["^SOX", "NVDA", "AMD", "AVGO", "MU", "LRCX"],
-        "cond": {"gt": [{"px": "close", "sym": "$s"}, {"lag": [{"px": "close", "sym": "$s"}, 1]}]}
-       }
-      },
-      4
-     ]
-    }
-   }
-  },
-  {
-   "label": "뉴스 전 가격 위치 (3재료 중 2 불편)",
-   "ref": "2-7",
-   "note": "3재료 중 2 불편→조심(안 산다). 이격폭·뉴스시점 수동.",
    "then": [
     {
      "when": {
       "atleast": 2,
       "of": [
-       {"rule": "최근 5일 과다상승"},
-       {"manual": "가격이 5일선과 너무 벌어짐 (이격 폭 저자 미명시)"},
-       {"manual": "뉴스 후 첫 30분 고점 못 지킴 (장중 뉴스 시점 — 연산 없음)"}
+       {
+        "ge": [
+         {
+          "sum": [
+           {
+            "case": [[{"gt": [{"px": "close", "sym": "^SOX"}, {"lag": [{"px": "close", "sym": "^SOX"}, 1]}]}, 1]],
+            "else": 0
+           },
+           10
+          ]
+         },
+         7
+        ],
+        "label": "반도체 지수 10일 중 상승일 7일 이상"
+       },
+       {
+        "ge": [
+         {
+          "mul": [
+           {
+            "sub": [
+             {
+              "div": [{"px": "close", "sym": "SOXL"}, {"div": [{"sum": [{"px": "close", "sym": "SOXL"}, 5]}, 5]}]
+             },
+             1
+            ]
+           },
+           100
+          ]
+         },
+         "?"
+        ],
+        "label": "SOXL 5일선 이격 과다"
+       },
+       {
+        "not": {
+         "atleast": 3,
+         "of": [
+          {"gt": [{"px": "close", "sym": "^SOX"}, {"lag": [{"px": "close", "sym": "^SOX"}, 1]}]},
+          {"gt": [{"px": "close", "sym": "NVDA"}, {"lag": [{"px": "close", "sym": "NVDA"}, 1]}]},
+          {"gt": [{"px": "close", "sym": "AMD"}, {"lag": [{"px": "close", "sym": "AMD"}, 1]}]},
+          {"gt": [{"px": "close", "sym": "AVGO"}, {"lag": [{"px": "close", "sym": "AVGO"}, 1]}]},
+          {"gt": [{"px": "close", "sym": "MU"}, {"lag": [{"px": "close", "sym": "MU"}, 1]}]},
+          {
+           "gt": [{"px": "close", "sym": "?"}, {"lag": [{"px": "close", "sym": "?"}, 1]}],
+           "label": "장비주 상승(티커 저자 미명시)"
+          }
+         ]
+        },
+        "label": "반도체 6개 중 상승 1~2개만"
+       },
+       {"manual": "데이터 없음: 뉴스 온도(좋은 뉴스가 가격보다 늦게 붙음)", "label": "뉴스 온도"}
       ]
      },
      "do": "안 산다"
@@ -416,288 +933,93 @@
    ]
   },
   {
-   "label": "최근 5일 과다상승",
-   "ref": "2-7·3-1·3-5",
-   "note": "이름 조건 — 최근 5거래일 상승률. 기준 '?'. 여러 규칙 공유. SOXL 15%(4-5)는 별 규칙.",
-   "value": {"ge": [{"pct": [{"px": "close"}, 5]}, "?"]}
+   "label": "SOXL 5일 상승률",
+   "ref": "2-3·4-5",
+   "note": "'줄인다/조심' → 안 산다. 2-3의 '상승일 7일 + 5일 20%↑'은 ≥15 발동에 포함돼 접음(느슨한 15)",
+   "on": ["SOXL"],
+   "value": {"rule": "상품 5일 상승률"},
+   "then": [{"when": {"ge": ["$value", 15]}, "do": "안 산다"}]
   },
   {
-   "label": "TQQQ 매수 3자리",
-   "ref": "3-1",
-   "on": ["TQQQ"],
-   "note": "20일선 위 AND 피해자리(3문장 중 2불편) 아니면 산다. 3-1 '매수 전 3문장'이 체크리스트라 그것으로. $index.",
+   "label": "SOXL 호재 매물 날",
+   "ref": "4-5·4-2",
+   "note": "'조심' → 안 산다. 거래량 '터짐'은 장 마감 점검표 1.5배(7-4·4-3 괄호). 종가 밀림 = 전일 대비 하락. 갭 윗꼬리·VIX·5일 과열은 다른 규칙",
+   "on": ["SOXL"],
    "then": [
     {
      "when": {
-      "all": [
+      "any": [
+       {"rule": "엔비디아 독주"},
        {
-        "gt": [{"px": "close", "sym": "$index"}, {"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}]
-       },
-       {"not": {"rule": "TQQQ 피해야 할 3자리 (3중 2)"}}
-      ]
-     },
-     "do": "산다"
-    },
-    {"when": {"rule": "TQQQ 피해야 할 3자리 (3중 2)"}, "do": "안 산다"}
-   ]
-  },
-  {
-   "label": "TQQQ 피해야 할 3자리 (3중 2)",
-   "ref": "3-1",
-   "on": ["TQQQ"],
-   "note": "이름 조건 — 3문장 불편 중 2↑. ① 20일선 아래 ② 5일 과다상승 ③ 윗꼬리 반복 수동.",
-   "value": {
-    "atleast": 2,
-    "of": [
-     {
-      "lt": [{"px": "close", "sym": "$index"}, {"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}]
-     },
-     {"rule": "최근 5일 과다상승"},
-     {"manual": "전고점 근처 윗꼬리 반복 (저자 미명시: 반복 횟수)"}
-    ]
-   }
-  },
-  {
-   "label": "나스닥100 상승초입 필터 (20·60일선)",
-   "ref": "3-2",
-   "on": ["TQQQ"],
-   "note": "이름 조건 — '필터'(환경). 20일선 위 2일연속 + 60일선 위 + 두 선 기울기 상승. $index.",
-   "value": {
-    "all": [
-     {
-      "gt": [{"px": "close", "sym": "$index"}, {"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}]
-     },
-     {
-      "ge": [
-       {
-        "streak": {
-         "gt": [{"px": "close", "sym": "$index"}, {"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}]
-        }
-       },
-       2
-      ]
-     },
-     {
-      "gt": [{"px": "close", "sym": "$index"}, {"div": [{"sum": [{"px": "close", "sym": "$index"}, 60]}, 60]}]
-     },
-     {
-      "gt": [
-       {"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]},
-       {"lag": [{"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}, 1]}
-      ]
-     },
-     {
-      "gt": [
-       {"div": [{"sum": [{"px": "close", "sym": "$index"}, 60]}, 60]},
-       {"lag": [{"div": [{"sum": [{"px": "close", "sym": "$index"}, 60]}, 60]}, 1]}
-      ]
-     }
-    ]
-   }
-  },
-  {
-   "label": "TQQQ 전고점 분할매수",
-   "ref": "3-3·3-4",
-   "on": ["TQQQ"],
-   "note": "3차 분할. 3-3 배분(25·25·50) 채택(3-4 25·30·45 note). 1차 돌파 전, 2차 돌파+1차 후, 3차 돌파 후 2일버팀+2차 후. 전고점 창 '?'.",
-   "then": [
-    {
-     "when": {"lt": [{"px": "close"}, {"highest": [{"lag": [{"px": "close"}, 1]}, "?"]}]},
-     "do": "산다",
-     "qty": {"of": "budget", "x": 0.25}
-    },
-    {
-     "when": {
-      "all": [
-       {"gt": [{"px": "close"}, {"highest": [{"lag": [{"px": "close"}, 1]}, "?"]}]},
-       {"ge": [{"pos": "filled", "rule": "TQQQ 전고점 분할매수"}, 1]}
-      ]
-     },
-     "do": "산다",
-     "qty": {"of": "budget", "x": 0.25}
-    },
-    {
-     "when": {
-      "all": [
-       {
-        "ge": [{"barssince": {"gt": [{"px": "close"}, {"highest": [{"lag": [{"px": "close"}, 1]}, "?"]}]}}, 2]
+        "all": [
+         {"rule": "거래량 전일 1.5배 이상"},
+         {"lt": [{"px": "close", "sym": "$self"}, {"lag": [{"px": "close", "sym": "$self"}, 1]}]}
+        ],
+        "label": "거래량 터졌는데 종가 하락"
        },
        {
-        "gt": [
+        "ge": [
          {
-          "minsince": [{"gt": [{"px": "close"}, {"highest": [{"lag": [{"px": "close"}, 1]}, "?"]}]}, {"px": "close"}]
+          "mul": [
+           {
+            "div": [
+             {"sub": [{"px": "high", "sym": "$self"}, {"px": "close", "sym": "$self"}]},
+             {"px": "high", "sym": "$self"}
+            ]
+           },
+           100
+          ]
          },
-         {
-          "valuewhen": [{"gt": [{"px": "close"}, {"highest": [{"lag": [{"px": "close"}, 1]}, "?"]}]}, {"px": "close"}]
-         }
-        ]
-       },
-       {"ge": [{"pos": "filled", "rule": "TQQQ 전고점 분할매수"}, 2]}
+         4
+        ],
+        "label": "장중 고점 대비 4% 이상 밀려 마감"
+       }
       ]
      },
-     "do": "산다",
-     "qty": {"of": "budget", "x": 0.5}
+     "do": "안 산다"
     }
    ]
   },
   {
-   "label": "TQQQ 실적시즌 축소",
-   "ref": "3-5",
-   "on": ["TQQQ"],
-   "note": "발표 전(수동) AND 3신호 중 1↑→판다 30%. ① 나스닥100 5일 상승('?')+수익 10%↑ ② VIX+10% ③ 주도주 갈라짐. 30~50%→하한 30%.",
-   "value": {
-    "atleast": 1,
-    "of": [
-     {
-      "all": [{"ge": [{"pct": [{"px": "close", "sym": "$index"}, 5]}, "?"]}, {"ge": [{"pos": "ret"}, 0.1]}]
-     },
-     {"ge": [{"pct": [{"px": "close", "sym": "^VIX"}, 1]}, 10]},
-     {"rule": "빅테크 주도주 갈라짐"}
-    ]
-   },
-   "then": [
-    {
-     "when": {"all": [{"manual": "빅테크 실적 발표 전 (실적 캘린더 — 데이터 없음)"}, "$value"]},
-     "do": "판다",
-     "qty": {"of": "held", "x": 0.3}
-    }
-   ]
-  },
-  {
-   "label": "빅테크 주도주 갈라짐",
-   "ref": "3-5·2-1",
-   "note": "이름 조건 — 빅테크 7종 중 상승 3개 미만.",
-   "value": {
-    "lt": [
-     {
-      "across": {
-       "syms": ["NVDA", "MSFT", "AAPL", "AMZN", "META", "GOOGL", "TSLA"],
-       "cond": {"gt": [{"px": "close", "sym": "$s"}, {"lag": [{"px": "close", "sym": "$s"}, 1]}]}
-      }
-     },
-     3
-    ]
-   }
-  },
-  {
-   "label": "SOXL 보유 익절 (수익 구간)",
-   "ref": "4-1·4-3·7-5",
+   "label": "SOXL 매수 전 대표주 3줄",
+   "ref": "4-2",
+   "note": "'매수를 줄인다' → 안 산다. 엔비디아 포함 2개 이상이 아니면. 종가 기준(일봉). 브로드컴 '근처' 폭·전고점 기간 '?'",
    "on": ["SOXL"],
-   "note": "7-5 구간(1차 10~12%/2차 15~20%) 채택. 각 30% 매도. 급등후 3일내 익절신호 별 갈래.",
-   "then": [
-    {
-     "when": {"all": [{"ge": [{"pos": "ret"}, 0.1]}, {"le": [{"pos": "ret"}, 0.12]}]},
-     "do": "판다",
-     "qty": {"of": "held", "x": 0.3}
-    },
-    {
-     "when": {"all": [{"ge": [{"pos": "ret"}, 0.15]}, {"le": [{"pos": "ret"}, 0.2]}]},
-     "do": "판다",
-     "qty": {"of": "held", "x": 0.3}
-    },
-    {
-     "when": {
-      "all": [
-       {"le": [{"barssince": {"ge": [{"pct": [{"px": "close"}, 1]}, "?"]}}, 3]},
-       {"rule": "익절 신호 (급등후 3일)"}
-      ]
-     },
-     "do": "판다",
-     "qty": {"of": "held", "x": 0.3}
-    }
-   ]
-  },
-  {
-   "label": "익절 신호 (급등후 3일)",
-   "ref": "4-3",
-   "on": ["SOXL"],
-   "note": "이름 조건 — 윗꼬리, 거래량 1.5배(마감 기준)+종가밀림, 주도주 2개 저점이탈(참조), 뉴스 온도 수동. '본인 감정'은 주관이라 뺌.",
-   "value": {
-    "atleast": 1,
-    "of": [
-     {
-      "all": [
-       {"lt": [{"px": "close"}, {"lag": [{"px": "close"}, 1]}]},
-       {"gt": [{"sub": [{"px": "high"}, {"px": "close"}]}, {"sub": [{"px": "close"}, {"px": "low"}]}]}
-      ]
-     },
-     {
-      "all": [
-       {"ge": [{"div": [{"px": "volume"}, {"lag": [{"px": "volume"}, 1]}]}, 1.5]},
-       {"lt": [{"px": "close"}, {"lag": [{"px": "close"}, 1]}]}
-      ]
-     },
-     {"rule": "반도체 주도주 2개 전일저점 이탈"},
-     {"manual": "좋은 뉴스에도 더 못 가는 가격 (뉴스 온도 — 연산 없음)"}
-    ]
-   }
-  },
-  {
-   "label": "반도체 주도주 2개 전일저점 이탈",
-   "ref": "4-3·7-6",
-   "note": "이름 조건 — 엔비디아·AMD·브로드컴 중 2↑ 당일저점<전일저점. 익절·손절 공유.",
-   "value": {
-    "ge": [
-     {
-      "across": {
-       "syms": ["NVDA", "AMD", "AVGO"],
-       "cond": {"lt": [{"px": "low", "sym": "$s"}, {"lag": [{"px": "low", "sym": "$s"}, 1]}]}
-      }
-     },
-     2
-    ]
-   }
-  },
-  {
-   "label": "SOXL 보유 수익반납 축소",
-   "ref": "4-1·7-5",
-   "on": ["SOXL"],
-   "note": "최고수익 대비 50% 반납→축소(판다). 30%는 경고(행동 없음)이라 뺌. 비율 '?'.",
-   "then": [
-    {
-     "when": {"ge": [{"sub": [{"pos": "maxret"}, {"pos": "ret"}]}, {"mul": [{"pos": "maxret"}, 0.5]}]},
-     "do": "판다",
-     "qty": {"of": "held", "x": "?"}
-    }
-   ]
-  },
-  {
-   "label": "SOXL 보유 대표주 약화 축소",
-   "ref": "4-1·6-5",
-   "on": ["SOXL"],
-   "note": "엔비디아 외 4종(AMD·브로드컴·마이크론·장비주) 중 3↑ 하락→축소(판다). 비율 '?'.",
-   "then": [
-    {
-     "when": {
-      "ge": [
-       {
-        "across": {
-         "syms": ["AMD", "AVGO", "MU", "LRCX"],
-         "cond": {"lt": [{"px": "close", "sym": "$s"}, {"lag": [{"px": "close", "sym": "$s"}, 1]}]}
-        }
-       },
-       3
-      ]
-     },
-     "do": "판다",
-     "qty": {"of": "held", "x": "?"}
-    }
-   ]
-  },
-  {
-   "label": "SOXL 방향 3줄 (대표주)",
-   "ref": "4-2·7-3",
-   "on": ["SOXL"],
-   "note": "3줄 중 2 미만이면 줄여 산다→안 산다(보수, 원칙2). 엔비디아 시초가 위, AMD 전일저점 지킴, 브로드컴 수동. '엔비디아 포함 2개'는 note. 7-3 갭상승도 같은 대표주.",
    "then": [
     {
      "when": {
       "not": {
-       "atleast": 2,
-       "of": [
-        {"gt": [{"px": "close", "sym": "NVDA", "tf": "1m"}, {"px": "open", "sym": "NVDA", "tf": "1d"}]},
-        {"ge": [{"px": "low", "sym": "AMD", "tf": "1m"}, {"lag": [{"px": "low", "sym": "AMD"}, 1]}]},
-        {"manual": "브로드컴이 전고점 근처에서 밀리지 않는가 (연산 없음: 전고점 근처·밀림)"}
+       "all": [
+        {"gt": [{"px": "close", "sym": "NVDA"}, {"px": "open", "sym": "NVDA"}]},
+        {
+         "atleast": 2,
+         "of": [
+          {"gt": [{"px": "close", "sym": "NVDA"}, {"px": "open", "sym": "NVDA"}], "label": "엔비디아 시초가 위"},
+          {
+           "ge": [{"px": "low", "sym": "AMD"}, {"lag": [{"px": "low", "sym": "AMD"}, 1]}],
+           "label": "AMD 전일 저점 지킴"
+          },
+          {
+           "ge": [
+            {
+             "mul": [
+              {
+               "sub": [
+                {
+                 "div": [{"px": "close", "sym": "AVGO"}, {"highest": [{"lag": [{"px": "close", "sym": "AVGO"}, 1]}, "?"]}]
+                },
+                1
+               ]
+              },
+              100
+             ]
+            },
+            "?"
+           ],
+           "label": "브로드컴 전고점 근처 유지"
+          }
+         ]
+        }
        ]
       }
      },
@@ -706,45 +1028,19 @@
    ]
   },
   {
-   "label": "SOXL 5일 과다상승",
-   "ref": "4-5",
+   "label": "SOXL 급등 후 2거래일 눌림",
+   "ref": "2-3",
+   "note": "사례 규칙. 2거래일 눌림 뒤(급등 후 2~3거래일째) 반도체 지수가 전일 저점 지키고 상승하면 산다",
    "on": ["SOXL"],
-   "note": "SOXL 최근 5일 상승률 15%↑→안 산다. '최근 5일 과다상승'과 같은 측정 다른 숫자(원칙5).",
-   "then": [{"when": {"ge": [{"pct": [{"px": "close"}, 5]}, 15]}, "do": "안 산다"}]
-  },
-  {
-   "label": "SOXL 장마감 고점이탈",
-   "ref": "4-5",
-   "on": ["SOXL"],
-   "note": "이름 조건 — 저자 '조심'(측정)만. 당일 고점 대비 종가 4%↑ 밀림.",
-   "value": {"ge": [{"div": [{"sub": [{"px": "high"}, {"px": "close"}]}, {"px": "high"}]}, 0.04]}
-  },
-  {
-   "label": "UPRO 상승장 초입 (20·60일선+섹터)",
-   "ref": "5-1·5-2",
-   "on": ["UPRO"],
-   "note": "초입(산다): 20일선 위 2일연속 + 60일선 위 + 섹터 5중 3 플러스. 5-1·5-2 같은 결정 모음. '하루 변동 금액'은 계좌 기준이라 뺌. $index.",
    "then": [
+    {"when": {"rule": "SOXL 급등일"}, "do": "안 산다"},
     {
      "when": {
       "all": [
-       {
-        "gt": [{"px": "close", "sym": "$index"}, {"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}]
-       },
-       {
-        "ge": [
-         {
-          "streak": {
-           "gt": [{"px": "close", "sym": "$index"}, {"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}]
-          }
-         },
-         2
-        ]
-       },
-       {
-        "gt": [{"px": "close", "sym": "$index"}, {"div": [{"sum": [{"px": "close", "sym": "$index"}, 60]}, 60]}]
-       },
-       {"rule": "섹터 폭 넓음 (5중 3)"}
+       {"ge": [{"barssince": {"rule": "SOXL 급등일"}}, 2]},
+       {"le": [{"barssince": {"rule": "SOXL 급등일"}}, 3]},
+       {"ge": [{"px": "low", "sym": "$index"}, {"lag": [{"px": "low", "sym": "$index"}, 1]}]},
+       {"gt": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]}
       ]
      },
      "do": "산다"
@@ -752,160 +1048,30 @@
    ]
   },
   {
-   "label": "섹터 폭 넓음 (5중 3)",
-   "ref": "5-1·5-2",
-   "on": ["UPRO"],
-   "note": "이름 조건 — 섹터 ETF 5종(XLK·XLF·XLI·XLV·XLP) 중 당일 상승 3↑.",
-   "value": {
-    "ge": [
-     {
-      "across": {
-       "syms": ["XLK", "XLF", "XLI", "XLV", "XLP"],
-       "cond": {"gt": [{"px": "close", "sym": "$s"}, {"lag": [{"px": "close", "sym": "$s"}, 1]}]}
-      }
-     },
-     3
-    ]
-   }
-  },
-  {
-   "label": "UPRO 침체 축소",
-   "ref": "5-3",
-   "on": ["UPRO"],
-   "note": "금융·산업재 5일 연속 약세→30% 축소(판다). 방어주 버팀은 묶음. 남기석 사례·60일선 추가축소는 note.",
-   "then": [
-    {
-     "when": {
-      "ge": [
-       {
-        "streak": {
-         "all": [
-          {"lt": [{"px": "close", "sym": "XLF"}, {"lag": [{"px": "close", "sym": "XLF"}, 1]}]},
-          {"lt": [{"px": "close", "sym": "XLI"}, {"lag": [{"px": "close", "sym": "XLI"}, 1]}]}
-         ]
-        }
-       },
-       5
-      ]
-     },
-     "do": "판다",
-     "qty": {"of": "held", "x": 0.3}
-    }
-   ]
-  },
-  {
-   "label": "UPRO 유리 순환매",
-   "ref": "5-4",
-   "on": ["UPRO"],
-   "note": "섹터 5중 20일선 위 4개 + S&P500 20일선 위→산다. 2개 이하→안 산다. '나스닥 약세 안 번짐'은 식 불가라 뺌. $index.",
-   "then": [
-    {
-     "when": {
-      "all": [
-       {
-        "gt": [{"px": "close", "sym": "$index"}, {"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}]
-       },
-       {
-        "ge": [
-         {
-          "across": {
-           "syms": ["XLK", "XLF", "XLI", "XLV", "XLP"],
-           "cond": {"gt": [{"px": "close", "sym": "$s"}, {"div": [{"sum": [{"px": "close", "sym": "$s"}, 20]}, 20]}]}
-          }
-         },
-         4
-        ]
-       }
-      ]
-     },
-     "do": "산다"
-    },
-    {
-     "when": {
-      "le": [
-       {
-        "across": {
-         "syms": ["XLK", "XLF", "XLI", "XLV", "XLP"],
-         "cond": {"gt": [{"px": "close", "sym": "$s"}, {"div": [{"sum": [{"px": "close", "sym": "$s"}, 20]}, 20]}]}
-        }
-       },
-       2
-      ]
-     },
-     "do": "안 산다"
-    }
-   ]
-  },
-  {
-   "label": "레버리지 부담 UPRO 전환",
-   "ref": "5-5",
-   "on": ["TQQQ", "SOXL"],
-   "note": "TQQQ·SOXL 보유 중 전환(매도로 봄). 수익 10%+VIX+10% 또는 윗꼬리→30%, 수익 15%+주도주 2개 약화→50%. UPRO 매수는 계좌간 이동이라 매도만.",
-   "then": [
-    {
-     "when": {"all": [{"ge": [{"pos": "ret"}, 0.15]}, {"rule": "반도체 주도주 2개 전일저점 이탈"}]},
-     "do": "판다",
-     "qty": {"of": "held", "x": 0.5}
-    },
-    {
-     "when": {
-      "all": [
-       {"ge": [{"pos": "ret"}, 0.1]},
-       {
-        "any": [{"ge": [{"pct": [{"px": "close", "sym": "^VIX"}, 1]}, 10]}, {"manual": "전고점 근처 윗꼬리 (연산 없음)"}]
-       }
-      ]
-     },
-     "do": "판다",
-     "qty": {"of": "held", "x": 0.3}
-    }
-   ]
-  },
-  {
-   "label": "포트폴리오 모드 (비중 배분)",
-   "ref": "6-1·6-2",
-   "skip": "연산 없음: 공격/균형/방어 3모드 금액 배분(TQQQ·SOXL·UPRO·현금)은 계좌 전체 기준 — 상품 하나로 계산 못 함"
-  },
-  {
-   "label": "현금 비중 기준",
-   "ref": "6-3·9-4",
-   "skip": "연산 없음: 현금 비중 30%/20%/40%는 계좌 전체 기준 — 상품 하나로 계산 못 함"
-  },
-  {
-   "label": "원금 손실 허용선 축소",
-   "ref": "6-4·7-6·9-1",
-   "skip": "연산 없음: 원금 대비 -5%·-8%·-12% 계좌 전체 손실 기준 — 상품 하나로 계산 못 함"
-  },
-  {
-   "label": "SOXL 종목 손절",
-   "ref": "6-4·7-6",
+   "label": "SOXL 급등 후 3거래일 익절 신호",
+   "ref": "4-3",
+   "note": "익절 = 판다, 비율은 같은 소절의 구간 익절(익절 구간 규칙)과 별개로 미명시 → held '?'. 1.7배(장중)·1.5배(장 마감) 중 이 소절 본문 1.7",
    "on": ["SOXL"],
-   "note": "수익률 -7%↓ 또는 구조이탈(대표주 2개 저점이탈)→절반 축소. 6-4 -7%·문성재 6% 중 -7% 채택.",
-   "then": [
-    {"when": {"le": [{"pos": "ret"}, -0.07]}, "do": "판다", "qty": {"of": "held", "x": 0.5}},
-    {"when": {"rule": "반도체 주도주 2개 전일저점 이탈"}, "do": "판다", "qty": {"of": "held", "x": 0.5}}
-   ]
-  },
-  {
-   "label": "TQQQ 종목 손절(구조)",
-   "ref": "6-5·7-6",
-   "on": ["TQQQ"],
-   "note": "나스닥100 20일선 아래 2일 연속→축소(판다). 6-4 '-7% 재판단'은 '판다' 말 없어 안 옮김(§6). 비율 '?'. $index.",
    "then": [
     {
      "when": {
       "all": [
+       {"le": [{"barssince": {"rule": "SOXL 급등일"}}, 3]},
        {
-        "lt": [{"px": "close", "sym": "$index"}, {"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}]
-       },
-       {
-        "ge": [
+        "any": [
+         {"ge": [{"rule": "상품 윗꼬리 길이"}, "?"]},
          {
-          "streak": {
-           "lt": [{"px": "close", "sym": "$index"}, {"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}]
-          }
+          "all": [
+           {
+            "ge": [{"div": [{"px": "volume", "sym": "$self"}, {"lag": [{"px": "volume", "sym": "$self"}, 1]}]}, 1.7]
+           },
+           {"lt": [{"px": "close", "sym": "$self"}, {"lag": [{"px": "close", "sym": "$self"}, 1]}]}
+          ],
+          "label": "거래량 전일 1.7배 이상 + 종가 하락"
          },
-         2
+         {"rule": "반도체 대표주 2개 이상 전일 저점 이탈"},
+         {"manual": "데이터 없음: 좋은 뉴스에도 가격이 더 못 감", "label": "호재에도 못 가는 가격"},
+         {"manual": "데이터 없음: 본인 감정 과열", "label": "본인 감정 과열"}
         ]
        }
       ]
@@ -916,27 +1082,59 @@
    ]
   },
   {
-   "label": "UPRO 종목 손절",
-   "ref": "6-4·6-5",
-   "on": ["UPRO"],
-   "note": "S&P500 20일선 이탈 또는 금융·산업재·소비재 동시 약세→축소(판다). 비율 '?'. $index.",
+   "label": "SOXL 대표주 약화",
+   "ref": "4-1·6-5",
+   "note": "약해짐 = 전일 대비 하락. 축소 비율 미명시 → held '?'",
+   "on": ["SOXL"],
    "then": [
     {
      "when": {
       "any": [
        {
-        "lt": [{"px": "close", "sym": "$index"}, {"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}]
-       },
-       {
-        "ge": [
+        "atleast": 3,
+        "of": [
+         {"lt": [{"px": "close", "sym": "AMD"}, {"lag": [{"px": "close", "sym": "AMD"}, 1]}]},
+         {"lt": [{"px": "close", "sym": "AVGO"}, {"lag": [{"px": "close", "sym": "AVGO"}, 1]}]},
+         {"lt": [{"px": "close", "sym": "MU"}, {"lag": [{"px": "close", "sym": "MU"}, 1]}]},
          {
-          "across": {
-           "syms": ["XLF", "XLI", "XLP"],
-           "cond": {"lt": [{"px": "close", "sym": "$s"}, {"lag": [{"px": "close", "sym": "$s"}, 1]}]}
-          }
-         },
-         3
+          "lt": [{"px": "close", "sym": "?"}, {"lag": [{"px": "close", "sym": "?"}, 1]}],
+          "label": "장비주 하락(티커 저자 미명시)"
+         }
         ]
+       },
+       {"rule": "엔비디아 독주"}
+      ]
+     },
+     "do": "판다",
+     "qty": {"of": "held", "x": "?"}
+    }
+   ]
+  },
+  {
+   "label": "SOXL 5~10거래일 20% 수익",
+   "ref": "4-1",
+   "note": "원문 '일부 익절을 고민' — 익절(판다) 말이 있어 판다, 비율 미명시 '?'. 기간은 상한 10",
+   "on": ["SOXL"],
+   "then": [
+    {
+     "when": {"all": [{"le": [{"pos": "days"}, 10]}, {"ge": [{"pos": "ret"}, 20]}]},
+     "do": "판다",
+     "qty": {"of": "held", "x": "?"}
+    }
+   ]
+  },
+  {
+   "label": "SOXL 5일선 단타 이탈",
+   "ref": "4-4",
+   "note": "'인정한다' = 손절로 읽어 판다, 비율 미명시. 단타 여부는 매매마다 사람이 정함(수동)",
+   "on": ["SOXL"],
+   "then": [
+    {
+     "when": {
+      "all": [
+       {"manual": "데이터 없음: 이번 매매가 5일선 단타로 들어간 것인지", "label": "5일선 단타 매매"},
+       {
+        "lt": [{"px": "close", "sym": "$self"}, {"div": [{"sum": [{"px": "close", "sym": "$self"}, 5]}, 5]}]
        }
       ]
      },
@@ -946,123 +1144,1205 @@
    ]
   },
   {
-   "label": "거래량 위치 (고점출구)",
-   "ref": "7-4",
-   "note": "이름 조건 — 저자 측정('매도자가 이긴 날')만. 거래량 전일 1.5배↑ + 종가 밀림.",
-   "value": {
-    "all": [
-     {"ge": [{"div": [{"px": "volume"}, {"lag": [{"px": "volume"}, 1]}]}, 1.5]},
-     {"lt": [{"px": "close"}, {"lag": [{"px": "close"}, 1]}]}
-    ]
-   }
+   "label": "SOXL 20일선 스윙 금액",
+   "ref": "4-4",
+   "on": ["SOXL"],
+   "skip": "데이터 없음: 매매 유형(20일선 스윙) 선택은 사람이 정함 — 시세 조건 없음"
   },
   {
-   "label": "익절 1차 구간 (TQQQ·UPRO)",
-   "ref": "7-5",
-   "on": ["TQQQ", "UPRO"],
-   "note": "1차 7~10%에서 30%, 2차 15~20%에서 30%. 구간 하한 발동. SOXL은 별 규칙.",
+   "label": "TQQQ 급등 4일째·전고점 윗꼬리 반복",
+   "ref": "3-1",
+   "note": "'3문장 중 2개'는 모든 조합이 '20일선 아래 위치'·'윗꼬리 반복' 단독 발동에 포함돼 접음. 급등 4일째 = 확정 일봉 3일 연속 상승 뒤(하한 4). 반복 = 최근 N일(미명시) 긴 윗꼬리 2번 이상",
+   "on": ["TQQQ"],
    "then": [
-    {
-     "when": {"all": [{"ge": [{"pos": "ret"}, 0.07]}, {"le": [{"pos": "ret"}, 0.1]}]},
-     "do": "판다",
-     "qty": {"of": "held", "x": 0.3}
-    },
-    {
-     "when": {"all": [{"ge": [{"pos": "ret"}, 0.15]}, {"le": [{"pos": "ret"}, 0.2]}]},
-     "do": "판다",
-     "qty": {"of": "held", "x": 0.3}
-    }
-   ]
-  },
-  {
-   "label": "최고수익 반납 익절",
-   "ref": "7-5·6-4",
-   "note": "최고수익 대비 30% 반납→일부 익절(판다). (maxret-ret)/maxret ≥0.3. 상품 공통(SOXL 50% 별도). 비율 '?'. 조성훈 40%·6-4 40% note.",
-   "then": [
-    {
-     "when": {"ge": [{"sub": [{"pos": "maxret"}, {"pos": "ret"}]}, {"mul": [{"pos": "maxret"}, 0.3]}]},
-     "do": "판다",
-     "qty": {"of": "held", "x": "?"}
-    }
-   ]
-  },
-  {
-   "label": "구조 손절 부분축소 (가격)",
-   "ref": "7-6",
-   "note": "종목 수익률 -5%↓→30% 부분축소(판다). 7-6 가격기준 첫 단계. -7%/-10%·구조이탈 50%는 상품별 손절과 겹쳐 note.",
-   "then": [{"when": {"le": [{"pos": "ret"}, -0.05]}, "do": "판다", "qty": {"of": "held", "x": 0.3}}]
-  },
-  {
-   "label": "환율 위치 (매수 축소)",
-   "ref": "8-1·8-5",
-   "note": "이름 조건 — 환율이 20일 평균보다 '크게 위'('?'). 8-5 '예시 20원'은 예시라 안 박음. 매수 축소는 크기말이라 do 안 둠. KRW=X.",
-   "value": {
-    "ge": [
-     {
-      "div": [{"px": "close", "sym": "KRW=X"}, {"div": [{"sum": [{"px": "close", "sym": "KRW=X"}, 20]}, 20]}]
-     },
-     "?"
-    ]
-   }
-  },
-  {
-   "label": "원화/달러 수익 분리",
-   "ref": "8-2",
-   "skip": "연산 없음: 원화 수익 vs 달러 수익 분리는 내 평균 환전환율 등 계좌 이력 필요 — 상품 하나로 계산 못 함"
-  },
-  {"label": "양도세 유보", "ref": "8-3", "skip": "연산 없음: 월별 실현손익·세금 몫 분리는 계좌 매매 이력 기준 — 상품 하나로 계산 못 함"},
-  {
-   "label": "V자 반등 (3일 확인)",
-   "ref": "9-3",
-   "note": "이름 조건 — V자 확인(3일). 첫날 급등(수동), 둘째날 저점지지, 셋째날 전일고점 재도전. 저자 '본다'(확인)라 이름조건.",
-   "value": {
-    "all": [
-     {"manual": "첫날 급등 (저자 미명시: 급등 기준)"},
-     {"ge": [{"px": "low"}, {"lag": [{"px": "low"}, 1]}]},
-     {"gt": [{"px": "close"}, {"lag": [{"px": "high"}, 1]}]}
-    ]
-   }
-  },
-  {
-   "label": "폭락후 재진입 (3단계)",
-   "ref": "9-5",
-   "note": "3줄 다 맞으면 비중 확대(산다), 2개 미만이면 큰돈 금지(안 산다). '하나면 소액'=관망. SOXL 추가조건 note. 3재료 이름조건 참조.",
-   "then": [
-    {
-     "when": {"all": [{"rule": "VIX 전일보다 꺾임"}, {"rule": "지수 20일선 회복"}, {"rule": "재진입 눌림 지지"}]},
-     "do": "산다"
-    },
     {
      "when": {
-      "not": {"atleast": 2, "of": [{"rule": "VIX 전일보다 꺾임"}, {"rule": "지수 20일선 회복"}, {"rule": "재진입 눌림 지지"}]}
+      "any": [
+       {
+        "ge": [
+         {
+          "barssince": {"not": {"gt": [{"px": "close", "sym": "$self"}, {"lag": [{"px": "close", "sym": "$self"}, 1]}]}}
+         },
+         3
+        ],
+        "label": "3일 연속 상승 뒤(급등 4일째)"
+       },
+       {
+        "all": [
+         {"rule": "전고점 근처 위치"},
+         {"ge": [{"sum": [{"case": [[{"ge": [{"rule": "상품 윗꼬리 길이"}, "?"]}, 1]], "else": 0}, "?"]}, 2]}
+        ],
+        "label": "전고점 근처 윗꼬리 반복"
+       }
+      ]
      },
      "do": "안 산다"
     }
    ]
   },
   {
-   "label": "지수 20일선 회복",
-   "ref": "9-5·9-2",
-   "note": "이름 조건 — 기준지수 종가 20일선 위. 재진입·방어 공유. $index.",
+   "label": "TQQQ 20일선 회복·돌파 버팀·눌림 반등",
+   "ref": "3-1",
+   "note": "셋 중 하나면 산다('작게 1차'는 크기 말 — qty 없음). 20일선은 지수 기준(3-2와 같은 측정). 강한 상승·근처·거래량 과다 기준 미명시 '?'",
+   "on": ["TQQQ"],
+   "then": [
+    {
+     "when": {
+      "any": [
+       {
+        "all": [
+         {"rule": "지수 20일선 위"},
+         {
+          "le": [
+           {"lag": [{"px": "close", "sym": "$index"}, 1]},
+           {"lag": [{"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}, 1]}
+          ]
+         }
+        ],
+        "label": "하락 후 20일선 종가 회복"
+       },
+       {"rule": "지수 돌파 후 2거래일 버팀"},
+       {
+        "all": [
+         {
+          "ge": [
+           {
+            "highest": [
+             {
+              "mul": [
+               {
+                "sub": [{"div": [{"px": "close", "sym": "$self"}, {"lag": [{"px": "close", "sym": "$self"}, 5]}]}, 1]
+               },
+               100
+              ]
+             },
+             "?"
+            ]
+           },
+           "?"
+          ]
+         },
+         {
+          "ge": [
+           {
+            "lag": [
+             {
+              "barssince": {"not": {"lt": [{"px": "close", "sym": "$self"}, {"lag": [{"px": "close", "sym": "$self"}, 1]}]}}
+             },
+             1
+            ]
+           },
+           2
+          ]
+         },
+         {
+          "le": [
+           {
+            "lag": [
+             {
+              "barssince": {"not": {"lt": [{"px": "close", "sym": "$self"}, {"lag": [{"px": "close", "sym": "$self"}, 1]}]}}
+             },
+             1
+            ]
+           },
+           4
+          ]
+         },
+         {"gt": [{"px": "close", "sym": "$self"}, {"lag": [{"px": "close", "sym": "$self"}, 1]}]},
+         {
+          "any": [
+           {
+            "le": [
+             {
+              "abs": {
+               "mul": [
+                {
+                 "sub": [
+                  {
+                   "div": [{"px": "close", "sym": "$self"}, {"div": [{"sum": [{"px": "close", "sym": "$self"}, 5]}, 5]}]
+                  },
+                  1
+                 ]
+                },
+                100
+               ]
+              }
+             },
+             "?"
+            ]
+           },
+           {
+            "le": [
+             {
+              "abs": {
+               "mul": [
+                {
+                 "sub": [
+                  {
+                   "div": [{"px": "close", "sym": "$self"}, {"div": [{"sum": [{"px": "close", "sym": "$self"}, 10]}, 10]}]
+                  },
+                  1
+                 ]
+                },
+                100
+               ]
+              }
+             },
+             "?"
+            ]
+           }
+          ]
+         },
+         {
+          "not": {
+           "ge": [
+            {
+             "highest": [
+              {
+               "case": [
+                [
+                 {"lt": [{"px": "close", "sym": "$self"}, {"lag": [{"px": "close", "sym": "$self"}, 1]}]},
+                 {
+                  "div": [{"px": "volume", "sym": "$self"}, {"div": [{"sum": [{"px": "volume", "sym": "$self"}, "?"]}, "?"]}]
+                 }
+                ]
+               ],
+               "else": 0
+              },
+              4
+             ]
+            },
+            "?"
+           ]
+          }
+         }
+        ],
+        "label": "강한 상승 뒤 2~4일 눌림 끝 5·10일선 근처 반등"
+       }
+      ]
+     },
+     "do": "산다"
+    }
+   ]
+  },
+  {
+   "label": "TQQQ 전고점 돌파 단계 비중",
+   "ref": "3-3",
+   "note": "TQQQ 장의 사다리(배분 예 25·25·50, 이 상품 배정 금액 기준). 돌파 전 = 지수 20일선 위·전고점 아래. 3-4의 25·30·45 분할과는 숫자가 다른 별개 사다리",
+   "on": ["TQQQ"],
+   "then": [
+    {
+     "when": {"all": [{"rule": "지수 20일선 위"}, {"not": {"rule": "지수 전고점 돌파"}}]},
+     "do": "산다",
+     "qty": {"of": "budget", "x": 0.25}
+    },
+    {"when": {"rule": "지수 전고점 돌파"}, "do": "산다", "qty": {"of": "budget", "x": 0.25}},
+    {"when": {"rule": "지수 돌파 후 2거래일 버팀"}, "do": "산다", "qty": {"of": "budget", "x": 0.5}}
+   ]
+  },
+  {
+   "label": "TQQQ 3단계 분할",
+   "ref": "3-4·6-5",
+   "note": "1차는 조건 없는 1차 분할(등급이 정함). '기준'은 매매마다 적는 첫 매수 이유라 수동. '1차 후 기준 깨지면 추가 금지'는 2차 조건(기준 유지)에 들어 있음",
+   "on": ["TQQQ"],
+   "then": [
+    {"do": "산다", "qty": {"of": "budget", "x": 0.25}},
+    {
+     "when": {
+      "all": [
+       {"ge": [{"pos": "filled", "rule": "TQQQ 3단계 분할"}, 1]},
+       {"manual": "데이터 없음: 1차 매수 기준(첫 매수 이유) 유지", "label": "1차 기준 유지"}
+      ]
+     },
+     "do": "산다",
+     "qty": {"of": "budget", "x": 0.3}
+    },
+    {
+     "when": {
+      "all": [
+       {"ge": [{"pos": "filled", "rule": "TQQQ 3단계 분할"}, 2]},
+       {"manual": "데이터 없음: 시장이 두 번 이상 확인해 줌", "label": "시장 두 번 이상 확인"}
+      ]
+     },
+     "do": "산다",
+     "qty": {"of": "budget", "x": 0.45}
+    }
+   ]
+  },
+  {
+   "label": "TQQQ 분할 차수 뒤 저점 이탈·수익",
+   "ref": "3-4",
+   "note": "전일 저점 이탈 = 종가 < 전일 저가. 비율 미명시 → held '?'",
+   "on": ["TQQQ"],
+   "then": [
+    {
+     "when": {
+      "all": [
+       {"ge": [{"pos": "filled", "rule": "TQQQ 3단계 분할"}, 2]},
+       {"lt": [{"px": "close", "sym": "$self"}, {"lag": [{"px": "low", "sym": "$self"}, 1]}]}
+      ]
+     },
+     "do": "판다",
+     "qty": {"of": "held", "x": "?"}
+    },
+    {
+     "when": {"all": [{"ge": [{"pos": "filled", "rule": "TQQQ 3단계 분할"}, 3]}, {"gt": [{"pos": "ret"}, 0]}]},
+     "do": "판다",
+     "qty": {"of": "held", "x": "?"}
+    }
+   ]
+  },
+  {
+   "label": "TQQQ 실적 시즌 노출",
+   "ref": "3-5",
+   "note": "'5거래일 이상 오른' = 지수 연속 상승 5일 이상으로 읽음. 주도주 갈라짐 = 빅테크 3개 이상 플러스 아님. 수익 10%↑ 축소 '30~50%' → 하한 0.3(절반 익절 '고민'은 note)",
+   "on": ["TQQQ"],
+   "then": [
+    {
+     "when": {
+      "all": [
+       {"manual": "데이터 없음: 빅테크 실적 발표 전 기간(발표일 캘린더)", "label": "실적 발표 전"},
+       {
+        "any": [
+         {
+          "ge": [
+           {
+            "barssince": {"not": {"gt": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]}}
+           },
+           5
+          ],
+          "label": "나스닥100 5거래일 이상 상승"
+         },
+         {"rule": "VIX 상승"},
+         {"not": {"rule": "빅테크 3개 이상 플러스"}, "label": "주도주 갈라짐"}
+        ]
+       }
+      ]
+     },
+     "do": "판다",
+     "qty": {"of": "held", "x": "?"}
+    },
+    {
+     "when": {
+      "all": [{"manual": "데이터 없음: 빅테크 실적 발표 전 기간(발표일 캘린더)", "label": "실적 발표 전"}, {"ge": [{"pos": "ret"}, 10]}]
+     },
+     "do": "판다",
+     "qty": {"of": "held", "x": 0.3}
+    },
+    {
+     "when": {
+      "all": [{"manual": "데이터 없음: 빅테크 실적 발표 전 기간(발표일 캘린더)", "label": "실적 발표 전"}, {"lt": [{"pos": "ret"}, 0]}]
+     },
+     "do": "안 산다"
+    }
+   ]
+  },
+  {"label": "실적 기대 미달(재료 소멸)", "ref": "3-5", "on": ["TQQQ"], "skip": "데이터 없음: 실적 기대치(컨센서스) 대비 실적"},
+  {
+   "label": "수익 반납률",
+   "ref": "4-1·7-5",
+   "note": "반납률 = (최고 수익률 − 현재 수익률) ÷ 최고 수익률 × 100(최고 수익 > 0일 때). TQQQ·UPRO는 30%, SOXL은 50%에서 축소(비율 미명시 '?'). 조성훈 사례 40% → 남은 물량 절반(공통)",
+   "value": {"mul": [{"div": [{"sub": [{"pos": "maxret"}, {"pos": "ret"}]}, {"pos": "maxret"}]}, 100]},
+   "then": [
+    {
+     "when": {"all": [{"gt": [{"pos": "maxret"}, 0]}, {"ge": ["$value", 40]}]},
+     "do": "판다",
+     "qty": {"of": "held", "x": 0.5}
+    },
+    {
+     "when": {
+      "all": [{"gt": [{"pos": "maxret"}, 0]}, {"ge": ["$value", 30]}, {"ge": ["$value", 50], "on": ["SOXL"]}]
+     },
+     "do": "판다",
+     "qty": {"of": "held", "x": "?"}
+    }
+   ]
+  },
+  {
+   "label": "익절 구간",
+   "ref": "4-3·7-5",
+   "note": "구간은 하한(7·10·15). 산 물량의 30%씩 — 잔량 40%는 '잔량 추세 유지' 이름 조건. SOXL 1차는 10%(델타 노드)",
+   "then": [
+    {
+     "when": {"all": [{"ge": [{"pos": "ret"}, 7]}, {"ge": [{"pos": "ret"}, 10], "on": ["SOXL"]}]},
+     "do": "판다",
+     "qty": {"of": "bought", "x": 0.3}
+    },
+    {"when": {"ge": [{"pos": "ret"}, 15]}, "do": "판다", "qty": {"of": "bought", "x": 0.3}}
+   ]
+  },
+  {
+   "label": "금융·산업재 5거래일 약세",
+   "ref": "5-3",
+   "note": "XLF·XLI 5일 변화율 < 0",
    "value": {
-    "gt": [{"px": "close", "sym": "$index"}, {"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}]
+    "all": [
+     {
+      "lt": [
+       {
+        "mul": [
+         {"sub": [{"div": [{"px": "close", "sym": "XLF"}, {"lag": [{"px": "close", "sym": "XLF"}, 5]}]}, 1]},
+         100
+        ]
+       },
+       0
+      ]
+     },
+     {
+      "lt": [
+       {
+        "mul": [
+         {"sub": [{"div": [{"px": "close", "sym": "XLI"}, {"lag": [{"px": "close", "sym": "XLI"}, 5]}]}, 1]},
+         100
+        ]
+       },
+       0
+      ]
+     }
+    ]
    }
   },
   {
-   "label": "재진입 눌림 지지",
+   "label": "방어주만 버팀",
+   "ref": "5-3",
+   "note": "XLP·XLV·XLU 5일 변화율 ≥ 0 인 개수 — 몇 개인지 저자 미명시 '?'",
+   "value": {
+    "atleast": "?",
+    "of": [
+     {
+      "ge": [
+       {
+        "mul": [
+         {"sub": [{"div": [{"px": "close", "sym": "XLP"}, {"lag": [{"px": "close", "sym": "XLP"}, 5]}]}, 1]},
+         100
+        ]
+       },
+       0
+      ]
+     },
+     {
+      "ge": [
+       {
+        "mul": [
+         {"sub": [{"div": [{"px": "close", "sym": "XLV"}, {"lag": [{"px": "close", "sym": "XLV"}, 5]}]}, 1]},
+         100
+        ]
+       },
+       0
+      ]
+     },
+     {
+      "ge": [
+       {
+        "mul": [
+         {"sub": [{"div": [{"px": "close", "sym": "XLU"}, {"lag": [{"px": "close", "sym": "XLU"}, 5]}]}, 1]},
+         100
+        ]
+       },
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "label": "금융·산업재 동시 하락",
+   "ref": "5-3·6-5",
+   "note": "같은 날 XLF·XLI 전일 대비 하락",
+   "value": {
+    "all": [
+     {"lt": [{"px": "close", "sym": "XLF"}, {"lag": [{"px": "close", "sym": "XLF"}, 1]}]},
+     {"lt": [{"px": "close", "sym": "XLI"}, {"lag": [{"px": "close", "sym": "XLI"}, 1]}]}
+    ]
+   }
+  },
+  {
+   "label": "UPRO 경기침체 신호",
+   "ref": "5-3",
+   "note": "'60일선 위협' = 지수의 60일선 이격 ≤ ?(폭 미명시). 기타 신호의 축소 비율 미명시 '?'",
+   "on": ["UPRO"],
+   "then": [
+    {
+     "when": {"all": [{"rule": "금융·산업재 5거래일 약세"}, {"rule": "방어주만 버팀"}]},
+     "do": "판다",
+     "qty": {"of": "held", "x": 0.3}
+    },
+    {
+     "when": {"all": [{"not": {"rule": "지수 20일선 위"}}, {"rule": "금융·산업재 동시 하락"}]},
+     "do": "판다",
+     "qty": {"of": "held", "x": 0.3}
+    },
+    {
+     "when": {
+      "all": [
+       {"not": {"rule": "지수 20일선 위"}},
+       {"rule": "금융·산업재 동시 하락"},
+       {
+        "le": [
+         {
+          "mul": [
+           {
+            "sub": [
+             {
+              "div": [{"px": "close", "sym": "$index"}, {"div": [{"sum": [{"px": "close", "sym": "$index"}, 60]}, 60]}]
+             },
+             1
+            ]
+           },
+           100
+          ]
+         },
+         "?"
+        ],
+        "label": "60일선 위협"
+       }
+      ]
+     },
+     "do": "판다",
+     "qty": {"of": "held", "x": 0.3}
+    },
+    {
+     "when": {
+      "any": [
+       {"manual": "데이터 없음: 실적 전망 하향이 업종 전체로 확산", "label": "실적 전망 하향 확산"},
+       {
+        "all": [
+         {"lt": [{"px": "close", "sym": "^TNX"}, {"lag": [{"px": "close", "sym": "^TNX"}, 1]}]},
+         {"not": {"gt": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]}}
+        ],
+        "label": "나쁜 금리 하락"
+       },
+       {
+        "all": [
+         {"not": {"rule": "지수 20일선 위"}},
+         {"gt": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]}
+        ],
+        "label": "20일선 깬 뒤 반등해도 회복 못 함"
+       }
+      ]
+     },
+     "do": "판다",
+     "qty": {"of": "held", "x": "?"}
+    }
+   ]
+  },
+  {
+   "label": "UPRO 순환매 구간",
+   "ref": "5-4",
+   "note": "UPRO 유리 구간 → 산다. '안 번짐' = S&P500 전일 대비 변화율 > 나스닥100. VIX 튐 = 전일 대비 10%↑(2-4)",
+   "on": ["UPRO"],
+   "then": [
+    {
+     "when": {
+      "all": [
+       {"rule": "지수 20일선 위"},
+       {"rule": "섹터 5개 중 3개 이상 플러스"},
+       {
+        "gt": [
+         {
+          "mul": [
+           {
+            "sub": [{"div": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]}, 1]
+           },
+           100
+          ]
+         },
+         {
+          "mul": [
+           {
+            "sub": [{"div": [{"px": "close", "sym": "^NDX"}, {"lag": [{"px": "close", "sym": "^NDX"}, 1]}]}, 1]
+           },
+           100
+          ]
+         }
+        ],
+        "label": "나스닥 약세가 S&P500으로 안 번짐"
+       },
+       {"not": {"all": [{"ge": [{"rule": "VIX 전일 대비"}, 10]}, {"rule": "달러 강세"}]}}
+      ]
+     },
+     "do": "산다"
+    }
+   ]
+  },
+  {
+   "label": "섹터 20일선 위 개수",
+   "ref": "5-4",
+   "note": "'비중을 높이고' → 산다(qty 없음) · '현금을 늘렸다' → 판다(비율 미명시 '?'). 2개 이하 = 3개 미만",
+   "on": ["UPRO"],
+   "then": [
+    {
+     "when": {
+      "atleast": 4,
+      "of": [
+       {"gt": [{"px": "close", "sym": "XLK"}, {"div": [{"sum": [{"px": "close", "sym": "XLK"}, 20]}, 20]}]},
+       {"gt": [{"px": "close", "sym": "XLF"}, {"div": [{"sum": [{"px": "close", "sym": "XLF"}, 20]}, 20]}]},
+       {"gt": [{"px": "close", "sym": "XLI"}, {"div": [{"sum": [{"px": "close", "sym": "XLI"}, 20]}, 20]}]},
+       {"gt": [{"px": "close", "sym": "XLV"}, {"div": [{"sum": [{"px": "close", "sym": "XLV"}, 20]}, 20]}]},
+       {"gt": [{"px": "close", "sym": "XLY"}, {"div": [{"sum": [{"px": "close", "sym": "XLY"}, 20]}, 20]}]}
+      ]
+     },
+     "do": "산다"
+    },
+    {
+     "when": {
+      "not": {
+       "atleast": 3,
+       "of": [
+        {"gt": [{"px": "close", "sym": "XLK"}, {"div": [{"sum": [{"px": "close", "sym": "XLK"}, 20]}, 20]}]},
+        {"gt": [{"px": "close", "sym": "XLF"}, {"div": [{"sum": [{"px": "close", "sym": "XLF"}, 20]}, 20]}]},
+        {"gt": [{"px": "close", "sym": "XLI"}, {"div": [{"sum": [{"px": "close", "sym": "XLI"}, 20]}, 20]}]},
+        {"gt": [{"px": "close", "sym": "XLV"}, {"div": [{"sum": [{"px": "close", "sym": "XLV"}, 20]}, 20]}]},
+        {"gt": [{"px": "close", "sym": "XLY"}, {"div": [{"sum": [{"px": "close", "sym": "XLY"}, 20]}, 20]}]}
+       ]
+      }
+     },
+     "do": "판다",
+     "qty": {"of": "held", "x": "?"}
+    }
+   ]
+  },
+  {
+   "label": "TQQQ·SOXL 수익 중 UPRO 전환",
+   "ref": "5-5",
+   "note": "전환 = 이 상품을 판다(남은 물량 30%·50%). '50%까지'는 누적 상한일 수 있음. 주도주 약화 = 전일 대비 하락(TQQQ 빅테크·SOXL 엔비디아·AMD·브로드컴)",
+   "on": ["TQQQ", "SOXL"],
+   "then": [
+    {
+     "when": {
+      "all": [
+       {"ge": [{"pos": "ret"}, 10]},
+       {
+        "any": [
+         {"ge": [{"rule": "VIX 전일 대비"}, 10]},
+         {"all": [{"rule": "전고점 근처 위치"}, {"ge": [{"rule": "상품 윗꼬리 길이"}, "?"]}], "label": "전고점 근처 윗꼬리"}
+        ]
+       }
+      ]
+     },
+     "do": "판다",
+     "qty": {"of": "held", "x": 0.3}
+    },
+    {
+     "when": {
+      "all": [
+       {"ge": [{"pos": "ret"}, 15]},
+       {
+        "atleast": 2,
+        "of": [
+         {"lt": [{"px": "close", "sym": "NVDA"}, {"lag": [{"px": "close", "sym": "NVDA"}, 1]}]},
+         {"lt": [{"px": "close", "sym": "MSFT"}, {"lag": [{"px": "close", "sym": "MSFT"}, 1]}]},
+         {"lt": [{"px": "close", "sym": "AAPL"}, {"lag": [{"px": "close", "sym": "AAPL"}, 1]}]},
+         {"lt": [{"px": "close", "sym": "AMZN"}, {"lag": [{"px": "close", "sym": "AMZN"}, 1]}]},
+         {"lt": [{"px": "close", "sym": "META"}, {"lag": [{"px": "close", "sym": "META"}, 1]}]},
+         {"lt": [{"px": "close", "sym": "GOOGL"}, {"lag": [{"px": "close", "sym": "GOOGL"}, 1]}]},
+         {"lt": [{"px": "close", "sym": "TSLA"}, {"lag": [{"px": "close", "sym": "TSLA"}, 1]}]}
+        ],
+        "on": ["TQQQ"]
+       },
+       {
+        "atleast": 2,
+        "of": [
+         {"lt": [{"px": "close", "sym": "NVDA"}, {"lag": [{"px": "close", "sym": "NVDA"}, 1]}]},
+         {"lt": [{"px": "close", "sym": "AMD"}, {"lag": [{"px": "close", "sym": "AMD"}, 1]}]},
+         {"lt": [{"px": "close", "sym": "AVGO"}, {"lag": [{"px": "close", "sym": "AVGO"}, 1]}]}
+        ],
+        "on": ["SOXL"]
+       }
+      ]
+     },
+     "do": "판다",
+     "qty": {"of": "held", "x": 0.5}
+    }
+   ]
+  },
+  {
+   "label": "줄인 금액 일부 UPRO 매수",
+   "ref": "5-5",
+   "on": ["UPRO"],
+   "skip": "연산 없음: 다른 상품을 판 금액으로 UPRO를 사는 상품 간 자금 이동"
+  },
+  {
+   "label": "TQQQ 포트폴리오 모드 비중",
+   "ref": "6-2·6-1",
+   "note": "총 5,000만 원 기준 저자 배분을 총 투자금 %로(만원÷5000×100). 모드: VIX 튐(전일 대비 10%↑)→방어형 · 반도체 과열(SOXL 과열 4신호)→균형형 · 강함(장전 점수 4점↑ '공격 가능')→공격형 · 그 외 '?'",
+   "on": ["TQQQ"],
+   "then": [
+    {
+     "do": "산다",
+     "qty": {
+      "of": "cash",
+      "x": {
+       "case": [
+        [{"ge": [{"rule": "VIX 전일 대비"}, 10]}, {"mul": [{"div": [700, 5000]}, 100]}],
+        [{"rule": "SOXL 과열 4신호"}, {"mul": [{"div": [1300, 5000]}, 100]}],
+        [{"rule": "장전 5지표 점수"}, {"mul": [{"div": [1700, 5000]}, 100]}]
+       ],
+       "else": "?"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "label": "SOXL 포트폴리오 모드 비중",
+   "ref": "6-2·6-1",
+   "note": "총 5,000만 원 기준 저자 배분을 총 투자금 %로(만원÷5000×100). 모드: VIX 튐(전일 대비 10%↑)→방어형 · 반도체 과열(SOXL 과열 4신호)→균형형 · 강함(장전 점수 4점↑ '공격 가능')→공격형 · 그 외 '?'",
+   "on": ["SOXL"],
+   "then": [
+    {
+     "do": "산다",
+     "qty": {
+      "of": "cash",
+      "x": {
+       "case": [
+        [{"ge": [{"rule": "VIX 전일 대비"}, 10]}, {"mul": [{"div": [300, 5000]}, 100]}],
+        [{"rule": "SOXL 과열 4신호"}, {"mul": [{"div": [700, 5000]}, 100]}],
+        [{"rule": "장전 5지표 점수"}, {"mul": [{"div": [1200, 5000]}, 100]}]
+       ],
+       "else": "?"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "label": "UPRO 포트폴리오 모드 비중",
+   "ref": "6-2·6-1",
+   "note": "총 5,000만 원 기준 저자 배분을 총 투자금 %로(만원÷5000×100). 모드: VIX 튐(전일 대비 10%↑)→방어형 · 반도체 과열(SOXL 과열 4신호)→균형형 · 강함(장전 점수 4점↑ '공격 가능')→공격형 · 그 외 '?'",
+   "on": ["UPRO"],
+   "then": [
+    {
+     "do": "산다",
+     "qty": {
+      "of": "cash",
+      "x": {
+       "case": [
+        [{"ge": [{"rule": "VIX 전일 대비"}, 10]}, {"mul": [{"div": [1500, 5000]}, 100]}],
+        [{"rule": "SOXL 과열 4신호"}, {"mul": [{"div": [1300, 5000]}, 100]}],
+        [{"rule": "장전 5지표 점수"}, {"mul": [{"div": [900, 5000]}, 100]}]
+       ],
+       "else": "?"
+      }
+     }
+    }
+   ]
+  },
+  {"label": "계좌 현금 비중", "ref": "6-3·9-4", "skip": "연산 없음: 계좌 전체 현금 비중(상품 하나의 판정으로 계산 못 함)"},
+  {"label": "계좌 전체 손실 허용선", "ref": "6-4·6-1·10-1", "skip": "연산 없음: 계좌 전체 손익·최고 수익(상품 하나로 계산 못 함)"},
+  {
+   "label": "SOXL 손실 손절선",
+   "ref": "6-4",
+   "note": "문성재 사례 'SOXL 6%'(부호 없음 — 손실선 맥락이라 −6으로 읽음)와 세 겹 예 −7%는 같은 행동·같은 비율이라 느슨한 −6으로 접음",
+   "on": ["SOXL"],
+   "then": [{"when": {"le": [{"pos": "ret"}, -6]}, "do": "판다", "qty": {"of": "held", "x": 0.5}}]
+  },
+  {
+   "label": "TQQQ 손실 7%",
+   "ref": "6-4",
+   "note": "'재판단'은 판다 말이 아님 → 이름 조건",
+   "on": ["TQQQ"],
+   "value": {"le": [{"pos": "ret"}, -7]}
+  },
+  {
+   "label": "UPRO 지수 20일선 이탈",
+   "ref": "6-4",
+   "note": "축소 비율 미명시 '?'",
+   "on": ["UPRO"],
+   "then": [{"when": {"not": {"rule": "지수 20일선 위"}}, "do": "판다", "qty": {"of": "held", "x": "?"}}]
+  },
+  {
+   "label": "UPRO 업종 확산 붕괴",
+   "ref": "6-5",
+   "note": "약해짐 = 같은 날 XLF·XLI·XLY 전일 대비 하락. 축소 비율 미명시",
+   "on": ["UPRO"],
+   "then": [
+    {
+     "when": {
+      "all": [
+       {"rule": "금융·산업재 동시 하락"},
+       {"lt": [{"px": "close", "sym": "XLY"}, {"lag": [{"px": "close", "sym": "XLY"}, 1]}]}
+      ]
+     },
+     "do": "판다",
+     "qty": {"of": "held", "x": "?"}
+    }
+   ]
+  },
+  {
+   "label": "보유 중 하락 시 추가매수 3문장",
+   "ref": "6-5·9-1·7-6",
+   "note": "보유 손실 중(ret<0) 추가매수: 셋 다 맞으면 산다('작게 더' — 크기 말, qty 없음), 하나라도 아니면 안 산다",
+   "then": [
+    {
+     "when": {
+      "all": [
+       {"lt": [{"pos": "ret"}, 0]},
+       {"manual": "데이터 없음: 처음 매수 이유가 살아 있는가", "label": "처음 매수 이유 유지"},
+       {"manual": "연산 없음: 추가 후 -5% 더 나와도 계좌 손실 허용선 안인가", "label": "추가 후 -5%도 허용선 안"},
+       {"manual": "연산 없음: 추가 후에도 계좌 현금이 20~30% 남는가", "label": "추가 후 현금 20~30%"}
+      ]
+     },
+     "do": "산다"
+    },
+    {
+     "when": {
+      "all": [
+       {"lt": [{"pos": "ret"}, 0]},
+       {
+        "not": {
+         "all": [
+          {"manual": "데이터 없음: 처음 매수 이유가 살아 있는가", "label": "처음 매수 이유 유지"},
+          {"manual": "연산 없음: 추가 후 -5% 더 나와도 계좌 손실 허용선 안인가", "label": "추가 후 -5%도 허용선 안"},
+          {"manual": "연산 없음: 추가 후에도 계좌 현금이 20~30% 남는가", "label": "추가 후 현금 20~30%"}
+         ]
+        }
+       }
+      ]
+     },
+     "do": "안 산다"
+    }
+   ]
+  },
+  {
+   "label": "손절 사다리(가격·구조)",
+   "ref": "7-6·6-5",
+   "note": "구조 기준은 상품별 노드(TQQQ 나스닥 20일선 이탈 · SOXL 대표주 2개 전일 저점 이탈 · UPRO S&P500 20일선 2일 연속 이탈). 6-5 TQQQ '20일선 2거래일 회복 못 함 축소'는 TQQQ 구조 이탈(당일 이탈) 발동에 포함돼 접음. 회복 실패 기간·추가 비율 미명시 '?'",
+   "then": [
+    {"when": {"le": [{"pos": "ret"}, -5]}, "do": "판다", "qty": {"of": "held", "x": 0.3}},
+    {
+     "when": {
+      "all": [
+       {"not": {"rule": "지수 20일선 위"}, "on": ["TQQQ"]},
+       {"all": [{"rule": "반도체 대표주 2개 이상 전일 저점 이탈"}], "on": ["SOXL"]},
+       {"ge": [{"rule": "지수 20일선 아래 연속 일수"}, 2], "on": ["UPRO"]}
+      ]
+     },
+     "do": "판다",
+     "qty": {"of": "held", "x": 0.5}
+    },
+    {
+     "when": {"ge": [{"rule": "지수 20일선 아래 연속 일수"}, "?"], "label": "20일선 회복 실패"},
+     "do": "판다",
+     "qty": {"of": "held", "x": "?"}
+    }
+   ]
+  },
+  {
+   "label": "갭상승 날 눌림 소액 진입",
+   "ref": "7-3",
+   "note": "금액은 저자 예(3,000만 계획 → 1,000만 이하) = 배정 금액의 1000/3000(상한). 시초가 위 = 일봉 종가 > 시가, 첫 30분 저점은 수동. TQQQ 빅테크 몇 개인지 미명시 '?'",
+   "then": [
+    {
+     "when": {
+      "all": [
+       {"rule": "상품 갭상승"},
+       {"gt": [{"px": "close", "sym": "$self"}, {"px": "open", "sym": "$self"}]},
+       {"rule": "장 초반 첫 눌림 저점 유지"},
+       {
+        "atleast": "?",
+        "of": [
+         {"gt": [{"px": "close", "sym": "NVDA"}, {"px": "open", "sym": "NVDA"}]},
+         {"gt": [{"px": "close", "sym": "MSFT"}, {"px": "open", "sym": "MSFT"}]},
+         {"gt": [{"px": "close", "sym": "AAPL"}, {"px": "open", "sym": "AAPL"}]},
+         {"gt": [{"px": "close", "sym": "AMZN"}, {"px": "open", "sym": "AMZN"}]},
+         {"gt": [{"px": "close", "sym": "META"}, {"px": "open", "sym": "META"}]},
+         {"gt": [{"px": "close", "sym": "GOOGL"}, {"px": "open", "sym": "GOOGL"}]},
+         {"gt": [{"px": "close", "sym": "TSLA"}, {"px": "open", "sym": "TSLA"}]}
+        ],
+        "on": ["TQQQ"]
+       },
+       {
+        "atleast": 2,
+        "of": [
+         {"gt": [{"px": "close", "sym": "NVDA"}, {"px": "open", "sym": "NVDA"}]},
+         {"gt": [{"px": "close", "sym": "AMD"}, {"px": "open", "sym": "AMD"}]},
+         {"gt": [{"px": "close", "sym": "AVGO"}, {"px": "open", "sym": "AVGO"}]}
+        ],
+        "on": ["SOXL"]
+       },
+       {
+        "all": [
+         {"gt": [{"px": "close", "sym": "XLF"}, {"px": "open", "sym": "XLF"}]},
+         {"gt": [{"px": "close", "sym": "XLI"}, {"px": "open", "sym": "XLI"}]}
+        ],
+        "on": ["UPRO"]
+       }
+      ]
+     },
+     "do": "산다",
+     "qty": {"of": "budget", "x": {"div": [1000, 3000]}}
+    }
+   ]
+  },
+  {
+   "label": "환율 20일 평균 위 급등",
+   "ref": "8-1",
+   "note": "'매수 금액을 줄인다' → 원칙 2 안 산다. '크게 위'(원)·'단기간' 기간·급등 폭 미명시 '?'. 8-5 '20원·40원'은 환전 단계 예시라 여기 안 씀",
+   "then": [
+    {
+     "when": {
+      "all": [
+       {
+        "ge": [
+         {
+          "sub": [{"px": "close", "sym": "KRW=X"}, {"div": [{"sum": [{"px": "close", "sym": "KRW=X"}, 20]}, 20]}]
+         },
+         "?"
+        ]
+       },
+       {
+        "ge": [
+         {
+          "mul": [
+           {
+            "sub": [{"div": [{"px": "close", "sym": "KRW=X"}, {"lag": [{"px": "close", "sym": "KRW=X"}, "?"]}]}, 1]
+           },
+           100
+          ]
+         },
+         "?"
+        ]
+       }
+      ]
+     },
+     "do": "안 산다"
+    }
+   ]
+  },
+  {"label": "환전 단계", "ref": "8-5·8-1", "skip": "연산 없음: 환전(달러 매수)은 ETF 매매 동사(산다·판다) 밖의 행동"},
+  {
+   "label": "원화 장부·세금·진입 비용 계산",
+   "ref": "8-2·8-3·8-4",
+   "skip": "연산 없음: 계좌 금액·환율 장부·세금 계산(상품 시세 조건 아님)"
+  },
+  {
+   "label": "손실 10% 경고",
+   "ref": "9-2",
+   "note": "'검문'은 판다 말이 아님 → 이름 조건",
+   "value": {"le": [{"pos": "ret"}, -10]}
+  },
+  {
+   "label": "손실률 구간 대응",
+   "ref": "9-2",
+   "note": "−20% 축소 비율 미명시 '?'. −30% 삼분할은 산 물량 기준 30%·40%. '반등' 폭 미명시 '?'(최저 수익률 대비 회복). 남은 30%는 보유(행동 없음)",
+   "then": [
+    {"when": {"le": [{"pos": "ret"}, -20]}, "do": "판다", "qty": {"of": "held", "x": "?"}},
+    {"when": {"le": [{"pos": "ret"}, -30]}, "do": "판다", "qty": {"of": "bought", "x": 0.3}},
+    {
+     "when": {
+      "all": [{"le": [{"pos": "minret"}, -30]}, {"ge": [{"sub": [{"pos": "ret"}, {"pos": "minret"}]}, "?"]}]
+     },
+     "do": "판다",
+     "qty": {"of": "bought", "x": 0.4}
+    }
+   ]
+  },
+  {
+   "label": "지수 급등 후 둘째 날",
+   "ref": "9-3",
+   "note": "급등 당일 안 산다 · 다음 날 종가 하락이면 안 산다. 하락장 맥락은 '크게'의 '?' 판단에 맡김",
+   "then": [
+    {"when": {"rule": "지수 급등일"}, "do": "안 산다"},
+    {
+     "when": {
+      "all": [
+       {"ge": [{"barssince": {"rule": "지수 급등일"}}, 1]},
+       {"le": [{"barssince": {"rule": "지수 급등일"}}, 1]},
+       {"lt": [{"px": "close", "sym": "$index"}, {"lag": [{"px": "close", "sym": "$index"}, 1]}]}
+      ]
+     },
+     "do": "안 산다"
+    }
+   ]
+  },
+  {
+   "label": "V자 3거래일 확인",
+   "ref": "9-3",
+   "note": "3일 확인 뒤의 행동은 저자가 주지 않음 → 이름 조건",
+   "value": {
+    "all": [
+     {"ge": [{"barssince": {"rule": "지수 급등일"}}, 2]},
+     {"le": [{"barssince": {"rule": "지수 급등일"}}, 2]},
+     {"ge": [{"lag": [{"px": "low", "sym": "$index"}, 1]}, {"lag": [{"px": "low", "sym": "$index"}, 2]}]},
+     {"ge": [{"px": "high", "sym": "$index"}, {"lag": [{"px": "high", "sym": "$index"}, 1]}]}
+    ]
+   }
+  },
+  {
+   "label": "현금 보유 구간",
+   "ref": "9-4",
+   "note": "과열 = 상품 5일 상승률 ≥ ?(기준 미명시) · 안 무너짐 = 지수 20일선 위 → 일부 현금화(판다 '?'). VIX 튐은 'VIX 전일 대비' 안 산다에 포함. 손절 직후 매수 금지·호재에도 못 감은 수동",
+   "then": [
+    {
+     "when": {"all": [{"ge": [{"rule": "상품 5일 상승률"}, "?"]}, {"rule": "지수 20일선 위"}]},
+     "do": "판다",
+     "qty": {"of": "held", "x": "?"}
+    },
+    {
+     "when": {
+      "any": [
+       {"manual": "데이터 없음: 좋은 뉴스에도 가격이 못 감", "label": "호재에도 못 가는 가격"},
+       {"manual": "연산 없음: 손절 직후(마지막 손절 매도 뒤 경과 — 포지션 값에 없음)", "label": "손절 직후"}
+      ]
+     },
+     "do": "안 산다"
+    }
+   ]
+  },
+  {
+   "label": "폭락 후 재진입 3줄",
    "ref": "9-5",
-   "note": "이름 조건 — 회복 후 첫 눌림 저점 비교는 회복 기점 식별 필요해 연산 없음(수동).",
-   "value": {"manual": "회복 후 첫 눌림에서 저점을 지켰는가 (회복 기점 눌림 저점 — 연산 없음)"}
+   "note": "폭락장 이후 맥락 = 최근 N일 고점 대비 저점 낙폭 ≤ ?(기간·폭 미명시). 2개 미만 '큰돈 금지'·1개 '소액만' → 안 산다, 셋 다 → 산다('비중 확대'), 2개 → 갈래 없음. 저점 지킴 = 회복일 저가 이후 저가 최저가 그 위. SOXL 대표주 저점 높임 = 저가 > 전일 저가",
+   "then": [
+    {
+     "when": {
+      "all": [
+       {
+        "le": [
+         {
+          "mul": [
+           {
+            "sub": [
+             {
+              "div": [
+               {"lowest": [{"px": "close", "sym": "$index"}, "?"]},
+               {"highest": [{"px": "close", "sym": "$index"}, "?"]}
+              ]
+             },
+             1
+            ]
+           },
+           100
+          ]
+         },
+         "?"
+        ],
+        "label": "지수 폭락 국면"
+       },
+       {
+        "not": {
+         "atleast": 2,
+         "of": [
+          {
+           "all": [
+            {"lt": [{"px": "close", "sym": "^VIX"}, {"highest": [{"px": "close", "sym": "^VIX"}, "?"]}]},
+            {"lt": [{"px": "close", "sym": "^VIX"}, {"lag": [{"px": "close", "sym": "^VIX"}, 1]}]}
+           ],
+           "label": "VIX 고점에서 꺾임"
+          },
+          {"rule": "지수 20일선 위"},
+          {
+           "all": [
+            {
+             "gt": [
+              {
+               "barssince": {
+                "all": [
+                 {"rule": "지수 20일선 위"},
+                 {
+                  "le": [
+                   {"lag": [{"px": "close", "sym": "$index"}, 1]},
+                   {"lag": [{"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}, 1]}
+                  ]
+                 }
+                ]
+               }
+              },
+              0
+             ]
+            },
+            {
+             "ge": [
+              {
+               "minsince": [
+                {
+                 "all": [
+                  {"rule": "지수 20일선 위"},
+                  {
+                   "le": [
+                    {"lag": [{"px": "close", "sym": "$index"}, 1]},
+                    {"lag": [{"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}, 1]}
+                   ]
+                  }
+                 ]
+                },
+                {"px": "low", "sym": "$index"}
+               ]
+              },
+              {
+               "valuewhen": [
+                {
+                 "all": [
+                  {"rule": "지수 20일선 위"},
+                  {
+                   "le": [
+                    {"lag": [{"px": "close", "sym": "$index"}, 1]},
+                    {"lag": [{"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}, 1]}
+                   ]
+                  }
+                 ]
+                },
+                {"px": "low", "sym": "$index"}
+               ]
+              }
+             ]
+            }
+           ],
+           "label": "회복 후 첫 눌림 저점 지킴"
+          }
+         ]
+        }
+       }
+      ]
+     },
+     "do": "안 산다"
+    },
+    {
+     "when": {
+      "all": [
+       {
+        "le": [
+         {
+          "mul": [
+           {
+            "sub": [
+             {
+              "div": [
+               {"lowest": [{"px": "close", "sym": "$index"}, "?"]},
+               {"highest": [{"px": "close", "sym": "$index"}, "?"]}
+              ]
+             },
+             1
+            ]
+           },
+           100
+          ]
+         },
+         "?"
+        ],
+        "label": "지수 폭락 국면"
+       },
+       {
+        "all": [
+         {"lt": [{"px": "close", "sym": "^VIX"}, {"highest": [{"px": "close", "sym": "^VIX"}, "?"]}]},
+         {"lt": [{"px": "close", "sym": "^VIX"}, {"lag": [{"px": "close", "sym": "^VIX"}, 1]}]}
+        ],
+        "label": "VIX 고점에서 꺾임"
+       },
+       {"rule": "지수 20일선 위"},
+       {
+        "all": [
+         {
+          "gt": [
+           {
+            "barssince": {
+             "all": [
+              {"rule": "지수 20일선 위"},
+              {
+               "le": [
+                {"lag": [{"px": "close", "sym": "$index"}, 1]},
+                {"lag": [{"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}, 1]}
+               ]
+              }
+             ]
+            }
+           },
+           0
+          ]
+         },
+         {
+          "ge": [
+           {
+            "minsince": [
+             {
+              "all": [
+               {"rule": "지수 20일선 위"},
+               {
+                "le": [
+                 {"lag": [{"px": "close", "sym": "$index"}, 1]},
+                 {"lag": [{"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}, 1]}
+                ]
+               }
+              ]
+             },
+             {"px": "low", "sym": "$index"}
+            ]
+           },
+           {
+            "valuewhen": [
+             {
+              "all": [
+               {"rule": "지수 20일선 위"},
+               {
+                "le": [
+                 {"lag": [{"px": "close", "sym": "$index"}, 1]},
+                 {"lag": [{"div": [{"sum": [{"px": "close", "sym": "$index"}, 20]}, 20]}, 1]}
+                ]
+               }
+              ]
+             },
+             {"px": "low", "sym": "$index"}
+            ]
+           }
+          ]
+         }
+        ],
+        "label": "회복 후 첫 눌림 저점 지킴"
+       },
+       {
+        "atleast": 2,
+        "of": [
+         {"gt": [{"px": "low", "sym": "NVDA"}, {"lag": [{"px": "low", "sym": "NVDA"}, 1]}]},
+         {"gt": [{"px": "low", "sym": "AMD"}, {"lag": [{"px": "low", "sym": "AMD"}, 1]}]},
+         {"gt": [{"px": "low", "sym": "AVGO"}, {"lag": [{"px": "low", "sym": "AVGO"}, 1]}]}
+        ],
+        "on": ["SOXL"]
+       }
+      ]
+     },
+     "do": "산다"
+    }
+   ]
   },
   {
-   "label": "주 1회 비중 조정",
-   "ref": "10-3",
-   "skip": "연산 없음: 계좌 구조 조정 주기(주1회)·개별 대응 구분은 계좌 운영 규칙 — 상품 판정으로 계산 못 함"
+   "label": "상품별 주도주 3개 중 2개 같은 방향",
+   "ref": "10-1",
+   "note": "'들어가면 안 되는 날을 거른다' → 안 산다. 7-1의 '주도주 3개 이상'과 숫자가 달라 별개 규칙. 상품별 주도주는 7-2(SOXL 엔비디아·AMD·브로드컴 · UPRO 기술·금융·산업재). TQQQ의 '3개'는 그날 끄는 빅테크라 선정 연산 없음(수동). 시장 방향·VIX·20일선·계좌는 각 규칙",
+   "then": [
+    {
+     "when": {
+      "not": {
+       "all": [
+        {"manual": "연산 없음: 그날 시장을 끄는 빅테크 3개 선정", "label": "빅테크 주도주 3개 중 2개 같은 방향", "on": ["TQQQ"]},
+        {
+         "atleast": 2,
+         "of": [
+          {"gt": [{"px": "close", "sym": "NVDA"}, {"lag": [{"px": "close", "sym": "NVDA"}, 1]}]},
+          {"gt": [{"px": "close", "sym": "AMD"}, {"lag": [{"px": "close", "sym": "AMD"}, 1]}]},
+          {"gt": [{"px": "close", "sym": "AVGO"}, {"lag": [{"px": "close", "sym": "AVGO"}, 1]}]}
+         ],
+         "on": ["SOXL"]
+        },
+        {
+         "atleast": 2,
+         "of": [
+          {"gt": [{"px": "close", "sym": "XLK"}, {"lag": [{"px": "close", "sym": "XLK"}, 1]}]},
+          {"gt": [{"px": "close", "sym": "XLF"}, {"lag": [{"px": "close", "sym": "XLF"}, 1]}]},
+          {"gt": [{"px": "close", "sym": "XLI"}, {"lag": [{"px": "close", "sym": "XLI"}, 1]}]}
+         ],
+         "on": ["UPRO"]
+        }
+       ]
+      }
+     },
+     "do": "안 산다"
+    }
+   ]
   },
-  {
-   "label": "수익 출금 분리",
-   "ref": "10-4",
-   "skip": "연산 없음: 실현수익 30%/40% 출금 분리·수익 직후 2일 신규 금지는 계좌 실현손익/이벤트 기준 — 상품 시세로 계산 못 함"
-  }
+  {"label": "매수 전 5줄 메모", "ref": "10-2·1-3·6-5·에필로그", "skip": "데이터 없음: 투자자의 매수 전 메모 작성 여부"},
+  {"label": "주 1회 비중 조정", "ref": "10-3", "skip": "연산 없음: 요일(조정일)·계좌 전체 구조 조정"},
+  {"label": "수익 출금·수익 후 매수 쉼", "ref": "10-4", "skip": "연산 없음: 계좌 실현수익·출금, 마지막 수익 확정일 뒤 경과(포지션 값에 없음)"},
+  {"label": "계좌 규모별 운용", "ref": "10-5", "skip": "데이터 없음: 계좌 규모(투자자 금액)"}
  ]
 }
