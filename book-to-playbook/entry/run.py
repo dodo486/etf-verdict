@@ -16,7 +16,7 @@ homebrew·python.org·Microsoft Store 어느 설치본이든 그대로 동작한
 
 옵션
   --quiet      콘솔 출력 최소화(로그 파일에는 그대로 남음)
-  --parity     (check 만) 선택 검사(opt) — 신호 패리티(verify.trading --parity)도 돈다(시세 필요).
+  --parity     (check 만) 선택 검사(opt) — 신호 패리티(consumers.backtest.verify_trading --parity)도 돈다(시세 필요).
 
 경로·크레덴셜은 shared/paths.py 규칙을 따른다. telegram.env · local.env 가 BASE에 있으면
 자동으로 환경변수에 주입한다(없으면 그냥 건너뜀). 스케줄러로 돌릴 때 jhts 시세 패키지 경로는
@@ -43,15 +43,15 @@ PY = sys.executable or "python3"
 #   warn2 종료코드 2 를 '경고(정지 아님)'로 보나. 아니면 0 외에는 전부 정지.
 Check = namedtuple("Check", "module args opt warn2 what")
 CHECKS = [
-    Check("verify.rules", (), False, False, "코드 규칙 — 폴더 경계·주인 표"),
-    Check("authoring.playbook.source_integrity", (), False, False, "플레이북 본문 해시"),
-    Check("authoring.checklist.score", ("--quick",), False, False, "트리 계약 — 소절 인덱스·트리 문법·ref"),
-    Check("consumers.display.book_page", (), False, False, "책 페이지 — 구획·UI 사본"),
-    Check("verify.primitives", (), False, True, "원시함수 계산"),
-    Check("verify.trading", (), False, True, "거래 시뮬레이터·실전 경로"),
-    Check("verify.view", (), False, True, "화면 설명 구조"),
-    Check("authoring.checklist.score", (), False, True, "규칙 동작(트리 없음·미심판 불일치·원문 사례 불일치 등)"),
-    Check("verify.trading", ("--parity",), True, False, "신호 패리티 — 백테스트 == 실시간(일봉)"),
+    Check("entry.verify_rules", (), False, False, "코드 규칙 — 폴더 경계·주인 표"),
+    Check("authoring.playbook.verify_source", (), False, False, "플레이북 본문 해시"),
+    Check("authoring.checklist.verify_tree", ("--quick",), False, False, "트리 계약 — 소절 인덱스·트리 문법·ref"),
+    Check("consumers.display.verify_page", (), False, False, "책 페이지 — 구획·UI 사본"),
+    Check("dsl.verify_primitives", (), False, True, "원시함수 계산"),
+    Check("consumers.backtest.verify_trading", (), False, True, "거래 시뮬레이터·실전 경로"),
+    Check("signals.verify_view", (), False, True, "화면 설명 구조"),
+    Check("authoring.checklist.verify_tree", (), False, True, "규칙 동작(트리 없음·미심판 불일치·원문 사례 불일치 등)"),
+    Check("consumers.backtest.verify_trading", ("--parity",), True, False, "신호 패리티 — 백테스트 == 실시간(일봉)"),
 ]
 
 

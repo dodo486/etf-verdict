@@ -9,7 +9,7 @@
 `consumers/backtest/trades.py` — 만드는 쪽의 검사와 읽는 쪽의 판정이 **같은 코드**를 쓴다. 문법 밖의 키는 오류로 거부된다.
 트리를 만드는 곳은 구간② 하나, 읽는 곳은 구간③(판정 엔진·백테스트) 하나다. 화면은 ③의 판정 결과만 그린다.
 트리 파일의 키 배치를 아는 코드는 `dsl/tree_gateway.py`(TreeGateway — 파일 형식 검사·탐색) 하나다 — 판정·백테스트·
-검사기는 거기에 묻고 원본 키를 직접 읽지 않는다(`verify/rules` 주인 표 '트리 원본 키').
+검사기는 거기에 묻고 원본 키를 직접 읽지 않는다(`entry/verify_rules` 주인 표 '트리 원본 키').
 
 ## 0. 핵심 원칙 (먼저 읽는다 — 문법보다 중요하다)
 
@@ -214,7 +214,7 @@ caution/sizing/exit)은 폐지됐다. 행동은 **동사 셋**으로 말한다.
 
 **직렬화**: 트리 파일을 쓴 뒤 반드시 `python -m dsl.tradeTool fmt <파일>` 로 공통 형식(`cond.compact_json` —
 한 줄에 들어가는 노드는 한 줄, 숫자 목록은 이어 붙임)으로 다시 쓴다. 들여쓰기로 줄 수를 부풀리지 않는다 —
-형식이 다르면 `authoring.checklist.score` 가 정지한다.
+형식이 다르면 `authoring.checklist.verify_tree` 가 정지한다.
 
 ## 6. 흔한 식 — 조합 패턴 (C = `{"px":"close"}`, V = `{"px":"volume"}`)
 

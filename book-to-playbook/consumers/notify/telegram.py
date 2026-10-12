@@ -3,7 +3,7 @@
 """텔레그램 알림 송신(구간③) — 판정 결과를 텔레그램으로 보내기만 한다(수집 아님).
 
 네트워크(urllib)가 들어 있어 "팀 폴더엔 네트워크 코드 금지(= 시세 자가수집 재발 방지)" 규칙과 부딪히므로,
-verify/rules.py ALLOW 에 (trading, notify/telegram.py): {urllib} 로 **이 한 파일만** 예외를 둔다.
+entry/verify_rules.py ALLOW 에 (trading, notify/telegram.py): {urllib} 로 **이 한 파일만** 예외를 둔다.
 여기는 데이터를 **보내기만** 한다 — 시세를 받아오는 코드는 이 파일에 올 수 없다.
 """
 import os

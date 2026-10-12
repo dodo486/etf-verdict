@@ -66,7 +66,7 @@ a·b 둘 다 원문에 어긋나진 않는데 갈린 경우(원문이 그 선택
 
 ## 5. 채점과 반복
 
-`python -m authoring.checklist.score <slug>` — 정지가 0 이 될 때까지 3~4 를 반복한다(경고는 남아도 되지만 하나씩 이유를 보고).
+`python -m authoring.checklist.verify_tree <slug>` — 정지가 0 이 될 때까지 3~4 를 반복한다(경고는 남아도 되지만 하나씩 이유를 보고).
 
 | 정지 | 뜻 | 고칠 곳 |
 |---|---|---|

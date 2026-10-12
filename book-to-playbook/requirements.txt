@@ -1,2 +1,2 @@
 jhts-marketdata>=0.3.0
-pandas>=2.0          # verify.primitives 의 기준값(원시함수 대조) 전용
+pandas>=2.0          # dsl.verify_primitives 의 기준값(원시함수 대조) 전용

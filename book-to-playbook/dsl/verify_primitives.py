@@ -18,9 +18,9 @@
   6. 표현력 회귀 — 이번에 발견된 버그 유형을 트리로 적어 원문 뜻대로 나오는지
   7. 트리 출입구(TreeGateway) 계약 — 판정·백테스트·검사기가 트리에 묻는 질문의 답 모양
   8. 사람이 답한 수동(Ctx answers) — 답 열쇠 규칙·극성·공통 정의·등급까지(서버 권위의 바탕)
-  (체결 워크·실전 경로는 verify/trading.py, 화면 설명 구조는 verify/view.py 가 본다)
+  (체결 워크·실전 경로는 consumers/backtest/verify_trading.py, 화면 설명 구조는 signals/verify_view.py 가 본다)
 
-사용: python -m verify.primitives   (실패 있으면 exit 1)
+사용: python -m dsl.verify_primitives   (실패 있으면 exit 1)
 """
 import itertools
 import json
@@ -33,7 +33,7 @@ import pandas as pd
 
 from shared import paths  # noqa: F401  (UTF-8 출력)
 from dsl.tradeTool import Cond
-from dsl.tree_gateway import TreeGateway, rule, synthetic   # 합성 트리는 출입구로 만든다(verify.rules 명시 예외)
+from dsl.tree_gateway import TreeGateway, rule, synthetic   # 합성 트리는 출입구로 만든다(entry.verify_rules 명시 예외)
 
 Candle = namedtuple("Candle", "date open high low close volume")
 FAILS = []
@@ -557,7 +557,7 @@ def t_settled_mtf():
 
 
 def t_grade():
-    """비중(산다 qty cash) — 수동 때문에 모르면 범위(화면 설명 구조는 verify/view.py)."""
+    """비중(산다 qty cash) — 수동 때문에 모르면 범위(화면 설명 구조는 signals/verify_view.py)."""
     from dsl.tradeTool import Grade
     xs = [100.0] * 30 + [130.0]
     cal = ["2022%04d" % i for i in range(len(xs))]

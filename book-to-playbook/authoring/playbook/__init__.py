@@ -3,7 +3,8 @@
 
   · book_source.py   원문 → 소절 인덱스(books/<slug>/source_index.json — 체크리스트 ref 의 기준)
   · pages.py         플레이북 소절 페이지 모음
+  · verify_source.py 검사 — 플레이북 본문(#src) 해시 불변(원문을 바꾸면)
   · PLAYBOOK.md      플레이북 작성 지침 · book_sources.json 원본 등록 · source_baseline.json 본문 해시 기준
 
-플레이북이 원문과 어긋나면 트리가 아니라 플레이북을 고친다(authoring.playbook.source_integrity --accept --why).
+플레이북이 원문과 어긋나면 트리가 아니라 플레이북을 고친다(authoring.playbook.verify_source --accept --why).
 """

@@ -1,6 +1,6 @@
 # 이어받기 — 할 일의 정본 (여기 한 곳)
 
-> 할 일은 이 파일에만 적는다(다른 곳에 TODO 파일을 만들지 않는다 — `verify.rules` 가 막는다).
+> 할 일은 이 파일에만 적는다(다른 곳에 TODO 파일을 만들지 않는다 — `entry.verify_rules` 가 막는다).
 > 구조·원칙은 `docs/ARCHITECTURE.md`, 세션 규칙은 레포 맨 위 `CLAUDE.md`.
 > 마지막 갱신 2026-10-12 · `main` 에 합침(작업 브랜치 work/v3-verbs 는 정리함).
 
@@ -12,8 +12,8 @@ tree.json 은 지운 연산(pct·count·streak)·옛 `review` 키 때문에 **�
 
 ## 1. 지금 상태
 
-- `python -m entry.run check` — 정지 2건이 정상: `authoring.checklist.score --quick`(trend 에 tree.json 없음 · moneycopy 트리 문법) ·
-  `authoring.checklist.score`(같은 이유 — run3 에서 사라진다). 나머지 6개 통과.
+- `python -m entry.run check` — 정지 2건이 정상: `authoring.checklist.verify_tree --quick`(trend 에 tree.json 없음 · moneycopy 트리 문법) ·
+  `authoring.checklist.verify_tree`(같은 이유 — run3 에서 사라진다). 나머지 6개 통과.
 - 화면 머리글 ①안 산다 ②산다 ③판다 ④얼마나(트리가 다시 생기면 그대로 그린다).
 - 전후 비교: 시세를 `ETF_DEV_CACHE=<캐시 폴더>` 로 고정하고 판정 JSON(`verdict_view.render`)·백테스트(`runner.run`)를 떠서 diff.
 
@@ -21,6 +21,7 @@ tree.json 은 지운 연산(pct·count·streak)·옛 `review` 키 때문에 **�
 
 | 커밋 | 내용 |
 |---|---|
+| verify/ 폐지 | **verify/ 폴더 폐지** — 검사는 대상 옆 `verify_*.py`(동작 불변): 트리 `authoring/checklist/verify_tree` · 원문 `authoring/playbook/verify_source` · 페이지 `consumers/display/verify_page` · 연산 `dsl/verify_primitives` · 설명 `signals/verify_view` · 체결 `consumers/backtest/verify_trading` · 코드 규칙 `entry/verify_rules` |
 | `43ebea0` | **검사는 바뀔 때만** — daily·verdict·watch 에서 검사 제거, `--no-verify-tree` 폐지. 바꿨으면 커밋 전 `run check` |
 | `fba5686` | **만드는 곳 = 검증하는 곳**(동작 불변) — 트리 채점 → `authoring/checklist/score.py`(+`--quick` 트리 계약) · 본문 해시 → `authoring/playbook/` · 책 페이지 검사 → `consumers/display/book_page.py` · `verify/` 는 코드 검사만 |
 | `d25526f` | 심판 비교 도구를 `authoring/checklist/compare.py` 로(채점과 '같은 뜻' 잣대 한 벌) — authoring 층 import 에 signals |
@@ -39,7 +40,7 @@ tree.json 은 지운 연산(pct·count·streak)·옛 `review` 키 때문에 **�
 
 ### 6. run3 — tree.json 다시 만들기 (키스톤)
 - 순서: 구간① 전사 → 구간② 추출 a·b(서로·최종·사례 안 봄, 각자 다른 서브에이전트) → 사례 작성자(트리 안 봄, `SCENARIO.md` —
-  기대값 = 그날 결과) → 심판(`JUDGE.md` — 규칙마다 `why`, `review` 없음) → `python -m authoring.checklist.score <slug>` exit 0.
+  기대값 = 그날 결과) → 심판(`JUDGE.md` — 규칙마다 `why`, `review` 없음) → `python -m authoring.checklist.verify_tree <slug>` exit 0.
   옛 후보·`scenarios.json`·`tree.json` 의 `review` 는 다시 뽑으면 없어진다(손으로 고치지 않는다).
 - 원문 위치 `authoring/playbook/book_sources.json`(trend = `books/trend/source.md`, moneycopy = `~/jhts/hypotheses/sources/미국-돈복사-ETF-투자방법.md`).
 - 끝나면 사용자 승인 후 `main` 에 합치기.
@@ -58,11 +59,11 @@ tree.json 은 지운 연산(pct·count·streak)·옛 `review` 키 때문에 **�
 ### 그 뒤
 - **트리 출입구 강제의 빈틈** — 주인 표 '트리 원본 키'는 `r["rules"]`·`.get("then")` 꼴만 잡는다. `"then" in r`·흔한 키
   (`when`·`qty`)·`book_file(slug, "tree.json")` 직접 열기는 안 잡힌다(지금 위반은 0). 출입구 밖에서 `"tree.json"`·`"tree_candidates"`
-  를 파일 열기에 넘기면 정지하는 줄을 주인 표에 · 후보 파일 이름(`tree_candidates/a.json`…)이 compare·score 에 흩어진 것을 출입구로.
+  를 파일 열기에 넘기면 정지하는 줄을 주인 표에 · 후보 파일 이름(`tree_candidates/a.json`…)이 compare·verify_tree 에 흩어진 것을 출입구로.
 - **백테스트 계산기 버그** — `portfolio` 가 1 unit = 시작자본 고정이라 손실 뒤 다음 진입이 남은 현금보다 클 수 있다
   (옛 표준 매도 사본에서 SOXL −162% 관측). 잔고 기준 사이징으로.
 - **장중 손익 백테스트**(분봉 ~7일뿐이라 보류 — 되살릴 땐 통일 신호 경로 위에 재구현) · tree 재생성 뒤
-  `python -m verify.trading --parity` 실측.
+  `python -m consumers.backtest.verify_trading --parity` 실측.
 - **무인 판정을 막는 수동 조건** — (가) 연산으로 풀 것 = v3 기본 부품 조합 · (나) 데이터가 없는 것 = 실적 캘린더 · 뉴스 시각 ·
   지수 구성종목 등락(breadth) · 개인 매매 기록 — 외부 소스 생기기 전엔 서버 권위 수동 답으로 '1회 답'까지 · (다) 정성 판단 = 수동 답.
 - **이번 범위 밖**(트리 v3 에서 `skip` "연산 없음"으로 드러남): 계좌 전체 기준 · 종목 간 돈 이동 · 지난 매매 이력.
@@ -80,10 +81,10 @@ tree.json 은 지운 연산(pct·count·streak)·옛 `review` 키 때문에 **�
 
 ```
 python -m entry.run check            # 전부(CHECKS 한 목록) — 바꿨으면 커밋 전. 요약 + 종료코드
-python -m verify.rules               # 코드 규칙 — 폴더 경계 + 주인 표
-python -m authoring.checklist.score <slug>        # 트리 채점
-python -m authoring.checklist.score --quick   # 트리 계약(소절·트리 문법·ref)
-python -m consumers.display.book_page         # 책 페이지 구획·UI 사본
+python -m entry.verify_rules               # 코드 규칙 — 폴더 경계 + 주인 표
+python -m authoring.checklist.verify_tree <slug>        # 트리 채점
+python -m authoring.checklist.verify_tree --quick   # 트리 계약(소절·트리 문법·ref)
+python -m consumers.display.verify_page         # 책 페이지 구획·UI 사본
 python -m authoring.checklist.compare <slug> 6   # 심판 비교 도구(a·b 덤프)
-python -m verify.trading --parity     # 판정 = 백테스트 일치(시세 필요)
+python -m consumers.backtest.verify_trading --parity     # 판정 = 백테스트 일치(시세 필요)
 ```

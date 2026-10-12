@@ -6,8 +6,9 @@
 
 ## 1. 구조 한눈에 — 폴더 이름이 곧 파이프라인
 
-폴더 = 층(layer). 흐름은 **아래에서 위로 한 방향** — 아래는 위를 import 하지 않는다(소비·진입·검사만 위에서 아래를 부른다).
-**제작(authoring)이 왼쪽에서 tree.json 을 만들고(그 검증까지), 런타임이 그 tree 를 오른쪽으로 흘린다. verify 는 코드 검사만.**
+폴더 = 층(layer). 흐름은 **아래에서 위로 한 방향** — 아래는 위를 import 하지 않는다(소비·진입만 위에서 아래를 부른다).
+**제작(authoring)이 왼쪽에서 tree.json 을 만들고(그 검증까지), 런타임이 그 tree 를 오른쪽으로 흘린다.**
+**검사는 따로 폴더가 없다 — 검사하는 대상 옆에 `verify_*.py` 로 둔다**(그 층의 import 규칙을 그대로 따른다).
 작업 순서(만들기 → 검증 → 사용)와 트리를 읽는 길은 1-2.
 
 ```
@@ -32,7 +33,8 @@ signals/     ① 판단층 — 판단자 Judge(책)·ProductJudge(상품): 트�
 
 shared/   경로(paths)·인코딩·책 레지스트리(books.json) — 뜻은 두지 않는다
 entry/    진입점 — serve(로컬 서버: 피더 구동 + SSE) · run(스케줄 daily·check) · live(2단 pub-sub 조립 뿌리)
-verify/   코드 검사만(가짜 트리·시세, 코드가 바뀌면) — 책 데이터 검사는 그것을 만드는 곳에(원문 → authoring/playbook · 트리 → authoring/checklist · 페이지 → consumers/display)
+검사      대상 옆 verify_*.py — 원문 authoring/playbook/verify_source · 트리 authoring/checklist/verify_tree · 페이지 consumers/display/verify_page
+          · 연산 dsl/verify_primitives · 설명 signals/verify_view · 체결 consumers/backtest/verify_trading · 코드 규칙 entry/verify_rules
 books/<slug>/  책 하나의 산출물 전부(playbook.html · source · source_index · tree.json · 후보 · 사례 · 결과 · 로그)
 ```
 
@@ -43,10 +45,9 @@ books/<slug>/  책 하나의 산출물 전부(playbook.html · source · source_
 | `dsl/` | 조건 트리(tree.json)의 언어 — **DSL 의 주인** | `tree_gateway.py`(출입구) · `tradeTool.py`(Cond·Grade·RuleSeries·History, +`grade_rules.json`) |
 | `feed/` | 라이브 틱 피더(pub-sub 버스) — 시세 모름 | `bus.py`(`Bus` 구독/발행 · `Poller` 틱 구동) · `feed.py`(`Feed`=Bus+run · `watch` 장중 루프) |
 | `signals/` | 판단자 — 트리·시세 원본의 유일한 사용자 → 판정 데이터 (돈·화면 모름) | `judge.py`(**Judge** 책 하나: 트리 열기·시세 받기·라이브 decisions·백테스트 signals·소절 반영 coverage·검사기 질문 · **ProductJudge** 상품 하나: 등급·decide·설명·보유 status·체결용 conditions·price · Holding · Decision 그릇) · `explain.py`(판단 근거 설명 — judge 만 부름) |
-| `consumers/` | 신호를 받아 쓰는 소비자(서브폴더로 구분) | **backtest** `{trades,portfolio,runner}.py`(체결·매도 정책 · 돈·수수료 · 러너, +`market_config.json`) · **notify** `{telegram,desktop}.py` · **display** `verdict_view.py`(판정→화면 JSON·사유 문장) · `backtest_page.py` · `book_page.py` · `build_home.py` · `inject_*.py` · `ui/*.js` |
-| `entry/` | 진입점 | `serve.py`(로컬 서버·SSE) · `run.py`(스케줄 러너·CHECKS) · `live.py`(`LiveHub` — 2단 버스 조립) |
-| `verify/` | 코드 검사만 — 엔진·화면 코드가 바뀌면(가짜 트리·시세, 책 무관). 책 데이터 검사는 그것을 만드는 층에 둔다 | `rules.py` · `primitives.py` · `trading.py` · `view.py` |
-| `authoring/` | 책 → 플레이북 → 트리를 **만드는** 쪽(런타임과 분리) | **playbook** `book_source.py` · `pages.py` · `source_integrity.py`(본문 해시) · `PLAYBOOK.md` · `book_sources.json` · `source_baseline.json` · **checklist** 지침 md(COND_DSL·EXTRACTOR·SCENARIO·JUDGE·README) · `compare.py`(심판 비교 도구 · '같은 뜻' 잣대) · `score.py`(트리 채점 · `--quick` 트리 계약) |
+| `consumers/` | 신호를 받아 쓰는 소비자(서브폴더로 구분) | **backtest** `{trades,portfolio,runner}.py`(체결·매도 정책 · 돈·수수료 · 러너, +`market_config.json`) · `verify_trading.py`(검사) · **notify** `{telegram,desktop}.py` · **display** `verdict_view.py`(판정→화면 JSON·사유 문장) · `backtest_page.py` · `book_page.py` · `build_home.py` · `inject_*.py` · `ui/*.js` · `verify_page.py`(검사) |
+| `entry/` | 진입점 | `serve.py`(로컬 서버·SSE) · `run.py`(스케줄 러너·CHECKS) · `live.py`(`LiveHub` — 2단 버스 조립) · `verify_rules.py`(코드 규칙 검사 — 전 층을 보므로 entry) |
+| `authoring/` | 책 → 플레이북 → 트리를 **만드는** 쪽(런타임과 분리) | **playbook** `book_source.py` · `pages.py` · `verify_source.py`(본문 해시 검사) · `PLAYBOOK.md` · `book_sources.json` · `source_baseline.json` · **checklist** 지침 md(COND_DSL·EXTRACTOR·SCENARIO·JUDGE·README) · `compare.py`(심판 비교 도구 · '같은 뜻' 잣대) · `verify_tree.py`(트리 채점 · `--quick` 트리 계약) |
 
 ### 1-1. 라이브 2단 pub-sub — 책 N개가 시세 하나를 나눠 쓴다
 
@@ -80,18 +81,18 @@ feed.price_bus (1개) ──틱 {ts, trees, hist}── fan-out ─┬───�
  작업 순서(위 → 아래)                                              트리를 읽는 길
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  0. 원문 (구간①, authoring/playbook) — 원문을 바꿀 때
-    book_source(소절 인덱스) → 전사 → source_integrity(본문 해시 고정)      트리 안 읽음
+    book_source(소절 인덱스) → 전사 → verify_source(본문 해시 고정)         트리 안 읽음
 ──────────────────────────────────────────────────────────────────────────────────
  1. 트리 만들기 + 검증 (구간②, authoring/checklist) — 트리를 바꿀 때
     ① 추출자 a·b ─▶ tree_candidates/a.json · b.json (서로 모름)        서브에이전트가 씀
     ② 사례 작성자 ─▶ scenarios.json                                   트리 안 읽음
     ③ 심판  compare <slug> 6 → logs/disagree.json (a·b 다른 곳)         Judge.read
             원문과 대조해 tree.json (규칙마다 why)                      심판이 씀
-    ④ 채점  score <slug> — 정지 0 까지 ③으로                            Judge.open/read
-            ('같은 뜻' 잣대는 compare 한 벌) · score --quick 트리 계약
+    ④ 채점  verify_tree <slug> — 정지 0 까지 ③으로                      Judge.open/read
+            ('같은 뜻' 잣대는 compare 한 벌) · verify_tree --quick 트리 계약
 ──────────────────────────────────────────────────────────────────────────────────
  2. 페이지 (consumers/display) — 페이지·UI 를 바꿀 때
-    playbook.html 골격 · book_page(구획·UI 사본 검사)                    트리 안 읽음
+    playbook.html 골격 · verify_page(구획·UI 사본 검사)                  트리 안 읽음
 ──────────────────────────────────────────────────────────────────────────────────
  3. 사용 (구간③, 런타임) — 매일·장중, 검사 없음
     entry/run daily·verdict · entry/live(watch·serve)                   Judge.open
@@ -100,7 +101,8 @@ feed.price_bus (1개) ──틱 {ts, trees, hist}── fan-out ─┬───�
         ├▶ consumers/backtest runner · trades (체결·수익)
         └▶ consumers/notify   알림
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- 코드 검사 (verify/) — 코드를 바꿀 때. rules · primitives · trading · view   가짜 트리(synthetic)만
+ 코드 검사 — 코드를 바꿀 때, 각 층 옆 verify_*.py              가짜 트리(synthetic)만
+   dsl/verify_primitives · signals/verify_view · consumers/backtest/verify_trading · entry/verify_rules
  전부 한 번에: python -m entry.run check  (무언가 바꿨으면 커밋 전 — 엔진 dsl·signals 를 바꿔도 트리 검사까지)
 ```
 
@@ -117,11 +119,11 @@ feed.price_bus (1개) ──틱 {ts, trees, hist}── fan-out ─┬───�
 
 | # | 원칙 | 지키는 장치 |
 |---|---|---|
-| 1 | **단방향 파이프라인** — shared ← market ← dsl ← signals·feed ← consumers (entry·verify 는 전부, authoring 은 signals 까지 — 심판 비교 도구가 후보 트리를 판단자로 평가). 층 사이 약속은 코드가 아니라 **산출물 파일**. 아래는 위를 import 하지 않는다 | `verify.rules` 폴더 경계 |
+| 1 | **단방향 파이프라인** — shared ← market ← dsl ← signals·feed ← consumers (entry 는 전부 · 검사는 대상 옆 verify_*.py 로 그 층 규칙을 따름, authoring 은 signals 까지 — 심판 비교 도구가 후보 트리를 판단자로 평가). 층 사이 약속은 코드가 아니라 **산출물 파일**. 아래는 위를 import 하지 않는다 | `entry.verify_rules` 폴더 경계 |
 | 2 | **산출물을 만든 쪽이 읽는 창구도 책임** — tree.json 키는 `TreeGateway` 만 안다. 소비자는 질문만 | 주인 표: 트리 원본 키 |
-| 3 | **결정 하나 = 주인 하나** — 같은 결정을 두 곳에 두지 않는다. 새로 '한 곳에서만 정할 것'이 생기면 주인 표에 한 줄 | 주인 표(`verify.rules.OWNERS`) |
+| 3 | **결정 하나 = 주인 하나** — 같은 결정을 두 곳에 두지 않는다. 새로 '한 곳에서만 정할 것'이 생기면 주인 표에 한 줄 | 주인 표(`entry.verify_rules.OWNERS`) |
 | 4 | **뜻 / 판단 / 실행 / 표시 분리** — 뜻 = `dsl` · 판단 = `signals`(`Judge`, 돈·잔고 모름) · 실행 = `consumers/backtest`(계좌·체결, 갈아끼울 수 있음) · 표시 = `consumers/display`(판단 안 함) · 트리거 = `feed`(언제, 가격 모름) | 폴더 경계 + 주인 표 |
-| 5 | **판단 엔진은 하나, 쓰임은 조합만 다름** — 오늘 판정 = 백테스트의 마지막 하루. 실전 주문도 같은 `Judge` | `Judge` 단일 경로 · `verify.trading --parity` |
+| 5 | **판단 엔진은 하나, 쓰임은 조합만 다름** — 오늘 판정 = 백테스트의 마지막 하루. 실전 주문도 같은 `Judge` | `Judge` 단일 경로 · `consumers.backtest.verify_trading --parity` |
 | 6 | **서버 권위** — 화면은 엔진 결과를 그리기만. 다시 계산하지 않는다 | 주인 표: 등급 사다리 |
 | 7 | **특수 기능보다 일반 부품 + 조합** — 사례마다 칸·지표를 덧대지 않는다. 조합으로 안 되면 **부품을 넓힌다**. `연산 없음`이 쌓이면 확장 신호 | 최소 문법 + 주인 표 |
 | 8 | **같은 것은 표현도 하나** — 같은 식 = 같은 조건, 같은 것은 라벨 하나 | 검사기(같은 식 두 벌 등) |
@@ -129,7 +131,7 @@ feed.price_bus (1개) ──틱 {ts, trees, hist}── fan-out ─┬───�
 | 10 | **데이터는 한 곳** — 책 산출물은 `books/<slug>/`, 경로는 `shared/paths.py` 하나 | 주인 표: 책 산출물 경로 |
 | 11 | **기본 계산은 검증된 라이브러리(pandas), 도메인 뜻만 직접** | — |
 | 12 | **특정 책에 맞추지 않는다** — 버그를 만나면 "공통 코드가 왜 이 책에선 안 먹히나"로 상위 로직을 고친다 | 리뷰 |
-| 13 | **트리·시세 원본의 사용자는 판단자 하나** — 출입구(TreeGateway)·시세 받기·조건 평가는 `signals/judge`(+ 도구 dsl)만 쓴다. 체결·화면·라이브·검사는 판단자에게 묻고 받은 값(판정·가격·조건 값·설명)만 쓴다(도구 단위 검사 verify.primitives 만 예외) | 주인 표: 트리 출입구 사용·조건 평가·시세 원본 |
+| 13 | **트리·시세 원본의 사용자는 판단자 하나** — 출입구(TreeGateway)·시세 받기·조건 평가는 `signals/judge`(+ 도구 dsl)만 쓴다. 체결·화면·라이브·검사는 판단자에게 묻고 받은 값(판정·가격·조건 값·설명)만 쓴다(도구 단위 검사 dsl.verify_primitives 만 예외) | 주인 표: 트리 출입구 사용·조건 평가·시세 원본 |
 
 ## 3. 변경 규율
 
@@ -140,7 +142,7 @@ feed.price_bus (1개) ──틱 {ts, trees, hist}── fan-out ─┬───�
 - **책 데이터(후보·tree.json)는 손으로 고치지 않는다** — 공통 로직을 고친 뒤 다시 뽑는다. 심판 몫은 심판이.
 - 트리 JSON 은 `python -m dsl.tradeTool fmt <파일>` 압축 형식.
 
-## 4. 주인 표 (`verify/rules.py` OWNERS — 주인 밖에 보이면 정지)
+## 4. 주인 표 (`entry/verify_rules.py` OWNERS — 주인 밖에 보이면 정지)
 
 | 결정 | 주인 |
 |---|---|
@@ -168,13 +170,13 @@ feed.price_bus (1개) ──틱 {ts, trees, hist}── fan-out ─┬───�
 
 | 검사 | 보는 것 |
 |---|---|
-| `verify.rules` | 폴더 경계(import 방향·jhts 단일 창구·자가수집 0) + 주인 표 |
-| `authoring.playbook.source_integrity` | 플레이북 본문(`#src`) 해시 |
-| `authoring.checklist.score --quick` | 트리 계약 — 소절 인덱스 · 트리 문법 · ref 가 실제 소절 |
-| `consumers.display.book_page` | 책 페이지 구획 · UI 사본 == `consumers/display/ui/*.js` |
-| `verify.primitives` | 원시 연산·등급·금액·수동 답(pandas 기준값·손계산) · 3값 논리 · 인과성 · 문법 · 출입구 계약 |
-| `verify.trading` | 체결 워크·수량 변환·금액·매도 정책 · 실전 경로. `--parity` = 판정 == 백테스트(opt) |
-| `verify.view` | 화면 설명 구조 |
-| `authoring.checklist.score` | 체크리스트가 원문 뜻대로 동작하나 — a·b 비교(식) · 원문 사례 · 심판 기록 · 발화 통계 |
+| `entry.verify_rules` | 폴더 경계(import 방향·jhts 단일 창구·자가수집 0) + 주인 표 |
+| `authoring.playbook.verify_source` | 플레이북 본문(`#src`) 해시 |
+| `authoring.checklist.verify_tree --quick` | 트리 계약 — 소절 인덱스 · 트리 문법 · ref 가 실제 소절 |
+| `consumers.display.verify_page` | 책 페이지 구획 · UI 사본 == `consumers/display/ui/*.js` |
+| `dsl.verify_primitives` | 원시 연산·등급·금액·수동 답(pandas 기준값·손계산) · 3값 논리 · 인과성 · 문법 · 출입구 계약 |
+| `consumers.backtest.verify_trading` | 체결 워크·수량 변환·금액·매도 정책 · 실전 경로. `--parity` = 판정 == 백테스트(opt) |
+| `signals.verify_view` | 화면 설명 구조 |
+| `authoring.checklist.verify_tree` | 체크리스트가 원문 뜻대로 동작하나 — a·b 비교(식) · 원문 사례 · 심판 기록 · 발화 통계 |
 
 검사는 전부 **실행**으로 본다(글자 대조 검사는 의미를 판정하지 못해 없앴다).

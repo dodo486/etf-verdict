@@ -37,8 +37,8 @@
   (책 페이지 구획·UI 사본은 페이지를 조립하는 consumers/display/book_page.py 가 본다)
 
 종료코드: 0 통과 · 1 정지(트리 없음/문법/미심판 불일치/같은 뜻 두 벌/사례 실패/비중 초과 …) · 2 경고만. --quick 은 0 · 1.
-사용: python -m authoring.checklist.score [slug ...] [--years 3]
-      python -m authoring.checklist.score --quick [slug ...]   빠른 계약만
+사용: python -m authoring.checklist.verify_tree [slug ...] [--years 3]
+      python -m authoring.checklist.verify_tree --quick [slug ...]   빠른 계약만
 """
 import json
 import os

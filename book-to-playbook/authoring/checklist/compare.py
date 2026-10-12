@@ -3,7 +3,7 @@
 """심판의 비교 도구 + a·b '같은 뜻' 잣대 (구간②, 책 무관). 트리를 만들거나 고치지 않는다(판단은 심판이 원문으로).
 
   · 잣대 — logic_key·rule_keys·pair_rules·factorable: 이름·출처(META)를 뗀 정규화 식으로 '같은 뜻'을 가린다.
-           채점기(score.py)도 이 한 벌로 채점한다 — 심판이 본 비교 = 채점 기준(두 벌이면 갈라진다).
+           채점기(verify_tree.py)도 이 한 벌로 채점한다 — 심판이 본 비교 = 채점 기준(두 벌이면 갈라진다).
   · 실제 시세 비교 — history·evaluate·window·compare: 두 트리를 판정과 같은 판단자(signals/judge.Judge)로 날마다 평가.
   · 덤프 — dump_disagreements: 규칙 짝(common·only_a·only_b)·조건 짝·식 모양 차이·판정이 갈린 날 N개씩을
            books/<slug>/logs/disagree.json 으로.

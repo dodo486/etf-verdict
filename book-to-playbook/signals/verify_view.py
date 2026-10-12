@@ -8,7 +8,7 @@
 
 (책 페이지 구획·UI 사본은 페이지를 조립하는 consumers/display/book_page.py 가 본다.)
 
-사용: python -m verify.view   (실패 있으면 exit 1)
+사용: python -m signals.verify_view   (실패 있으면 exit 1)
 """
 import sys
 from collections import namedtuple

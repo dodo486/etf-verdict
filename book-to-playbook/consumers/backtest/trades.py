@@ -12,12 +12,12 @@ build_trades 결과(체결 일정)를 받아서 낸다. 매도 정책(책에 매
   · tranches_of : 분할 매수 차수. 분할이 없거나 저자가 비율을 안 줬으면("?") 전량 한 번(비율을 지어내지 않는다).
   · unsized_note: 분할 비율·매도 비율 '저자 미명시'를 백테스트가 어떻게 계산했는지 결과에 표시할 문구.
 
-수량 변환(이 파일 하나가 주인, verify.rules 주인 표 '수량 변환')
+수량 변환(이 파일 하나가 주인, entry.verify_rules 주인 표 '수량 변환')
   · to_units    : 정규화된 '얼마나'(출입구 Qty(of, x) — cash·budget·bought·held)를 물량으로 바꾸는 단 하나의
                   함수. 매수(분할 차수)·매도(산/남은 물량의 비율)·비중이 전부 여기를 지난다. 장부 = Ledger.
   · sell_text · live_units : 화면이 basis 를 다시 해석하지 않게 매도 문장·라이브 오늘 장부를 여기서 빚는다.
 
-금액 정책(얼마나 사나 — 이 파일 하나가 주인, verify.rules 주인 표 '금액 정책')
+금액 정책(얼마나 사나 — 이 파일 하나가 주인, entry.verify_rules 주인 표 '금액 정책')
   · size_of     : 그날의 '얼마나' 사실(judge.Amount — 라이브 화면과 같은 Judge.amount 한 경로)을 그날 장부
                   Ledger(budget = 비중)로. 매수 물량 = to_units(분할 차수 Qty, 그 장부) = 분할 비율 × 비중(%)/100.
                   모름은 지어내지 않는다(아래 SIZE_NOTES 로 횟수를 결과에 드러낸다):
@@ -79,7 +79,7 @@ class Ledger(namedtuple("Ledger", "budget bought held")):
 
 def to_units(q, led):
     """정규화된 '얼마나'(출입구 Qty(of, x)) → 물량 — 매수·매도·비중이 전부 지나는 단 하나의 변환
-    (verify.rules 주인 표 '수량 변환'). led = 그 시점 장부(Ledger).
+    (entry.verify_rules 주인 표 '수량 변환'). led = 그 시점 장부(Ledger).
       cash   x → x/100            총 투자금의 x %          (비중)
       budget x → x × led.budget   이 상품 배정 금액의 x    (분할 차수)
       bought x → x × led.bought   지금까지 산 물량의 x     (매도)

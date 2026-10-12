@@ -6,6 +6,6 @@
   · SCENARIO.md   사례 작성자 지침(원문만 보고 정답지)
   · JUDGE.md      심판 지침(비교 도구·판단·최종 트리와 review·채점 대응)
   · COND_DSL.md   트리 문법 — 트리를 쓰는 추출자·심판 참고서(유효한 것과 그 뜻)
-  · compare.py    심판 비교 도구(a·b 덤프 → logs/disagree.json)와 '같은 뜻' 잣대(채점기 score 도 쓴다)
-  · score.py      트리 채점(심판 반복의 합격 기준) · --quick 트리 계약(소절·트리 문법·ref, 시세 없이)
+  · compare.py    심판 비교 도구(a·b 덤프 → logs/disagree.json)와 '같은 뜻' 잣대(채점기 verify_tree 도 쓴다)
+  · verify_tree.py 트리 채점(심판 반복의 합격 기준) · --quick 트리 계약(소절·트리 문법·ref, 시세 없이)
 """
