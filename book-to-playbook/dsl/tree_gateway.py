@@ -22,15 +22,24 @@ from dsl.tradeTool import Cond
 from shared.paths import book_file
 
 BLOCK, BUY, SELL = Cond.BLOCK, Cond.BUY, Cond.SELL
+# 트리 v3 파일 형식(COND_DSL 1·5절) — 여기 밖의 키는 거부한다(옛 양식·오타를 조용히 무시하지 않는다).
+TOP_KEYS = ("version", "products", "names", "rules", "note")
+PRODUCT_KEYS = ("index", "ref", "note")
+NAME_KEYS = ("syms", "ref", "note")
+RULE_KEYS = ("label", "ref", "note", "on", "value", "then", "skip", "why")
+BRANCH_KEYS = ("when", "do", "qty", "repeat")
+QTY_OF = {BUY: ("cash", "budget"), SELL: ("bought", "held")}   # 동사마다 쓸 수 있는 qty 종류(안 산다는 qty 없음)
 
 
-def rule(label, do, when=None, qty=None, **meta):
+def rule(label, do, when=None, qty=None, repeat=False, **meta):
     """합성 트리(검사용)의 행동 규칙 하나 — 갈래 하나짜리. qty = (of, x) 또는 None. meta = ref·note·on 등."""
     br = {"do": do}
     if when is not None:
         br["when"] = when
     if qty is not None:
         br["qty"] = {"of": qty[0], "x": qty[1]}
+    if repeat:
+        br["repeat"] = True
     return dict(meta, label=label, then=[br])
 
 
@@ -49,12 +58,14 @@ class Qty(namedtuple("Qty", "of x")):
 
 
 class Rule:
-    """갈래 하나(분할 차수·매도·비중)의 읽기 전용 값. 없는 필드는 None. qty = Qty(얼마나)."""
-    __slots__ = ("label", "ref", "note", "when", "qty", "allprod")
+    """갈래 하나(분할 차수·매도·비중)의 읽기 전용 값. 없는 필드는 None. qty = Qty(얼마나).
+    repeat = 조건이 다시 맞을 때마다(판다 갈래만 — 기본은 한 번)."""
+    __slots__ = ("label", "ref", "note", "when", "qty", "allprod", "repeat")
 
-    def __init__(self, label=None, ref=None, note=None, when=None, qty=None, allprod=None):
+    def __init__(self, label=None, ref=None, note=None, when=None, qty=None, allprod=None, repeat=False):
         self.label, self.ref, self.note, self.when, self.qty = label, ref, note, when, qty
         self.allprod = allprod                   # 공통(on 없음) 규칙이면 True — 화면이 공통 섹션으로 모은다
+        self.repeat = repeat
 
 
 def _num(x):
@@ -201,17 +212,66 @@ class TreeGateway:
         rules = tree.get("rules")
         if not isinstance(rules, list) or not rules:
             raise Cond.CondError("rules 가 비어 있다")
-        labels = [r.get("label") for r in rules if isinstance(r, dict)]
-        if len(labels) != len(set(labels)):
-            raise Cond.CondError("규칙 label 이 책 안에서 유일하지 않다")
-        bad = sorted({t.get("do") for r in rules if isinstance(r, dict) for t in r.get("then", [])} - set(Cond.VERBS))
-        if bad:
-            raise Cond.CondError("모르는 동사 %r (허용 %s)" % (bad, " · ".join(Cond.VERBS)))
+        self._check_shape(tree, rules)
         # 펼친 조건식의 문법만 검사(참조·이름 심볼은 이미 펼쳐짐)
         for prod in tree["products"]:
             for _do, label, _ref, node in self.expressions(prod):
                 Cond.validate(node, "%s.%s" % (prod, label or _do))
         return True
+
+    @staticmethod
+    def _keys(obj, allowed, where):
+        if not isinstance(obj, dict):
+            raise Cond.CondError("%s: 객체여야 한다" % where)
+        extra = sorted(set(obj) - set(allowed))
+        if extra:
+            raise Cond.CondError("%s: 모르는 키 %s (허용 %s)" % (where, extra, " · ".join(allowed)))
+
+    def _check_shape(self, tree, rules):
+        """파일 형식 — 맨 위·상품·이름 심볼·규칙·갈래·qty 의 키와 값의 모양."""
+        self._keys(tree, TOP_KEYS, "트리 맨 위")
+        for p, v in tree["products"].items():
+            self._keys(v, PRODUCT_KEYS, "products.%s" % p)
+        for n, v in (tree.get("names") or {}).items():
+            self._keys(v, NAME_KEYS, "names.%s" % n)
+            if not (isinstance(v.get("syms"), list) and v["syms"]):
+                raise Cond.CondError("names.%s: syms 목록이 필요하다" % n)
+        targets = set(tree["products"]) | set(tree.get("names") or {})
+        labels = set()
+        for r in rules:
+            self._keys(r, RULE_KEYS, "규칙 %r" % (r.get("label") if isinstance(r, dict) else r))
+            lab = r.get("label")
+            if not (isinstance(lab, str) and lab.strip()):
+                raise Cond.CondError("규칙에 label(이름)이 없다: %r" % sorted(r))
+            if lab in labels:
+                raise Cond.CondError("규칙 label 이 책 안에서 유일하지 않다: %r" % lab)
+            labels.add(lab)
+            if "then" in r and "skip" in r:
+                raise Cond.CondError("규칙 %r: then 과 skip 을 같이 쓸 수 없다" % lab)
+            if "then" not in r and "skip" not in r and "value" not in r:
+                raise Cond.CondError("규칙 %r: then(행동)·value(이름 조건)·skip(못 옮김) 중 하나가 필요하다" % lab)
+            if "skip" in r and not (isinstance(r["skip"], str) and r["skip"].strip()):
+                raise Cond.CondError("규칙 %r: skip 사유 문자열이 필요하다" % lab)
+            bad_on = [x for x in (r.get("on") or []) if x not in targets]
+            if bad_on:
+                raise Cond.CondError("규칙 %r: on 의 %s 가 products·names 에 없다" % (lab, bad_on))
+            if "then" in r and not (isinstance(r["then"], list) and r["then"]):
+                raise Cond.CondError("규칙 %r: then 은 갈래 목록이어야 한다" % lab)
+            for k, t in enumerate(r.get("then") or []):
+                where = "규칙 %r 갈래 %d" % (lab, k)
+                self._keys(t, BRANCH_KEYS, where)
+                do = t.get("do")
+                if do not in Cond.VERBS:
+                    raise Cond.CondError("%s: 모르는 동사 %r (허용 %s)" % (where, do, " · ".join(Cond.VERBS)))
+                if "repeat" in t and (t["repeat"] is not True or do != SELL):
+                    raise Cond.CondError("%s: repeat 은 판다 갈래에 true 로만(산다·안 산다의 반복은 연산 없음)" % where)
+                q = t.get("qty")
+                if q is not None:
+                    self._keys(q, ("of", "x"), where + " qty")
+                    if q.get("of") not in QTY_OF.get(do, ()):
+                        raise Cond.CondError("%s: %s 갈래의 qty 종류는 %s (받은 값 %r)"
+                                             % (where, do, " · ".join(QTY_OF.get(do, ())) or "없음", q.get("of")))
+                    Cond.validate(q.get("x"), where + " qty.x")
 
     # ---------------------------------------------------------------- 책·상품
     def _p(self, prod):
@@ -275,7 +335,7 @@ class TreeGateway:
     def sells(self, prod):
         """판다 갈래 [Rule(when, qty bought/held)] — qty 없으면 남은 전량. 없으면 [](trades.exit_policy 가 정책을 정한다)."""
         return [Rule(r.get("label"), r.get("ref"), when=self._when_of(r, t), qty=_qty(t.get("qty"), Qty("held", 1.0)),
-                     allprod=not r.get("on"))
+                     allprod=not r.get("on"), repeat=bool(t.get("repeat")))
                 for r, t in self._qty_branches(prod, SELL)]
 
     def expressions(self, prod):
@@ -393,10 +453,6 @@ class TreeGateway:
     def name_symbols(self):
         """이름 심볼 {이름: [종목…]} (펼치기 전 원본 — 검사기가 "?" 남음을 본다)."""
         return {k: list((v or {}).get("syms") or []) for k, v in self._names.items()}
-
-    def legacy_keys(self):
-        """v3 에 없는 맨 위 키(옛 양식 잔재 — 예: review). 런타임은 무시하고 검사기가 정지시킨다."""
-        return sorted(set(self._d) - {"version", "products", "names", "rules", "note"})
 
     # ---------------------------------------------------------------- 원본 그대로(검사기의 전체 훑기 전용)
     def whole(self):

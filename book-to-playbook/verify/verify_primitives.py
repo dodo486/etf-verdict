@@ -753,14 +753,25 @@ def t_gateway():
     check(g.value("20일선 위") == W and g.value("선물 양") is None and g.why("선물 양") is None
           and TreeGateway.of(dict(data, rules=data["rules"] + [dict(rule("w", Cond.BUY), why="원문 3-1")])).why("w") == "원문 3-1",
           "value/why")
-    check(g.name_symbols() == {"$묶음": ["N1", "N2"]} and g.legacy_keys() == []
-          and TreeGateway.of(dict(data, review={})).legacy_keys() == ["review"], "name_symbols/legacy_keys")
+    check(g.name_symbols() == {"$묶음": ["N1", "N2"]}, "name_symbols")
     bad = dict(data, rules=data["rules"] + [rule("x", Cond.BUY, {"rule": "없는 이름"})])
     check(TreeGateway.of(bad).gate("A", Cond.BUY)["any"][-1].get("manual", "").startswith("연산 없음: 미해결 참조"),
           "없는 이름 참조는 수동(연산 없음)으로 드러낸다")
+    R0 = {"label": "r", "then": [{"when": W, "do": Cond.SELL}]}
     for broken in (dict(data, version=2), dict(data, products={}), dict(data, rules=[]),
                    dict(data, rules=data["rules"] + [data["rules"][0]]),
-                   dict(data, rules=data["rules"] + [rule("y", "쉰다", {"all": []})])):
+                   dict(data, rules=data["rules"] + [rule("y", "쉰다", {"all": []})]),
+                   dict(data, review={}),                                         # 옛 양식 키
+                   dict(data, products={"A": {"index": "^NDX", "exit_note": "x"}}),
+                   dict(data, rules=[dict(R0, scale=0.5)]),                         # 규칙에 모르는 키
+                   dict(data, rules=[{"label": "r", "then": [{"when": W, "do": Cond.SELL, "sell": "all"}]}]),
+                   dict(data, rules=[{"label": "r", "then": [{"when": W, "do": Cond.SELL, "qty": {"of": "cash", "x": 1}}]}]),
+                   dict(data, rules=[{"label": "r", "then": [{"when": W, "do": Cond.BLOCK, "qty": {"of": "held", "x": 1}}]}]),
+                   dict(data, rules=[{"label": "r", "then": [{"when": W, "do": Cond.BUY, "repeat": True}]}]),
+                   dict(data, rules=[dict(R0, skip="연산 없음: x")]),                  # then 과 skip 같이
+                   dict(data, rules=[{"label": "r", "note": "식 없음"}]),               # then·value·skip 다 없음
+                   dict(data, rules=[dict(R0, on=["Z"])]),                            # on 이 없는 종목
+                   dict(data, rules=[{"then": R0["then"]}])):                         # label 없음
         try:
             TreeGateway.of(broken)
             FAILS.append("형식이 틀린 트리가 통과: %r" % sorted(broken))

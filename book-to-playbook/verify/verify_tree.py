@@ -14,7 +14,7 @@
 
 무엇을 하나 (books/<slug>/ 아래) — 정지·경고의 뜻과 고칠 곳은 authoring/checklist/JUDGE.md 5절
   1. 최종 트리(tree.json, 심판이 씀) — 라이브 책은 반드시 있어야 하고, 문법 검사를 통과해야 한다.
-     v3 에 없는 맨 위 키(옛 review 등)가 남아 있으면 정지.
+     v3 형식 밖의 키(옛 review·오타)·동사에 안 맞는 qty 는 문법 오류로 정지(출입구 validate).
   2. 이중 추출 일치 — 서로 독립인 두 추출(tree_candidates/a.json·b.json)과 최종 트리를 **규칙 단위**로 맞춘다(규칙의 뜻 =
      이름·출처·메모를 뗀 펼친 식). a·b 가 같은 식으로 합의하지 않은 최종 규칙(한쪽에서 고름·심판이 새로 씀)은 그 규칙의
      `why` 가 있어야 한다(미심판 불일치). 등급 동사(안 산다·산다)·비중은 실제 시세 수년치로 날마다 비교해 일치율을 보인다(참고).
@@ -867,11 +867,6 @@ def check_book(slug, years):
         stop.append("%s 식 없는 수동 조건 %d개" % (slug, len(unclassified)))
         print("  ❌ '(정성)' 아닌 문장 수동 %d개 — 수치로 정할 수 있으면 식으로 쓰고 숫자 자리를 \"?\" 로: %s"
               % (len(unclassified), unclassified[:3]))
-    # 00b. 옛 양식 잔재 — v3 맨 위 키가 아닌 것(옛 칸 단위 심판 기록 review 등). 심판 근거는 규칙의 why 로.
-    legacy = tree.legacy_keys()
-    if legacy:
-        stop.append("%s 옛 양식 키 %s" % (slug, legacy))
-        print("  ❌ v3 에 없는 맨 위 키 %s — 심판 근거는 규칙마다 why 로(옛 review 는 다시 뽑을 때 없어진다)" % legacy)
     # 0c. 같은 뜻 정리 · skip 사유 머리 · 종목·심볼 "?"
     for kind, ls in same_meaning(tree):
         stop.append("%s %s: %s" % (slug, kind, " · ".join(ls)))

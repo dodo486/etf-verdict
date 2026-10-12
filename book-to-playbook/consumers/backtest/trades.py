@@ -152,7 +152,8 @@ def build_trades(gw, prod, hist, cal, starts, sell_rules, tranches=None, amount=
       · 1차: 신호 시작일 T 의 다음 날 시가(T+1)에. 한 상품에 포지션은 하나(보유 중 신호는 건너뜀).
       · 2차 이후: 매일 종가에 다음 차수 when 을 평가 → 참이면 다음 날 시가에(차례대로 각 한 번).
         같은 날 매도가 걸렸으면 그날은 사지 않는다.
-      · 매도: 매일 종가에 규칙 평가 → 걸리면 다음 날 시가에. 규칙마다 한 번만(같은 날 여럿이면 적힌 순서).
+      · 매도: 매일 종가에 규칙 평가 → 걸리면 다음 날 시가에. 규칙마다 한 번만(같은 날 여럿이면 적힌 순서) —
+        repeat 인 판다 갈래는 조건이 다시 맞을 때마다(거짓·모름 → 참으로 바뀐 날) 또 판다.
         qty held x=남은 물량의 x(1 = 전량) · bought x=그때까지 산 물량의 x.
       · 수익률 = (판 금액 + 남은 물량 × 마지막 종가) ÷ 산 금액 − 1. 미청산은 마지막 종가로 평가.
       · manual 은 '매매가 안 나가는 쪽'으로 푼다(manual_as=False). 매도 비율 "?"(저자 미명시)도 같은 쪽 — 팔지 않는다.
@@ -198,8 +199,10 @@ def build_trades(gw, prod, hist, cal, starts, sell_rules, tranches=None, amount=
         for d in range(e, L):
             sold_today = False
             for k, r in enumerate(sell_rules):
-                if k in fired or whens[k][d] is not True:
+                if whens[k][d] is not True:
                     continue
+                if k in fired and not (r.repeat and d > e and whens[k][d - 1] is not True):
+                    continue                      # 한 번만 — repeat 이면 다시 참이 된 날에만 또
                 fired.add(k)
                 q = to_units(r.qty, Ledger(bought=bought, held=remaining))
                 if q is None:

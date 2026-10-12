@@ -109,6 +109,10 @@ def t_trades():
     tree, hist, cal = mk(rows)
     t = bt(tree, hist, cal, [0], [sell("1차", {"ge": [R, 7]}, "bought", 0.3)])[0]
     check(len(t["sells"]) == 1, "규칙 한 번만")
+    # (4b) repeat — 조건이 다시 맞을 때마다(거짓 → 참으로 바뀐 날) 또 판다: +8%(참) → 0%(거짓) → +9%(다시 참)
+    t = bt(tree, hist, cal, [0], [rule("반복 축소", Cond.SELL, {"ge": [R, 7]}, ("held", 0.5), repeat=True)])[0]
+    check([(x["date"], round(x["qty"], 6)) for x in t["sells"]] == [(cal[2], 0.5), (cal[4], 0.25)],
+          "repeat 판다는 다시 참이 된 날마다 %r" % t["sells"])
     # (5) 매도 비율 null(저자 미명시) — 걸려도 팔지 않고 문구로 드러낸다
     ex = [sell("축소", {"ge": [R, 7]}, "held", "?")]
     t = bt(tree, hist, cal, [0], ex)[0]
