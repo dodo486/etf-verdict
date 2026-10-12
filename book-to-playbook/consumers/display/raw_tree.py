@@ -7,7 +7,7 @@
   트리가 잘못 뽑혀서인지 화면 로직 탓인지"를 가릴 수 없다. 이 보기는 그 반대다 — 재배치·등급·펼치기 없이 규칙을 원문
   소절(ref)마다 그대로 보여준다(플레이북 소절 헤딩의 '🌲 규칙' 토글).
 
-  트리는 판단자에게 묻는다 — Judge.cards()(출입구 TreeGateway.cards 의 규칙 카드: 적힌 그대로). 파일 키를 직접 만지지 않는다.
+  트리는 판단자에게 묻는다 — judge.tree.cards()(출입구 TreeGateway.cards 의 규칙 카드: 적힌 그대로). 파일 키를 직접 만지지 않는다.
   식 → 글 규칙(종가·k일 전·모두{}·«이름» 등)은 여기 한 곳."""
 import re
 
@@ -156,7 +156,7 @@ def render_by_ref(judge):
     """{소절 ref: 그 소절을 근거로 단 규칙들의 HTML} — 플레이북 소절 밑에 붙이는 조각. 한 규칙이 소절 여럿을 ref 로
     들면 그 소절마다 나온다."""
     out = {}
-    for c in judge.cards():
+    for c in judge.tree.cards():
         html = _card_html(c)
         for ref in _ref_tokens(c.ref):
             out.setdefault(ref, []).append(html)

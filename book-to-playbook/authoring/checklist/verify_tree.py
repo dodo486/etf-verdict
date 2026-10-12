@@ -128,7 +128,7 @@ def scenario_result(tree, sc):
     want, pct = (expect.get("do"), expect.get("pct")) if isinstance(expect, dict) else (expect, None)
     if "section" in sc or want not in Cond.VERBS + (WAIT,) or not tree.has(p):
         return "형식오류", None                  # 옛 칸 사례(section·참/거짓 기대값) 또는 모르는 결과·상품
-    hist, cal = _synthetic(sc, tree.symbols())
+    hist, cal = _synthetic(sc, tree.tree.symbols())
     judge = tree.product(p, hist, days=cal)
     if want == Cond.SELL:
         alts = {_sell_hit(judge, m) for m in (None, True, False)}
@@ -170,7 +170,7 @@ def _has_manual(n):
 
 def _stat_nodes(tree, prod):
     """통계 대상 라벨 노드 [(동사, 노드)] — 등급 동사(안 산다·산다)."""
-    return [(do, n) for do in Cond.GATES for n in Cond.labeled(tree.gate(prod, do))]
+    return [(do, n) for do in Cond.GATES for n in Cond.labeled(tree.tree.gate(prod, do))]
 
 
 def fire_stats(tree, hist, years):
@@ -182,7 +182,7 @@ def fire_stats(tree, hist, years):
         idx = window(cal, years)
         N = max(1, len(idx))
         nodes = []
-        top_avoid = {repr(n) for n in Grade._top_labeled(tree.gate(p, Cond.BLOCK))}
+        top_avoid = {repr(n) for n in Grade._top_labeled(tree.tree.gate(p, Cond.BLOCK))}
         for sec, n in _stat_nodes(tree, p):
             if _has_manual(n):
                 continue                         # 수동이 섞이면 '안 뜸/모름'이 정상이다
@@ -235,7 +235,7 @@ def weight_overflow(tree, hist, years):
     """상품 비중 합이 100% 를 넘는 날 [(날짜, 합)] — 비중을 아는 상품만 더한다(수동 범위는 최댓값)."""
     by_day = {}
     for p in tree.products():
-        if tree.weight(p).qty.x is None:
+        if tree.tree.weight(p).qty.x is None:
             continue
         judge = tree.product(p, hist)
         cal = judge.days
@@ -251,7 +251,7 @@ def manual_heads(tree):
     """{머리: 개수} — 사유 머리(COND_DSL 2절)로 수동 조건을 센다(같은 사유는 하나로)."""
     seen, cnt = set(), {}
     for p in tree.products():
-        for _z, _l, _r, node in tree.expressions(p):
+        for _z, _l, _r, node in tree.tree.expressions(p):
             for n in Cond.manual_leaves(node):
                 key = n["manual"] if "manual" in n else logic_key(n)   # "?" 식은 식이 신원
                 if key in seen:
@@ -271,7 +271,7 @@ def check_rules(tree, ta, tb):
     for l, k in rule_keys(tree).items():
         side = "합의" if (k in ka and k in kb) else ("a 쪽" if k in ka else ("b 쪽" if k in kb else "심판이 새로"))
         cnt[side] += 1
-        if side != "합의" and not tree.why(l):
+        if side != "합의" and not tree.tree.why(l):
             stop.append("미심판 불일치: %s(%s)" % (l, side))
     print("  규칙 %d개: %s" % (sum(cnt.values()), " · ".join("%s %d" % kv for kv in cnt.items())))
     for x in stop[:8]:
@@ -293,15 +293,15 @@ def gate_agreement(ta, tb, hist, years):
 def same_meaning(tree):
     """같은 뜻 정리 위반 [(종류, 내용)] — 같은 식 두 벌 · 같은 측정 두 번 · 이름↔식 1:1."""
     out = []
-    skipped = {u["rule"] for u in tree.skips()}
+    skipped = {u["rule"] for u in tree.tree.skips()}
     by = {}
     for l, k in rule_keys(tree, expand=False).items():
         if l not in skipped:
             by.setdefault(k, []).append(l)
     out.extend(("같은 식 두 벌", ls) for ls in by.values() if len(ls) > 1)
     by = {}
-    for l in tree.labels():
-        v = tree.value(l, expand=False)
+    for l in tree.tree.labels():
+        v = tree.tree.value(l, expand=False)
         if v is not None:
             by.setdefault(logic_key(v), []).append(l)
     out.extend(("같은 측정 두 번(참조 없이)", ls) for ls in by.values() if len(ls) > 1)
@@ -319,7 +319,7 @@ def same_meaning(tree):
             elif isinstance(node, list):
                 for v in node:
                     walk(v)
-        for do, label, _r, node in tree.expressions(p):
+        for do, label, _r, node in tree.tree.expressions(p):
             if label is None and do in Cond.GATES:
                 # 등급 묶음의 맨 위 항목은 규칙 이름을 단 갈래다 — 한 규칙의 여러 갈래(4개 이상 → 산다 · 2개 이하 →
                 #   안 산다)는 이름이 같은 게 정상이라 그 안쪽만 본다.
@@ -346,7 +346,7 @@ def symbol_gaps(tree):
         elif isinstance(n, list):
             for v in n:
                 walk(v, lab)
-    for c in tree.conditions():
+    for c in tree.tree.conditions():
         walk(c, None)
     return out
 
@@ -403,12 +403,12 @@ def check_book(slug, years):
         stop.append("%s 공통 직렬화 아님 %d개" % (slug, len(loose)))
         print("  ❌ 공통 직렬화가 아닌 파일 %s — 쓴 사람이 python -m dsl.tradeTool fmt <파일> 로 다시 쓴다" % loose)
     # 0. 이름 없는 수동 조건 정지 — 체크리스트가 조용히 사라지거나 '수동 확인'으로만 뜨면 안 된다
-    nameless = _nameless_manual(tree.conditions())
+    nameless = _nameless_manual(tree.tree.conditions())
     if nameless:
         stop.append("%s 이름 없는 수동 조건 %d개" % (slug, len(nameless)))
         print("  ❌ label 없는 수동 잎 %d개 — 화면에 '수동 확인'으로 샌다: %s" % (len(nameless), nameless[:3]))
     # 0b. 식 없는 수동 정지 — '저자 미명시' 는 수치로 정할 수 있으면 "?" 식, 순수 주관이면 '(정성)' 문장
-    unclassified = _unclassified_numeric_manual(tree.conditions())
+    unclassified = _unclassified_numeric_manual(tree.tree.conditions())
     if unclassified:
         stop.append("%s 식 없는 수동 조건 %d개" % (slug, len(unclassified)))
         print("  ❌ '(정성)' 아닌 문장 수동 %d개 — 수치로 정할 수 있으면 식으로 쓰고 숫자 자리를 \"?\" 로: %s"
@@ -417,7 +417,7 @@ def check_book(slug, years):
     for kind, ls in same_meaning(tree):
         stop.append("%s %s: %s" % (slug, kind, " · ".join(ls)))
         print("  ❌ %s: %s — 이름 하나로 두고 다른 규칙은 {\"rule\"} 로 참조" % (kind, " · ".join(ls)))
-    bad_skip = [u["rule"] for u in tree.skips() if not str(u.get("reason") or "").startswith(tuple(h + ":" for h in SKIP_HEADS))]
+    bad_skip = [u["rule"] for u in tree.tree.skips() if not str(u.get("reason") or "").startswith(tuple(h + ":" for h in SKIP_HEADS))]
     if bad_skip:
         stop.append("%s 사유 머리 없는 skip %d개" % (slug, len(bad_skip)))
         print("  ❌ skip 사유가 '데이터 없음:'·'연산 없음:' 로 시작하지 않음: %s" % bad_skip[:3])
@@ -448,7 +448,7 @@ def check_book(slug, years):
         stop.extend("%s %s" % (slug, x) for x in check_rules(tree, ta, tb))
         gate_agreement(ta, tb, hist, years)
         for name, t in (("a", ta), ("b", tb)):
-            un = t.skips()
+            un = t.tree.skips()
             if un:
                 heads = {}
                 for u in un:
@@ -484,7 +484,7 @@ def check_book(slug, years):
     #   남기는 게 맞고, 저자가 일부러 둘로 썼으면 두 규칙의 why 에 판례로 적는다(JUDGE 5절).
     for p, sa, la, sb, lb in same:
         msg = "%s 완전히 같은 조건: [%s] %s == [%s] %s" % (p, sa, la, sb, lb)
-        if sa != sb or (tree.why(la) and tree.why(lb)):
+        if sa != sb or (tree.tree.why(la) and tree.tree.why(lb)):
             print("  ☑ %s — %s" % (msg, "동사가 다름" if sa != sb else "두 규칙 다 why"))
             continue
         stop.append("%s 판정이 완전히 같은 조건: %s · %s" % (slug, la, lb))
@@ -529,7 +529,7 @@ def contract(slug):
         bad.append("tree.json 문법: %s" % e)
         tree = None
     if tree is not None and keys:
-        refs = tree.refs()
+        refs = tree.tree.refs()
         # "2-1·2-3" 처럼 여러 소절을 함께 적은 ref 는 하나하나 본다
         parts = {p.strip() for r in refs for p in str(r).replace("·", ",").split(",") if p.strip()}
         missing = sorted(parts - keys)

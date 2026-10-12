@@ -143,7 +143,7 @@ def factorable(node):
 # ------------------------------------------------------------------ 규칙 단위 이중 추출 · 같은 뜻 정리
 def rule_keys(tree, expand=True):
     """{라벨: 규칙 뜻 지문}."""
-    return {l: logic_key(tree.body(l, expand)) for l in tree.labels()}
+    return {l: logic_key(tree.tree.body(l, expand)) for l in tree.tree.labels()}
 
 
 def pair_rules(ta, tb):
@@ -172,7 +172,7 @@ def _tranche_rows(tranches):
 
 def _zone_node(tree, prod, sec):
     """등급 동사 하나의 식(any 묶음) — 안 산다·산다만(그 밖은 None)."""
-    return tree.gate(prod, sec) if sec in Cond.GATES else None
+    return tree.tree.gate(prod, sec) if sec in Cond.GATES else None
 
 
 def _section_key(tree, prod, sec):
@@ -184,7 +184,7 @@ def _conditions(tree, prod):
     """상품의 이름 달린 조건들 {지문: {"label", "zones", "expr"}} — 동사 어디든(분할·비중·판다 갈래 안 포함).
     같은 식이 여러 동사에 쓰이면 한 항목에 동사를 모은다."""
     out = {}
-    for z, _l, _r, node in tree.expressions(prod):
+    for z, _l, _r, node in tree.tree.expressions(prod):
         def walk(n):
             if isinstance(n, dict):
                 if n.get("label") and factorable(n):
@@ -381,10 +381,10 @@ def zone_diff(ta, tb, prod, zone):
     if zone == Cond.SELL:
         return {"status": "same" if _ckey(xa) == _ckey(xb) else "diff", "rules": _rules_diff(xa, xb)}
     out = {"status": "same" if _ckey(xa) == _ckey(xb) else "diff"}            # weight(비중·분할)
-    wa, wb = ta.weight(prod).qty.x, tb.weight(prod).qty.x
+    wa, wb = ta.tree.weight(prod).qty.x, tb.tree.weight(prod).qty.x
     if _ckey(wa) != _ckey(wb):
         out["weight"] = tree_diff(wa, wb) if isinstance(wa, dict) and isinstance(wb, dict) else {"a": wa, "b": wb}
-    ra, rb = _tranche_rows(ta.tranches(prod)), _tranche_rows(tb.tranches(prod))
+    ra, rb = _tranche_rows(ta.tree.tranches(prod)), _tranche_rows(tb.tree.tranches(prod))
     if _ckey(ra) != _ckey(rb):
         out["tranches"] = _rules_diff(ra, rb)
     return out
@@ -458,7 +458,7 @@ def dump_disagreements(slug, per, years):
             for d in picks:
                 i = cal.index(d)
                 prices = {}
-                for s in sorted(ta.symbols([p]) | tb.symbols([p])):
+                for s in sorted(ta.tree.symbols([p]) | tb.tree.symbols([p])):
                     prices[s] = Judge.recent(hist, s, d, 25)
                 cases.append({"date": d, "a": r["_ia"][sec][i], "b": r["_ib"][sec][i],
                               "a_explain": _zone_explain(pa, sec, i), "b_explain": _zone_explain(pb, sec, i),

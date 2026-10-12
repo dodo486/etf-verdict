@@ -8,7 +8,7 @@
 라이브 서버·러너가 부르는 '진입+표시+알림' 껍데기 · 판단은 signals.judge 가 한다).
 
 출력 계약(알림 · 화면 · /api/verdict 가 소비):
-  top     : {slug, title, ts, date, source, cash, verbs[], grades{}, verdicts[], refs{}, missing{}, positions_note}
+  top     : {slug, title, ts, date, source, cash, verbs[], grades{}, verdicts[], missing{}, positions_note}
             verbs = 동사 셋(정본 Cond.VERBS — 화면 머리글) · grades = 등급 글자표(정본 Grade.GRADES)
   verdict : {prod, note, date, close, chg, key, grade, reason,
              gates{안 산다, 산다: view}, opt{..}, pes{..},     등급 동사 둘의 중첩 설명 + 낙관·비관 값
@@ -16,8 +16,6 @@
                                                      units = 오늘 물량(시작자본 1.0 기준 — trades.to_units, 비중 모르면 None)
              sells[{label, ref, sell(문장 — trades.sell_text), note, view}], exit_policy("book"|"none" — trades.exit_policy),
              positions[{…, sells[], next_tranche}]}                  positions = 내 포지션(로컬 파일)이 있을 때만
-  refs    : {원문 소절: {auto, manual, verbs[], prods[], skipped?[{rule, reason}]}}
-            플레이북 소절별 체크리스트 반영 현황 + 트리로 못 옮긴 규칙(skip)과 그 사유
 view 는 노드 하나당 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, hidden?} (판단자 설명 signals/explain.view)
 — 수동은 '모름'(사람이 답했으면 그 답 — render(answers=))으로 둔 그날 값. 화면은 다시 계산하지 않고 그대로 그린다.
 """
@@ -137,7 +135,7 @@ def _format(slug, book, prices, decisions, answers=None):
     라이브 2단 pub-sub 의 화면 소비자가 verdict_bus 에서 받은 사실로 이걸 부른다(같은 모양을 라이브·배치가 공유)."""
     now = datetime.now(timezone.utc).astimezone()
     top = {"slug": slug, "title": book_title(slug), "ts": now.isoformat(), "source": SOURCE,
-           "verdicts": [], "refs": {}, "missing": {}, "cash": None,
+           "verdicts": [], "missing": {}, "cash": None,
            # 등급 글자표(키→라벨)를 실어보낸다 — 화면이 따로 복붙하지 않고 이걸 받아 쓴다(단일 출처).
            "grades": Grade.GRADES,
            # 동사 셋(화면 머리글·판정 JSON 키) — Cond.VERBS 가 정본이다. 화면은 복붙하지 않고 이걸 받아 쓴다.
@@ -160,7 +158,6 @@ def _format(slug, book, prices, decisions, answers=None):
     if weights and all_known:
         top["cash"] = max(0.0, 100.0 - sum(weights))
     top["date"] = max((v.get("date") or "" for v in top["verdicts"]), default=None)
-    top["refs"] = book.coverage()
     top["missing"] = {s: md_feed.requested().get(s, "-") for s in Judge.missing(prices)}
     if answers is not None:
         top["answers"] = answers

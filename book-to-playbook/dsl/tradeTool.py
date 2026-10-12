@@ -882,25 +882,24 @@ def session_closes(symbols, cal, asof):
 class RuleSeries:
     """한 상품의 등급 동사(안 산다·산다)·비중을 전체 달력에 대해 한 번 계산해 둔다."""
 
-    def __init__(self, rules, prices, days, asof=None, answers=None):
-        """rules = 상품 하나의 규칙 묶음(TreeGateway.product — ProductRules). asof = 관측 시각(UTC datetime) — 장중(tf="1m"/"5m") 조건을 이 시점 이하로 자르고, 일봉은 asof 이하
+    def __init__(self, tree, product, prices, days, asof=None, answers=None):
+        """tree = 트리 출입구(TreeGateway) · product = 판정할 상품 — 그 상품의 규칙을 골라 평가한다. asof = 관측 시각(UTC datetime) — 장중(tf="1m"/"5m") 조건을 이 시점 이하로 자르고, 일봉은 asof 이하
         확정(settled) 봉만 본다(미확정 그날 일봉은 None). None 이면 실제 지금(일봉은 마지막 확정봉).
         answers = 사람이 답한 수동 {answer_key: 참/거짓} — 등급·금액·비중이 그 답으로 풀린다(서버 권위).
         None 이면 옛 동작 그대로."""
-        product = rules.product
-        self.rules, self.product, self.days, self.prices = rules, product, list(days), prices
-        sc = session_closes(rules.symbols(), list(days), asof)
+        self.tree, self.product, self.days, self.prices = tree, product, list(days), prices
+        sc = session_closes(tree.symbols([product]), list(days), asof)
         mk = lambda m: Ctx(prices, days, product, manual_as=m, asof=asof, session_close=sc, answers=answers)
         self.ctx = {True: mk(True), False: mk(False), None: mk(None)}
         s = lambda node, m: series(node, self.ctx[m])
-        self.opt = {do: s(rules.gate(do), BUY_SIDE[do]) for do in GATES}
-        self.pes = {do: s(rules.gate(do), not BUY_SIDE[do]) for do in GATES}
-        w = rules.weight().qty.x                # 비중 식(Qty "cash") — None = 저자 미명시
+        self.opt = {do: s(tree.gate(product, do), BUY_SIDE[do]) for do in GATES}
+        self.pes = {do: s(tree.gate(product, do), not BUY_SIDE[do]) for do in GATES}
+        w = tree.weight(product).qty.x                # 비중 식(Qty "cash") — None = 저자 미명시
         self.weight = {m: (s(w, m) if w is not None else None) for m in (None, True, False)}
         # 데이터 완전성 가드 — 이 상품 등급이 실제로 쓰는 가장 긴 워밍업(트리에서 파생, 하드코딩 아님).
         #   그보다 '확정 봉'이 적은 초기 구간의 1d 신호는 창이 덜 차 조용히 None/틀릴 수 있어 신뢰불가다
         #   → grade_key 가 '불완전 데이터(❔ 보류)'로 표시한다(✅/🚫 확신 금지). WARMUP_DAYS(fetch 버퍼)와 무관.
-        self.warmup = rules.warmup()
+        self.warmup = tree.warmup(product)
         # 심볼 확정봉 지도 — asof 장중이면 오늘 미확정 봉을 뺀 '마지막 확정 index'(없으면 전부 확정 = 항등).
         #   여러 심볼을 보면 가장 적게 확정된 심볼(지연된 feed)이 기준이다 — 하나라도 모자라면 불완전.
         self._confirmed = self._confirmed_index_map()
@@ -910,7 +909,7 @@ class RuleSeries:
         아직 확정 못 했으면(지연된 feed·asof 장중 미확정) 그 심볼 기준으로 낮춘다. 확정봉이 하나도 없으면 -1.
         캘린더가 없거나 asof 가 없으면(라이브 지금) settled_map 이 no-op(None) → 날짜 index 그대로(항등)."""
         ctx = self.ctx[None]
-        syms = sorted(set(self.rules.symbols()) | {self.product})
+        syms = sorted(set(self.tree.symbols([self.product])) | {self.product})
         maps = [ctx.settled_map(s) for s in syms]
         out = []
         for day in range(len(self.days)):
@@ -955,18 +954,18 @@ class RuleSeries:
     def explain(self, day):
         """라벨 달린 노드의 그날 값 — 수동은 '모름'(None)으로 둔 평가. {동사: [(label, ref, 값)]}"""
         return {do: [(n.get("label"), n.get("ref"), series(n, self.ctx[None])[day])
-                     for n in labeled(self.rules.gate(do))] for do in GATES}
+                     for n in labeled(self.tree.gate(self.product, do))] for do in GATES}
 
     def top(self, day):
         """동사마다 맨 위 라벨 노드들의 그날 값(사유 문장용 — 안쪽 노드까지 늘어놓으면
         not 아래의 '거짓 = 정상' 노드가 '미충족'으로 읽힌다). 수동은 모름(None)."""
         return {do: [(n.get("label"), n.get("ref"), series(n, self.ctx[None])[day])
-                     for n in _top_labeled(self.rules.gate(do))] for do in GATES}
+                     for n in _top_labeled(self.tree.gate(self.product, do))] for do in GATES}
 
     def manual_items(self, day=None):
         """사람 확인이 필요한 조건 [(동사, 라벨, ref)] — 판다(보유분)는 뺀다."""
         return [(z, n.get("label") or manual_text(n), n.get("ref"))
-                for z, _l, _r, node in self.rules.expressions() if z != SELL for n in manual_leaves(node)]
+                for z, _l, _r, node in self.tree.expressions(self.product) if z != SELL for n in manual_leaves(node)]
 
 
 def _top_labeled(node):

@@ -3,9 +3,8 @@
 """판단자(구간③) — 트리 원본과 시세 원본을 쓰는 유일한 곳. 책의 내용대로 판단하는 일은 여기 한 곳에서만 한다.
 
   · Judge         책 하나의 판단자 — 트리를 열고(TreeGateway 는 여기서만), 시세를 받고(Grade.history 는 여기서만),
-                  상품마다 ProductJudge 를 세운다. 라이브 판정(decisions)·백테스트 신호(signals)·원문 소절별 반영
-                  현황(coverage)·트리 검사기의 질문(labels·body·why…)을 낸다.
-  · ProductJudge  상품 하나의 판단자 — 그 상품 규칙(ProductRules)과 시세만 안다(책의 다른 상품·트리 파일은 모른다).
+                  상품마다 ProductJudge 를 세운다. 라이브 판정(decisions)·백테스트 신호(signals)를 낸다.
+  · ProductJudge  상품 하나의 판단자 — 트리에서 그 상품의 규칙만 골라 시세와 평가한다.
                   등급(grade·latest)·그날 판정(decide → Decision)·조건 설명(views)·보유분 상태(status)·체결 워크가
                   쓸 보유 조건 값(conditions)·가격(price — 체결가·수익률 계산용).
   · Holding       보유 하나의 상태(첫 매수 봉·평단·산 차수·체결 장부) — 값만. 평가는 ProductJudge 가 한다.
@@ -88,20 +87,20 @@ class Holding:
 # ================================================================ 상품 하나
 class ProductJudge:
     """상품 하나의 판단자 — 생성 때 그 상품 규칙을 달력 전체로 한 번 계산해 둔다(Grade.RuleSeries).
-    rules = ProductRules(TreeGateway.product) · prices = 시세 묶음(Judge 가 받은 것) · days = 판정 달력(생략 = 이 상품 봉 날짜)
+    tree = 트리 출입구 · product = 상품 · prices = 시세 묶음(Judge 가 받은 것) · days = 판정 달력(생략 = 이 상품 봉 날짜)
     · asof = 관측 시각(UTC datetime, None 이면 지금) · answers = 사람이 답한 수동 {Cond.answer_key: 참/거짓}."""
 
-    def __init__(self, rules, prices, days=None, asof=None, answers=None):
-        self._rules, self.product = rules, rules.product
+    def __init__(self, tree, product, prices, days=None, asof=None, answers=None):
+        self._tree, self.product = tree, product
         self._prices = prices
         self._bars = prices.get(self.product) or []
         self.days = [c.date for c in self._bars] if days is None else list(days)
-        self._series = Grade.RuleSeries(rules, prices, self.days, asof, answers)
+        self._series = Grade.RuleSeries(tree, product, prices, self.days, asof, answers)
 
     # ------------------------------------------------------------ 상품·가격
     @property
     def note(self):
-        return self._rules.note
+        return self._tree.note(self.product)
 
     @property
     def has_data(self):
@@ -120,15 +119,15 @@ class ProductJudge:
     # ------------------------------------------------------------ 갈래 목록(Branch 값 — 라벨·소절·메모·조건·얼마나)
     def weight(self):
         """비중 갈래(산다 qty cash) — 없으면 qty.x None."""
-        return self._rules.weight()
+        return self._tree.weight(self.product)
 
     def tranches(self):
         """분할 차수 갈래(산다 qty budget)."""
-        return self._rules.tranches()
+        return self._tree.tranches(self.product)
 
     def sells(self):
         """판다 갈래."""
-        return self._rules.sells()
+        return self._tree.sells(self.product)
 
     # ------------------------------------------------------------ 등급·얼마나
     def grade(self, day):
@@ -155,7 +154,7 @@ class ProductJudge:
     def gate_value(self, do, day, view=None):
         """등급 동사 하나의 그날 값 — view None = 수동 모름 · "opt" = 수동이 유리하게 · "pes" = 불리하게(검사·사례 채점용)."""
         if view is None:
-            return Cond.series(self._rules.gate(do), self._series.ctx[None])[day]
+            return Cond.series(self._tree.gate(self.product, do), self._series.ctx[None])[day]
         return (self._series.opt if view == "opt" else self._series.pes)[do][day]
 
     def weight_at(self, day):
@@ -176,12 +175,12 @@ class ProductJudge:
             incomplete=s.incomplete(day), confirmed=s._confirmed[day] + 1, warmup=s.warmup,
             top=s.top(day), manual=s.manual_items(day), amount=self.amount(day),
             opt={do: s.opt[do][day] for do in Cond.GATES}, pes={do: s.pes[do][day] for do in Cond.GATES},
-            views={do: explain.view(self._rules.gate(do), s.ctx[None], day) for do in Cond.GATES},
+            views={do: explain.view(self._tree.gate(self.product, do), s.ctx[None], day) for do in Cond.GATES},
             holdings=[self.status(h, day) for h in holdings])
 
     def static_views(self):
         """시세 없이 보이는 등급 조건 설명(값 없음) — 시세가 없는 상품의 체크리스트 구조."""
-        return {do: explain.static_view(self._rules.gate(do)) for do in Cond.GATES}
+        return {do: explain.static_view(self._tree.gate(self.product, do)) for do in Cond.GATES}
 
     def describe(self, branch):
         """갈래 하나(비중·분할·판다)의 값 없는 설명."""
@@ -229,7 +228,7 @@ class ProductJudge:
 
     def gate(self, do):
         """등급 동사 하나의 조건 묶음(펼친 식) — 검사기가 라벨 노드를 훑는 데 쓴다."""
-        return self._rules.gate(do)
+        return self._tree.gate(self.product, do)
 
 
 # ================================================================ 책 하나
@@ -301,7 +300,9 @@ class Judge:
 
     def product(self, product, prices, days=None, asof=None, answers=None):
         """상품 하나의 판단자."""
-        return ProductJudge(self._tree.product(product), prices, days, asof, answers)
+        if not self._tree.has(product):
+            raise Cond.CondError("트리에 없는 상품 %r" % product)
+        return ProductJudge(self._tree, product, prices, days, asof, answers)
 
     # ------------------------------------------------------------ 라이브 · 백테스트
     def positions(self):
@@ -342,80 +343,8 @@ class Judge:
             out[p] = (pj, pts)
         return out
 
-    # ------------------------------------------------------------ 원문 소절별 반영 현황(플레이북 배지)
-    def coverage(self):
-        """{소절: {auto, manual, verbs[], prods[], skipped?[{rule, reason}]}} — 트리에 ref 로 달린 라벨 노드·규칙을 센다."""
-        out = {}
-
-        def add(ref, do, prod, manual):
-            if not ref:
-                return
-            r = out.setdefault(ref, {"auto": 0, "manual": 0, "verbs": [], "prods": []})
-            r["manual" if manual else "auto"] += 1
-            if do not in r["verbs"]:
-                r["verbs"].append(do)
-            if prod not in r["prods"]:
-                r["prods"].append(prod)
-
-        for p in self.products():
-            rules = self._tree.product(p)
-            for do, label, ref, node in rules.expressions():
-                if label:
-                    add(ref, do, p, bool(Cond.manual_leaves(node)))
-                for n in Cond.labeled(node):
-                    add(n.get("ref"), do, p, bool(Cond.manual_leaves(n)))
-            for t in rules.tranches():
-                if t.when is None:
-                    add(t.ref, Cond.BUY, p, False)
-            w = rules.weight()
-            if w.qty.x is None and w.ref:
-                add(w.ref, Cond.BUY, p, False)
-        for u in self._tree.skips():
-            if u.get("ref"):
-                r = out.setdefault(u["ref"], {"auto": 0, "manual": 0, "verbs": [], "prods": []})
-                r.setdefault("skipped", []).append({"rule": u.get("rule"), "reason": u.get("reason")})
-        return out
-
-    # ------------------------------------------------------------ 트리 검사기의 질문(구간② — 시세 없이 트리만)
-    def gate(self, product, do):
-        return self._tree.gate(product, do)
-
-    def weight(self, product):
-        return self._tree.weight(product)
-
-    def tranches(self, product):
-        return self._tree.tranches(product)
-
-    def sells(self, product):
-        return self._tree.sells(product)
-
-    def expressions(self, product):
-        return self._tree.expressions(product)
-
-    def symbols(self, products=None):
-        return self._tree.symbols(products)
-
-    def refs(self):
-        return self._tree.refs()
-
-    def skips(self):
-        return self._tree.skips()
-
-    def labels(self):
-        return self._tree.labels()
-
-    def body(self, label, expand=True):
-        return self._tree.body(label, expand)
-
-    def value(self, label, expand=True):
-        return self._tree.value(label, expand)
-
-    def why(self, label):
-        return self._tree.why(label)
-
-    def conditions(self):
-        return self._tree.conditions()
-
-    def cards(self):
-        """규칙 카드(적힌 그대로) — 원시 트리 보기(화면)용."""
-        return self._tree.cards()
+    # ------------------------------------------------------------ 트리 질문(구간② 비교·채점·원시 트리 보기 — 시세 없이 트리만)
+    @property
+    def tree(self):
+        """트리 출입구(TreeGateway) — 비교 도구·채점기·원시 트리 보기가 규칙·식을 직접 묻는 단 하나의 문. 판정은 여기로 안 낸다."""
+        return self._tree

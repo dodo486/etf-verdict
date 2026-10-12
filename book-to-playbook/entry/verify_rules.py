@@ -327,7 +327,7 @@ def m_gone_ops(src):
 
 
 # 판단자 — 트리 원본·시세 원본·조건 평가를 쓰는 곳은 판단자(signals/judge) 하나와 그 도구(dsl)뿐.
-GATEWAY_NAMES = {"TreeGateway", "ProductRules"}
+GATEWAY_NAMES = {"TreeGateway"}
 EVAL_ATTRS = {"series", "Ctx", "RuleSeries"}                       # Cond.series·Cond.Ctx·Grade.RuleSeries
 FETCH_ATTRS = {"history", "history_back", "History", "histories", "minutes", "sessions"}   # Grade.·md_feed. 시세 받기
 BAR_FIELDS = {"open", "high", "low", "close", "volume"}               # 캔들(시세 원본) 필드
@@ -338,7 +338,7 @@ def _call_funcs(tree):
 
 
 def m_gateway_use(src):
-    """출입구(TreeGateway·ProductRules)를 이름으로 쓰는 자리 — import 포함."""
+    """출입구(TreeGateway)를 이름으로 쓰는 자리 — import 포함."""
     if src.kind != "py":
         return []
     out = [(ln, f, x) for ln, f, x in _py_names(src) if x in GATEWAY_NAMES]
