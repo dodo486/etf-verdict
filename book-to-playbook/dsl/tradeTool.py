@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from market import md_feed
 
 # ================= 문법·평가 (옛 cond.py) =================
+ROLES = ("$self", "$index")   # 시세 잎 sym 의 역할 — 해석기가 상품마다 채운다($self = 판정 중인 상품, $index = 그 상품의 지수)
 META = ("label", "ref", "id", "note", "allprod", "on")   # allprod = 화면 전용 플래그(공통 규칙 여부) — 평가기는 무시
                                                          # on = 노드 레벨 대상 상품(series 가 처리) — 평가 중 상품이 빠지면 그 노드는 '항상 참'
 UNKNOWN = "?"             # 저자가 안 준 숫자 — 이 자리를 품은 판단 노드는 수동(사람이 정함)
@@ -117,9 +118,9 @@ def answer_key(node, prod):
 
 
 def product_specific(node):
-    """pos(그 상품 보유분)·노드 레벨 on(그 밖의 상품에선 항상 참)을 쓰는 식은 상품마다 값이 달라진다 — 여러 상품이
-    '같이 보는' 판단이 아니다. 시세 잎은 늘 구체 티커(sym)라 상품과 무관하다."""
-    return any(isinstance(n, dict) and ("pos" in n or n.get("on")) for n in labeled_all(node))
+    """$self·$index(상품마다 채워지는 역할)·pos(그 상품 보유분)·노드 레벨 on 을 쓰는 식은 상품마다 값이 달라진다 —
+    여러 상품이 '같이 보는' 판단이 아니다. 구체 티커 시세만 쓰면 상품과 무관하다."""
+    return any(isinstance(n, dict) and ("pos" in n or n.get("on") or n.get("sym") in ROLES) for n in labeled_all(node))
 
 
 def validate(node, path="$"):
@@ -148,9 +149,9 @@ def validate(node, path="$"):
             raise CondError("%s.px: 모르는 시세 필드 %r" % (path, v))
         sym = node.get("sym")
         if not (isinstance(sym, str) and sym.strip()):
-            raise CondError("%s.sym: 구체 티커가 필요하다(생략 금지 — 상품 자신이면 그 티커, 지수면 지수 티커)" % path)
-        if sym.startswith("$"):
-            raise CondError("%s.sym: %r — $ 심볼($self·$index·$s·이름 심볼)은 폐지됐다. 구체 티커를 쓴다" % (path, sym))
+            raise CondError("%s.sym: 필요하다(생략 금지) — 역할 $self·$index 또는 구체 티커" % path)
+        if sym.startswith("$") and sym not in ROLES:
+            raise CondError("%s.sym: %r — 역할은 $self·$index 뿐이다($s·이름 심볼은 폐지, 여러 종목은 atleast·of)" % (path, sym))
         if "tf" in node and node["tf"] not in TIMEFRAMES:
             raise CondError("%s.tf: 모르는 봉 %r (허용 %s)" % (path, node["tf"], "/".join(TIMEFRAMES)))
     elif op == "abs":
@@ -212,9 +213,9 @@ def validate(node, path="$"):
 class Ctx:
     """평가 문맥. hist={심볼: [Candle(date,open,high,low,close,volume)]}, cal=날짜 목록."""
 
-    def __init__(self, hist, cal, self_sym, manual_as=None, pos=None, asof=None,
+    def __init__(self, hist, cal, self_sym, index_sym=None, manual_as=None, pos=None, asof=None,
                  session_close=None, answers=None):
-        """self_sym = 평가 중인 상품(포지션 pos 의 종가·수동 답 열쇠·노드 레벨 on 에만 — 시세 잎은 늘 구체 sym).
+        """self_sym = 평가 중인 상품($self) · index_sym = 그 상품의 지수($index, 없으면 None).
         pos = (첫 매수일 인덱스, 평균 매입가 | 날짜별 평균 매입가 목록[, 장부]) — 판다·분할 갈래 평가 때만.
         장부 = {"filled": {규칙 이름 | None(전체): 날짜별 산 횟수}, "sold": 날짜별 판 비율} — 없으면 filled·sold 는 모름.
         asof = 관측 시각(UTC datetime) — 분봉(tf="1m"/"5m") 필드를 이 시각 이하로 자른다. None 이면 실제 지금.
@@ -228,6 +229,7 @@ class Ctx:
         self.hist = hist
         self.cal = list(cal)
         self.self_sym = self_sym
+        self.index_sym = index_sym
         self.manual_as = manual_as
         self.session_close = session_close or {}  # {심볼: {YYYYMMDD: 마감 UTC datetime}} — 일봉 확정 경계
         self._px = {}
@@ -241,7 +243,7 @@ class Ctx:
         if self.manual_as is None:
             return self
         if self._flip is None:
-            f = Ctx(self.hist, self.cal, self.self_sym, not self.manual_as, self.pos,
+            f = Ctx(self.hist, self.cal, self.self_sym, self.index_sym, not self.manual_as, self.pos,
                     self.asof, self.session_close, self.answers)
             f._px, f._smap, f._flip = self._px, self._smap, self
             self._flip = f
@@ -254,6 +256,16 @@ class Ctx:
             if a is not None:
                 return a
         return self.manual_as
+
+    def bind(self, sym):
+        """역할 → 실제 티커($self → 상품, $index → 그 상품의 지수). 구체 티커는 그대로."""
+        if sym == "$self":
+            return self.self_sym
+        if sym == "$index":
+            if not self.index_sym:
+                raise CondError("$index 가 정의되지 않은 상품: %s (products 에 index 가 없다)" % self.self_sym)
+            return self.index_sym
+        return sym
 
     def px(self, sym, field, tf="1d"):
         """심볼·필드의 asof 축 시계열(달력 길이). 일봉(tf="1d")은 날짜별 '확정(settled)' 일봉(장중 asof 면 아직
@@ -436,7 +448,7 @@ def _daily_axis(node, ctx):
         if op == "px":
             if n.get("tf", "1d") != "1d":
                 return None                 # 분봉/5분봉 잎 — 1d-순수 아님
-            syms.add(n["sym"])
+            syms.add(ctx.bind(n["sym"]))
         elif op in _NON_DAILY or is_unknown(n):
             return None                     # 수동("?" 식 포함)·포지션 — 1d-순수 아님
     if not syms:
@@ -491,7 +503,7 @@ def _series(node, ctx):
     S = lambda n: series(n, ctx)
 
     if op == "px":
-        return ctx.px(node["sym"], v, node.get("tf", "1d"))
+        return ctx.px(ctx.bind(node["sym"]), v, node.get("tf", "1d"))
 
     if op in ARITH:
         a, b = S(v[0]), S(v[1])
@@ -888,8 +900,9 @@ class RuleSeries:
         answers = 사람이 답한 수동 {answer_key: 참/거짓} — 등급·금액·비중이 그 답으로 풀린다(서버 권위).
         None 이면 옛 동작 그대로."""
         self.tree, self.product, self.days, self.prices = tree, product, list(days), prices
+        self.index = tree.index(product)
         sc = session_closes(tree.symbols([product]), list(days), asof)
-        mk = lambda m: Ctx(prices, days, product, manual_as=m, asof=asof, session_close=sc, answers=answers)
+        mk = lambda m: Ctx(prices, days, product, self.index, manual_as=m, asof=asof, session_close=sc, answers=answers)
         self.ctx = {True: mk(True), False: mk(False), None: mk(None)}
         s = lambda node, m: series(node, self.ctx[m])
         self.opt = {do: s(tree.gate(product, do), BUY_SIDE[do]) for do in GATES}
@@ -1061,6 +1074,7 @@ class Cond:
 종목 모델: 규칙·노드가 어느 상품에 판정을 내나 = on · 시세 잎이 읽는 티커 = sym. 둘뿐이다
   ("여러 종목 중 N개" = {"atleast": N, "of": [종목별 비교 …]}, 각 잎 sym = 그 티커)."""
     META = META
+    ROLES = ROLES
     UNKNOWN = UNKNOWN
     UNKNOWN_REASON = UNKNOWN_REASON
     PX_FIELDS = PX_FIELDS

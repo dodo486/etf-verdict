@@ -12,8 +12,10 @@
     · weight — 산다 + qty cash(비중) · tranches — 산다 + qty budget(분할) · sells — 판다
   수량은 트리의 qty {of, x} 를 그대로 Qty(of, x) 로 건넨다("?" → None). 물량 변환은 consumers/backtest/trades.to_units.
   `{"rule": "이름"}` 참조는 건네기 전에 **펼친다** — 평가기(Cond)는 평범한 식만 본다.
-  종목 모델은 둘뿐 — 규칙(·노드)이 어느 상품에 판정을 내나 = `on`, 시세 잎이 읽는 티커 = `sym`(구체 티커, 필수).
-  ($self·$index·$s·이름 심볼 names·products 의 index 칸·across 는 폐지 — 형식 검사가 거부한다.)
+  트리는 상품을 모르는 공통 로직이다. 상품마다 달라지는 것은 해석기(판단자)가 채운다:
+    · 시세 잎 sym = 역할 `$self`(판정 중인 상품) · `$index`(그 상품의 지수 — products 의 index) · 또는 구체 티커(^VIX 등)
+    · 규칙·노드 `on` = 저자가 상품을 이름으로 짚은 규칙의 대상 상품 필터(생략 = 전 상품)
+  ($s·이름 심볼 names·across 는 폐지 — 여러 종목 중 N개는 atleast·of. 형식 검사가 거부한다.)
   `{"pos": "filled", "rule": 이름}`(그 규칙으로 산 횟수)은 그대로 건넨다 — 값은 체결 장부(trades)가 낸다.
 """
 import json
@@ -26,7 +28,7 @@ from shared.paths import book_file
 BLOCK, BUY, SELL = Cond.BLOCK, Cond.BUY, Cond.SELL
 # 트리 v3 파일 형식(COND_DSL 1·5절) — 여기 밖의 키는 거부한다(옛 양식·오타를 조용히 무시하지 않는다).
 TOP_KEYS = ("version", "products", "rules", "note")
-PRODUCT_KEYS = ("ref", "note")
+PRODUCT_KEYS = ("index", "ref", "note")
 # 책 폴더 안의 트리 파일 — 어느 트리(최종 None · 추출자 후보 "a"·"b")가 어느 파일인지는 여기 한 곳.
 FILES = {None: "tree.json", "a": "tree_candidates/a.json", "b": "tree_candidates/b.json"}
 RULE_KEYS = ("label", "ref", "note", "on", "value", "then", "skip", "why")
@@ -47,8 +49,10 @@ def rule(label, do, when=None, qty=None, repeat=False, **meta):
 
 
 def synthetic(products, *rules, **top):
-    """합성 트리(검사용, v3). products = 상품 티커 목록. 규칙이 없으면 skip 하나를 둔다(v3 는 빈 rules 를 거부한다)."""
-    prods = {p: {} for p in products}
+    """합성 트리(검사용, v3). products = 상품 티커 목록 또는 {상품: 기준지수 | None}. 규칙이 없으면 skip 하나를 둔다
+    (v3 는 빈 rules 를 거부한다)."""
+    items = products.items() if isinstance(products, dict) else [(p, None) for p in products]
+    prods = {p: ({"index": ix} if ix else {}) for p, ix in items}
     return dict(top, version=3, products=prods,
                 rules=list(rules) or [{"label": "(합성 — 규칙 없음)", "skip": "연산 없음: 합성 트리"}])
 
@@ -218,10 +222,13 @@ class TreeGateway:
         if not isinstance(rules, list) or not rules:
             raise Cond.CondError("rules 가 비어 있다")
         self._check_shape(tree, rules)
-        # 펼친 조건식의 문법만 검사({"rule"} 참조는 이미 펼쳐짐)
+        # 펼친 조건식의 문법만 검사({"rule"} 참조는 이미 펼쳐짐) + $index 를 쓰면 그 상품에 index 가 있어야 한다
         for prod in tree["products"]:
             for _do, label, _ref, node in self.expressions(prod):
                 Cond.validate(node, "%s.%s" % (prod, label or _do))
+                if not self.index(prod) and any(n.get("sym") == "$index" for n in Cond.labeled_all(node)
+                                                if isinstance(n, dict) and "px" in n):
+                    raise Cond.CondError("%s.%s: $index 를 쓰는데 products.%s 에 index 가 없다" % (prod, label or _do, prod))
         return True
 
     @staticmethod
@@ -287,6 +294,10 @@ class TreeGateway:
 
     def has(self, prod):
         return prod in self._d["products"]
+
+    def index(self, prod):
+        """상품의 기준 지수 티커 — `$index` 가 채워지는 값(없으면 None)."""
+        return self._p(prod).get("index")
 
     def note(self, prod):
         return self._p(prod).get("note")
@@ -360,12 +371,12 @@ class TreeGateway:
         return nodes
 
     def symbols(self, prods=None):
-        """트리가 참조하는 실제 심볼 전부(상품 + 식의 시세 잎 sym)."""
+        """트리가 참조하는 실제 심볼 전부 — 상품 · 그 상품의 지수 · 식의 구체 티커($self·$index 는 위 둘로 채워짐)."""
         out = set()
 
         def walk(n):
             if isinstance(n, dict):
-                if "px" in n:
+                if "px" in n and n.get("sym") not in Cond.ROLES:
                     out.add(n.get("sym"))
                 for k, x in n.items():
                     if k not in Cond.META:
@@ -376,6 +387,8 @@ class TreeGateway:
 
         for p in (self._d["products"] if prods is None else prods):
             out.add(p)
+            if self.index(p):
+                out.add(self.index(p))
             for _z, _l, _r, node in self.expressions(p):
                 walk(node)
         out.discard(None)
@@ -387,7 +400,13 @@ class TreeGateway:
             for n in Cond.labeled_all(node):
                 if not (isinstance(n, dict) and "px" in n and n.get("tf") in ("1m", "5m")):
                     continue
-                out.add(n.get("sym"))
+                s = n.get("sym")
+                if s == "$self":
+                    out.update(self._d["products"])
+                elif s == "$index":
+                    out.update(self.index(p) for p in self._d["products"])
+                else:
+                    out.add(s)
         out.discard(None)
         return out
 

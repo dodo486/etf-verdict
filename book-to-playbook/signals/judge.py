@@ -99,6 +99,10 @@ class ProductJudge:
 
     # ------------------------------------------------------------ 상품·가격
     @property
+    def index(self):
+        return self._tree.index(self.product)
+
+    @property
     def note(self):
         return self._tree.note(self.product)
 
@@ -180,11 +184,11 @@ class ProductJudge:
 
     def static_views(self):
         """시세 없이 보이는 등급 조건 설명(값 없음) — 시세가 없는 상품의 체크리스트 구조."""
-        return {do: explain.static_view(self._tree.gate(self.product, do)) for do in Cond.GATES}
+        return {do: explain.static_view(self._tree.gate(self.product, do), self.index) for do in Cond.GATES}
 
     def describe(self, branch):
         """갈래 하나(비중·분할·판다)의 값 없는 설명."""
-        return explain.static_view(branch.when)
+        return explain.static_view(branch.when, self.index)
 
     def view(self, node, day):
         """조건 하나의 그날 설명(값·측정 증거) — 수동은 모름."""
@@ -194,7 +198,7 @@ class ProductJudge:
     def _context(self, holding, manual_as=None):
         pos = ((holding.entry_day, holding.cost) if holding.book is None
                else (holding.entry_day, holding.cost, holding.book))
-        return Cond.Ctx(self._prices, self.days, self.product, manual_as=manual_as, pos=pos)
+        return Cond.Ctx(self._prices, self.days, self.product, self.index, manual_as=manual_as, pos=pos)
 
     def conditions(self, holding, sells, tranches, manual_as=False):
         """이 보유 상태로 판다 갈래·분할 차수 조건의 날짜별 값 — 백테스트 체결 워크가 체결을 정하는 데 쓴다.

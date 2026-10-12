@@ -362,8 +362,8 @@ def t_syntax():
         {"gt": [C]}, {"sum": [C, 0]}, {"sum": [C, 2.5]}, {"ma": [C, 20]}, {"px": "price"}, {"foo": 1},
         {"gt": [C, 1], "lt": [C, 2]}, True, {"atleast": 2}, {"def": "없음"},
         {"across": {"syms": ["A"], "cond": C}}, {"manual": ""}, {"gt": [C, 1], "op": "above"},
-        {"px": "close", "sym": "X", "tf": "1h"}, {"px": "close"}, {"px": "close", "sym": "$self"},
-        {"px": "close", "sym": "$index"}, {"abs": [C, 1]}, {"case": [[C, 1]]}, {"case": [C, 1], "else": 0},
+        {"px": "close", "sym": "X", "tf": "1h"}, {"px": "close"}, {"px": "close", "sym": "$s"},
+        {"px": "close", "sym": "$빅테크"}, {"abs": [C, 1]}, {"case": [[C, 1]]}, {"case": [C, 1], "else": 0},
         {"max": [C]},
     ]
     for b in bad:
@@ -708,19 +708,19 @@ def t_regress():
 # ------------------------------------------------------------------ 7. 트리 출입구(TreeGateway) 계약
 def t_gateway():
     """판정·백테스트·검사기가 트리(v3 규칙 목록)에 묻는 질문의 답 모양 — {"rule"} 은 펼쳐서 건넨다.
-    종목 모델은 on(어느 상품) + sym(구체 티커) 둘뿐 — 폐지된 표기(names·products.index·$ 심볼·across)는 거부."""
+    상품마다 달라지는 것은 해석기가 채운다($self·$index = products 의 index) — 폐지된 표기($s·names·across)는 거부."""
     W = {"gt": [C, AVG(C, 20)]}
     M = {"gt": [{"px": "close", "sym": "NQ=F", "tf": "1m"}, 0]}
     UP = lambda t: {"gt": [{"px": "close", "sym": t}, 0]}
     data = {
         "version": 3,
-        "products": {"A": {"note": "a 노트", "ref": "0-1"}, "B": {}},
+        "products": {"A": {"index": "^NDX", "note": "a 노트", "ref": "0-1"}, "B": {"index": "^SOX"}},
         "rules": [
             {"label": "20일선 위", "ref": "1-1", "value": W},
             {"label": "선물 양", "ref": "1-2", "on": ["A"],
              "then": [{"when": {"all": [{"rule": "20일선 위"}, M]}, "do": Cond.BUY}]},
             {"label": "지수 음", "ref": "2-1",
-             "then": [{"when": {"lt": [{"px": "close", "sym": "^NDX"}, 0]}, "do": Cond.BLOCK}]},
+             "then": [{"when": {"lt": [{"px": "close", "sym": "$index"}, 0]}, "do": Cond.BLOCK}]},
             {"label": "비중", "ref": "4-1", "then": [{"do": Cond.BUY, "qty": {"of": "cash", "x": 30}}]},
             {"label": "1차", "ref": "4-2", "on": ["A"], "then": [{"do": Cond.BUY, "qty": {"of": "budget", "x": 0.5}}]},
             {"label": "2차", "on": ["A"], "then": [{"when": {"ge": [{"pos": "filled", "rule": "1차"}, 1]},
@@ -732,7 +732,7 @@ def t_gateway():
             {"label": "못 옮김", "ref": "9-9", "skip": "데이터 없음: x"}]}
     g = TreeGateway.of(data)
     check(g.products() == ["A", "B"] and g.has("A") and not g.has("Z"), "products/has")
-    check(g.note("A") == "a 노트" and g.note("B") is None, "note")
+    check(g.index("A") == "^NDX" and g.index("B") == "^SOX" and g.note("A") == "a 노트", "index/note")
     ent = g.gate("A", Cond.BUY)["any"]
     check([n["label"] for n in ent] == ["선물 양", "묶음 상승"] and g.gate("B", Cond.BUY) == {"any": []},
           "gate(산다) = 산다 갈래(포지션·조건 없는 갈래 제외, on 반영) %r" % ent)
@@ -755,7 +755,7 @@ def t_gateway():
           % [(t.label, t.when) for t in trs])
     e = g.sells("A")
     check([(r.label, r.qty) for r in e] == [("익절", ("held", 1))], "sells = 판다 %r" % [(r.label, r.qty) for r in e])
-    check(g.symbols() == {"A", "B", "X", "^NDX", "NQ=F", "N1", "N2"} and g.symbols(["B"]) == {"B", "^NDX"},
+    check(g.symbols() == {"A", "B", "X", "^NDX", "^SOX", "NQ=F", "N1", "N2"} and g.symbols(["B"]) == {"B", "^SOX"},
           "symbols = 상품 + 식의 sym %r · %r" % (g.symbols(), g.symbols(["B"])))
     check(g.minute_symbols() == {"NQ=F"} and g.timeframes() == {"1d", "1m"}, "minute_symbols/timeframes")
     check(g.warmup("A") == 19 and g.warmup("B") == 0 and g.warmup() == 19, "warmup")
@@ -801,8 +801,8 @@ def t_gateway():
                    dict(data, review={}),                                         # 옛 양식 키
                    dict(data, products={"A": {"ref": "0-1", "exit_note": "x"}}),
                    dict(data, names={"$묶음": {"syms": ["N1"]}}),                    # 폐지: 이름 심볼
-                   dict(data, products={"A": {"index": "^NDX"}, "B": {}}),          # 폐지: 상품의 기준지수 칸
-                   old_sym("$self"), old_sym("$index"),                            # 폐지: $ 심볼
+                   old_sym("$s"), old_sym("$빅테크"),                                 # 폐지: $s·이름 심볼
+                   dict(data, products={"A": {"index": "^NDX"}, "B": {}}),                  # $index 인데 상품 B 에 index 없음
                    dict(data, rules=[{"label": "r", "then": [{"when": {"lt": [{"px": "close"}, 0]}, "do": Cond.BLOCK}]}]),  # sym 생략
                    dict(data, rules=[{"label": "r", "then": [{"when": {"ge": [{"across": {"syms": ["N1"], "cond": UP("N1")}}, 1]},
                                                               "do": Cond.BUY}]}]),     # 폐지: across
