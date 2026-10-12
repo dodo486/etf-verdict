@@ -308,6 +308,26 @@ def m_qty_convert(src):
     return [(ln, None, x) for ln, x in _js_hits(src, QTY_JS)]
 
 
+def m_gone_ops(src):
+    """어디서든(주인 포함) — 지운 전용 지표 연산(Cond.GONE_OPS: ma·ema·stdev·rsi)을 연산 이름으로 다시 쓰는 자리.
+    dict 키·비교·튜플 원소로 쓴 문자열 상수를 본다(조합으로 쓴다 — COND_DSL 6절)."""
+    from dsl.tradeTool import Cond
+    if src.kind != "py":
+        return []
+    out = []
+    for n, fn in _py_nodes(src.tree):
+        keys = []
+        if isinstance(n, ast.Dict):
+            keys = n.keys
+        elif isinstance(n, ast.Compare):
+            keys = [n.left] + n.comparators
+        elif isinstance(n, (ast.Tuple, ast.List, ast.Set)):
+            keys = n.elts
+        out.extend((n.lineno, fn, k.value) for k in keys
+                   if isinstance(k, ast.Constant) and isinstance(k.value, str) and k.value in Cond.GONE_OPS)
+    return out
+
+
 def _labels():
     """동사·등급 이름표 글자 — 정본(Cond.VERBS · Grade.GRADES)에서 읽는다(여기 다시 적지 않는다)."""
     from dsl.tradeTool import Cond, Grade
@@ -364,6 +384,11 @@ OWNERS = [
          why="'얼마나'(Qty: cash·budget·bought·held)를 물량으로 바꾸는 곳은 trades.to_units 하나 — 매수(분할)·매도·"
              "비중이 같은 변환을 지난다. 밖은 Qty 를 건네기만 하고 basis 를 가르거나 셈하지 않는다",
          hint="trades.to_units(Qty, Ledger) · 화면은 엔진이 낸 units·sell 문장으로", allow={}),
+    dict(concept="지운 연산", owners=(), match=lambda src: [], everywhere=m_gone_ops,
+         why="전용 지표 연산(ma·ema·stdev·rsi)은 지웠다 — 지표는 기본 부품(sum·lag·pct·case…) 조합으로 쓴다. 정본 목록 Cond.GONE_OPS",
+         hint="COND_DSL 6절 조합 예시로(평균 = sum ÷ n)",
+         allow={("dsl/tradeTool.py", None): (None, "지운 연산 목록 정본(GONE_OPS)"),
+                ("verify/verify_primitives.py", "t_syntax"): ({"ma"}, "지운 연산이 문법에서 거부되는지 보는 자리")}),
     dict(concept="동사·등급 이름표", owners=("dsl/tradeTool.py",), match=m_labels,
          why="Cond.VERBS(안 산다·산다·판다) · Grade.GRADES · grade_rules.json 이 정본 — 화면은 판정 JSON(verbs·grades)으로 받는다",
          hint="파이썬은 Cond.BLOCK·BUY·SELL·VERBS, 화면은 판정 JSON 의 verbs·grades 로", allow={}),

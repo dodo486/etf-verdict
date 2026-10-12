@@ -123,13 +123,13 @@ def t_numeric(rng):
         ref = (ps - prev).abs()
         got = Cond.series({"abs": {"sub": [C, {"lag": [C, 1]}]}}, ctx)
         check(all(same(got[i], ref[i], 1e-7) for i in range(len(xs))), "abs 불일치 (trial %d)" % trial)
-    # rsi — 알려진 성질
-    up = make_ctx([float(i) for i in range(1, 60)])
-    r = Cond.series({"rsi": [C, 14]}, up)
-    check(r[13] is None and same(r[14], 100.0) and same(r[-1], 100.0), "단조증가 rsi = 100")
-    alt = make_ctx([100 + (1 if i % 2 else -1) for i in range(80)])
-    r = Cond.series({"rsi": [C, 14]}, alt)
-    check(40 < r[-1] < 60, "등락 교대 rsi ≈ 50 (got %r)" % r[-1])
+    # 지운 전용 지표 연산은 문법에서 거부된다(조합으로 쓴다)
+    for op in Cond.GONE_OPS:
+        try:
+            Cond.validate({op: [C, 5]})
+            FAILS.append("지운 연산 %s 가 문법을 통과" % op)
+        except Cond.CondError:
+            pass
 
 
 # ------------------------------------------------------------------ 2. 3값 논리
@@ -305,7 +305,7 @@ def t_pos(rng):
 
 # ------------------------------------------------------------------ 4. 인과성
 CAUSAL_NODES = [
-    AVG(C, 5), {"rsi": [C, 5]},
+    AVG(C, 5),
     {"highest": [C, 10]}, {"pct": [C, 3]}, {"lag": [C, 2]},
     {"count": [{"gt": [C, {"lag": [C, 1]}]}, 5]},
     {"streak": {"gt": [C, AVG(C, 5)]}},
@@ -597,7 +597,7 @@ def t_warmup_guard():
     직접 뽑아, 그보다 확정 봉이 적은 초기 구간의 1d 신호를 '불완전 데이터(❔)'로 표면화한다.
 
     확인:
-      1) 필요 워밍업을 트리에서 바르게 계산한다(창 n-1·lag k·rsi n·count n-1 가 가장 깊은 사슬로 누적되고,
+      1) 필요 워밍업을 트리에서 바르게 계산한다(창 n-1·lag k·count n-1 가 가장 깊은 사슬로 누적되고,
          streak/barssince 류는 AtLeast/None 으로 스스로 불확실을 드러내므로 워밍업에 넣지 않는다).
       2) 워밍업을 일부러 잘라낸(필요보다 적은 봉) 입력 → 그 초기 구간은 incomplete=True 이고 grade_key 가 ❔.
       3) 워밍업이 충분한 구간 → incomplete=False, 가드 끼기 전과 등급이 '그대로'(오탐 0).
@@ -608,7 +608,7 @@ def t_warmup_guard():
     cases = [
         (C, 0), ({"px": "close"}, 0), ({"manual": "x"}, 0), (5, 0),
         (AVG(C, 20), 19), ({"highest": [C, 60]}, 59), ({"sum": [C, 10]}, 9),
-        ({"lag": [C, 5]}, 5), ({"pct": [C, 3]}, 3), ({"rsi": [C, 14]}, 14), ({"count": [C, 10]}, 9),
+        ({"lag": [C, 5]}, 5), ({"pct": [C, 3]}, 3), ({"count": [C, 10]}, 9),
         (AVG({"lag": [C, 5]}, 20), 24),                          # 중첩: lag5 안에 평균20 → 5 + 19
         ({"streak": {"gt": [C, AVG(C, 20)]}}, 19),               # streak 자체는 안 더함, 안쪽 평균20 만
         ({"barssince": {"ge": [C, {"highest": [C, 60]}]}}, 59),

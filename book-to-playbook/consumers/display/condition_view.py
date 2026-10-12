@@ -56,10 +56,8 @@ def _describe_operand(e):
         pre = "장중 " if e.get("tf", "1d") in ("1m", "5m") else ""   # 장중 분봉 vs 확정 일봉 구분
         core = base if sym in ("$self", "$index") else "%s %s" % (sym, base)
         return pre + core
-    if op in ("ma", "ema"):
-        return "%s일선" % _n(e[op][1]) if op == "ma" else "%s일 지수이평" % _n(e[op][1])
-    if op in ("highest", "lowest", "sum", "stdev"):
-        m = {"highest": "최고", "lowest": "최저", "sum": "합계", "stdev": "변동성"}
+    if op in ("highest", "lowest", "sum"):
+        m = {"highest": "최고", "lowest": "최저", "sum": "합계"}
         return "%s일 %s" % (_n(e[op][1]), m[op])
     if op == "pct":
         return "전일 대비 변화율" if e["pct"][1] == 1 else "%s일 전 대비 변화율" % _n(e["pct"][1])
@@ -72,8 +70,6 @@ def _describe_operand(e):
         return "최근 참 일수"
     if op == "barssince":
         return "마지막 참 이후 일수"
-    if op == "rsi":
-        return "RSI%s" % _n(e["rsi"][1])
     if op == "pos":
         return {"ret": "수익률(%)", "days": "보유일", "maxret": "최고수익(%)",
                 "minret": "최저수익(%)"}.get(e["pos"], "포지션")
@@ -98,8 +94,6 @@ def _unit_of(e):
         return "일"
     if op == "div":
         return "배"
-    if op == "rsi":
-        return ""
     if op == "pos":
         return "일" if e["pos"] == "days" else "%"
     return ""
@@ -136,9 +130,8 @@ def _inputs_of(e, ctx, i, acc, seen, top=True):
     if op == "abs":
         _inputs_of(e["abs"], ctx, i, acc, seen, top=False)
         return
-    # 단일 잎(px·ma·streak…): 산술 안쪽이면 값으로 보여주고, LHS 통째면(top) 분해하지 않는다
-    if not top and op in ("px", "ma", "ema", "lag", "streak", "count", "barssince",
-                          "rsi", "highest", "lowest", "sum", "stdev", "pos"):
+    # 단일 잎(px·streak·창…): 산술 안쪽이면 값으로 보여주고, LHS 통째면(top) 분해하지 않는다
+    if not top and op in ("px", "lag", "streak", "count", "barssince", "highest", "lowest", "sum", "pos"):
         add(_describe_operand(e), _meas_val(e, ctx, i))
     # case·valuewhen 등은 생략(라벨이 설명을 맡는다)
 

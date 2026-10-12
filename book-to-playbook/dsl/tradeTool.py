@@ -26,7 +26,8 @@ ARITH = ("add", "sub", "mul", "div", "max", "min")
 TIMEFRAMES = ("1d", "1m", "5m")  # 봉 길이 — asof 축에서 자른다. 일봉은 확정(settled) 일봉, 분봉은 asof 이하
                            # 마지막 분봉, 5분봉은 1분봉을 세션 안에서 5분 OHLC 로 집계한 뒤 asof 이하 마지막.
                            # 데이터가 없으면 None(모름).
-WINDOW = ("highest", "lowest", "sum")   # 창(n거래일) 집계 — ma/ema/stdev/rsi/pct 는 사칙·smooth·sqrt 조합으로 대체
+WINDOW = ("highest", "lowest", "sum")   # 창(n거래일) 집계 — 평균 등 지표는 전용 연산 없이 조합(COND_DSL 6절)
+GONE_OPS = ("ma", "ema", "stdev", "rsi")  # 지운 전용 지표 연산 — 조합으로 쓴다(verify_code 주인 표가 되살림을 막는다)
 CMP = ("gt", "ge", "lt", "le")
 STREAK_CAP = 400          # 연속·경과일을 거꾸로 셀 때의 상한(데이터 길이보다 길면 무의미)
 
@@ -168,7 +169,7 @@ def validate(node, path="$"):
         two(op)
         validate(v[0], path + "." + op + "[0]")
         validate(v[1], path + "." + op + "[1]")
-    elif op in WINDOW or op in ("lag", "pct", "rsi"):
+    elif op in WINDOW or op in ("lag", "pct"):
         two(op)
         validate(v[0], path + "." + op + "[0]")
         if op == "lag":
@@ -522,7 +523,7 @@ def _series(node, ctx, s_sym):
     v = node[op]
     if is_unknown(node):
         return [ctx.manual_value(node)] * L  # 저자가 숫자를 안 준 판단 — 사람이 정한다(수동과 같은 규칙)
-    if op in WINDOW + ("lag", "pct", "rsi", "count") and v[1] == UNKNOWN:
+    if op in WINDOW + ("lag", "pct", "count") and v[1] == UNKNOWN:
         return [None] * L                    # 기간을 모름 — 값도 모름
     R = lambda n: series(n, ctx, s_sym)                                   # 논리 묶음용(제외 표지 그대로)
     S = lambda n: [None if x is EXCLUDED else x for x in series(n, ctx, s_sym)]   # 그 밖의 연산용
@@ -589,40 +590,8 @@ def _series(node, ctx, s_sym):
 
     if op in WINDOW:
         s, n = S(v[0]), v[1]
-        out = []
-        if op == "ema":
-            k = 2.0 / (n + 1)
-            prev = None
-            for i in range(L):
-                x = s[i]
-                if not _exact(x):
-                    prev = None              # 결측이 끼면 다시 쌓는다(조용히 건너뛰지 않는다)
-                    out.append(None)
-                    continue
-                if prev is None:
-                    w = _window(s, i, n)
-                    prev = sum(w) / n if w else None
-                    out.append(prev)
-                    continue
-                prev = x * k + prev * (1 - k)
-                out.append(prev)
-            return out
-        for i in range(L):
-            w = _window(s, i, n)
-            if w is None:
-                out.append(None)
-            elif op == "ma":
-                out.append(sum(w) / n)
-            elif op == "sum":
-                out.append(sum(w))
-            elif op == "highest":
-                out.append(max(w))
-            elif op == "lowest":
-                out.append(min(w))
-            else:                         # stdev(모집단) — 볼린저밴드 관례
-                m = sum(w) / n
-                out.append(math.sqrt(sum((x - m) ** 2 for x in w) / n))
-        return out
+        agg = {"sum": sum, "highest": max, "lowest": min}[op]
+        return [None if w is None else agg(w) for w in (_window(s, i, n) for i in range(L))]
 
     if op == "lag":
         s, k = S(v[0]), v[1]
@@ -635,29 +604,6 @@ def _series(node, ctx, s_sym):
             a = s[i]
             b = s[i - k] if i - k >= 0 else None
             out.append((a / b - 1) * 100 if (_exact(a) and _exact(b) and b != 0) else None)
-        return out
-
-    if op == "rsi":
-        # Wilder: 첫 평균 = 처음 n개 변화의 단순평균, 이후 (prev*(n-1)+x)/n. 결측이 끼면 다시 쌓는다.
-        s, n = S(v[0]), v[1]
-        out = [None] * L
-        gs, ls, ag, al = [], [], None, None
-        for i in range(1, L):
-            if not (_exact(s[i]) and _exact(s[i - 1])):
-                gs, ls, ag, al = [], [], None, None
-                continue
-            ch = s[i] - s[i - 1]
-            g, lo = max(ch, 0.0), max(-ch, 0.0)
-            if ag is None:
-                gs.append(g)
-                ls.append(lo)
-                if len(gs) < n:
-                    continue
-                ag, al = sum(gs) / n, sum(ls) / n
-            else:
-                ag = (ag * (n - 1) + g) / n
-                al = (al * (n - 1) + lo) / n
-            out[i] = 100.0 if al == 0 else 100 - 100 / (1 + ag / al)
         return out
 
     if op in ("all", "any"):
@@ -914,8 +860,7 @@ def warmup_of(node):
       표면화하는 가드(Grade)의 임계값이 된다 — WARMUP_DAYS(fetch 버퍼)와 무관하다.
 
     어떻게 세나 (연산마다 '그날 값이 서려면 그 앞에 몇 봉이 더 있어야 하나'를 더해 가장 깊은 사슬)
-      · 창(ma/ema/stdev/highest/lowest/sum) n : n-1 + 안쪽
-      · rsi n                                : n + 안쪽(와일더 시드)
+      · 창(highest/lowest/sum) n             : n-1 + 안쪽
       · lag/pct k                            : k  + 안쪽
       · count n                              : n-1 + 안쪽
       · streak/barssince/valuewhen/minsince/maxsince : 안쪽만. 이들은 데이터 시작에 닿으면 조용히
@@ -933,14 +878,12 @@ def warmup_of(node):
     w = warmup_of
     if is_unknown(node):
         return 0                             # 사람이 정하는 판단 — 기계 lookback 없음
-    if op in WINDOW + ("rsi", "lag", "pct", "count") and v[1] == UNKNOWN:
+    if op in WINDOW + ("lag", "pct", "count") and v[1] == UNKNOWN:
         return w(v[0])                       # 기간을 모름 — 그 값은 늘 모름이라 이 창은 워밍업에 안 넣는다
     if op == "px":
         return 0
     if op in WINDOW:
         return (v[1] - 1) + w(v[0])
-    if op == "rsi":
-        return v[1] + w(v[0])
     if op in ("lag", "pct"):
         return v[1] + w(v[0])
     if op == "count":
@@ -1216,10 +1159,9 @@ class Cond:
                 {"abs": a}
   선택          {"case": [[c1, v1], [c2, v2], ...], "else": v}   위에서부터 처음 참인 c 의 v.
                 앞의 c 가 모름(None)이면 결과도 모름(뒤 갈래로 넘어가지 않는다).
-  이동/창       {"ma"|"ema"|"stdev"|"highest"|"lowest"|"sum": [s, n]}
+  이동/창       {"highest"|"lowest"|"sum": [s, n]}   (평균 = sum ÷ n — 전용 지표 연산은 두지 않는다)
                 {"lag": [s, k]}   k 거래일 전 값
                 {"pct": [s, k]}   k 거래일 전 대비 변화율(%)
-                {"rsi": [s, n]}   Wilder RSI
   비교          {"gt"|"ge"|"lt"|"le": [a, b]}
   논리          {"all": [...]}, {"any": [...]}, {"atleast": n, "of": [...]}, {"not": c}
   시간          {"count": [c, n]}       최근 n거래일(오늘 포함) 중 c 가 참인 날 수
@@ -1245,6 +1187,7 @@ class Cond:
     ARITH = ARITH
     TIMEFRAMES = TIMEFRAMES
     WINDOW = WINDOW
+    GONE_OPS = GONE_OPS
     CMP = CMP
     STREAK_CAP = STREAK_CAP
     CondError = CondError
