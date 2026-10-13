@@ -24,7 +24,7 @@ from datetime import datetime, timedelta, timezone
 
 from shared.paths import book_meta
 from market import md_feed
-from tree.gateway import BLOCK, BUY, GATES, SELL, VERBS, _uses_pos, product_specific
+from tree.gateway import BLOCK, BUY, GATES, SELL, VERBS, _uses_pos, product_specific, reads_self
 from judge.judge import GRADES, NO_EXIT_NOTE, Judge, exit_policy, live_units, sell_text
 from web import explain
 from web.raw_tree import e as prose
@@ -89,6 +89,8 @@ def _rule_views(judge, a=None):
                                    "when": _when(judge, t), "view": _describe(judge, t)} for t in judge.tranches()]},
             "sells": [{"label": r.label, "ref": r.ref, "allprod": r.allprod,
                        "allsame": bool(r.allprod) and not product_specific(r.when or {}),   # 상품마다 같은 규칙 → 공통 섹션
+                       "selfdep": reads_self(r.when or {}),   # 자기 보유분(pos) 등 상품별 → 공통 아님, 상품 카드로
+
                        "sell": sell_text(r.qty, r.repeat),
                        "note": r.note, "when": _when(judge, r), "view": _describe(judge, r)} for r in judge.sells()],
             "exit_policy": exit_policy(judge.sells())}

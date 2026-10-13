@@ -224,6 +224,13 @@ def product_specific(node):
     return any(isinstance(n, dict) and ("pos" in n or n.get("on") or n.get("sym") in ROLES) for n in labeled_all(node))
 
 
+def reads_self(node):
+    """그 상품 **자기 데이터**($self·$index 시세 · pos 보유분)를 읽는가 — 상품마다 값이 실제로 다르다.
+    노드 레벨 on 은 뺀다: 공통 시장 결정(VIX·금리처럼)에 한 상품만 더 붙는 조건일 뿐, 규칙 자체는 시장 공통이다.
+    화면이 '공통 시장 신호'(구체 티커)와 '상품별'(자기 시세·보유)을 가르는 데 쓴다 — product_specific 과 달리 on 무관."""
+    return any(isinstance(n, dict) and ("pos" in n or n.get("sym") in ROLES) for n in labeled_all(node))
+
+
 def validate(node, path="$"):
     """문법 검사. 모르는 연산·키·인자 개수·필드는 전부 CondError(위치 포함)."""
     if isinstance(node, bool):

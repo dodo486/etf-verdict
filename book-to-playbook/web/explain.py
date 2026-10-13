@@ -9,8 +9,8 @@
   · _measure 외  '무엇을 재서 얼마였나'(측정 증거)
 """
 from tree.gateway import (
-    ARITH, CMP, CondError, is_manual, is_unknown, manual_key, META, _op_of, product_specific, ROLES, UNKNOWN,
-    UNKNOWN_REASON)
+    ARITH, CMP, CondError, is_manual, is_unknown, manual_key, META, _op_of, product_specific, reads_self, ROLES,
+    UNKNOWN, UNKNOWN_REASON)
 from web import text
 from web.raw_tree import e as prose
 
@@ -206,12 +206,16 @@ def _view(node, val, prod=None):
     for k in ("label", "ref", "note"):
         if node.get(k):
             item[k] = node[k]
-    if node.get("allprod"):                      # 공통(on 없음) 규칙 — 화면이 상품 카드에서 빼고 공통 섹션으로 모은다
+    if node.get("allprod"):                      # 규칙 레벨 on 없음 — 후보 공통 규칙
         item["allprod"] = True
         # 상품에 안 기대는 공통 규칙($self·$index·pos·노드 on 안 씀)은 상품마다 값·질문이 같다 → 화면이 한 줄로 합쳐도 된다는 힌트.
         #   답 열쇠(mkey)는 지금 규칙 그대로(상품별) — 화면이 그 한 줄의 수동 답을 세 상품 열쇠에 같이 넣는다(서버 무변).
         if not product_specific(node):
             item["allsame"] = True
+        # 자기 데이터($self·$index 시세·pos 보유분)를 읽으면 '상품별'이다 — 화면이 공통 섹션이 아니라 상품 카드로 보낸다.
+        #   (VIX·금리처럼 구체 티커만 보는 시장 신호는 공통. 노드 on 은 상품별로 치지 않는다 — reads_self 가 뺀다.)
+        if reads_self(node):
+            item["selfdep"] = True
     if op in LOGICAL:
         # 묶음(all/any/atleast/not)은 '?' 가 안에 있어도 **항상 펼친다** — 사람이 확인할 건 묶음 자체가 아니라
         #   그 안의 sub-조건들이다(각 '?' sub 는 재귀로 자기 수동 잎이 된다). 접어서 "수동 확인" 하나로 숨기지 않는다.
