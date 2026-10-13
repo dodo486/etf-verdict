@@ -12,6 +12,7 @@ from tree.gateway import (
     ARITH, CMP, CondError, is_manual, is_unknown, manual_key, META, _op_of, product_specific, ROLES, UNKNOWN,
     UNKNOWN_REASON)
 from web import text
+from web.raw_tree import e as prose
 
 LOGICAL = ("all", "any", "atleast", "not")
 
@@ -153,11 +154,12 @@ def _measure(node, val, top=True):
 
 
 def view(node, val):
-    """노드 하나 → 화면 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, hidden?}.
+    """노드 하나 → 화면 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, expr?}.
 
     · 논리 노드(all/any/atleast/not)는 op 와 자식 항목 전부를 담는다 — 화면이 사람이 체크한 수동 조건으로
       같은 3값 논리를 다시 계산할 수 있게(not 아래 수동은 극성이 뒤집힌다 — cond 와 같은 규칙).
-    · 그 밖의 노드는 그날 값(v)이 고정된 잎이다. 라벨이 없으면 hidden(화면에 안 보이지만 계산엔 쓴다),
+    · 그 밖의 노드는 그날 값(v)이 고정된 잎이다. 잎은 **식 글(expr)을 항상 단다** — 라벨·수동 사유가 식을 가리지 않게
+      (라벨만 보이고 무엇을 재는지 안 보이면 사람이 트리를 검증할 수 없다). 라벨 없는 잎도 숨기지 않고 식 글로 보인다.
       안쪽에 라벨 달린 노드가 있으면 참고용 kids(op 없음 — 다시 계산하지 않는다)로 붙인다.
     val(n) = 노드 n 의 그날 값(부르는 쪽이 판단자에게서 — 수동 = 모름(None)·사람이 답했으면 그 답)."""
     skip = ("of", "sym", "tf", "else")
@@ -193,8 +195,8 @@ def view(node, val):
         inner = [view(k, val) for k in _labeled_inside(node)]
         if inner:
             item["kids"] = inner
-        if not node.get("label"):
-            item["hidden"] = True
+    if op not in LOGICAL and op != "manual":
+        item["expr"] = prose(node)               # 식 글(원시 트리 보기와 같은 문장) — "?" 수동 잎도 무엇을 정하는지 보인다
     # 측정 증거 — 화면에 보이는 조건(라벨/수동/관측)에 그날 실제 값을 붙인다. "?" 식이면 알려진 쪽 값이
     #   근거 숫자다(기준은 저자가 안 줬으니 사람이 그 숫자를 보고 참/거짓을 고른다 — 깜깜이 판단 방지).
     if node.get("label") or is_manual(node):

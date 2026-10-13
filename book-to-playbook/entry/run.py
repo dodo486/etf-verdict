@@ -42,7 +42,7 @@ CHECKS = [
     Check("entry.verify_rules", (), False, False, "코드 규칙 — 폴더 경계·주인 표"),
     Check("authoring.transcribe.verify_source", (), False, False, "플레이북 본문 해시"),
     Check("authoring.extract.verify_tree", ("--quick",), False, False, "트리 계약 — 소절 인덱스·트리 문법·ref"),
-    Check("web.verify_page", (), False, False, "책 페이지 — 구획·UI 사본"),
+    Check("web.verify_page", (), False, False, "책 페이지 — 구획·UI 사본·트리 ↔ 화면"),
     Check("market.verify_store", (), False, False, "시세 칸 저장소"),
     Check("tree.verify_gateway", (), False, True, "트리 언어·출입구"),
     Check("judge.verify_eval", (), False, True, "계산기·등급"),

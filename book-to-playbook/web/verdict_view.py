@@ -7,15 +7,16 @@
 화면은 판정을 계산하지 않는다). 라이브는 entry/live 허브가 판정 사실을 _format 으로, 일일 배치(entry.notify)는 render 로 빚는다.
 
 출력 계약(알림 · 화면 · /api/verdict 가 소비):
-  top     : {slug, title, ts, date, source, cash, verbs[], grades{}, verdicts[], missing{}, positions_note}
+  top     : {slug, title, ts, date, source, cash, verbs[], grades{}, verdicts[], outside[], missing{}, positions_note}
+            outside = 체크리스트 칸에 안 실린 트리 규칙 전부(outside() — 화면이 '칸 밖 규칙'으로 보인다)
             verbs = 동사 셋(정본 tree.gateway.VERBS — 화면 머리글) · grades = 등급 글자표(정본 judge.judge.GRADES)
   verdict : {prod, index, note, date, close, chg, key, grade, reason,
              gates{안 산다, 산다: view}, opt{..}, pes{..},     등급 동사 둘의 중첩 설명 + 낙관·비관 값
-             size{label, ref, weight, weight_range, units, tranches[{label, ref, ratio, units, view?}]},   얼마나(산다 qty)
+             size{label, ref, expr, weight, weight_range, units, tranches[{label, ref, ratio, units, when, view?}]},   얼마나(산다 qty)
                                                      units = 오늘 물량(시작자본 1.0 기준 — judge.to_units, 비중 모르면 None)
-             sells[{label, ref, sell(문장 — judge.sell_text), note, view}], exit_policy("book"|"none" — judge.exit_policy),
+             sells[{label, ref, sell(문장 — judge.sell_text), note, when(조건 식 글), view}], exit_policy("book"|"none" — judge.exit_policy),
              positions[{…, sells[], next_tranche}]}                  positions = 내 포지션(로컬 파일)이 있을 때만
-view 는 노드 하나당 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, hidden?, detail?} (web/explain.view —
+view 는 노드 하나당 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, expr?, detail?} (web/explain.view —
 값은 판단자 ProductJudge.value 가 낸다, 값 없는 규칙 설명은 web/explain.static_view + ProductJudge.blank_value)
 — 수동은 '모름'(사람이 답했으면 그 답 — render(answers=))으로 둔 그날 값. 화면은 다시 계산하지 않고 그대로 그린다.
 """
@@ -23,9 +24,10 @@ from datetime import datetime, timedelta, timezone
 
 from shared.paths import book_meta
 from market import md_feed
-from tree.gateway import BLOCK, BUY, GATES, VERBS
+from tree.gateway import BLOCK, BUY, GATES, SELL, VERBS, _uses_pos
 from judge.judge import GRADES, NO_EXIT_NOTE, Judge, exit_policy, live_units, sell_text
 from web import explain
+from web.raw_tree import e as prose
 
 SOURCE = "jhts 시세팀(일봉)"
 
@@ -68,18 +70,25 @@ def _describe(judge, branch):
     return explain.static_view(branch.when, judge.blank_value)
 
 
+def _when(branch):
+    """갈래 조건의 식 글 — 화면이 규칙 이름 옆에 '언제'를 그대로 보인다(이름만 보이고 조건이 가려지지 않게). 조건 없으면 None."""
+    return None if branch.when is None else prose(branch.when)
+
+
 def _rule_views(judge, a=None):
     """얼마나(비중·분할)·판다 규칙의 화면 모양 — 시세가 있든 없든 같은 모양(규칙 설명은 값 없는 설명).
     a = 그날 Amount(judge.amount) — 없으면(시세 없음) 비중·물량은 None."""
     sz = judge.weight()
+    x = sz.qty.x
     return {"size": {"label": sz.label, "ref": sz.ref, "note": sz.note,
+                     "expr": prose(x) if isinstance(x, (dict, list)) else None,   # 비중이 식(모드별 등)이면 그 식 글
                      "weight": a and a.weight, "weight_range": a and a.weight_range, "weight_set": a and a.weight_set,
                      "units": a and live_units(a),            # 오늘 물량(시작자본 1.0 기준, 화면이 × 총 투자금)
                      "tranches": [{"label": t.label, "ref": t.ref, "ratio": t.qty.x,
-                                   "units": a and live_units(a, t.qty), "conditional": t.when is not None,
-                                   "view": _describe(judge, t)} for t in judge.tranches()]},
+                                   "units": a and live_units(a, t.qty),
+                                   "when": _when(t), "view": _describe(judge, t)} for t in judge.tranches()]},
             "sells": [{"label": r.label, "ref": r.ref, "allprod": r.allprod, "sell": sell_text(r.qty, r.repeat),
-                       "note": r.note, "view": _describe(judge, r)} for r in judge.sells()],
+                       "note": r.note, "when": _when(r), "view": _describe(judge, r)} for r in judge.sells()],
             "exit_policy": exit_policy(judge.sells())}
 
 
@@ -124,6 +133,112 @@ def _holding_view(judge, day, hs):
     return out
 
 
+# ------------------------------------------------------------------ 칸 밖 규칙(트리 ↔ 화면 대조)
+def _placed(verdicts):
+    """화면 칸(①안 산다 ②산다 ③판다 ④얼마나)에 실린 갈래 수 {(라벨, 동사): 상품들 중 최대 개수}."""
+    out = {}
+    for v in verdicts:
+        cnt = {}
+        for do, g in (v.get("gates") or {}).items():
+            for k in (g or {}).get("kids") or []:
+                cnt[(k.get("label"), do)] = cnt.get((k.get("label"), do), 0) + 1
+        sz = v.get("size") or {}
+        if sz.get("label"):
+            cnt[(sz["label"], BUY)] = cnt.get((sz["label"], BUY), 0) + 1
+        for t in sz.get("tranches") or []:
+            cnt[(t["label"], BUY)] = cnt.get((t["label"], BUY), 0) + 1
+        for r in v.get("sells") or []:
+            cnt[(r["label"], SELL)] = cnt.get((r["label"], SELL), 0) + 1
+        for key, n in cnt.items():
+            out[key] = max(out.get(key, 0), n)
+    return out
+
+
+def _referenced(verdicts):
+    """화면 설명 안 어디든 이름으로 실린 라벨(참조로 펼쳐진 이름 조건 포함)."""
+    seen = set()
+
+    def walk(x):
+        if isinstance(x, dict):
+            if x.get("label"):
+                seen.add(x["label"])
+            for y in x.values():
+                walk(y)
+        elif isinstance(x, list):
+            for y in x:
+                walk(y)
+    walk(verdicts)
+    return seen
+
+
+def _rule_refs(x, acc=None):
+    """적힌 식 안의 {"rule": 이름} 참조 이름들."""
+    acc = set() if acc is None else acc
+    if isinstance(x, dict):
+        if isinstance(x.get("rule"), str) and "pos" not in x:
+            acc.add(x["rule"])
+        for y in x.values():
+            _rule_refs(y, acc)
+    elif isinstance(x, (list, tuple)):
+        for y in x:
+            _rule_refs(y, acc)
+    return acc
+
+
+def outside(tree, verdicts):
+    """트리의 규칙 중 체크리스트 칸에 안 실린 것 [{label, ref, on, kind, reason, text}] — 화면이 '칸 밖 규칙'으로 전부 보인다.
+    사람은 트리를 웹으로만 검증하므로, 트리에 있는데 화면 어디에도 없는 규칙이 하나도 없어야 한다(조용히 빠지지 않게).
+    kind: skip(못 옮김) · name(이름 조건 — 어느 칸에도 안 쓰임) · branch(행동 갈래인데 칸에 안 실림)."""
+    cards = tree.cards()
+    # 다른 규칙이 {"rule": 이름} 으로 쓰는 이름 조건 — 그 규칙 줄의 식 글에 펼쳐져 보인다(칸 밖 아님)
+    named = _referenced(verdicts) | _rule_refs([(c.value, [(b.when, b.qty and b.qty.x) for b in c.branches]) for c in cards])
+    placed, out = _placed(verdicts), []
+    for c in cards:
+        base = {"label": c.label, "ref": c.ref, "on": c.on}
+        if c.skip:
+            out.append(dict(base, kind="skip", reason=c.skip, text=None))
+            continue
+        if not c.branches:
+            if c.label not in named:
+                out.append(dict(base, kind="name", reason="이름 조건 — 어느 행동 규칙도 쓰지 않아 체크리스트 칸에 안 나온다",
+                                text=prose(c.value) if c.value is not None else None))
+            continue
+        left = {}
+        for b in c.branches:
+            left.setdefault(b.do, []).append(b)
+        for do, bs in left.items():
+            for b in bs[placed.get((c.label, do), 0):]:
+                why = ("조건 없는 갈래" if b.when is None else "포지션 조건(보유 중) 갈래" if _uses_pos(b.when)
+                       else "행동 갈래")
+                q = "" if b.qty is None else " [qty %s %s]" % (b.qty[0], prose(b.qty[1]))   # 적힌 그대로(변환 안 함)
+                out.append(dict(base, kind="branch", reason="%s — 체크리스트 칸에 안 실림" % why,
+                                text="%s%s%s" % (do, q, "" if b.when is None else " · 언제 " + prose(b.when))))
+    return out
+
+
+def uncovered(tree, top):
+    """트리 ↔ 화면 대조(검사기용) — 화면 데이터(top)에서 보이지 않는 것 [문장]. 비어야 정상.
+    · 트리 규칙 이름이 칸(라벨)에도 칸 밖(outside)에도 없다 · 화면 잎(논리 묶음·문장 수동 아님)에 식 글(expr)이 없다."""
+    cards = tree.cards()
+    shown = (_referenced(top["verdicts"]) | {x["label"] for x in top.get("outside") or []}
+             | _rule_refs([(c.value, [(b.when, b.qty and b.qty.x) for b in c.branches]) for c in cards]))
+    bad = ["규칙 %r 가 화면 어디에도 없다" % c.label for c in cards if c.label not in shown]
+
+    def walk(it, where):                                       # 조건 설명 항목(view) 하나와 그 자식들
+        if not isinstance(it, dict):
+            return
+        if not it.get("op") and "manual" not in it and not it.get("expr"):
+            bad.append("%s: 식 글 없는 조건 %r" % (where, it.get("label")))
+        if it.get("mkey") and not it.get("op") and not it.get("expr"):
+            bad.append("%s: \"?\" 수동 조건의 식 글 없음 %r" % (where, it.get("label")))
+        for k in it.get("kids") or []:
+            walk(k, where)
+    for v in top["verdicts"]:
+        for do, g in (v.get("gates") or {}).items():
+            walk(g, "%s %s" % (v.get("prod"), do))
+    return bad
+
+
 # ------------------------------------------------------------------ 책 하나
 def render(slug, asof=None, answers=None):
     """asof = 관측 시각(UTC datetime). None 이면 지금 — 장중(tf="1m") 조건을 이 시점 이하로 자른다.
@@ -166,6 +281,7 @@ def _format(slug, book, prices, decisions, answers=None):
                 weights.append(sz["weight"])
     if weights and all_known:
         top["cash"] = max(0.0, 100.0 - sum(weights))
+    top["outside"] = outside(book.tree, top["verdicts"])
     top["date"] = max((v.get("date") or "" for v in top["verdicts"]), default=None)
     top["missing"] = {s: md_feed.requested().get(s, "-") for s in Judge.missing(prices)}
     if answers is not None:
