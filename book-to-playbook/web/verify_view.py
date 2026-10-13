@@ -51,6 +51,12 @@ def t_view():
     check(lab.get("expr", "").endswith("≥ 20"), "라벨 달린 잎의 식 글 %r" % lab)
     q = view({"label": "기준 미명시", "gt": [C, "?"]}, val)
     check(q.get("manual") and q.get("expr") == "X 종가 > ?(미명시)", "\"?\" 수동 잎의 식 글 %r" % q)
+    # 상품 판 — 다른 상품 전용(노드 on) 조건은 꺼짐(off)으로 식과 함께, $self·$index 글은 실제 티커로
+    off = view({"label": "Y 전용", "on": ["Y"], "gt": [C, 1]}, val, "X")
+    check(off.get("off") == ["Y"] and off.get("expr") == "X 종가 > 1", "다른 상품 전용 조건 %r" % off)
+    me = view({"label": "자기", "gt": [{"px": "close", "sym": "$self"}, {"px": "close", "sym": "$index"}]},
+              lambda n: None, "X", "IX")                    # 글만 본다(값은 판단자 몫)
+    check(me.get("expr") == "X 종가 > IX 종가" and me["detail"][0]["lhsd"] == "X 종가", "역할 → 실제 티커 %r" % me)
     # 창 길이·lag 가 "?"(저자 미명시)인 식도 근거 설명이 죽지 않는다 — "?일" 로 보인다
     unk = {"label": "최근 ?일 급등", "ge": [{"lag": [C, "?"]}, {"lowest": [C, "?"]}]}
     d = view(unk, val).get("detail") or []

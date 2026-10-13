@@ -16,7 +16,7 @@
                                                      units = 오늘 물량(시작자본 1.0 기준 — judge.to_units, 비중 모르면 None)
              sells[{label, ref, sell(문장 — judge.sell_text), note, when(조건 식 글), view}], exit_policy("book"|"none" — judge.exit_policy),
              positions[{…, sells[], next_tranche}]}                  positions = 내 포지션(로컬 파일)이 있을 때만
-view 는 노드 하나당 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, expr?, detail?} (web/explain.view —
+view 는 노드 하나당 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, expr?, off?, detail?} (web/explain.view —
 값은 판단자 ProductJudge.value 가 낸다, 값 없는 규칙 설명은 web/explain.static_view + ProductJudge.blank_value)
 — 수동은 '모름'(사람이 답했으면 그 답 — render(answers=))으로 둔 그날 값. 화면은 다시 계산하지 않고 그대로 그린다.
 """
@@ -24,7 +24,7 @@ from datetime import datetime, timedelta, timezone
 
 from shared.paths import book_meta
 from market import md_feed
-from tree.gateway import BLOCK, BUY, GATES, SELL, VERBS, _uses_pos
+from tree.gateway import BLOCK, BUY, GATES, SELL, VERBS, _uses_pos, product_specific
 from judge.judge import GRADES, NO_EXIT_NOTE, Judge, exit_policy, live_units, sell_text
 from web import explain
 from web.raw_tree import e as prose
@@ -61,18 +61,18 @@ def reason_of(key, ex, manual):
 def gate_views(judge, day=None):
     """등급 동사별 조건 설명 {동사: view} — day None 이면 값 없는 설명(시세 없는 상품의 체크리스트 구조)."""
     if day is None:
-        return {do: explain.static_view(judge.gate(do), judge.blank_value) for do in GATES}
-    return {do: explain.view(judge.gate(do), lambda n: judge.value(n, day)) for do in GATES}
+        return {do: explain.static_view(judge.gate(do), judge.blank_value, judge.product, judge.index) for do in GATES}
+    return {do: explain.view(judge.gate(do), lambda n: judge.value(n, day), judge.product, judge.index) for do in GATES}
 
 
 def _describe(judge, branch):
     """갈래 하나(비중·분할·판다)의 값 없는 설명."""
-    return explain.static_view(branch.when, judge.blank_value)
+    return explain.static_view(branch.when, judge.blank_value, judge.product, judge.index)
 
 
-def _when(branch):
-    """갈래 조건의 식 글 — 화면이 규칙 이름 옆에 '언제'를 그대로 보인다(이름만 보이고 조건이 가려지지 않게). 조건 없으면 None."""
-    return None if branch.when is None else prose(branch.when)
+def _when(judge, branch):
+    """갈래 조건의 식 글(그 상품 판 — $self·$index 는 실제 티커) — 화면이 규칙 이름 옆에 '언제'를 그대로 보인다. 조건 없으면 None."""
+    return None if branch.when is None else explain.role_text(prose(branch.when), judge.product, judge.index)
 
 
 def _rule_views(judge, a=None):
@@ -86,10 +86,23 @@ def _rule_views(judge, a=None):
                      "units": a and live_units(a),            # 오늘 물량(시작자본 1.0 기준, 화면이 × 총 투자금)
                      "tranches": [{"label": t.label, "ref": t.ref, "ratio": t.qty.x,
                                    "units": a and live_units(a, t.qty),
-                                   "when": _when(t), "view": _describe(judge, t)} for t in judge.tranches()]},
-            "sells": [{"label": r.label, "ref": r.ref, "allprod": r.allprod, "sell": sell_text(r.qty, r.repeat),
-                       "note": r.note, "when": _when(r), "view": _describe(judge, r)} for r in judge.sells()],
+                                   "when": _when(judge, t), "view": _describe(judge, t)} for t in judge.tranches()]},
+            "sells": [{"label": r.label, "ref": r.ref, "allprod": r.allprod,
+                       "allsame": bool(r.allprod) and not product_specific(r.when or {}),   # 상품마다 같은 규칙 → 공통 섹션
+                       "sell": sell_text(r.qty, r.repeat),
+                       "note": r.note, "when": _when(judge, r), "view": _describe(judge, r)} for r in judge.sells()],
             "exit_policy": exit_policy(judge.sells())}
+
+
+def _common_by_rule(v):
+    """공통 배치는 규칙 단위 — 한 규칙의 갈래 중 하나라도 상품마다 갈리면(allsame 아님) 그 규칙의 갈래 전부를 상품 카드로.
+    (갈래마다 따로 정하면 한 규칙이 공통 섹션과 상품 카드로 쪼개져 보인다.)"""
+    items = [k for g in (v.get("gates") or {}).values() for k in (g or {}).get("kids") or []] + list(v.get("sells") or [])
+    split = {k.get("label") for k in items if k.get("allprod") and not k.get("allsame")}
+    for k in items:
+        if k.get("label") in split:
+            k.pop("allsame", None)
+    return v
 
 
 def product_verdict(judge, d, mine):
@@ -99,9 +112,9 @@ def product_verdict(judge, d, mine):
     if not d.has_data:
         # 시세가 없어도 체크리스트 '구조'(규칙·조건 항목)는 정적으로 보여준다 — 값은 모름(❔), 지어내지 않는다.
         req = md_feed.requested().get(judge.product, "-")
-        return dict(base, key="unknown", grade=GRADES["unknown"], date="", close=None, chg=None,
+        return _common_by_rule(dict(base, key="unknown", grade=GRADES["unknown"], date="", close=None, chg=None,
                     reason="%s 시세 없음(수집 요청 %s) — 아래는 판정 전 체크리스트 구조" % (judge.product, req),
-                    gates=gate_views(judge), opt={}, pes={}, **_rule_views(judge))
+                    gates=gate_views(judge), opt={}, pes={}, **_rule_views(judge)))
     reason = reason_of(d.key, d.top, d.manual)
     # 데이터 완전성 가드 — 지금 가진 확정 봉이 트리가 쓰는 가장 긴 창(필요 워밍업)보다 짧으면 등급은 ❔(불완전
     #   데이터, 판정 보류)로 떨어져 있다(grade_key). 사유를 '모르고 매매 금지'로 분명히 적는다(✅/⛔ 확신 금지).
@@ -115,7 +128,7 @@ def product_verdict(judge, d, mine):
            for hs, x in zip(d.holdings, mine)]
     if pos:
         v["positions"] = pos
-    return v
+    return _common_by_rule(v)
 
 
 def _holding_view(judge, day, hs):
@@ -126,10 +139,10 @@ def _holding_view(judge, day, hs):
     val = lambda n: judge.value(n, day, hs.holding)      # noqa: E731
     out = {"ret": hs.ret, "days": hs.days,
            "sells": [{"label": r.label, "ref": r.ref, "sell": sell_text(r.qty, r.repeat), "v": v,
-                      "view": explain.view(r.when, val)} for r, v in hs.sells]}
+                      "view": explain.view(r.when, val, judge.product, judge.index)} for r, v in hs.sells]}
     nt = hs.next_tranche
     out["next_tranche"] = None if nt is None else {
-        "label": nt[0].label, "ref": nt[0].ref, "ratio": nt[0].qty.x, "v": nt[1], "view": explain.view(nt[0].when, val)}
+        "label": nt[0].label, "ref": nt[0].ref, "ratio": nt[0].qty.x, "v": nt[1], "view": explain.view(nt[0].when, val, judge.product, judge.index)}
     return out
 
 

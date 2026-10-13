@@ -50,7 +50,7 @@ def _describe_operand(e):
         sym = e["sym"]
         base = text.px_name(e["px"])
         pre = text.intraday(e)                   # 장중 분봉 vs 확정 일봉 구분
-        core = base if sym in ROLES else "%s %s" % (sym, base)   # 역할($self·$index)은 이름 없이, 구체 티커는 이름과 함께
+        core = "%s %s" % (sym, base)            # 역할($self·$index)도 이름과 함께 — view 가 상품 판의 실제 티커로 채운다
         return pre + core
     if op in ("highest", "lowest", "sum"):
         return "%s일 %s" % (text.short_n(e[op][1]), text.WINDOW[op])
@@ -153,8 +153,39 @@ def _measure(node, val, top=True):
     return facts
 
 
-def view(node, val):
-    """노드 하나 → 화면 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, expr?}.
+def view(node, val, prod=None, index=None):
+    """view 본체(_view) + 역할 채우기 — prod·index 를 주면 글(식 글·측정 설명)의 $self·$index 를 그 상품 판의 실제 티커로
+    (예: TQQQ 카드의 "$index 종가" → "^NDX 종가"). 값은 이미 그 상품으로 계산돼 있다 — 글만 맞춘다."""
+    item = _view(node, val, prod)
+    roles = {r: t for r, t in (("$self", prod), ("$index", index)) if t}
+    return _fill_roles(item, roles) if roles else item
+
+
+def role_text(t, prod, index=None):
+    """글 하나의 $self·$index 를 그 상품 판의 실제 티커로(갈래 '언제' 글 등)."""
+    return _fill_roles({"expr": t}, {r: x for r, x in (("$self", prod), ("$index", index)) if x})["expr"]
+
+
+def _fill_roles(x, roles):
+    """설명 항목 안 글(expr·lhsd·rhsd·d)의 역할 이름을 실제 티커로."""
+    if isinstance(x, list):
+        return [_fill_roles(y, roles) for y in x]
+    if not isinstance(x, dict):
+        return x
+    out = {}
+    for k, v in x.items():
+        if k in ("expr", "lhsd", "rhsd", "d") and isinstance(v, str):
+            for r, t in roles.items():
+                v = v.replace(r, t)
+        out[k] = _fill_roles(v, roles) if isinstance(v, (dict, list)) else v
+    return out
+
+
+def _view(node, val, prod=None):
+    """노드 하나 → 화면 항목 하나 {v, op?, n?, kids?, label?, ref?, manual?, note?, expr?, off?}.
+
+    · prod = 이 설명을 보는 상품. 노드 레벨 on 에 prod 가 없으면 그 노드는 이 상품에서 꺼진다('항상 참' — tree.gateway.bind).
+      숨기지 않고 off(대상 상품들)·식 글로 한 줄 보인다 — 다른 상품 전용 조건이 이 상품엔 어떻게 처리되는지 드러나게.
 
     · 논리 노드(all/any/atleast/not)는 op 와 자식 항목 전부를 담는다 — 화면이 사람이 체크한 수동 조건으로
       같은 3값 논리를 다시 계산할 수 있게(not 아래 수동은 극성이 뒤집힌다 — cond 와 같은 규칙).
@@ -162,6 +193,13 @@ def view(node, val):
       (라벨만 보이고 무엇을 재는지 안 보이면 사람이 트리를 검증할 수 없다). 라벨 없는 잎도 숨기지 않고 식 글로 보인다.
       안쪽에 라벨 달린 노드가 있으면 참고용 kids(op 없음 — 다시 계산하지 않는다)로 붙인다.
     val(n) = 노드 n 의 그날 값(부르는 쪽이 판단자에게서 — 수동 = 모름(None)·사람이 답했으면 그 답)."""
+    on = node.get("on")
+    if prod and on and prod not in on:
+        item = {"v": val(node), "off": list(on), "expr": prose({k: x for k, x in node.items() if k != "on"})}
+        for k in ("label", "ref"):
+            if node.get(k):
+                item[k] = node[k]
+        return item
     skip = ("of", "sym", "tf", "else")
     op = next((k for k in node if k not in META and k not in skip), None)
     item = {"v": val(node)}
@@ -184,7 +222,7 @@ def view(node, val):
             if node["atleast"] == UNKNOWN:  # 몇 개 필요한지 저자 미명시 — 묶음은 수동(사람이 개수 판단), 단 후보는 펼친다
                 item["manual"] = UNKNOWN_REASON
                 item["mkey"] = manual_key(node)
-        item["kids"] = [view(k, val) for k in kids]
+        item["kids"] = [_view(k, val, prod) for k in kids]
     elif is_unknown(node):
         # 저자가 숫자를 안 준 식("?") — 사람이 정하는 수동 잎. 답을 묶는 열쇠는 식(문장 아님 — 같은 식 = 같은 질문).
         item["manual"] = UNKNOWN_REASON
@@ -192,7 +230,7 @@ def view(node, val):
     elif op == "manual":
         item["manual"] = node["manual"]
     else:
-        inner = [view(k, val) for k in _labeled_inside(node)]
+        inner = [_view(k, val, prod) for k in _labeled_inside(node)]
         if inner:
             item["kids"] = inner
     if op not in LOGICAL and op != "manual":
@@ -227,7 +265,7 @@ def _labeled_inside(node):
     return out
 
 
-def static_view(node, val):
+def static_view(node, val, prod=None, index=None):
     """포지션·시세 없이 보이는 규칙 설명(값 없음) — 라벨·논리 묶음·수동 사유만(비중·분할·판다 갈래, 시세 없는 상품).
     val = 시세·포지션 없는 값 함수(ProductJudge.blank_value)."""
     if node is None:
@@ -239,6 +277,6 @@ def static_view(node, val):
             it["kids"] = [strip(k) for k in it["kids"]]
         return it
     try:
-        return strip(view(node, val))
+        return strip(view(node, val, prod, index))
     except CondError:
         return None
