@@ -971,10 +971,39 @@ class TreeGateway:
         out.discard(None)
         return out
 
+    def _atom_symbols(self, prod):
+        """상품 하나가 '일봉 아닌 봉(sub-day tf≠1d)'으로 읽는 실제 심볼 — $self→상품·$index→지수 해석. 원자(최소 단위
+        봉)를 받아야 할 심볼만(원자는 최근 ~6일뿐이라 전 심볼이 아니라 sub-day 잎이 가리키는 심볼만 받는다)."""
+        ix = self.index(prod)
+        out = set()
+
+        def walk(n):
+            if isinstance(n, dict):
+                if "px" in n and n.get("tf", "1d") != "1d":
+                    s = n.get("sym")
+                    out.add(prod if s == "$self" else ix if s == "$index" else s)
+                for k, x in n.items():
+                    if k not in META:
+                        walk(x)
+            elif isinstance(n, list):
+                for x in n:
+                    walk(x)
+
+        for _z, _l, _r, node in self.expressions(prod):
+            walk(node)
+        out.discard(None)
+        return out
+
     # ---------------------------------------------------------------- 트리 전체 훑기
     def symbols(self, prods=None):
         """트리가 참조하는 실제 심볼 전부 — 상품들(생략 = 전부) 판때기의 필요 심볼 합집합."""
         return set().union(*[self.board(p).symbols for p in (self._d["products"] if prods is None else prods)])
+
+    def atom_symbols(self, prods=None):
+        """트리가 '일봉 아닌 봉(sub-day)'으로 읽는 심볼 전부(생략 = 전 상품) — 원자(최소 단위 봉)를 받아야 할 심볼.
+        이게 비면 그 책은 원자가 필요 없다(일봉 전용)."""
+        ps = self._d["products"] if prods is None else prods
+        return set().union(set(), *[self._atom_symbols(p) for p in ps])
 
     def warmup(self, prod=None):
         """필요 워밍업(거래일) — 상품 하나(생략 = 전 상품 중 최대)의 등급 식이 쓰는 가장 긴 lookback."""

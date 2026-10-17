@@ -128,6 +128,8 @@ def t_gateway():
     check([(r.label, r.qty) for r in e] == [("익절", ("held", 1))], "sells = 판다 %r" % [(r.label, r.qty) for r in e])
     check(g.symbols() == {"A", "B", "X", "^NDX", "^SOX", "NQ=F", "N1", "N2"} and g.symbols(["B"]) == {"B", "^SOX"},
           "symbols = 상품 + 식의 sym %r · %r" % (g.symbols(), g.symbols(["B"])))
+    check(g.atom_symbols() == {"NQ=F"} and g.atom_symbols(["B"]) == set(),
+          "atom_symbols = sub-day(tf≠1d) 잎의 심볼만(원자 필요) %r" % g.atom_symbols())
     check(g.warmup("A") == 19 and g.warmup("B") == 0 and g.warmup() == 19, "warmup")
     check(g.refs() == {"0-1", "1-1", "1-2", "2-1", "4-1", "4-2", "5-1", "6-1", "9-9"}, "refs %r" % g.refs())
     check(g.skips() == [{"rule": "못 옮김", "ref": "9-9", "reason": "데이터 없음: x"}], "skip 규칙")

@@ -20,13 +20,11 @@ market 은 트리를 모른다 — 무엇이 필요한지는 위층이 need 로 
 """
 import datetime as _dt
 import threading
-from collections import namedtuple
 
 from market import md_feed
+from market.md_feed import Candle   # 봉 타입 주인은 창구(md_feed) 하나 — resample 산출 봉도 이걸 쓴다
 
 TF_DAY = "1d"
-Candle = namedtuple("Candle", "date open high low close volume")   # 봉 하나(date = 일봉 YYYYMMDD · 분봉 YYYYMMDDHHMM)
-                                                                   # jhts 일봉 Candle 과 필드가 같다(평가기는 속성만 읽음).
 
 
 # ================================================================ 일봉 확정 — 주인

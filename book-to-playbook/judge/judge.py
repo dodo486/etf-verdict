@@ -38,11 +38,20 @@ from judge.eval import Ctx, series
 # ================================================================ 시세 받기 — 판단자만(market 은 트리를 모른다)
 def history(trees, start):
     """트리(들 — TreeGateway)가 쓰는 모든 심볼의 일봉 {심볼: 일봉} — 수집 단계(md_feed) 하나로 받는다.
-    jhts 는 md_feed 에서만 만진다(팀 경계). 일봉 아닌 봉(tf 1m·5m)은 받지 않는다 — 그 조건은 모름(None)."""
+    jhts 는 md_feed 에서만 만진다(팀 경계). sub-day tf(5m·1s…) 조건이 쓰는 원자(최소 단위 봉)는 atoms() 가 따로 받는다."""
     syms = set()
     for t in trees if isinstance(trees, list) else [trees]:
         syms |= t.symbols()
     return md_feed.histories(syms, start)
+
+
+def atoms(trees):
+    """트리(들)가 sub-day tf 로 읽는 심볼의 '원자 봉'(피드가 주는 가장 잔 봉) {심볼: [Candle]} — 수집은 md_feed 하나.
+    엔진이 resample 로 임의 tf 를 만드는 최소 단위 봉. sub-day 심볼이 없으면 빈 dict(일봉 전용 책은 원자를 안 받는다)."""
+    syms = set()
+    for t in trees if isinstance(trees, list) else [trees]:
+        syms |= t.atom_symbols()
+    return md_feed.atoms(syms) if syms else {}
 
 
 def since(extra_days=0):
@@ -104,18 +113,18 @@ def shared_values(prices, days, asof):
 class RuleSeries:
     """한 상품의 등급 동사(안 산다·산다)·비중을 전체 달력에 대해 한 번 계산해 둔다."""
 
-    def __init__(self, tree, product, prices, days, asof=None, answers=None):
+    def __init__(self, tree, product, prices, days, asof=None, answers=None, atom=None):
         """tree = 트리 출입구(TreeGateway) · product = 판정할 상품 — 그 상품의 판때기(tree.board)를 평가한다. asof = 관측 시각(UTC datetime) — 일봉은 asof 이하
         확정(settled) 봉만 본다(미확정 그날 일봉은 None). None 이면 실제 지금(일봉은 마지막 확정봉).
         answers = 사람이 답한 수동 {answer_key: 참/거짓} — 등급·금액·비중이 그 답으로 풀린다(서버 권위).
-        None 이면 옛 동작 그대로."""
+        None 이면 옛 동작 그대로. atom = {심볼: [원자 봉 Candle]} — sub-day tf 노드가 resample 해 쓸 최소 단위 봉(없으면 그 조건은 모름)."""
         self.tree, self.product, self.days, self.prices = tree, product, list(days), prices
         self.board = board = tree.board(product)
         self.index = board.index
         sc = session_closes(board.symbols, self.days, asof)
         shared, scope = shared_values(prices, self.days, asof), (None if asof is None else board.symbols)
         mk = lambda m: Ctx(prices, days, product, self.index, manual_as=m, asof=asof, session_close=sc, answers=answers,
-                           shared=shared, scope=scope)
+                           shared=shared, scope=scope, atom=atom)
         self.ctx = {True: mk(True), False: mk(False), None: mk(None)}
         s = lambda node, m: series(node, self.ctx[m])
         self.opt = {do: s(board.gates[do], BUY_SIDE[do]) for do in GATES}
@@ -382,14 +391,16 @@ def size_notes(counts):
 class ProductJudge:
     """상품 하나의 판단자 — 생성 때 그 상품 규칙을 달력 전체로 한 번 계산해 둔다(RuleSeries).
     tree = 트리 출입구 · product = 상품 · prices = 시세 묶음(Judge 가 받은 것) · days = 판정 달력(생략 = 이 상품 봉 날짜)
-    · asof = 관측 시각(UTC datetime, None 이면 지금) · answers = 사람이 답한 수동 {tree.gateway.answer_key: 참/거짓}."""
+    · asof = 관측 시각(UTC datetime, None 이면 지금) · answers = 사람이 답한 수동 {tree.gateway.answer_key: 참/거짓}
+    · atom = {심볼: [원자 봉]} — sub-day tf 조건이 쓸 최소 단위 봉(없으면 그 조건은 모름)."""
 
-    def __init__(self, tree, product, prices, days=None, asof=None, answers=None):
+    def __init__(self, tree, product, prices, days=None, asof=None, answers=None, atom=None):
         self._tree, self.product = tree, product
         self._prices = prices
+        self._atom = atom or {}
         self._bars = prices.get(self.product) or []
         self.days = [c.date for c in self._bars] if days is None else list(days)
-        self._series = RuleSeries(tree, product, prices, self.days, asof, answers)
+        self._series = RuleSeries(tree, product, prices, self.days, asof, answers, atom=self._atom)
 
     # ------------------------------------------------------------ 상품·가격
     @property
@@ -489,7 +500,7 @@ class ProductJudge:
         pos = ((holding.entry_day, holding.cost) if holding.book is None
                else (holding.entry_day, holding.cost, holding.book))
         return Ctx(self._prices, self.days, self.product, self.index, manual_as=manual_as, pos=pos,
-                   shared=shared_values(self._prices, self.days, None))
+                   shared=shared_values(self._prices, self.days, None), atom=self._atom)
 
     def conditions(self, holding, sells, tranches, manual_as=False):
         """이 보유 상태로 판다 갈래·분할 차수 조건의 날짜별 값 — 백테스트 체결 워크가 체결을 정하는 데 쓴다.
@@ -581,6 +592,10 @@ class Judge:
         """이 책이 쓰는 시세(워밍업 포함, extra_days 만큼 더 과거까지)."""
         return history_back(self._tree, extra_days)
 
+    def atoms(self):
+        """이 책이 sub-day tf 로 읽는 심볼의 원자 봉 {심볼: [Candle]} — decisions(atom=…) 에 넘긴다(일봉 전용 책은 빈 dict)."""
+        return atoms(self._tree)
+
     @staticmethod
     def shared_prices(judges, extra_days=0):
         """여러 책이 같이 쓰는 시세를 한 번에(심볼 합집합 1회 조회) — 배치용(심판 비교 등). 라이브는 시세 칸(market/store)을 쓴다."""
@@ -610,11 +625,11 @@ class Judge:
     def has(self, product):
         return self._tree.has(product)
 
-    def product(self, product, prices, days=None, asof=None, answers=None):
-        """상품 하나의 판단자."""
+    def product(self, product, prices, days=None, asof=None, answers=None, atom=None):
+        """상품 하나의 판단자. atom = {심볼: [원자 봉]} — sub-day tf 조건이 쓸 최소 단위 봉."""
         if not self._tree.has(product):
             raise CondError("트리에 없는 상품 %r" % product)
-        return ProductJudge(self._tree, product, prices, days, asof, answers)
+        return ProductJudge(self._tree, product, prices, days, asof, answers, atom=atom)
 
     # ------------------------------------------------------------ 라이브 · 백테스트
     def positions(self):
@@ -632,15 +647,16 @@ class Judge:
         라이브는 이 심볼 중 하나라도 바뀐 상품만 다시 판정한다(entry/live)."""
         return {p: self._tree.board(p).symbols | {p} for p in self.products()}
 
-    def decisions(self, prices, asof=None, answers=None, products=None):
+    def decisions(self, prices, asof=None, answers=None, products=None, atom=None):
         """라이브 판정 — 상품마다 마지막 봉 Decision(내 포지션 상태 포함). products = 판정할 상품만(생략 = 전부, 순서는 트리 순).
+        atom = {심볼: [원자 봉]} — sub-day tf 조건이 쓸 최소 단위 봉(없으면 그 조건은 모름, 일봉은 그대로).
         → [(상품, Decision, ProductJudge, [내 포지션])] — 화면은 ProductJudge 에 규칙 설명을 묻는다."""
         my_positions = self.positions()
         out = []
         for p in self.products():
             if products is not None and p not in products:
                 continue
-            pj = self.product(p, prices, asof=asof, answers=answers)
+            pj = self.product(p, prices, asof=asof, answers=answers, atom=atom)
             mine = my_positions.get(p, [])
             holdings = [Holding.at(pj.days, str(x["entry_date"]), float(x["entry_px"]), int(x.get("filled", 1))) for x in mine]
             out.append((p, pj.decide(holdings=holdings), pj, mine))

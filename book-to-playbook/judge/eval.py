@@ -22,7 +22,7 @@ class Ctx:
     """평가 문맥. hist={심볼: [Candle(date,open,high,low,close,volume)]}, cal=날짜 목록."""
 
     def __init__(self, hist, cal, self_sym, index_sym=None, manual_as=None, pos=None, asof=None,
-                 session_close=None, answers=None, shared=None, scope=None, minute=None, tf=None):
+                 session_close=None, answers=None, shared=None, scope=None, atom=None, tf=None):
         """self_sym = 평가 중인 상품($self) · index_sym = 그 상품의 지수($index, 없으면 None).
         pos = (첫 매수일 인덱스, 평균 매입가 | 날짜별 평균 매입가 목록[, 장부]) — 판다·분할 갈래 평가 때만.
         장부 = {"filled": {규칙 이름 | None(전체): 날짜별 산 횟수}, "sold": 날짜별 판 비율} — 없으면 filled·sold 는 모름.
@@ -35,7 +35,8 @@ class Ctx:
         shared = 공유 값 기억 {nid: 시계열} — 같은 시세·달력·asof 의 문맥끼리만 준다(판단자 몫). pure 노드만 넣고 꺼낸다.
         scope = 이 문맥의 확정 경계(session_close)가 덮는 상품 심볼 집합 — 경계가 있으면 식의 심볼이 그 안일 때만 공유
         (상품마다 경계가 그 상품 심볼로만 만들어지므로). None = 제한 없음.
-        minute = {심볼: [최소 단위 봉(Candle, date=타임스탬프)]} — 분봉 노드가 쓸 원자(없으면 분봉 조건은 모름). 일봉축 루트에만 준다.
+        atom = {심볼: [원자 봉(Candle, date=타임스탬프)]} — 피드가 주는 가장 잔 봉. sub-day tf 노드가 이걸 resample 해 쓴다
+        (없으면 그 조건은 모름). 일봉축 루트에만 준다. 단위(분·초)는 모른다 — md_feed 가 '원자'로만 넘긴다.
         tf = 이 문맥의 '축' — None 이면 일봉축(루트, cal=날짜·hist=일봉). 분봉 tf("5m"…)면 장중축(cal=그 tf 봉 타임스탬프·
         hist=resample 된 그 tf 봉) — 분봉 노드를 돌릴 때 _intraday_ctx 가 만든다. px 는 이 축에 맞춰 hist 를 cal 로 읽는다."""
         self.pos = pos
@@ -53,7 +54,7 @@ class Ctx:
         self._flip = None
         self.answers = answers
         self.shared, self.scope = shared, scope
-        self.minute = minute or {}    # {심볼: [최소 단위 봉]} — 분봉 원자
+        self.atom = atom or {}        # {심볼: [원자 봉]} — 피드가 주는 가장 잔 봉(단위 무관)
         self.tf = tf                  # 이 문맥의 축(None = 일봉축 루트, "5m"… = 장중축)
         self._ictx = {}               # tf → 장중축 하위 문맥(한 번 만들어 재사용)
 
@@ -63,7 +64,7 @@ class Ctx:
             return self
         if self._flip is None:
             f = Ctx(self.hist, self.cal, self.self_sym, self.index_sym, not self.manual_as, self.pos,
-                    self.asof, self.session_close, self.answers, self.shared, self.scope, self.minute, self.tf)
+                    self.asof, self.session_close, self.answers, self.shared, self.scope, self.atom, self.tf)
             f._px, f._smap, f._bound, f._flip, f._ictx = self._px, self._smap, self._bound, self, self._ictx
             self._flip = f
         return self._flip
@@ -100,11 +101,11 @@ class Ctx:
         한 tf 에 한 번 만들어 재사용(루트 문맥이 쥔다)."""
         ic = self._ictx.get(tf)
         if ic is None:
-            ihist = {s: resample(bars, tf) for s, bars in self.minute.items()}
+            ihist = {s: resample(bars, tf) for s, bars in self.atom.items()}
             cutoff = None if self.asof is None else int(self.asof.timestamp())   # 에폭 비교 — 봉 정밀도(분·초·ms) 무관
             keys = {c.date for bars in ihist.values() for c in bars if cutoff is None or _epoch(c.date) <= cutoff}
             ic = Ctx(ihist, sorted(keys), self.self_sym, self.index_sym, self.manual_as, self.pos,
-                     self.asof, answers=self.answers, minute=self.minute, tf=tf)
+                     self.asof, answers=self.answers, atom=self.atom, tf=tf)
             self._ictx[tf] = ic
         return ic
 

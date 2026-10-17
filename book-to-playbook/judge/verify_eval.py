@@ -393,7 +393,7 @@ def t_tf():
     # ★ 단위 무관 — 같은 식을 '분봉 원자'·'초봉 원자' 둘로 돌려 같은 결과(엔진은 봉 개수만 센다, 단위를 모름).
     #   close 10..21 을 5개씩 묶으면 5tf 봉 종가 = [14, 19, 21]. lag1 비교 → 오늘 칸만 참, 과거일 None(장중은 접힘).
     def run(atom, tf, asof):
-        ctx = Ctx(dhist, cal, "X", asof=asof, minute={"X": atom})
+        ctx = Ctx(dhist, cal, "X", asof=asof, atom={"X": atom})
         gt = {"gt": [{"px": "close", "sym": "X", "tf": tf}, {"lag": [{"px": "close", "sym": "X", "tf": tf}, 1]}]}
         return ctx._intraday_ctx(tf).px("X", "close"), series(gt, ctx)
     mins = [Candle("2026100213%02d" % m, 10 + m, 10 + m, 10 + m, 10 + m, 1) for m in range(12)]   # 13:00..13:11 (분)
@@ -405,7 +405,7 @@ def t_tf():
     check(v_m == [None, True] and v_s == [None, True], "lag 는 그 tf 봉 개수로 셈 + 장중은 오늘 칸에 접힘(과거 None)")
 
     # lag 가 '봉 개수'를 세는 증거(일수 아님): lag2 = 2봉 전(=14) 과 비교
-    ctxs = Ctx(dhist, cal, "X", asof=dt.datetime(2026, 10, 2, 13, 0, 11, tzinfo=utc), minute={"X": secs})
+    ctxs = Ctx(dhist, cal, "X", asof=dt.datetime(2026, 10, 2, 13, 0, 11, tzinfo=utc), atom={"X": secs})
     v2 = series({"gt": [{"px": "close", "sym": "X", "tf": "5s"}, {"lag": [{"px": "close", "sym": "X", "tf": "5s"}, 2]}]}, ctxs)
     check(v2 == [None, True], "lag2 = 2봉 전(14) — 봉 개수로 센다")
 
@@ -418,6 +418,25 @@ def t_tf():
         FAILS.append("지운 observe 노드가 문법을 통과")
     except CondError:
         pass
+
+
+def t_atom_supply():
+    """판단자 배선 — RuleSeries 가 atom(원자 봉)을 받으면 sub-day tf 게이트가 실제로 소비한다(안 주면 모름).
+    공급 사슬(judge→Ctx)이 원자를 꿰는지 — 엔진은 verify_eval 봉(tf) 가 보고, 여기선 '판단자가 원자를 넘기나'를 본다."""
+    import datetime as dt
+    utc = dt.timezone.utc
+    cal = ["20261001", "20261002"]
+    hist = {"X": [Candle("20261001", 90, 90, 90, 90, 1000), Candle("20261002", 100, 100, 100, 100, 1000)]}
+    atom = {"X": [Candle("2026100213%02d" % m, 10 + m, 10 + m, 10 + m, 10 + m, 1) for m in range(12)]}  # 종가 10..21 상승
+    # 산다: 현재 5분봉 종가 > 직전 5분봉 (장중 상승) — sub-day tf 게이트
+    tree = TreeGateway.of(synthetic(["X"],
+        rule("장중상승", BUY, {"gt": [{"px": "close", "sym": "$self", "tf": "5m"},
+                                      {"lag": [{"px": "close", "sym": "$self", "tf": "5m"}, 1]}]})))
+    asof = dt.datetime(2026, 10, 2, 13, 11, tzinfo=utc)
+    no = RuleSeries(tree, "X", hist, cal, asof=asof)                 # 원자 없음 → 모름
+    yes = RuleSeries(tree, "X", hist, cal, asof=asof, atom=atom)     # 원자 공급 → 소비
+    check(no.opt[BUY][-1] is None, "원자 안 주면 sub-day 게이트는 모름(None) %r" % no.opt[BUY][-1])
+    check(yes.opt[BUY][-1] is True, "원자 주면 sub-day 게이트가 실제 소비(21>19=참) %r" % yes.opt[BUY][-1])
 
 
 def t_settled_mtf():
@@ -694,6 +713,7 @@ def main():
     for name, fn in (("수치 연산", lambda: t_numeric(rng)), ("3값 논리", t_logic),
                      ("시간 연산", lambda: t_time(rng)), ("하한", t_bounds), ("포지션", lambda: t_pos(rng)),
                      ("인과성", lambda: t_causal(rng)), ("봉(tf)", t_tf),
+                     ("판단자 원자 공급", t_atom_supply),
                      ("혼합 tf·확정봉·look-ahead 0", t_settled_mtf),
                      ("등급·금액", t_grade), ("데이터 완전성 가드(워밍업)", t_warmup_guard),
                      ("표현력 회귀", t_regress),

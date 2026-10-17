@@ -14,8 +14,13 @@ jhts.marketdata 미설치 시 AVAILABLE=False, 함수는 빈 값을 돌려준다
 (`import jhts` 가 허용되는 곳도 파이프라인 전체에서 이 파일 하나다. entry/verify_rules.py 가 강제.)
 """
 import sys
+from collections import namedtuple
 
 from market import _dev_cache  # DEV 전용 시세 캐시(ETF_DEV_CACHE 꺼지면 no-op) — 반복 네트워크 제거
+
+# 봉 하나 — date = 일봉 YYYYMMDD · 분봉 YYYYMMDDHHMM(UTC). jhts 일봉 Candle 과 필드가 같다(평가기는 속성만 읽음).
+# 시세의 '봉' 타입 주인은 이 창구 하나 — 분봉·resample 산출 봉이 다 이걸 쓴다(market.store 는 여기서 가져다 쓴다).
+Candle = namedtuple("Candle", "date open high low close volume")
 
 try:
     import jhts.marketdata as md
@@ -63,12 +68,30 @@ def _request(symbol, start):
         return "요청 실패: %s" % e
 
 
+# 피드가 주는 '원자(atom) = 가장 잔 봉'의 tf. 지금 jhts 최소 granularity 가 1분이라 "1m" 일 뿐,
+# 이 '분'이라는 사실은 이 어댑터 안에만 둔다 — 위층(store·판단자·라이브)은 '원자'만 알고 단위를 모른다.
+# 더 잔 봉(초·틱)이 생기면 여기만 바뀌고 위층은 그대로(엔진은 resample·봉 개수로 단위 무관).
+ATOM_TF = "1m"
+
+
+def atoms(symbols):
+    """심볼들의 '원자 봉'(피드가 주는 가장 잔 봉) {심볼: [Candle]} 오름차순 — histories() 의 원자판(수집 단일 입구).
+    이게 최소 단위 봉이다 — 엔진(judge/eval)이 resample 로 임의 tf(5m·30m…)를 만든다. 없는 심볼은 빈 리스트."""
+    return {s: atom_bars(s) for s in sorted(set(symbols))}
+
+
+def atom_bars(symbol):
+    """심볼 하나의 원자 봉 [Candle(date=타임스탬프 UTC, o,h,l,c,v)] 오름차순 — minutes() dict 를 Candle 리스트로."""
+    bars = minutes(symbol)
+    return [Candle(k, v["open"], v["high"], v["low"], v["close"], v["volume"]) for k, v in sorted(bars.items())]
+
+
 def minutes(symbol):
-    """1분봉 OHLCV {YYYYMMDDHHMM(UTC): {open,high,low,close,volume}} — 계약은 MIGRATION_NOTES ④.
+    """1분봉 OHLCV {YYYYMMDDHHMM(UTC): {open,high,low,close,volume}}.
     jhts.marketdata.minute_bars 로 받는다: 리스트 [{dt(ISO8601 UTC, 끝 Z), open,high,low,close,vol}] 오름차순.
     여기서 모양만 계약으로 바꾼다 — dt 를 YYYYMMDDHHMM(UTC 그대로) 키로, vol → volume 로.
-    실패·빈결과·미설치·예외 → {} (가짜로 안 채운다).
-    아직 평가기는 이걸 부르지 않는다 — 일봉 아닌 봉(tf 1m·5m)은 모름(None). 앞으로 시세 저장소가 쓴다."""
+    실패·빈결과·미설치·예외 → {} (가짜로 안 채운다). 이 '분봉'은 어댑터 내부 모양이고, 위층엔 atom_bars()/atoms()
+    가 '원자 봉'(Candle 리스트)으로 내놓는다 — 엔진이 resample 로 임의 tf 를 만드는 최소 단위 봉."""
     if not AVAILABLE:
         return {}
     try:
