@@ -75,6 +75,27 @@ def strip(top):
     return {k: v for k, v in top.items() if k != "ts"}
 
 
+def t_atom():
+    """원자(sub-day tf)가 LiveHub 를 거쳐 판정에 실제로 흐른다 — store.atoms() → decisions(atom=). 없으면 모름."""
+    zbook = synthetic(["Z"], rule("장중상승", BUY,
+                      {"gt": [{"px": "close", "sym": "$self", "tf": "5m"},
+                              {"lag": [{"px": "close", "sym": "$self", "tf": "5m"}, 1]}]}))
+    dbars = {"Z": [Candle("20261001", 50, 50, 50, 50, 1), Candle("20261002", 50, 50, 50, 50, 1)]}
+    at = {"Z": [Candle("2026100213%02d" % m, 10 + m, 10 + m, 10 + m, 10 + m, 1) for m in range(12)]}  # 5m 상승
+    nowf = lambda: datetime(2026, 10, 2, 23, tzinfo=timezone.utc)
+    dfetch = lambda syms, start: {s: dbars.get(s, []) for s in syms}
+
+    def hub_opt(atom_fetch):
+        store = Store(fetch=dfetch, atom_fetch=atom_fetch, now=nowf, market_of=lambda s: None)
+        hub = LiveHub(slugs=["vz"], store=store, judges={"vz": Judge.of(zbook, "vz")})
+        hub.tick()
+        return hub._decided["vz"]["Z"][1].opt.get(BUY)
+
+    check(hub_opt(lambda syms: {s: at.get(s, []) for s in syms}) is True,
+          "LiveHub: 원자 공급되어 sub-day 산다 게이트 실제 소비(상승=참)")
+    check(hub_opt(lambda syms: {}) is None, "LiveHub: 원자 없으면 sub-day 게이트 모름(None)")
+
+
 def main():
     today = datetime.now()
     cal = [(today - timedelta(days=80 - k)).strftime("%Y%m%d") for k in range(80)]
@@ -95,9 +116,9 @@ def main():
               "구독표 %s: %r" % (slug, j.subscriptions()))
     calls = []                                   # (slug, 판정한 상품 집합)
     for slug, j in judges.items():
-        def wrapped(prices, asof=None, answers=None, products=None, _slug=slug, _orig=j.decisions, _j=j):
+        def wrapped(prices, asof=None, answers=None, products=None, atom=None, _slug=slug, _orig=j.decisions, _j=j):
             calls.append((_slug, set(products or _j.products())))
-            return _orig(prices, asof=asof, answers=answers, products=products)
+            return _orig(prices, asof=asof, answers=answers, products=products, atom=atom)
         j.decisions = wrapped
     hub = LiveHub(slugs=list(judges), store=store, judges=judges)
     events = []
@@ -172,12 +193,14 @@ def main():
     check(strip(top) == strip(_format("vl1", j1, store.prices(), batch, answers=ans)), "judge_with ≠ 배치(answers) 판정")
     check(next(v["key"] for v in top["verdicts"] if v["prod"] == "C") == "avoid", "judge_with: C 수동 악재 참 → 안 산다")
 
+    t_atom()
+
     if FAILS:
         for f in FAILS:
             print("  FAIL", f)
         print("라이브 허브 검사 정지 %d건" % len(FAILS))
         return 1
-    print("라이브 허브 검사 통과 — 바뀐 상품만 판정 · 틱당 책마다 발행 하나 · 바뀐 것 없으면 무발행 · 판정 == 배치 · 재생 == 신호")
+    print("라이브 허브 검사 통과 — 바뀐 상품만 판정 · 틱당 책마다 발행 하나 · 바뀐 것 없으면 무발행 · 판정 == 배치 · 재생 == 신호 · 원자 흐름")
     return 0
 
 

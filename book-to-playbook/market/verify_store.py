@@ -141,6 +141,25 @@ def main():
     r5s = resample(secs, "5s")
     check("초봉 원자 → 5s 집계(같은 코드, 단위만 다름)", [c.close for c in r5s] == [14, 19, 21])
 
+    print("[원자 칸 — sub-day tf 용(need_atom·load_atom·refresh_atom·atoms)]")
+    abars = {"QQQ": {"202610091200": 100.0, "202610091201": 101.0}}
+    acalls = []
+
+    def afeed(symbols):
+        acalls.append(tuple(sorted(symbols)))
+        return {s: [Candle(ts, c, c, c, c, 1) for ts, c in sorted(abars.get(s, {}).items())] for s in symbols}
+
+    sa = Store(fetch=FakeFeed({}), atom_fetch=afeed, now=lambda: now[0], market_of=MARKET.get)
+    sa.need_atom(["QQQ"])
+    sa.load_atom()
+    check("load_atom: 원자 1회 적재", acalls == [("QQQ",)] and [c.close for c in sa.atoms()["QQQ"]] == [100.0, 101.0])
+    ap = sa.atoms()
+    check("변화 없으면 refresh_atom 빈 집합·같은 객체", sa.refresh_atom() == set() and sa.atoms() is ap)
+    abars["QQQ"]["202610091202"] = 102.0                         # 새 원자 봉
+    check("refresh_atom: 바뀐 심볼만", sa.refresh_atom() == {"QQQ"})
+    check("새 원자 봉 덧붙음", [c.date for c in sa.atoms()["QQQ"]][-1] == "202610091202")
+    check("일봉 칸과 분리(atoms ≠ prices)", sa.prices() == {})
+
     print("[같은 규칙 — judge 계산기와 공유]")
     asof = _dt.datetime(2026, 10, 9, 18, 0, tzinfo=UTC)
     sc = session_closes(["AAA", "KKK", "ZZZ"], ["20261005", "20261009"], asof, fake_sessions, MARKET.get)
@@ -148,7 +167,7 @@ def main():
     check("settled_dates: 마감 ≤ asof 만", settled_dates(sc["AAA"], asof) == {"20261005", "20261006", "20261007", "20261008"})
     check("asof 없으면 빈 경계", session_closes(["AAA"], ["20261005"], None, fake_sessions, MARKET.get) == {})
 
-    print("\n%s" % ("시세 칸 저장소 검사 통과 — 한 번 적재 · 바뀐 심볼만 · 스냅샷 동일성 · 확정 표시 · 봉 집계(단위 무관)" if not FAILS else "시세 칸 저장소 검사 실패 %d개: %s" % (len(FAILS), ", ".join(FAILS))))
+    print("\n%s" % ("시세 칸 저장소 검사 통과 — 한 번 적재 · 바뀐 심볼만 · 스냅샷 동일성 · 확정 표시 · 봉 집계(단위 무관) · 원자 칸" if not FAILS else "시세 칸 저장소 검사 실패 %d개: %s" % (len(FAILS), ", ".join(FAILS))))
     return 1 if FAILS else 0
 
 

@@ -77,17 +77,23 @@ class LiveHub:
             self._resubscribe()
 
     def _resubscribe(self):
-        """구독표를 다시 짓고 저장소에 필요 심볼을 등록·적재한다(등록은 넓히기만 — 멱등, 적재는 안 받은 심볼만)."""
-        subs = {}
+        """구독표를 다시 짓고 저장소에 필요 심볼을 등록·적재한다(등록은 넓히기만 — 멱등, 적재는 안 받은 심볼만).
+        sub-day tf 가 쓰는 심볼은 원자(최소 단위 봉)도 등록한다 — 원자 심볼은 이미 구독표에 있어(board 필요 심볼)
+        틱에서 바뀌면 그 상품이 깨워진다."""
+        subs, atom_syms = {}, set()
         for slug, j in self._judges.items():
             if j:
                 for p, syms in j.subscriptions().items():
                     for s in syms:
                         subs.setdefault(s, set()).add((slug, p))
+                atom_syms |= j.tree.atom_symbols()
         self._subs = subs
         if subs:
             self._store.need(set(subs), since())
             self._store.load()
+        if atom_syms:
+            self._store.need_atom(atom_syms)
+            self._store.load_atom()
 
     def _positions_changed(self, slug):
         """내 포지션 파일(입력)이 바뀌었나 — 파일 표식(수정 시각·크기)만 본다(읽는 건 판단자)."""
@@ -105,8 +111,8 @@ class LiveHub:
         """한 틱 — 저장소 갱신 → 바뀐 심볼을 구독한 상품만 깨워 책마다 한 번 판정·발행. 발행한 책 slug 집합을 돌려준다."""
         with self._tick:
             self._sync()
-            changed = self._store.refresh()
-            prices = self._store.prices()
+            changed = self._store.refresh() | self._store.refresh_atom()   # 일봉·원자 둘 다 바뀐 심볼
+            prices, atom = self._store.prices(), self._store.atoms()
             woken = {}
             for sym in changed:
                 for slug, p in self._subs.get(sym, ()):
@@ -114,13 +120,14 @@ class LiveHub:
             for slug in list(self._judges):
                 if self._positions_changed(slug) or slug in self._dirty:
                     woken[slug] = None                        # 전 상품
-            published = {slug for slug, prods in woken.items() if self._publish(slug, prices, prods)}
+            published = {slug for slug, prods in woken.items() if self._publish(slug, prices, prods, atom)}
             self._dirty -= set(woken)
             self.ticked = True
             return published
 
-    def _publish(self, slug, prices, prods):
-        """책 하나 — 깨운 상품(prods, None = 전부)만 판정해 지난 판정과 합치고 verdict_bus 에 이벤트 하나."""
+    def _publish(self, slug, prices, prods, atom=None):
+        """책 하나 — 깨운 상품(prods, None = 전부)만 판정해 지난 판정과 합치고 verdict_bus 에 이벤트 하나.
+        atom = 원자 봉 스냅숏(sub-day tf 조건이 소비)."""
         j, bus = self._judges.get(slug), self.verdict_bus.get(slug)
         if bus is None:
             return False
@@ -128,7 +135,7 @@ class LiveHub:
             bus.publish({"slug": slug, "book": None, "prices": {}, "decisions": [], "error": self._errors.get(slug)})
             return True
         try:
-            fresh = j.decisions(prices, products=prods)
+            fresh = j.decisions(prices, products=prods, atom=atom)
         except Exception as ex:  # noqa: BLE001 — 한 책의 계산 실패가 다른 책을 막지 않는다
             bus.publish({"slug": slug, "book": None, "prices": {}, "decisions": [], "error": "판정 실패: %s" % ex})
             return True
@@ -161,8 +168,8 @@ class LiveHub:
                 if self._errors.get(slug):
                     top["error"] = self._errors[slug]
                 return top
-            prices = self._store.prices()
-            return _format(slug, j, prices, j.decisions(prices, answers=answers), answers=answers)
+            prices, atom = self._store.prices(), self._store.atoms()
+            return _format(slug, j, prices, j.decisions(prices, answers=answers, atom=atom), answers=answers)
 
     def start(self, interval, now=None, sleep=None):
         """interval 초마다 tick 을 부르는 Poller 를 스레드로 띄운다(데몬). 첫 틱은 바로."""

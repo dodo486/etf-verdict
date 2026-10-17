@@ -70,10 +70,12 @@ class Store:
     """시세 칸 묶음 — 같은 심볼은 누가 쓰든 칸 하나. 위층이 need 로 필요 심볼·시작일을 알려주고 load 로 한 번 적재,
     틱마다 refresh 로 최근 창만 다시 받아 합친다. prices() 는 판단자가 쓰는 모양 그대로(md_feed.histories 와 같음)."""
 
-    def __init__(self, fetch=None, sessions=None, now=None, market_of=None):
+    def __init__(self, fetch=None, sessions=None, now=None, market_of=None, atom_fetch=None):
         """fetch(symbols, start) → {심볼: [Candle]} (기본 md_feed.histories) · sessions(market, start, end) → [Session]
-        (기본 md_feed.sessions) · now() → 지금(UTC tz-aware) · market_of(심볼) → "US"|"KR"|None — 전부 주입 가능(검사용)."""
+        (기본 md_feed.sessions) · now() → 지금(UTC tz-aware) · market_of(심볼) → "US"|"KR"|None ·
+        atom_fetch(symbols) → {심볼: [원자 Candle]} (기본 md_feed.atoms, 시작일 없이 최근만) — 전부 주입 가능(검사용)."""
         self._fetch = fetch or md_feed.histories
+        self._atom_fetch = atom_fetch or md_feed.atoms
         self._sessions = sessions or md_feed.sessions
         self._market_of = market_of or md_feed.market_of
         self._now = now or (lambda: _dt.datetime.now(_dt.timezone.utc))
@@ -84,6 +86,8 @@ class Store:
         self._bufs = {}                     # (심볼, tf) → [Candle] 오름차순 — 내보낸 뒤엔 고치지 않는다
         self._snap = {}                     # prices() 스냅숏 — 바뀌면 새 dict
         self._cal = {}                      # 시장 → (시작, 끝, {YYYYMMDD: 마감 UTC}) — confirmed 의 캘린더 기억
+        self._aneed = set()                 # 원자(최소 단위 봉)가 필요한 심볼 — sub-day tf 가 쓰는 심볼
+        self._asnap = {}                    # atoms() 스냅숏 {심볼: [원자 Candle]} — 바뀌면 새 dict
 
     # ------------------------------------------------------------ 등록·적재
     def need(self, symbols, start):
@@ -145,12 +149,54 @@ class Store:
                     self._snap = snap
             return changed
 
+    # ------------------------------------------------------------ 원자(최소 단위 봉) — sub-day tf 가 쓴다
+    def need_atom(self, symbols):
+        """symbols 를 '원자 봉이 필요하다'고 등록 — 여러 번 불러도 같다. 원자는 시작일이 없다(피드가 최근만 준다)."""
+        with self._lock:
+            self._aneed |= set(symbols)
+
+    def load_atom(self):
+        """등록됐지만 아직 안 받은 원자 심볼만 한 번에 받는다(refresh_atom 과 같은 경로 — 최초 적재)."""
+        self.refresh_atom(only_new=True)
+
+    def refresh_atom(self, only_new=False):
+        """등록된 원자 심볼을 다시 받아 합친다(같은 타임스탬프 봉은 바꾸고 새 봉은 덧붙임) → 실제로 바뀐 심볼.
+        only_new=True 면 아직 안 받은 심볼만(최초 적재). 원자는 시작일 없이 최근만 받는다. 빈 결과는 지우지 않는다."""
+        with self._io:
+            with self._lock:
+                syms = sorted(self._aneed - set(self._asnap) if only_new else self._aneed)
+            if not syms:
+                return set()
+            got = self._atom_fetch(syms)
+            changed = set()
+            with self._lock:
+                asnap = None
+                for s in syms:
+                    new = got.get(s) or []
+                    if not new:
+                        continue
+                    old = self._asnap.get(s) or []
+                    merged = _merge(old, new)
+                    if merged != old:
+                        if asnap is None:
+                            asnap = dict(self._asnap)
+                        asnap[s] = merged
+                        changed.add(s)
+                if asnap is not None:
+                    self._asnap = asnap
+            return changed
+
     # ------------------------------------------------------------ 읽기
     def prices(self):
         """{심볼: [Candle]} — 판단자가 쓰는 모양(md_feed.histories 와 같음). 바뀐 게 없으면 같은 dict 객체, 바뀌면 새 객체.
         돌려준 dict·리스트는 저장소가 다시 고치지 않는다 — 받는 쪽도 고치지 않는다."""
         with self._lock:
             return self._snap
+
+    def atoms(self):
+        """{심볼: [원자 Candle]} — 판단자 decisions(atom=…) 에 넘길 최소 단위 봉. 바뀐 게 없으면 같은 dict 객체."""
+        with self._lock:
+            return self._asnap
 
     def symbols(self):
         with self._lock:
