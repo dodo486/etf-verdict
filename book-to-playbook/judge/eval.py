@@ -82,11 +82,11 @@ class Ctx:
             raise CondError("$index 가 정의되지 않은 상품: %s (products 에 index 가 없다)" % self.self_sym)
         return sym
 
-    def px(self, sym, field, tf="1d"):
-        """심볼·필드를 이 문맥의 '축'(cal)으로 읽는다 — tf 가 뭐든 '이 축의 봉'을 그대로 읽을 뿐(봉 종류를 안 가린다).
-        hist 는 이 축의 봉이다: 일봉축이면 일봉, 장중축이면 이미 그 tf 로 집계된(resample) 봉. 축 구성은 문맥이 하고,
-        여기선 '확정 경계(settled)를 넘는 봉만 가린다'는 한 규칙뿐 — 장중 하위 문맥은 세션 캘린더가 없어 settled 가
-        None(안 가림)이 되고 cal 도 이미 asof 로 잘려 있어, 같은 식이 평문 읽기로 떨어진다(일봉·분봉·초봉 한 경로)."""
+    def px(self, sym, field):
+        """심볼·필드를 이 문맥의 '축'(cal)으로 읽는다 — tf 를 받지 않는다. 어느 봉인지는 이 문맥(축)이 이미 정했다:
+        일봉축이면 hist=일봉, 장중축이면 hist=그 tf 로 집계(resample)된 봉. 그래서 소비 코드엔 봉 단위가 전혀 없다
+        (식은 tf 무관하게 똑같고, series 가 노드의 tf 에 맞는 축을 깔아 준다). 여기선 '확정 경계(settled)를 넘는 봉만
+        가린다'는 한 규칙뿐 — 장중축은 캘린더가 없어 settled=None(안 가림)·cal 도 asof 로 잘려 평문 읽기로 떨어진다."""
         key = (sym, field)
         if key not in self._px:
             by = {c.date: getattr(c, field) for c in (self.hist.get(sym) or [])}
@@ -282,7 +282,7 @@ def _series(node, ctx):
     S = lambda n: series(n, ctx)
 
     if op == "px":
-        return ctx.px(ctx._role(node["sym"]), v, node.get("tf", "1d"))
+        return ctx.px(ctx._role(node["sym"]), v)   # tf 는 bind 때 Node.grid 로 쓰였다 — 읽을 땐 축(ctx)이 정한 봉을 본다
 
     if op in ARITH:
         a, b = S(v[0]), S(v[1])

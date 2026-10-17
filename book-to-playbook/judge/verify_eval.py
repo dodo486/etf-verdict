@@ -395,7 +395,7 @@ def t_tf():
     def run(atom, tf, asof):
         ctx = Ctx(dhist, cal, "X", asof=asof, minute={"X": atom})
         gt = {"gt": [{"px": "close", "sym": "X", "tf": tf}, {"lag": [{"px": "close", "sym": "X", "tf": tf}, 1]}]}
-        return ctx._intraday_ctx(tf).px("X", "close", tf), series(gt, ctx)
+        return ctx._intraday_ctx(tf).px("X", "close"), series(gt, ctx)
     mins = [Candle("2026100213%02d" % m, 10 + m, 10 + m, 10 + m, 10 + m, 1) for m in range(12)]   # 13:00..13:11 (분)
     secs = [Candle("202610021300%02d" % s, 10 + s, 10 + s, 10 + s, 10 + s, 1) for s in range(12)]  # 13:00:00..11 (초)
     px_m, v_m = run(mins, "5m", dt.datetime(2026, 10, 2, 13, 11, tzinfo=utc))
