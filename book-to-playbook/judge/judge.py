@@ -455,10 +455,11 @@ class ProductJudge:
         return Amount(w, alt, self._series.weight[None] is not None)
 
     def latest(self):
-        """(등급 키, 종가) — 달력 마지막 봉(라이브 '지금'). 시세가 없으면 ("unknown", None)."""
+        """(등급 키, 현재가) — 라이브 '지금'. 현재가 = asof 원자 최신값(없으면 마지막 일봉 종가, 패리티). 시세 없으면 ("unknown", None)."""
         if not self._bars:
             return "unknown", None
-        return self.grade(len(self.days) - 1), self._bars[-1].close
+        sp = self._series.ctx[None].spot(self.product)
+        return self.grade(len(self.days) - 1), (sp.close if sp is not None else self._bars[-1].close)
 
     def gate_value(self, do, day, view=None):
         """등급 동사 하나의 그날 값 — view None = 수동 모름 · "opt" = 수동이 유리하게 · "pes" = 불리하게(검사·사례 채점용)."""
@@ -478,8 +479,10 @@ class ProductJudge:
         s = self._series
         day = len(self.days) - 1 if day is None else day
         close = self.price("close")
+        sp = s.ctx[None].spot(self.product)                       # asof 현재가(원자) — 없으면 일봉 종가(패리티)
+        close_now = sp.close if sp is not None else close[day]
         return Decision(
-            self.product, self.grade(day), day=day, date=self.days[day], close=close[day],
+            self.product, self.grade(day), day=day, date=self.days[day], close=close_now,
             prev_close=close[day - 1] if day >= 1 else None,
             incomplete=s.incomplete(day), confirmed=s._confirmed[day] + 1, warmup=s.warmup,
             top=s.top(day), manual=s.manual_items(day), amount=self.amount(day),

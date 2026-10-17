@@ -438,6 +438,15 @@ def t_atom_supply():
     check(no.opt[BUY][-1] is None, "원자 안 주면 sub-day 게이트는 모름(None) %r" % no.opt[BUY][-1])
     check(yes.opt[BUY][-1] is True, "원자 주면 sub-day 게이트가 실제 소비(21>19=참) %r" % yes.opt[BUY][-1])
 
+    # pos 수익률·현재가 = asof '지금값'(원자). 평단 100 보유 · 일봉 종가 100 · 원자 현재가 112.
+    ph = {"X": [Candle("20261001", 100, 100, 100, 100, 1), Candle("20261002", 100, 100, 100, 100, 1)]}
+    pa = {"X": [Candle("2026100213%02d" % m, 110 + m, 110 + m, 110 + m, 110 + m, 1) for m in range(3)]}  # 현재가 112
+    aa = dt.datetime(2026, 10, 2, 13, 11, tzinfo=utc)
+    check(same(series({"pos": "ret"}, Ctx(ph, cal, "X", pos=(0, 100.0), asof=aa, atom=pa))[-1], 12.0),
+          "pos.ret 는 원자 현재가(112)로 — 어제 종가 아니라 지금값(장중 매도 조건)")
+    check(same(series({"pos": "ret"}, Ctx(ph, cal, "X", pos=(0, 100.0), asof=aa))[-1], 0.0),
+          "원자 없으면 일봉 종가(100)로 폴백 — 패리티")
+
 
 def t_settled_mtf():
     """★ 혼합 tf·확정(settled) 규칙·일봉축 '마지막 확정봉'·look-ahead 0 — 이 덩어리의 최우선 correctness 증명(영구).

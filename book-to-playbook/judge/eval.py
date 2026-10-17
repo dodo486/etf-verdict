@@ -122,6 +122,30 @@ class Ctx:
             out[idx] = raw[-1]
         return out
 
+    def spot(self, sym):
+        """asof 시점 '현재가' 봉 — 그 심볼 원자(가장 잔 봉)의 asof 이하 마지막 (종가 있는) 봉. 원자가 없으면 None.
+        '현재가'는 특정 tf 가 아니라 가장 잔 최신값 = 진짜 지금값(pos 수익률·화면 현재가가 이걸 쓴다)."""
+        last = None
+        cut = None if self.asof is None else int(self.asof.timestamp())
+        for c in self.atom.get(sym) or []:
+            if (cut is None or _epoch(c.date) <= cut) and c.close is not None:
+                last = c
+        return last
+
+    def spot_close(self, sym):
+        """일봉 종가 시계열(cal 길이)에 asof 현재가(원자)를 '그날 칸'에 덮어쓴 것 — pos 가 '지금값'으로 수익률을 낸다.
+        원자가 없으면 일봉 그대로(바이트 동일 — 백테스트·EOD·asof None·캘린더 없음 패리티)."""
+        daily = self.px(sym, "close")
+        sp = self.spot(sym)
+        if sp is None:
+            return daily
+        idx = next((i for i in range(len(self.cal) - 1, -1, -1) if self.cal[i] == sp.date[:8]), None)
+        if idx is None:
+            return daily
+        out = list(daily)
+        out[idx] = sp.close
+        return out
+
     def _settled_dates(self, sym):
         """일봉 확정(settled) 규칙: 심볼의 거래소 세션 마감이 asof 이하인 날짜 집합(그 날 일봉은 확정 → 읽어도 됨).
         asof 가 없으면(라이브 '지금' = 늘 마지막 확정봉 계약) 또는 그 심볼의 세션 캘린더가 없으면(미설치·조회 실패)
@@ -422,7 +446,7 @@ def _series(node, ctx):
             book = ctx.pos[2] if len(ctx.pos) > 2 else None
             s = None if book is None else (book["sold"] if v == "sold" else book["filled"].get(node.get("rule"), [0] * L))
             return [float(s[i]) if (s is not None and i >= e and s[i] is not None) else None for i in range(L)]
-        close = ctx.px(ctx.self_sym, "close")
+        close = ctx.spot_close(ctx.self_sym)   # 수익률·현재가는 asof '지금값'(원자)으로 — 원자 없으면 일봉(패리티)
         px = cost if isinstance(cost, list) else [cost] * L
         ret = [((close[i] / px[i] - 1) * 100 if (i >= e and _exact(close[i]) and px[i]) else None)
                for i in range(L)]
