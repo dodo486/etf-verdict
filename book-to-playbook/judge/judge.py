@@ -335,7 +335,7 @@ def to_units(q, led):
       bought x → x × led.bought   지금까지 산 물량의 x     (매도)
       held   x → x × led.held     지금 남은 물량의 x(1=전량)(매도)
     x None(저자 미명시) → None — 지어내지 않는다(호출자 정책: 매도는 팔지 않음 · 비중은 size_of)."""
-    if q.x is None:
+    if q.x is None or not isinstance(q.x, (int, float)):
         return None
     return {"cash": lambda: q.x / 100.0, "budget": lambda: q.x * led.budget,
             "bought": lambda: q.x * led.bought, "held": lambda: q.x * led.held}[q.of]()
