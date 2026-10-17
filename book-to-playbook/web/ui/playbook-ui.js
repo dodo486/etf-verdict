@@ -190,6 +190,52 @@
   const side = document.getElementById('side');
   if(btn) btn.addEventListener('click',()=>side.classList.toggle('open'));
 
+  // ── 넓은 화면 목차 접기/펴기 (책 무관) ──────────────────────────────────────
+  //   좁은 화면(≤860px)은 ☰ 목차 드로어(#menubtn)가 처리한다. 넓은 화면에선 목차(nav.side)가 늘 248px 를
+  //   차지해 본문이 좁다 — 접기 버튼으로 목차를 숨기고 본문을 전폭으로 넓힌다. 상태는 localStorage 로 유지.
+  //   스타일·버튼은 여기서 주입한다(페이지 CSS 손 안 대고 모든 책에 전파). 버튼은 플레이북 탭 안에만 둬서
+  //   다른 탭(시트·백테스트)에선 자동으로 사라진다.
+  (function(){
+    if(!side) return;
+    const st = document.createElement('style');
+    st.textContent =
+      '.toc-collapse{display:none;align-items:center;justify-content:center;gap:6px;width:100%;margin:0 0 14px;'
+      +'padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:transparent;'
+      +'color:var(--mute);font:inherit;font-size:12px;font-weight:700;cursor:pointer}'
+      +'.toc-collapse:hover{color:var(--head);border-color:var(--mute)}'
+      +'#toc-expand{display:none;position:fixed;z-index:60;top:60px;left:10px;align-items:center;gap:6px;'
+      +'background:var(--surface-2);color:var(--gold);border:1px solid var(--line);border-radius:9px;'
+      +'padding:8px 12px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer}'
+      +'#toc-expand:hover{border-color:var(--mute)}'
+      +'@media(min-width:861px){'
+      +'.toc-collapse{display:flex}'
+      +'body.toc-collapsed #panel-playbook .wrap{grid-template-columns:minmax(0,1fr)}'
+      +'body.toc-collapsed #panel-playbook nav.side{display:none}'
+      +'body.toc-collapsed #toc-expand{display:inline-flex}'
+      +'}';
+    document.head.appendChild(st);
+
+    const collapseBtn = document.createElement('button');
+    collapseBtn.type = 'button'; collapseBtn.className = 'toc-collapse';
+    collapseBtn.innerHTML = '◀ 목차 접기';
+    side.insertBefore(collapseBtn, side.firstChild);
+
+    const expandBtn = document.createElement('button');
+    expandBtn.type = 'button'; expandBtn.id = 'toc-expand';
+    expandBtn.innerHTML = '☰ 목차';
+    // 플레이북 탭 패널 안에 둔다 — 다른 탭이 활성화되면 패널이 display:none 이라 버튼도 같이 사라진다.
+    (document.getElementById('panel-playbook') || document.body).appendChild(expandBtn);
+
+    const KEY = 'pb.tocCollapsed';
+    function apply(on){
+      document.body.classList.toggle('toc-collapsed', on);
+      try { localStorage.setItem(KEY, on ? '1' : '0'); } catch(e){}
+    }
+    try { if(localStorage.getItem(KEY) === '1') document.body.classList.add('toc-collapsed'); } catch(e){}
+    collapseBtn.addEventListener('click', ()=>apply(true));
+    expandBtn.addEventListener('click', ()=>apply(false));
+  })();
+
   // ── 본문 단어 검색 (책 무관 · 검수여부 무관) ──────────────────────────────
   //   #content 텍스트에서 단어를 찾아 하이라이트, 매치 든 챕터를 펼치고, 이전/다음 점프.
   //   스타일도 여기서 주입한다(페이지 CSS 손 안 대고 모든 책에 전파).

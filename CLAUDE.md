@@ -4,7 +4,7 @@
 
 - **구조·원칙의 정본**: `book-to-playbook/docs/ARCHITECTURE.md` — 작업 전에 읽는다.
 - **할 일의 정본**: `book-to-playbook/docs/HANDOFF.md` 한 곳(다른 곳에 TODO 를 만들지 않는다).
-- **검사**: `python -m entry.run check` (book-to-playbook 에서) — 매일 돌지 않는다. **무언가 바꿨으면 커밋 전에 돌린다**(엔진 코드 dsl·signals 를 바꿔도 트리 검사까지 다시). 실행 환경: `PYTHONPATH=<jhts 경로>`(jhts-marketdata 미설치 시 시세가 빈다), `PYTHONIOENCODING=utf-8`.
+- **검사**: `python -m entry.run check` (book-to-playbook 에서) — 매일 돌지 않는다. **무언가 바꿨으면 커밋 전에 돌린다**(엔진 코드 dsl·signals 를 바꿔도 트리 검사까지 다시). 실행 환경: **레포 `.venv` 로 돌린다**(`.venv/bin/python -m entry.run check`, book-to-playbook 에서). 이 venv 에 `requirements.txt`(pandas·yfinance·alpaca-py·exchange_calendars·psycopg2-binary)가 깔려 있고, jhts 경로는 `.venv` 안 `jhts.pth` 로 구워 넣어 `PYTHONPATH` 불필요. **맨 `python3`(의존성 없음)로 돌리면 시세가 전부 빈다 → 모든 조건이 `모름` → 시장을 못 본다.** 한글 깨지면 `PYTHONIOENCODING=utf-8`. 재구축: `python3.13 -m venv .venv && .venv/bin/pip install -r requirements.txt`, 그 뒤 site-packages 에 `jhts.pth`(jhts 절대경로 한 줄).
 
 ## 꼭 지킬 것
 

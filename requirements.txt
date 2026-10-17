@@ -1,0 +1,6 @@
+alpaca-py==0.44.0
+exchange_calendars==4.13.2
+pandas==3.0.6
+psycopg2-binary==2.9.13
+requests==2.34.2
+yfinance==1.7.0

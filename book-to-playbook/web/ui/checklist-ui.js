@@ -41,13 +41,25 @@
   let pending = false, serverNote = '';   // 답을 보내고 서버 판정을 기다리는 중 · 서버 판정을 못 받음 알림
 
   /* ---- 그리기 ---- */
-  const MARK = v => v===true ? '<span class="ck-m t">●</span>' : (v===false ? '<span class="ck-m f">○</span>' : '<span class="ck-m u">?</span>');
-  // 논리 묶음 설명. not 은 라벨·증거 줄이 뜻을 다 전하므로 캡션을 달지 않는다(군더더기 제거).
+  // 색 규칙(통일) — '켜졌을 때만 색': 조건이 지금 참(ON)일 때만 역할색이 뜬다.
+  //   회피(안 산다)·매도(판다) 역할이 ON → 빨강(방어 경보) · 좋은 신호(산다) 역할이 ON → 초록.
+  //   참(ON)만 역할색 · 거짓은 흐린 실선 테두리 · 모름(데이터 없음·저자 미명시)은 점선+? 로 거짓과 구분한다
+  //   ('모름'을 '아님'으로 오해해 잘못된 확신으로 매매하지 않게). 수동은 색 대신 손바닥(✋) — 사람이 참/거짓을 직접 고른다.
+  //   pol: 'good'(산다) | 'bad'(안 산다·판다) | null(중립).
+  function markCls(v, pol){
+    if(v === true) return pol==='bad'?'on bad':pol==='good'?'on good':'on';
+    if(v === false) return 'off';
+    return 'unknown';   // null/undefined = 모름(데이터 없음·저자 미명시) — 거짓과 다르다
+  }
+  function dot(v, pol){
+    var c = markCls(v, pol);
+    return '<span class="ck-m '+c+'"'+(c==='unknown' ? ' title="모름 — 데이터 없음 또는 저자 미명시">?' : '>')+'</span>';
+  }
+  // 논리 묶음 캡션(모두 / 하나 이상 / N개 이상). not 은 라벨이 뜻을 전하므로 캡션 없음.
   const OPW = it => it.op==='all' ? '모두' : it.op==='any' ? '하나 이상' : it.op==='atleast' ? (it.n+'개 이상') : '';
   // 원문 소절 뱃지 — 규칙 줄마다 한 번. 이게 그 규칙의 원문 표시다(다른 데서 또 표시하지 않는다).
   function refChip(ref){ return ref ? ' <a class="ck-ref" data-ref="'+esc(ref)+'" title="플레이북 원문 소절로">'+esc(ref)+'</a>' : ''; }
   function fmtV(v){ return typeof v === 'number' ? (Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(2)) : ''; }
-  // 측정 증거 — 조건이 '무엇을 재서 그 값이 얼마였나'를 한 줄로(엔진이 detail 로 실어보냄). 사용자가 ●/○ 를 믿을 근거.
   function fmtMeas(x){
     if(x === null || x === undefined) return '—';
     if(typeof x !== 'number') return esc(String(x));
@@ -60,31 +72,27 @@
     return (neg ? '-' : '') + ip + fp;
   }
   const EVSYM = {gt:'>', ge:'≥', lt:'<', le:'≤'};
-  function evLine(detail){
+  // 실제데이터 — 조건이 '무엇을 재서 얼마였나'(엔진 detail). 원시 입력 나열은 빼고 잰 값·기준만 간결히.
+  function measCompact(detail){
     if(!detail || !detail.length) return '';
-    let missing = false;
     const parts = detail.map(d=>{
       const u = d.unit ? esc(d.unit) : '';
       const noVal = (d.lhs === null || d.lhs === undefined);
-      if(noVal) missing = true;
-      // 복합식이면 원시 입력값을 먼저(예: 고가 7750 · 종가 7736 →)
-      let lead = '';
-      if(d.inputs && d.inputs.length){
-        lead = d.inputs.map(x=>esc(x.d)+' '+((x.v===null||x.v===undefined)?'<span class="ev-x">—</span>':'<b>'+fmtMeas(x.v)+'</b>')).join('<span class="ev-sep"> · </span>') + ' → ';
-      }
       const lv = noVal ? '<span class="ev-x">측정 없음</span>' : '<b>'+fmtMeas(d.lhs)+u+'</b>';
-      // 입력값(lead)이 있으면 파생값 이름(lhsd)은 생략 — 입력이 이미 설명한다
-      const L = lead + (lead ? '' : (d.lhsd ? esc(d.lhsd)+' ' : '')) + lv;
-      // 기준이 상수(rhsd 없음)면 "· 기준 op 값", 다른 식이면 "op 설명 값" — 단위는 양쪽에 같게 붙인다
-      //   상수 자리가 비었으면(rhs 없음·설명 없음) 저자가 기준을 안 준 "?" 식 — '기준 ?'로 보여 사람이 숫자를 보고 고르게
+      const L = (d.lhsd ? esc(d.lhsd)+' ' : '') + lv;
       const R = d.rhsd ? ' '+(EVSYM[d.op]||'')+' '+esc(d.rhsd)+' <b>'+fmtMeas(d.rhs)+u+'</b>'
               : (d.rhs === null || d.rhs === undefined) ? ' <span class="ev-th">· 기준 '+(EVSYM[d.op]||'')+' ? (저자 미명시)</span>'
                        : ' <span class="ev-th">· 기준 '+(EVSYM[d.op]||'')+' '+fmtMeas(d.rhs)+u+'</span>';
       return L + R;
     });
-    return '<div class="ck-ev'+(missing?' miss':'')+'">'+(missing?'⚠️':'📊')+' '+parts.join('<span class="ev-sep"> · </span>')+'</div>';
+    return parts.join('<span class="ev-sep"> · </span>');
   }
-  // 식 글 한 줄 — 라벨·수동 사유가 '무엇을 재는지'를 가리지 않게 규칙의 식을 그대로 보인다(엔진이 it.expr 로 실어보냄).
+  // 오른쪽 '실제데이터' 칸 — 측정값만(있을 때). 참/거짓 글자는 없다 — 상태는 동그라미가 전한다.
+  function dataCell(node){
+    const m = measCompact(node.detail);
+    return m ? '<span class="ck-d">'+m+'</span>' : '';
+  }
+  // 식 글 한 줄 — 칸 밖 규칙(renderOutside)에서만 쓴다. 본 체크리스트 줄엔 수식 글줄을 넣지 않는다(피로도).
   function exprLine(x, head){ return x ? '<div class="ck-expr">'+(head?'<span class="ck-exh">'+esc(head)+'</span> ':'')+esc(x)+'</div>' : ''; }
   // 공통 규칙 = 모든 상품에 거는 **시장 신호**(엔진 allprod=규칙 레벨 on 없음 · selfdep=자기 시세/보유 안 읽음).
   //   VIX·금리·선물처럼 구체 티커만 보는 규칙이 공통이다. 상품 자기 시세($self)·기준 지수($index)·보유(pos)를
@@ -93,20 +101,23 @@
   const isCommon = it => !!(it && it.allprod && !it.selfdep);
   // 공통 섹션 — 세 상품의 같은 규칙 노드를 나란히 걷는다(구조 동일, 값만 갈림). 값이 상품마다 같으면 칩 하나,
   //   갈리면(자기 시세·기준 지수·보유·상품 전용 노드) 상품별 칩. 측정 증거(📊 detail)는 여기선 생략 — 상품 카드에서(옵션 B).
-  function valMark(v){ return (typeof v === 'number') ? '<span class="dataval">'+fmtV(v)+'</span>' : MARK(v===undefined?null:v); }
-  function cMark(prods, its){
+  function valMark(v, pol){ return (typeof v === 'number') ? '<span class="dataval">'+fmtV(v)+'</span>' : dot(v===undefined?null:v, pol); }
+  // 상품별 결과 마크(동사 갈래 머리칩 등) — 값이 상품마다 같으면 마크 하나, 갈리면 상품별 칩. 색은 pol 로.
+  function cMark(prods, its, pol){
     // 상품별 값(off = 노드 레벨 on 에 그 상품이 없음 → 이 상품엔 적용 안 됨)
     const vals = its.map(it => !it ? undefined : (it.off ? 'off' : (it.v===undefined?null:it.v)));
     const real = vals.filter(v => v!=='off' && v!==undefined);
     const anyOff = vals.some(v => v==='off');
     const allSame = real.length>0 && real.every(v => v===real[0]);
-    if(allSame && !anyOff) return valMark(real[0]);          // 값 공통(구체 티커) → 칩 하나
+    if(allSame && !anyOff) return valMark(real[0], pol);     // 값 공통(구체 티커) → 마크 하나
     return '<span class="ck-pcs">'+prods.map((p,i)=>{        // 갈림 → 상품별 칩
-      const v = vals[i], m = (v==='off'||v===undefined) ? '<span class="ck-m n">—</span>' : valMark(v);
+      const v = vals[i], m = (v==='off'||v===undefined) ? '<span class="ck-m n"></span>' : valMark(v, pol);
       return '<span class="ck-pc" title="'+esc(p)+'"><span class="ck-pcl">'+esc(p)+'</span>'+m+'</span>';
     }).join('')+'</span>';
   }
-  function commonNode(its, prods, path, ans, depth, seen){
+  // 조건 한 줄(공통·카드 공용) — [동그라미][라벨·묶음캡션·소절칩][실제데이터] 한 형식으로 통일한다.
+  //   pol = 이 조건이 속한 동사 갈래의 역할색(산다=good · 안 산다/판다=bad). 중첩 자식은 부모 pol 을 잇는다.
+  function commonNode(its, prods, path, ans, depth, seen, pol){
     // 구조 기준은 off 아닌(활성) 상품 노드 — off 껍데기는 op·kids 가 없어 식 글만 있다(상품 포크의 주인 상품을 따른다).
     const it0 = its.find(it => it && !it.off) || its.find(Boolean); if(!it0) return '';
     // 주어진 상품 전부에서 off(=다른 상품 전용 노드)면 이 뷰에선 안 보인다 — 상품 카드(상품 하나)에선 그 상품에 안 걸리는
@@ -117,7 +128,7 @@
     const sig = (it0.label||it0.manual||it0.expr) ? ((it0.label||it0.manual||'')+'|'+(it0.expr||'')+'|'+(it0.ref||'')) : null;
     const dup = !!(sig && seen.has(sig)); if(sig) seen.add(sig);
     const ck = (depth>0 && it0.label && it0.manual===undefined && (it0.kids||it0.expr)) ? it0.label+'|'+(it0.expr||'') : null;
-    if(ck && cardSeen.has(ck)) return '<div class="ck-row auto fold"><div class="ck-line">'+cMark(prods,its)
+    if(ck && cardSeen.has(ck)) return '<div class="ck-row fold"><div class="ck-line">'+dot(it0.v===undefined?null:it0.v, pol)
       + '<span class="ck-t">'+esc(it0.label)+' <span class="ck-opl">↑ 위에서 펼침</span>'+refChip(it0.ref)+'</span></div></div>';
     if(ck) cardSeen.add(ck);
     // 상품 포크 접기 — 여러 상품 중 일부에서만 켜지는 가지(off 섞임)는 공통 뷰에서 안쪽을 펼치지 않고 한 줄로
@@ -126,41 +137,48 @@
     const nk = gated ? 0 : its.reduce((m,it)=> Math.max(m, it&&it.kids?it.kids.length:0), 0);
     let kidsHtml = '';
     for(let i=0;i<nk;i++){
-      kidsHtml += commonNode(its.map(it => it&&it.kids?it.kids[i]:null), prods, path+'.'+i, ans, depth+1, depth===0?new Set():seen);
+      kidsHtml += commonNode(its.map(it => it&&it.kids?it.kids[i]:null), prods, path+'.'+i, ans, depth+1, depth===0?new Set():seen, pol);
     }
+    const isM = it0.manual!==undefined && !gated;
     const showRow = it0.label || it0.manual!==undefined || it0.expr || gated;
     if(!showRow){
       if(!kidsHtml) return '';
       const gop = OPW(it0);
-      return it0.op ? '<div class="ck-grp">'+(gop?'<div class="ck-op">'+esc(gop)+'</div>':'')+kidsHtml+'</div>' : kidsHtml;
+      // 묶음 캡션(모두·하나 이상·N개 이상)이 있으면 그 아래 조건을 들여써서 '이 캡션이 지배하는 줄'을 눈으로 묶는다.
+      //   중첩(모두 { … 하나 이상 { … } })이 평평하게 섞여 어느 캡션이 어느 줄을 가리키는지 흐려지지 않게.
+      return it0.op ? '<div class="ck-grp">'+(gop?'<div class="ck-op">'+esc(gop)+'</div><div class="ck-gkids">'+kidsHtml+'</div>':kidsHtml)+'</div>' : kidsHtml;
     }
     if(dup) return '';
-    const isM = it0.manual!==undefined && !gated;
-    let ctl;
+    // 왼쪽 동그라미 + 오른쪽 실제데이터
+    let circle, data;
     if(isM){
-      // 수동 토글 한 번 누르면 세 상품 열쇠에 같은 답(mkey 는 상품별 그대로 — 서버 무변). bind() 가 data-keys 로 처리.
+      // 수동 — 체크 동그라미에 손바닥(✋). 눌러서 체크(✔)↔해제. 참/거짓 글자는 없다(동그라미가 상태를 전한다).
+      //   한 번 누르면 세 상품 열쇠에 같은 답(mkey 는 상품별 그대로 — 서버 무변). bind() 가 data-keys 로 처리.
       const body = it0.mkey || it0.manual, keys = prods.map(p=>p+'|'+body), a = ans[keys[0]];
-      ctl = '<span class="ck-man" data-key="'+esc(keys[0])+'" data-keys="'+esc(JSON.stringify(keys))+'">'
-          + '<button data-a="1" class="seg t'+(a===true?' on':'')+'" title="참">● 참</button>'
-          + '<button data-a="0" class="seg f'+(a===false?' on':'')+'" title="거짓">○ 거짓</button></span>';
-    } else ctl = cMark(prods, its);
+      const onc = a===true ? ' on'+(pol==='bad'?' bad':pol==='good'?' good':'') : '';
+      circle = '<span class="ck-man" data-key="'+esc(keys[0])+'" data-keys="'+esc(JSON.stringify(keys))+'">'
+             + '<button type="button" data-a="1" class="ck-m man'+onc+'" title="수동 확인 — 눌러서 체크">✋</button></span>';
+      data = '';
+    } else {
+      const vals = its.map(it => !it ? undefined : (it.off ? 'off' : (it.v===undefined?null:it.v)));
+      const real = vals.filter(v => v!=='off' && v!==undefined);
+      const allSame = real.length>0 && real.every(v => v===real[0]) && !vals.some(v=>v==='off');
+      circle = cMark(prods, its, pol);
+      data = (gated || !allSame) ? '' : dataCell(it0);   // 상품마다 값이 갈리면 동그라미 칩이 이미 상태를 전한다
+    }
     // 적용되는 상품만 꼬리표(상품 포크면 '· 상품 카드에서'로 안쪽을 거기서 보라고 안내)
     const act = prods.filter((p,i)=> its[i] && !its[i].off);
     const offNote = (act.length && act.length<prods.length)
       ? ' <span class="ck-opl">'+esc(act.join(','))+' 전용'+(gated?' · 상품 카드에서':'')+'</span>' : '';
-    const why = (!gated && isM) ? '<div class="ck-why">✋ '+esc(it0.manual)+'</div>' : ((!gated && it0.note)?'<div class="ck-why">'+esc(it0.note)+'</div>':'');
     const opw = OPW(it0), opl = (opw && !gated)?' <span class="ck-opl">'+esc(opw)+'</span>':'';
-    // 접힌 포크 줄 이름: 라벨 없으면 묶음 캡션('3개 이상' 등)으로 짧게 — 긴 식 글은 숨긴다
-    const txt = it0.label || (gated && it0.op ? OPW(it0)+' 조건' : (it0.expr||'수동 확인'));
-    // 측정 증거(📊) — 공통·카드 어디서든 실제 데이터를 보인다(체크리스트는 둘 다 같은 구조). 📊 가 값까지 보이면 그 위 식 설명줄은 중복이라 숨긴다.
-    const hasDetail = !gated && it0.detail && it0.detail.length;
-    const meas = hasDetail ? evLine(it0.detail) : '';
-    return '<div class="ck-row'+(isM?' man':' auto')+'" '+(it0.ref?'data-ref="'+esc(it0.ref)+'"':'')+'>'
-      + '<div class="ck-line">'+ctl+'<span class="ck-t">'+esc(txt)+opl+offNote+refChip(it0.ref)+'</span></div>'
-      + ((!gated && it0.label && !hasDetail)?exprLine(it0.expr):'') + why + meas + (kidsHtml?'<div class="ck-kids">'+kidsHtml+'</div>':'') + '</div>';
+    // 라벨 없으면: 수동 사유 → 묶음 캡션 → 식 순으로 라벨 자리를 채운다(식 글줄은 따로 넣지 않으므로 여기서만).
+    const txt = it0.label || (isM ? (it0.manual||'수동 확인') : (gated && it0.op ? OPW(it0)+' 조건' : (it0.expr||'수동 확인')));
+    return '<div class="ck-row'+(isM?' man':'')+'" '+(it0.ref?'data-ref="'+esc(it0.ref)+'"':'')+'>'
+      + '<div class="ck-line">'+circle+'<span class="ck-t">'+esc(txt)+opl+offNote+refChip(it0.ref)+'</span>'+data+'</div>'
+      + (kidsHtml?'<div class="ck-kids">'+kidsHtml+'</div>':'') + '</div>';
   }
-  // 규칙 블록 안의 판다(매도) 갈래 한 줄 — 매도는 보유분에만 걸리므로 상품별 결과 칩은 '내 포지션'이 있을 때만
-  //   (ps.sells[그 규칙 index]), 없으면 '—'. 조건은 카드와 같은 '언제' 식 글.
+  // 판다(매도) 갈래 한 줄 — 매도는 보유분에만 걸리므로 상품별 결과 칩은 '내 포지션'이 있을 때만(없으면 흐린 동그라미).
+  //   역할색 bad(방어). 조건 설명은 '언제' 글을 라벨 자리에 둔다(수식 글줄은 따로 넣지 않는다).
   function commonExitFace(sell, vs, lab){
     const r0 = sell[0][1];
     const marks = [];
@@ -169,11 +187,10 @@
       if(idx < 0) return;
       (v.positions||[]).forEach(ps=>{ const e = (ps.sells||[])[idx]; if(e) marks.push([v.prod, {v:e.v}]); });
     });
-    const st = marks.length ? cMark(marks.map(x=>x[0]), marks.map(x=>x[1])) : '<span class="ck-m n">—</span>';
-    return '<div class="ck-cm-face"><span class="ck-cm-verb">③ '+esc((VD.verbs||[])[2]||'')+'</span>'+st
-      + ' <span class="ck-opl">'+esc(r0.sell)+'</span></div>'
-      + (r0.when?'<div class="ck-expr"><span class="ck-exh">언제</span> '+esc(r0.when)+'</div>':'')
-      + (r0.note?'<div class="ck-why">'+esc(r0.note)+'</div>':'');
+    const st = marks.length ? cMark(marks.map(x=>x[0]), marks.map(x=>x[1]), 'bad') : '<span class="ck-m off"></span>';
+    const txt = r0.when || r0.sell || lab;
+    return '<div class="ck-row"><div class="ck-line">'+st
+      + '<span class="ck-t">'+esc(txt)+' <span class="ck-opl">③ '+esc((VD.verbs||[])[2]||'')+(r0.sell?' · '+esc(r0.sell):'')+'</span></span></div></div>';
   }
   // ── 점수 규칙(장전 5지표처럼 '5개 중 N개' 게이트) ── 산다·안산다 갈래가 **같은 지표 집합**을 임계만 달리 보는
   //   규칙은 지표를 두 번 나열하지 않고 점수표 하나 + 띠 범례로 보인다(저자의 '4점↑ 산다 · 3점 관망 · 2점↓ 안 산다').
@@ -218,7 +235,7 @@
     const prods = byProd.map(b=>b.prod);
     let items = '';
     for(let i=0;i<total;i++){
-      items += commonNode(byProd.map(b=>b.s.at.kids[i]), prods, 'common', ans, 0, new Set());
+      items += commonNode(byProd.map(b=>b.s.at.kids[i]), prods, 'common', ans, 0, new Set(), 'good');   // 점수 지표 = 유리할수록 좋음(초록)
     }
     // 상품 전용 가지(대표주 등 extras) — extras 가 있는 갈래(보통 산다)에서 상품별로 가져온다
     const ef = parsed.find(x=>x.sc.extras.length);
@@ -226,7 +243,7 @@
       const eb = ef.f.perProd.map(x=>({prod:x[0], s:findScore(x[1])}));
       const ne = Math.max.apply(null, eb.map(b=>b.s?b.s.extras.length:0).concat(0));
       for(let i=0;i<ne;i++){
-        items += commonNode(eb.map(b=> b.s && b.s.extras[i] || null), eb.map(b=>b.prod), 'common', ans, 0, new Set());
+        items += commonNode(eb.map(b=> b.s && b.s.extras[i] || null), eb.map(b=>b.prod), 'common', ans, 0, new Set(), 'good');
       }
     }
     // 띠 범례 — 산다 임계(≥) · 안산다 임계(< → 이하) · 그 사이 관망
@@ -241,51 +258,9 @@
     if(buyMin!=null && blockN!=null && (buyMin-1) >= blockN){ const lo=blockN, hi=buyMin-1; bands.push((lo===hi?lo+'개':lo+'~'+hi+'개')+' 관망'); }
     if(blockN!=null) bands.push('<b>'+(blockN-1)+'개 이하</b> 안 산다');
     else if(buyMin==null && blockN==null) return null;
-    // 머리 상품별 칩 = 산다 갈래(없으면 첫 갈래) 상품별 판정
-    const hf = (parsed.find(x=>x.f.verb===BUY) || parsed[0]).f;
-    const headChips = cMark(hf.perProd.map(x=>x[0]), hf.perProd.map(x=>x[1]));
-    const head = '<div class="ck-cm-face"><span class="ck-cm-verb">점수</span>'+headChips
-      + '<span class="ck-opl">'+total+'개 중 유리한 개수로 판정</span></div>';
-    const band = bands.length ? '<div class="ck-sc-band">판정: '+bands.join(' · ')+'</div>' : '';
-    return head + items + band;
-  }
-  // ── 전제+갈림축 규칙(갭상승 눌림처럼) ── 산다·안산다가 '같은 조건을 반대 극성'으로 가르면(산다=참, 안산다=not),
-  //   전제(양쪽 같은 극성)는 한 번, 갈림축(참/거짓으로 산다↔안산다)도 한 번만 보이고 각 갈래는 나머지만.
-  //   키는 **라벨 기반**(상품마다 $self 식이 달라도 같은 조건으로 묶임), 극성은 not 으로 판별.
-  function pivotRender(info, ans){
-    const faces = info.faces || [];
-    const V = VD.verbs || [], BLOCK = V[0], BUY = V[1];
-    const buy = faces.find(f=>f.verb===BUY), block = faces.find(f=>f.verb===BLOCK);
-    if(!buy || !block || faces.length > 2) return null;
-    const kidsOf = n => (n && n.op==='all' && n.kids) ? n.kids : (n ? [n] : []);
-    const keyBase = n => n ? (n.label || leafLabel(n) || n.expr || '') : '';
-    const nkey = n => n && n.op==='not' ? keyBase(n.kids && n.kids[0]) : keyBase(n);   // 극성 뺀 키
-    const isNeg = n => !!(n && n.op==='not');
-    const anchorOf = f => f.perProd.map(x=>x[1]).find(n=>n&&!n.off) || f.perProd[0][1];
-    const bK = kidsOf(anchorOf(buy)), kK = kidsOf(anchorOf(block));
-    // 갈림축 = 산다엔 양(+)·안산다엔 음(not) 으로 같은 조건(정확히 하나일 때만 — 안전)
-    const pivots = bK.filter(b=>!isNeg(b) && kK.some(k=>isNeg(k) && nkey(k)===nkey(b)));
-    if(pivots.length !== 1) return null;
-    const pk = nkey(pivots[0]);
-    const preKeys = bK.filter(b=>nkey(b)!==pk && kK.some(k=>nkey(k)===nkey(b) && isNeg(k)===isNeg(b))).map(nkey);
-    const prods = buy.perProd.map(x=>x[0]);
-    const byKey = (face, key) => face.perProd.map(x => kidsOf(x[1]).find(c=>nkey(c)===key) || null);
-    let html = '';
-    if(preKeys.length){
-      html += '<div class="ck-cm-face"><span class="ck-cm-verb">전제</span><span class="ck-opl">모두 필요</span></div>';
-      preKeys.forEach(k=>{ html += commonNode(byKey(buy, k), prods, 'common', ans, 0, new Set()); });
-    }
-    html += '<div class="ck-cm-face"><span class="ck-cm-verb">갈림</span><span class="ck-opl">참이면 산다 · 거짓이면 안 산다</span></div>';
-    html += commonNode(byKey(buy, pk), prods, 'common', ans, 0, new Set());
-    const buyExtra = bK.filter(b=>nkey(b)!==pk && preKeys.indexOf(nkey(b))<0).map(nkey);
-    html += '<div class="ck-cm-face"><span class="ck-cm-verb ok">② '+esc(BUY)+'</span>'+cMark(prods, buy.perProd.map(x=>x[1]))+'</div>';
-    if(buyExtra.length) buyExtra.forEach(k=>{ html += commonNode(byKey(buy, k), prods, 'common', ans, 0, new Set()); });
-    else html += '<div class="ck-row auto"><div class="ck-line"><span class="ck-m n">·</span><span class="ck-t"><span class="ck-opl">전제·갈림 충족 시</span></span></div></div>';
-    const blkExtra = kK.filter(k=>nkey(k)!==pk && preKeys.indexOf(nkey(k))<0).map(nkey);
-    html += '<div class="ck-cm-face"><span class="ck-cm-verb bad">① '+esc(BLOCK)+'</span>'+cMark(prods, block.perProd.map(x=>x[1]))+'</div>';
-    if(blkExtra.length) blkExtra.forEach(k=>{ html += commonNode(byKey(block, k), prods, 'common', ans, 0, new Set()); });
-    else html += '<div class="ck-row auto"><div class="ck-line"><span class="ck-m n">·</span><span class="ck-t"><span class="ck-opl">갈림이 거짓이면</span></span></div></div>';
-    return html;
+    // 특수 머리칩은 없앴다(통일) — 유리 지표를 같은 줄로 나열하고, 임계만 한 줄 요약으로.
+    const band = bands.length ? '<div class="ck-sc-band">판정: '+total+'개 중 '+bands.join(' · ')+'</div>' : '';
+    return items + band;
   }
   // 규칙을 라벨로 묶는다(동사 가로질러) — 공통 섹션·상품 카드가 **같은 구조**로 쓴다.
   //   keep = 이 뷰에 넣을 규칙(공통 섹션: isCommon · 상품 카드: 그 반대). verdicts = 상품 범위(공통: 전부 · 카드: 하나).
@@ -309,15 +284,17 @@
   }
   // 규칙 하나 블록 — 점수표 → 전제갈림 → 동사 갈래. 공통·카드 공용(perProd 길이만 다름). vs = 포지션 조회 상품 범위.
   function ruleBlock(info, ans, vs){
-    const V = VD.verbs || [], vnum = {}, vcls = {};
+    const V = VD.verbs || [], vnum = {}, vcls = {}, vpol = {};
     vnum[V[0]]='① '; vnum[V[1]]='② '; vnum[V[2]]='③ '; vcls[V[0]]='bad'; vcls[V[1]]='ok';
+    vpol[V[0]]='bad'; vpol[V[1]]='good'; vpol[V[2]]='bad';   // 안 산다·판다=방어(빨강) · 산다=좋음(초록)
     let block = '<div class="ck-cm-rule"><span class="ck-cm-name">'+esc(info.label)+'</span>'+refChip(info.ref)+'</div>';
-    const sc = info.faces.length ? (scoreCard(info, ans) || pivotRender(info, ans)) : null;
+    const sc = info.faces.length ? scoreCard(info, ans) : null;   // 점수 규칙만 특수(임계 한 줄) — 나머지는 전부 같은 줄
     if(sc){ block += sc; }
     else info.faces.forEach(f=>{
-      const chips = cMark(f.perProd.map(x=>x[0]), f.perProd.map(x=>x[1]));
+      const pol = vpol[f.verb] || null;
+      const chips = cMark(f.perProd.map(x=>x[0]), f.perProd.map(x=>x[1]), pol);
       const bare = f.perProd.map(x=>{ const n = Object.assign({}, x[1]); delete n.label; delete n.ref; delete n.note; return n; });
-      const cond = commonNode(bare, f.perProd.map(x=>x[0]), 'common', ans, 0, new Set());
+      const cond = commonNode(bare, f.perProd.map(x=>x[0]), 'common', ans, 0, new Set(), pol);
       block += '<div class="ck-cm-face"><span class="ck-cm-verb '+(vcls[f.verb]||'')+'">'+(vnum[f.verb]||'')+esc(f.verb)+'</span>'+chips+'</div>'+cond;
     });
     if(info.sell){ block += commonExitFace(info.sell, vs, info.label); }
@@ -425,7 +402,7 @@
     if(pending) h += '<div class="note">✋ 체크한 답으로 서버 판정을 다시 받는 중…</div>';
     if(serverNote) h += '<div class="note warn">'+esc(serverNote)+'</div>';
     const d = VD.ts ? new Date(VD.ts) : null, pad = n => String(n).padStart(2,'0');
-    h += '<p class="subtle" id="td-ts">'+(VD.date?'<b>'+esc(VD.date)+'</b> 종가 기준':'')+(d?' · 판정 '+d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes()):'')+' · 출처 '+esc(VD.source||'')+' · ● 참 ○ 거짓 ? 모름 · ✋ 수동 조건만 직접 체크</p>';
+    h += '<p class="subtle" id="td-ts">'+(VD.date?'<b>'+esc(VD.date)+'</b> 종가 기준':'')+(d?' · 판정 '+d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes()):'')+' · 출처 '+esc(VD.source||'')+' · 동그라미는 켜졌을 때만 색: <span style="color:var(--entry)">●</span> 좋은 신호 · <span style="color:var(--warn)">●</span> 회피·매도 · ○ 거짓 · <span class="ck-m unknown" style="display:inline-flex">?</span> 모름(데이터·숫자 없음) · ✋ 수동(눌러서 체크)</p>';
     if(VD.missing && Object.keys(VD.missing).length){
       h += '<div class="note warn">시세 없음 → jhts 수집 요청: '+Object.keys(VD.missing).map(s=>esc(s)+' #'+esc(VD.missing[s])).join(' · ')+' — 그 심볼을 쓰는 조건은 ❔ 로 남습니다.</div>';
     }
@@ -484,31 +461,35 @@
       +'#sheet-root .ck-kids{margin:8px 0 0 3px;border-left:1px solid var(--line);padding-left:13px;display:flex;flex-direction:column}'
       +'#sheet-root .ck-kids .ck-row{background:transparent;border:none;border-radius:0;padding:6px 0;margin:0}'
       +'#sheet-root .ck-grp{margin:0}#sheet-root .ck-op{font-size:11px;color:var(--mute);margin:2px 0 5px;letter-spacing:.02em}'
-      +'#sheet-root .ck-line{display:flex;gap:10px;align-items:flex-start}'
-      +'#sheet-root .ck-t{flex:1;font-size:13.5px;line-height:1.5;color:var(--text)}'
+      +'#sheet-root .ck-gkids{margin:0 0 0 3px;border-left:1px solid var(--line);padding-left:13px}'
+      +'#sheet-root .ck-line{display:flex;gap:10px;align-items:center}'
+      +'#sheet-root .ck-t{flex:1;min-width:0;font-size:13.5px;line-height:1.5;color:var(--text)}'
       +'#sheet-root .ck-row.man .ck-t{color:var(--head)}'
       +'#sheet-root .ck-opl{font-size:11.5px;color:var(--mute);margin-left:6px}'
-      +'#sheet-root .ck-expr{font-size:12px;color:var(--text);margin:4px 0 0 32px;line-height:1.55;font-family:ui-monospace,Consolas,monospace;opacity:.85;word-break:break-word}'
+      // 칸 밖 규칙에서만 쓰는 식 글·사유줄(본 체크리스트 줄엔 없다)
+      +'#sheet-root .ck-expr{font-size:12px;color:var(--text);margin:4px 0 0 2px;line-height:1.55;font-family:ui-monospace,Consolas,monospace;opacity:.85;word-break:break-word}'
       +'#sheet-root .ck-expr .ck-exh{font-family:inherit;color:var(--mute);font-weight:700;margin-right:2px}'
-      +'#sheet-root .ck-why{font-size:12px;color:var(--mute);margin:4px 0 0 32px;line-height:1.5}'
-      // 측정 증거 칩
-      +'#sheet-root .ck-ev{font-size:12px;color:var(--mute);margin:6px 0 0 32px;line-height:1.5;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:4px 10px;display:inline-block}'
-      +'#sheet-root .ck-ev b{color:var(--head);font-weight:700}'
-      +'#sheet-root .ck-ev .ev-x{color:var(--gold);font-weight:700}#sheet-root .ck-ev .ev-th{color:var(--mute)}#sheet-root .ck-ev .ev-sep{color:var(--line);margin:0 2px}'
-      +'#sheet-root .ck-ev.miss{background:rgba(212,162,78,.10);border-color:var(--gold)}'
-      // 마크(자동)·수동 토글 — 같은 원형 칩(통일된 시각 언어: ● 참 · ○ 거짓 · ? 모름, 참/거짓 글자 없음)
-      +'#sheet-root .ck-m{flex:none;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:12px;font-weight:800;line-height:1}'
-      +'#sheet-root .ck-m.t{color:var(--entry);background:rgba(63,185,80,.15)}'
-      +'#sheet-root .ck-m.f{color:var(--mute);background:rgba(122,129,148,.15)}'
-      +'#sheet-root .ck-m.u{color:var(--gold);background:rgba(212,162,78,.16)}'
-      +'#sheet-root .ck-m.n{color:var(--line);background:transparent}'
-      // 수동 토글 = 하나로 붙은 세그먼트(참|거짓) — 체크박스 2개가 아니라 '하나를 고르는' 한 컨트롤
-      +'#sheet-root .ck-man{flex:none;align-self:flex-start;display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}'
-      +'#sheet-root .ck-man button{border:0;background:transparent;color:var(--mute);font-size:11.5px;font-weight:700;line-height:1;padding:4px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;transition:background .12s,color .12s}'
-      +'#sheet-root .ck-man button+button{border-left:1px solid var(--line)}'
-      +'#sheet-root .ck-man button:hover{color:var(--head)}'
-      +'#sheet-root .ck-man button.t.on{background:rgba(63,185,80,.18);color:var(--entry)}'
-      +'#sheet-root .ck-man button.f.on{background:rgba(122,129,148,.22);color:var(--head)}'
+      +'#sheet-root .ck-why{font-size:12px;color:var(--mute);margin:4px 0 0 2px;line-height:1.5}'
+      // 실제데이터 칸(오른쪽) — 측정값 + 지금 상태(참/거짓/확인 필요)
+      +'#sheet-root .ck-d{flex:none;max-width:52%;text-align:right;font-size:12px;color:var(--mute);line-height:1.5}'
+      +'#sheet-root .ck-d b{color:var(--head);font-weight:700}'
+      +'#sheet-root .ck-d .ev-x{color:var(--gold);font-weight:700}#sheet-root .ck-d .ev-th{color:var(--mute)}#sheet-root .ck-d .ev-sep{color:var(--line);margin:0 2px}'
+      // 동그라미 — 켜졌을 때만 색(초록=좋음·빨강=회피/매도), 거짓·모름은 흐린 테두리. 수동은 손바닥(✋).
+      +'#sheet-root .ck-m{flex:none;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;border:2px solid var(--line);background:transparent;line-height:1}'
+      +'#sheet-root .ck-m.on{border-color:transparent;background:var(--mute)}'
+      +'#sheet-root .ck-m.on.good{background:var(--entry)}'
+      +'#sheet-root .ck-m.on.bad{background:var(--warn)}'
+      +'#sheet-root .ck-m.off{border-color:var(--line);background:transparent}'
+      +'#sheet-root .ck-m.unknown{border-color:var(--line);border-style:dashed;background:transparent;color:var(--mute);font-size:10px}'
+      +'#sheet-root .ck-m.n{border-color:var(--line);background:transparent;opacity:.5}'
+      // 수동 = 체크 동그라미에 손바닥(✋) — 눌러서 체크↔해제. 미체크는 점선 테두리(확인 필요), 체크하면 역할색으로 채움.
+      +'#sheet-root button.ck-m{padding:0;cursor:pointer;font:inherit;color:inherit;transition:background .12s,border-color .12s}'
+      +'#sheet-root .ck-m.man{width:18px;height:18px;border:2px dashed var(--gold);background:transparent;color:var(--gold);font-size:10px}'
+      +'#sheet-root .ck-m.man:hover{border-color:var(--head);color:var(--head)}'
+      +'#sheet-root .ck-m.man.on{border-style:solid;border-color:transparent;background:var(--gold);color:#0d0f14}'
+      +'#sheet-root .ck-m.man.on.good{background:var(--entry)}'
+      +'#sheet-root .ck-m.man.on.bad{background:var(--warn)}'
+      +'#sheet-root .ck-man{flex:none;align-self:center;display:inline-flex}'
       +'#sheet-root .dataval{font-size:12px;color:var(--mute);font-weight:600;margin-left:4px}'
       +'#sheet-root .ck-ref{font-size:11px;padding:0 7px;margin-left:6px;border:1px solid var(--line);border-radius:999px;color:var(--mute);cursor:pointer;text-decoration:none}'
       +'#sheet-root .ck-ref:hover{color:var(--head);border-color:var(--mute)}'

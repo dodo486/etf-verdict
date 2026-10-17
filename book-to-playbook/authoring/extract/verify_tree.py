@@ -25,7 +25,9 @@
      비중 % 포함)가 기대값과 맞는지. 틀리면 정지(사례가 원문을 잘못 읽었으면 심판이 보고 — 사례 작성자가 다시 쓴다).
   5. 발화 통계 — 최종 트리의 라벨 노드를 실제 시세에서 날마다 평가해: 한 번도 안 뜸 · 거의 매일 ·
      항상 판정 불가 · 두 조건이 완전히 같음 · 산다가 뜨면 늘 안 산다도 뜸 · 산다 도달 불가.
-     (경고. 단 '완전히 같은 조건'은 같은 조건 두 벌일 수 있어 정지 — 동사가 다르거나 두 규칙 다 why 가 있으면 둔다.)
+     (경고. 단 '완전히 같은 조건'은 같은 조건 두 벌일 수 있어 정지 — 동사가 다르거나 두 규칙 다 why 가 있으면 둔다.
+      펼친 식이 글자 그대로 같은 쌍(한쪽이 다른쪽을 참조하거나 같은 이름 조건을 씀)은 '우연의 일치'가 아니라
+      정의상 같음이라 여기선 제외한다 — 같은 식 중복은 3절 same_meaning(참조를 구분)이 본다.)
   6. 비중 합 — 상품 비중(산다 qty cash)의 합이 어느 날이든 100% 를 넘으면 정지.
   7. 수동 사유 분류 — manual 사유를 '저자 미명시 / 데이터 없음 / 연산 없음' 으로 세어 보고한다.
      사유 머리가 없으면 경고(어디로 보내야 할지 모르는 수동은 조용한 누락이 된다).
@@ -194,7 +196,7 @@ def fire_stats(tree, hist, years):
             if not all(x is None or isinstance(x, bool) for x in v):
                 continue                         # 숫자 노드는 통계 대상 아님
             on, na = sum(1 for x in v if x is True), sum(1 for x in v if x is None)
-            nodes.append((sec, n.get("label"), v, repr(n)))
+            nodes.append((sec, n.get("label"), v, repr(n), logic_key(n)))
             flag = ""
             if na == len(v):
                 flag = "항상 판정 불가"
@@ -209,18 +211,22 @@ def fire_stats(tree, hist, years):
                 warns.append("%s %s '%s': %s" % (p, sec, n.get("label"), flag))
         for a in range(len(nodes)):
             for b in range(a + 1, len(nodes)):
-                sa, la, va, ra = nodes[a]
-                sb, lb, vb, rb = nodes[b]
+                sa, la, va, ra, ka = nodes[a]
+                sb, lb, vb, rb, kb = nodes[b]
                 if la == lb or sum(1 for x in va if x is True) < 10:
                     continue
                 if sa == sb and (ra in rb or rb in ra):
                     continue                         # 감싸는 노드와 그 안의 노드 — 같은 게 정상
-                if va == vb:
+                # 펼친 식이 같으면(한쪽이 다른쪽을 {rule} 로 참조하거나 같은 이름 조건을 써서) 시계열이
+                # 같은 건 당연하다 — 우연의 일치가 아니다. 같은 식 중복은 3절 same_meaning(참조 구분)이 본다.
+                # 발화 통계는 '식은 다른데 동작이 같은' 우연만 잡는다.
+                if va == vb and ka != kb:
                     same.append((p, sa, la, sb, lb))
                 # 산다 ⇒ 안 산다: 안 산다는 맨 위 노드만(안쪽 하위 조건이 산다와 겹치는 건 정상)
                 for (s1, l1, v1, r1), (s2, l2, v2, r2) in (((sa, la, va, ra), (sb, lb, vb, rb)),
                                                          ((sb, lb, vb, rb), (sa, la, va, ra))):
-                    if s1 == BUY and s2 == BLOCK and r2 in top_avoid \
+                    # 같은 식(ka==kb)이면 '산다가 뜨면 안 산다도 뜸'은 당연 — 식이 다른 함의만 신호다.
+                    if ka != kb and s1 == BUY and s2 == BLOCK and r2 in top_avoid \
                             and sum(1 for x in v1 if x) >= 10 \
                             and all(v2[k] is True for k in range(len(v1)) if v1[k] is True):
                         warns.append("%s %s⇒%s: '%s' 가 뜨면 늘 '%s' 도 뜸" % (p, BUY, BLOCK, l1, l2))
