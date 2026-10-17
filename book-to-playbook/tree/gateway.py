@@ -24,7 +24,8 @@ TreeGateway. 공개 이름은 모듈 수준 정의 그대로(from tree.gateway i
 관측 시점(asof)
   평가는 '사용자가 보는 그 순간(asof)' 기준이다. asof = 관측 시각(UTC datetime) — 라이브는 실제 지금
   또는 지정 시각, 백테스트는 재생되는 각 시점. 일봉 필드는 asof 이하 마지막 확정 일봉을 본다.
-  일봉 아닌 봉(tf "1m"·"5m")은 아직 시세 경로가 없어 None(모름) — 조용히 거짓으로 치지 않는다.
+  일봉 아닌 봉(tf "5m"·"1m"·"1s"…)은 그 tf 의 봉 축에서 본다 — 최소 단위 봉을 그 tf 로 집계(resample)하고 창·lag 도
+  그 봉 개수로 센다. 장중 조건은 asof 시점 값으로 '오늘 칸'에 접힌다. 분봉 원자가 공급되지 않으면 모름(None).
 
 3값 논리
   all : 하나라도 False → False, 아니면 하나라도 None → None, 아니면 True (빈 all = True)
@@ -57,8 +58,9 @@ TreeGateway. 공개 이름은 모듈 수준 정의 그대로(from tree.gateway i
   시세          {"px": "close"|"open"|"high"|"low"|"volume", "sym": 티커, "tf": 봉?}   sym = 구체 티커(필수 —
                 상품 자신이면 그 티커, 지수면 지수 티커. $ 심볼 없음),
                 tf 기본 "1d"(일봉 — asof 이하 '확정(settled)' 일봉; 장중 asof 면 아직 마감 안 된 그날 일봉은
-                None, 즉 전일 종가까지만 본다). tf "1m"·"5m"(분봉)은 적을 수 있지만 시세 경로가 없어
-                값은 모름(None).
+                None, 즉 전일 종가까지만 본다). 그 밖은 "<수><단위 s/m/h/d/w>"(예 "5m"·"30m"·"1h"·"1s") — 최소 단위
+                봉을 그 tf 로 집계(resample)해 읽는다(허용 봉은 market.store.tf_seconds 한 곳). 분봉 원자가 없으면 모름(None).
+                한 식에 봉을 섞으면(예 5m vs 1d) 각 잎이 제 봉으로 읽힌 뒤 장중 쪽이 asof 값으로 '오늘 칸'에 접혀 비교된다.
   산술          {"add"|"sub"|"mul"|"div"|"max"|"min": [a, b]}   max/min = 같은 날 두 값 중 큰/작은 값
                 {"abs": a}
   선택          {"case": [[c1, v1], [c2, v2], ...], "else": v}   위에서부터 처음 참인 c 의 v.
@@ -116,6 +118,7 @@ import os
 import weakref
 from collections import namedtuple
 
+from market.store import tf_seconds        # 봉 길이(초)의 주인은 market — 문법 검사·resample 이 같이 쓴다
 from shared.paths import book_file
 
 # ================= 문법 — 트리 언어의 이름·검사 =================
@@ -127,8 +130,10 @@ UNKNOWN_REASON = "저자 미명시: 기준 숫자를 주지 않음(식의 ? 자�
 PX_FIELDS = ("open", "high", "low", "close", "volume")
 POS_FIELDS = ("ret", "days", "maxret", "minret", "filled", "sold")
 ARITH = ("add", "sub", "mul", "div", "max", "min")
-TIMEFRAMES = ("1d", "1m", "5m")  # 봉 길이(문법) — 평가하는 건 일봉(확정 settled 일봉)뿐. 1m·5m 는 트리에 적을 수 있지만
-                                 # 아직 시세 경로가 없어 값은 전부 None(모름) — 시세 저장소가 생기면 거기서 채운다.
+# 봉 길이 tf: "1d"(일봉축 — 확정 settled 일봉) 또는 "<수><단위>"(분봉·초봉 — 최소 단위 봉을 resample).
+# 허용 여부는 market.store.tf_seconds 하나가 정한다(단위가 늘어도 거기 한 곳) — 여기서 봉 종류를 다시 적지 않는다.
+def tf_ok(tf):
+    return tf == "1d" or bool(tf_seconds(tf))
 WINDOW = ("highest", "lowest", "sum")   # 창(n거래일) 집계 — 평균 등 지표는 전용 연산 없이 조합(COND_DSL 6절)
 GONE_OPS = ("ma", "ema", "stdev", "rsi", "pct", "count", "streak", "across")   # 지운 전용 연산 — 조합으로 쓴다(across → atleast·of · entry.verify_rules 주인 표가 되살림을 막는다)
 CMP = ("gt", "ge", "lt", "le")
@@ -260,8 +265,8 @@ def validate(node, path="$"):
             raise CondError("%s.sym: 필요하다(생략 금지) — 역할 $self·$index 또는 구체 티커" % path)
         if sym.startswith("$") and sym not in ROLES:
             raise CondError("%s.sym: %r — 역할은 $self·$index 뿐이다($s·이름 심볼은 폐지, 여러 종목은 atleast·of)" % (path, sym))
-        if "tf" in node and node["tf"] not in TIMEFRAMES:
-            raise CondError("%s.tf: 모르는 봉 %r (허용 %s)" % (path, node["tf"], "/".join(TIMEFRAMES)))
+        if "tf" in node and not tf_ok(node["tf"]):
+            raise CondError("%s.tf: 모르는 봉 %r (허용 1d · <수><단위 s/m/h/d/w>)" % (path, node["tf"]))
     elif op == "abs":
         validate(v, path + ".abs")
     elif op == "case":
@@ -482,8 +487,11 @@ class Node(dict):
             OFF 노드(노드 레벨 on 에 빠진 상품)는 값은 '항상 참'이지만 적힌 식의 axis·syms 를 그대로 지닌다
             (부모의 일봉축 판정이 on 걸러내기 전과 같게 — 계산기 series 계약)
       syms  식이 읽는 심볼 전부(OFF 노드는 적힌 식의 심볼)
+      grid  이 노드가 '도는 봉' — None(일봉축) 또는 분봉 tf("5m"·"1m"…). px 잎은 자기 tf, 수동·pos 는 일봉(None).
+            여러 자식의 봉이 하나로 일치하면 그 봉, 섞이면(일봉+분봉·다른 분봉끼리) None(일봉축에서 접어 맞춘다).
+            창·lag 는 이 봉 단위로 센다(COND_DSL 계약) — 계산기(eval.series)가 이 봉의 cal 로 기존 _series 를 돌린다.
       mkey  수동 잎의 답 열쇠 본체(manual_key — 적힌 식 기준: $self 그대로) · off = OFF 노드인가"""
-    __slots__ = ("nid", "key", "pure", "axis", "syms", "mkey", "off", "__weakref__")
+    __slots__ = ("nid", "key", "pure", "axis", "syms", "grid", "mkey", "off", "__weakref__")
 
     def __setitem__(self, k, v):
         raise TypeError("묶인 노드는 바꿀 수 없다")
@@ -493,11 +501,11 @@ _POOL = weakref.WeakValueDictionary()   # 정규 열쇠 → Node (모든 책·�
 _NID = itertools.count(1)
 
 
-def _intern(key, items, pure, axis, syms, mkey=None, off=False):
+def _intern(key, items, pure, axis, syms, mkey=None, off=False, grid=None):
     n = _POOL.get(key)
     if n is None:
         n = Node(items)
-        n.nid, n.key, n.pure, n.mkey, n.off = next(_NID), key, pure, mkey, off
+        n.nid, n.key, n.pure, n.mkey, n.off, n.grid = next(_NID), key, pure, mkey, off, grid
         n.axis = None if axis is None else frozenset(axis)
         n.syms = frozenset(syms)
         _POOL[key] = n
@@ -520,10 +528,10 @@ def bind(node, prod, index=None, cache=None):
     else:
         out = _bind_dict(node, prod, index, cache)
         on = node.get("on")
-        if on and prod not in on:            # OFF — 값은 '항상 참'(빈 all), 부모를 위한 axis·syms 는 적힌 식 그대로
+        if on and prod not in on:            # OFF — 값은 '항상 참'(빈 all), 부모를 위한 axis·syms·grid 는 적힌 식 그대로
             ax = None if out.axis is None else sorted(out.axis)
             out = _intern("off|%s|%s" % (json.dumps(ax), json.dumps(sorted(out.syms), ensure_ascii=False)),
-                          {"all": []}, True, out.axis, out.syms, off=True)
+                          {"all": []}, True, out.axis, out.syms, off=True, grid=out.grid)
     if cache is not None:
         cache[id(node)] = (node, out)
     return out
@@ -548,7 +556,7 @@ def _kids(x):
 
 
 def _bind_dict(node, prod, index, cache):
-    items, pure, axis, syms = {}, True, set(), set()
+    items, pure, axis, syms, grids = {}, True, set(), set(), set()
     for k, v in node.items():
         if k in META:
             continue
@@ -557,21 +565,25 @@ def _bind_dict(node, prod, index, cache):
             pure = pure and c.pure
             syms |= c.syms
             axis = None if (axis is None or c.axis is None) else axis | c.axis
+            grids.add(c.grid)
     mkey = None
+    grid = next(iter(grids)) if len(grids) == 1 else None   # 자식 봉이 하나로 일치하면 그 봉, 섞이면 일봉축(접어 맞춤)
     if "px" in node:
         sym = node.get("sym")
         sym = prod if sym == "$self" else (index or sym) if sym == "$index" else sym
         items["sym"] = sym
         syms.add(sym)
-        axis = None if (axis is None or node.get("tf", "1d") != "1d") else axis | {sym}
-    if is_manual(node):                       # 수동 잎("?" 식 포함) — 답 열쇠는 적힌 식 그대로
-        mkey, pure, axis = manual_key(node), False, None
+        tf = node.get("tf", "1d")
+        axis = None if (axis is None or tf != "1d") else axis | {sym}
+        grid = None if tf == "1d" else tf                  # px 잎은 자기 tf — 일봉은 일봉축(None), 분봉은 그 tf
+    if is_manual(node):                       # 수동 잎("?" 식 포함) — 답 열쇠는 적힌 식 그대로. 사람이 정하므로 일봉축
+        mkey, pure, axis, grid = manual_key(node), False, None, None
     elif "pos" in node:
-        pure, axis = False, None
+        pure, axis, grid = False, None, None
     key = json.dumps(_form(items), ensure_ascii=False, sort_keys=True)
     if not pure:                              # 상품마다 값이 다르다 — 상품끼리 공유하지 않는다
         key = "%s|%s|%s" % (prod, mkey, key)
-    return _intern(key, items, pure, axis, syms, mkey)
+    return _intern(key, items, pure, axis, syms, mkey, grid=grid)
 
 
 class Board(namedtuple("Board", "product index gates weight tranches sells symbols warmup")):

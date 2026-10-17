@@ -15,7 +15,7 @@ import datetime as _dt
 import sys
 from collections import namedtuple
 
-from market.store import Store, session_closes, settled_dates
+from market.store import Store, session_closes, settled_dates, resample, tf_seconds
 
 Candle = namedtuple("Candle", "date open high low close volume")
 Session = namedtuple("Session", "date open close is_half")
@@ -127,6 +127,20 @@ def main():
     check("캘린더 범위 밖 새 봉(월요일) — 캘린더를 넓혀 다시 보고 마감 전이면 진행 중",
           b[-1].date == "20261012" and st.confirmed("BBB", -1) is False)
 
+    print("[봉 집계(resample) — 최소 단위 → 임의 tf, 단위 무관]")
+    check("tf_seconds: 단위표 s·m·h·d·w", (tf_seconds("5m"), tf_seconds("1h"), tf_seconds("1d"), tf_seconds("30s")) == (300, 3600, 86400, 30))
+    check("tf_seconds: 모르는 꼴은 None", tf_seconds("5x") is None and tf_seconds("m") is None)
+    # 분봉 원자(종가 10..21, 13:00~13:11) → 5m 봉 3개: 끝값 14·19·21, open=첫·high=최고·low=최저·volume=합
+    mins = [Candle("2026100213%02d" % m, 10 + m, 10 + m, 10 + m, 10 + m, 2) for m in range(12)]
+    r5 = resample(mins, "5m")
+    check("5m 봉 수·종가(=구간 끝 1분봉)", [c.date for c in r5] == ["202610021300", "202610021305", "202610021310"] and [c.close for c in r5] == [14, 19, 21])
+    check("5m open=첫·high=최고·low=최저·volume=합", r5[0].open == 10 and r5[0].high == 14 and r5[0].low == 10 and r5[0].volume == 10)
+    check("1m·1d 는 그대로(집계 안 함)", resample(mins, "1m") == mins and resample(mins, "1d") != [])
+    # 초봉 원자(14자리 타임스탬프)도 같은 코드로 — 최소 단위가 더 잘아져도 안 깨진다
+    secs = [Candle("202610021300%02d" % s, 10 + s, 10 + s, 10 + s, 10 + s, 1) for s in range(12)]
+    r5s = resample(secs, "5s")
+    check("초봉 원자 → 5s 집계(같은 코드, 단위만 다름)", [c.close for c in r5s] == [14, 19, 21])
+
     print("[같은 규칙 — judge 계산기와 공유]")
     asof = _dt.datetime(2026, 10, 9, 18, 0, tzinfo=UTC)
     sc = session_closes(["AAA", "KKK", "ZZZ"], ["20261005", "20261009"], asof, fake_sessions, MARKET.get)
@@ -134,7 +148,7 @@ def main():
     check("settled_dates: 마감 ≤ asof 만", settled_dates(sc["AAA"], asof) == {"20261005", "20261006", "20261007", "20261008"})
     check("asof 없으면 빈 경계", session_closes(["AAA"], ["20261005"], None, fake_sessions, MARKET.get) == {})
 
-    print("\n%s" % ("시세 칸 저장소 검사 통과 — 한 번 적재 · 바뀐 심볼만 · 스냅샷 동일성 · 확정 표시" if not FAILS else "시세 칸 저장소 검사 실패 %d개: %s" % (len(FAILS), ", ".join(FAILS))))
+    print("\n%s" % ("시세 칸 저장소 검사 통과 — 한 번 적재 · 바뀐 심볼만 · 스냅샷 동일성 · 확정 표시 · 봉 집계(단위 무관)" if not FAILS else "시세 칸 저장소 검사 실패 %d개: %s" % (len(FAILS), ", ".join(FAILS))))
     return 1 if FAILS else 0
 
 

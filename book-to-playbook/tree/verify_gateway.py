@@ -43,7 +43,7 @@ def t_syntax():
         {"gt": [C]}, {"sum": [C, 0]}, {"sum": [C, 2.5]}, {"ma": [C, 20]}, {"px": "price"}, {"foo": 1},
         {"gt": [C, 1], "lt": [C, 2]}, True, {"atleast": 2}, {"def": "없음"},
         {"across": {"syms": ["A"], "cond": C}}, {"manual": ""}, {"gt": [C, 1], "op": "above"},
-        {"px": "close", "sym": "X", "tf": "1h"}, {"px": "close"}, {"px": "close", "sym": "$s"},
+        {"px": "close", "sym": "X", "tf": "5x"}, {"px": "close", "sym": "X", "tf": "m"}, {"px": "close"}, {"px": "close", "sym": "$s"},
         {"px": "close", "sym": "$빅테크"}, {"abs": [C, 1]}, {"case": [[C, 1]]}, {"case": [C, 1], "else": 0},
         {"max": [C]},
     ]
@@ -61,6 +61,8 @@ def t_syntax():
         FAILS.append("올바른 노드가 거부: %s" % e)
     try:
         validate({"case": [[{"gt": [C, 1]}, 2]], "else": {"px": "close", "sym": "X", "tf": "1d"}})
+        for tf in ("1d", "1m", "5m", "15m", "30m", "1h", "1s"):   # 봉 단위는 1d + <수><단위 s/m/h/d/w> 전부 통과
+            validate({"px": "close", "sym": "X", "tf": tf})
     except CondError as e:
         FAILS.append("올바른 case·tf 가 거부: %s" % e)
     W = {"gt": [C, 1]}

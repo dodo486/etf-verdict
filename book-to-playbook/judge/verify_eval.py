@@ -15,7 +15,8 @@
   3. 시간 연산(barssince·valuewhen, 조합: 최근 참 일수·연속 참 일수 · 여러 종목 중 N개 = atleast·of) — 단순 반복 구현과 대조
      · 하한(AtLeast) 비교 · 포지션 값(pos)
   4. 인과성 — 미래 데이터를 잘라도 과거 날짜 값이 같아야 한다(미래 참조 금지)
-  5. 봉(tf) — 일봉 아닌 봉은 모름(None) · 혼합 tf·'오늘 미확정' 확정봉 규칙·look-ahead 0
+  5. 봉(tf) — 적힌 tf 의 봉만 읽는다(단위 무관: 분·초 같은 코드) · 창·lag 는 그 tf 봉 개수로 셈 · 장중은 오늘 칸에 접힘
+     · 혼합 tf(장중 vs 일봉) · '오늘 미확정' 확정봉 규칙·look-ahead 0
   6. 등급 — 비중 범위 · 데이터 완전성 가드(워밍업 부족 → ❔, 충분 구간은 원시 등급 사다리와 같음)
   7. 표현력 회귀 — 발견된 버그 유형을 트리로 적어 원문 뜻대로 나오는지
   8. 사람이 답한 수동(Ctx answers) — 답 열쇠 규칙·극성·등급까지(서버 권위의 바탕)
@@ -367,28 +368,51 @@ def t_causal(rng):
 
 
 def t_tf():
-    """봉(tf) — 문법은 "1d"/"1m"/"5m" 만 받고, 일봉 아닌 봉(1m·5m)은 시세 경로가 없어 값이 전부 None(모름)."""
+    """봉(tf) — 엔진은 '적힌 tf 의 봉'만 읽는다(치환 없음). 최소 단위가 분이든 초든 같은 경로 — tf 단위로만 읽고
+    창·lag 는 그 tf 봉 개수로 센다(COND_DSL 계약). 장중 조건은 asof 시점 값으로 '오늘 칸'에 접힌다(과거일은 모름).
+    분봉 데이터가 없으면 모름(None). 혼합(장중 vs 일봉)은 각자 제 봉으로 읽고 비교한다."""
     import datetime as dt
     utc = dt.timezone.utc
     cal = ["20261001", "20261002"]
-    asof = dt.datetime(2026, 10, 2, 13, 20, tzinfo=utc)      # 10/02 13:20 UTC
-    # 문법: tf 는 "1d"/"1m"/"5m" 만, 그 밖은 거부. px 에 모르는 보조 키가 붙으면 '노드에 연산 둘'로 거부된다.
-    for b in ({"px": "close", "sym": "X", "tf": "1h"}, {"px": "close", "sym": "X", "tf": "15m"},
+    dhist = {"X": [Candle(d, 100, 100, 100, 100, 1000) for d in cal]}
+    # 문법: 1d · "<수><단위 s/m/h/d/w>" 는 받고, 그 밖·보조 키는 거부(허용 봉은 market.store.tf_seconds 한 곳).
+    for b in ({"px": "close", "sym": "X", "tf": "5x"}, {"px": "close", "sym": "X", "tf": "m"},
               {"px": "close", "sym": "X", "offset": -10}):
         try:
             validate(b)
-            FAILS.append("잘못된 tf 통과: %r" % b)
+            FAILS.append("잘못된 tf/키 통과: %r" % b)
         except CondError:
             pass
-    validate({"px": "close", "sym": "X", "tf": "1m"})      # 분봉 노드는 통과
-    validate({"px": "close", "sym": "X", "tf": "5m"})      # 5분봉 노드도 통과
-    # 평가: 일봉 아닌 봉은 모름(None) — 그 잎을 품은 비교도 모름(조용히 거짓 아님).
-    hist = {"X": [Candle(d, 100, 100, 100, 100, 1000) for d in cal]}
-    ctx = Ctx(hist, cal, "X", asof=asof)
-    for tf in ("1m", "5m"):
-        check(ctx.px("X", "close", tf) == [None, None], "%s px = 전부 None(모름)" % tf)
-        v = series({"gt": [{"px": "close", "sym": "X", "tf": tf}, {"px": "close", "sym": "X"}]}, ctx)
-        check(v == [None, None], "%s 잎 > 일봉 종가 = 모름 %r" % (tf, v))
+    for tf in ("1d", "1m", "5m", "15m", "30m", "1h", "1s"):   # 어떤 tf 단위든 문법 통과(1d 도 분·초도)
+        validate({"px": "close", "sym": "X", "tf": tf})
+
+    # 분봉 데이터가 없으면 그 tf 조건은 모름(조용히 거짓 아님)
+    ctx0 = Ctx(dhist, cal, "X", asof=dt.datetime(2026, 10, 2, 13, 20, tzinfo=utc))
+    check(series({"px": "close", "sym": "X", "tf": "5m"}, ctx0) == [None, None], "분봉 데이터 없으면 5m 모름")
+
+    # ★ 단위 무관 — 같은 식을 '분봉 원자'·'초봉 원자' 둘로 돌려 같은 결과(엔진은 봉 개수만 센다, 단위를 모름).
+    #   close 10..21 을 5개씩 묶으면 5tf 봉 종가 = [14, 19, 21]. lag1 비교 → 오늘 칸만 참, 과거일 None(장중은 접힘).
+    def run(atom, tf, asof):
+        ctx = Ctx(dhist, cal, "X", asof=asof, minute={"X": atom})
+        gt = {"gt": [{"px": "close", "sym": "X", "tf": tf}, {"lag": [{"px": "close", "sym": "X", "tf": tf}, 1]}]}
+        return ctx._intraday_ctx(tf).px("X", "close", tf), series(gt, ctx)
+    mins = [Candle("2026100213%02d" % m, 10 + m, 10 + m, 10 + m, 10 + m, 1) for m in range(12)]   # 13:00..13:11 (분)
+    secs = [Candle("202610021300%02d" % s, 10 + s, 10 + s, 10 + s, 10 + s, 1) for s in range(12)]  # 13:00:00..11 (초)
+    px_m, v_m = run(mins, "5m", dt.datetime(2026, 10, 2, 13, 11, tzinfo=utc))
+    px_s, v_s = run(secs, "5s", dt.datetime(2026, 10, 2, 13, 0, 11, tzinfo=utc))
+    check(px_m == [14, 19, 21], "5m px = resample(분봉) 종가 %r" % px_m)
+    check(px_s == [14, 19, 21], "5s px = resample(초봉) 종가 — 같은 코드, 단위만 다름 %r" % px_s)
+    check(v_m == [None, True] and v_s == [None, True], "lag 는 그 tf 봉 개수로 셈 + 장중은 오늘 칸에 접힘(과거 None)")
+
+    # lag 가 '봉 개수'를 세는 증거(일수 아님): lag2 = 2봉 전(=14) 과 비교
+    ctxs = Ctx(dhist, cal, "X", asof=dt.datetime(2026, 10, 2, 13, 0, 11, tzinfo=utc), minute={"X": secs})
+    v2 = series({"gt": [{"px": "close", "sym": "X", "tf": "5s"}, {"lag": [{"px": "close", "sym": "X", "tf": "5s"}, 2]}]}, ctxs)
+    check(v2 == [None, True], "lag2 = 2봉 전(14) — 봉 개수로 센다")
+
+    # 혼합 tf — 장중 현재가(21) vs 일봉 종가(100): 각자 제 봉으로 읽고 비교, 장중 쪽이 오늘 칸에 접힌다
+    vm = series({"gt": [{"px": "close", "sym": "X", "tf": "5s"}, {"px": "close", "sym": "X"}]}, ctxs)
+    check(vm == [None, False], "혼합 tf: 장중 vs 일봉 — 각자 제 봉 읽고 비교 %r" % vm)
+
     try:
         validate({"observe": {"gt": [C, 1]}, "manual": "데이터 없음: x"})
         FAILS.append("지운 observe 노드가 문법을 통과")

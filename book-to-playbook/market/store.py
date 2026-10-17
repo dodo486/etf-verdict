@@ -20,10 +20,13 @@ market 은 트리를 모른다 — 무엇이 필요한지는 위층이 need 로 
 """
 import datetime as _dt
 import threading
+from collections import namedtuple
 
 from market import md_feed
 
 TF_DAY = "1d"
+Candle = namedtuple("Candle", "date open high low close volume")   # 봉 하나(date = 일봉 YYYYMMDD · 분봉 YYYYMMDDHHMM)
+                                                                   # jhts 일봉 Candle 과 필드가 같다(평가기는 속성만 읽음).
 
 
 # ================================================================ 일봉 확정 — 주인
@@ -188,3 +191,54 @@ def _merge(old, new):
     by = {c.date: c for c in old}
     by.update((c.date, c) for c in new)
     return [by[d] for d in sorted(by)]
+
+
+# ================================================================ 봉 집계(resample) — 최소 단위 → 임의 tf (단위 무관)
+# 봉 '길이'의 주인은 여기 한 곳(tf_seconds). 엔진(judge/eval.series)은 봉을 **개수**로만 세므로 단위를 아예 모른다 —
+# 분봉이 초봉·틱으로 바뀌어도 엔진은 0줄 수정, 새 시간 단위가 생겨도 아래 _TF_UNIT_S 에 한 줄이면 끝.
+_TF_UNIT_S = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}   # 봉 단위 → 초 (새 단위는 여기 한 줄)
+_TS_FMT = {8: "%Y%m%d", 12: "%Y%m%d%H%M", 14: "%Y%m%d%H%M%S"}         # 봉 타임스탬프 자리수 → 형식(정밀도 — 초·ms 도 한 줄)
+
+
+def tf_seconds(tf):
+    """봉 길이 토큰("5m"·"30m"·"1h"·"1d"…) → 초. 끝 글자 = 단위(s·m·h·d·w), 앞 = 수. 모르는 꼴이면 None.
+    최소 단위가 분봉이든 초봉이든 '얼마 간격으로 묶나'는 이 초 하나로 정해진다(resample·문법 검사가 같이 쓴다)."""
+    n, u = tf[:-1], tf[-1:]
+    return int(n) * _TF_UNIT_S[u] if n.isdigit() and u in _TF_UNIT_S else None
+
+
+def _epoch(ts):
+    """봉 타임스탬프 문자열(UTC) → 에폭 초. 자리수로 정밀도를 안다(12=분, 14=초 …)."""
+    return int(_dt.datetime.strptime(ts, _TS_FMT[len(ts)]).replace(tzinfo=_dt.timezone.utc).timestamp())
+
+
+def resample(bars, tf):
+    """최소 단위 봉 [Candle(date=타임스탬프, o,h,l,c,v)](오름차순) → tf 봉. 구간 = tf초 격자(자정 UTC 기준)로
+    타임스탬프를 내림(floor)해 묶는다 — 분봉·초봉·틱 어떤 최소 단위가 와도 같은 코드(시각만 보면 되니까).
+    봉 하나 = 그 구간 원자들의 open=첫·high=최고·low=최저·close=끝·volume=합. 마지막 구간이 덜 찼으면 그대로
+    (진행 중 봉 — close = 지금까지 마지막값). tf 가 원자와 같거나 더 잘거나, 분석 못 할 꼴이면 그대로 돌려준다."""
+    s = tf_seconds(tf)
+    if s is None or not bars:
+        return list(bars)
+    width = len(bars[0].date)
+    out, cur, g = [], None, []
+    for c in bars:
+        bucket = (_epoch(c.date) // s) * s
+        key = _dt.datetime.fromtimestamp(bucket, _dt.timezone.utc).strftime(_TS_FMT[width])
+        if key != cur and g:
+            out.append(_agg(cur, g))
+            g = []
+        cur = key
+        g.append(c)
+    if g:
+        out.append(_agg(cur, g))
+    return out
+
+
+def _agg(key, g):
+    """1분봉 묶음 g → 봉 하나(date = 구간 시작 key). open=첫·high=최고·low=최저·close=끝·volume=합(없는 값은 무시)."""
+    highs = [c.high for c in g if c.high is not None]
+    lows = [c.low for c in g if c.low is not None]
+    vols = [c.volume for c in g if c.volume is not None]
+    return Candle(key, g[0].open, max(highs) if highs else None, min(lows) if lows else None,
+                  g[-1].close, sum(vols) if vols else None)

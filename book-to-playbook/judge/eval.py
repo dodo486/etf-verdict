@@ -9,9 +9,10 @@
 값 기억: 문맥마다 노드 일련번호(nid)로 한 번만 계산한다. 수동·pos 가 없는 노드(Node.pure)의 값은 시세·달력·asof 로만
 정해지므로, 판단자가 같은 시세·달력·asof 의 문맥들에 같은 공유 기억(shared)을 주면 상품끼리(수동 가정 셋끼리도) 한 번만 계산한다.
 """
+import datetime as _dt
 import math
 
-from market.store import settled_dates
+from market.store import resample, settled_dates, _epoch
 from tree.gateway import ARITH, AtLeast, bind, CMP, CondError, Node, _op_of, ROLES, UNKNOWN, WINDOW
 
 STREAK_CAP = 400          # 연속·경과일을 거꾸로 셀 때의 상한(데이터 길이보다 길면 무의미)
@@ -21,7 +22,7 @@ class Ctx:
     """평가 문맥. hist={심볼: [Candle(date,open,high,low,close,volume)]}, cal=날짜 목록."""
 
     def __init__(self, hist, cal, self_sym, index_sym=None, manual_as=None, pos=None, asof=None,
-                 session_close=None, answers=None, shared=None, scope=None):
+                 session_close=None, answers=None, shared=None, scope=None, minute=None, tf=None):
         """self_sym = 평가 중인 상품($self) · index_sym = 그 상품의 지수($index, 없으면 None).
         pos = (첫 매수일 인덱스, 평균 매입가 | 날짜별 평균 매입가 목록[, 장부]) — 판다·분할 갈래 평가 때만.
         장부 = {"filled": {규칙 이름 | None(전체): 날짜별 산 횟수}, "sold": 날짜별 판 비율} — 없으면 filled·sold 는 모름.
@@ -33,7 +34,10 @@ class Ctx:
         answers = {answer_key: True|False} — 사람이 답한 수동(없는 열쇠는 manual_as). None 이면 옛 동작 그대로.
         shared = 공유 값 기억 {nid: 시계열} — 같은 시세·달력·asof 의 문맥끼리만 준다(판단자 몫). pure 노드만 넣고 꺼낸다.
         scope = 이 문맥의 확정 경계(session_close)가 덮는 상품 심볼 집합 — 경계가 있으면 식의 심볼이 그 안일 때만 공유
-        (상품마다 경계가 그 상품 심볼로만 만들어지므로). None = 제한 없음."""
+        (상품마다 경계가 그 상품 심볼로만 만들어지므로). None = 제한 없음.
+        minute = {심볼: [최소 단위 봉(Candle, date=타임스탬프)]} — 분봉 노드가 쓸 원자(없으면 분봉 조건은 모름). 일봉축 루트에만 준다.
+        tf = 이 문맥의 '축' — None 이면 일봉축(루트, cal=날짜·hist=일봉). 분봉 tf("5m"…)면 장중축(cal=그 tf 봉 타임스탬프·
+        hist=resample 된 그 tf 봉) — 분봉 노드를 돌릴 때 _intraday_ctx 가 만든다. px 는 이 축에 맞춰 hist 를 cal 로 읽는다."""
         self.pos = pos
         self.asof = asof          # 관측 시각(UTC datetime) — 일봉 확정 경계. None 이면 실제 지금
         self.hist = hist
@@ -49,6 +53,9 @@ class Ctx:
         self._flip = None
         self.answers = answers
         self.shared, self.scope = shared, scope
+        self.minute = minute or {}    # {심볼: [최소 단위 봉]} — 분봉 원자
+        self.tf = tf                  # 이 문맥의 축(None = 일봉축 루트, "5m"… = 장중축)
+        self._ictx = {}               # tf → 장중축 하위 문맥(한 번 만들어 재사용)
 
     def flipped(self):
         """수동 가정을 뒤집은 문맥(not 아래 평가용). 시세 캐시는 공유한다. 사람의 답(answers)은 뒤집지 않는다."""
@@ -56,8 +63,8 @@ class Ctx:
             return self
         if self._flip is None:
             f = Ctx(self.hist, self.cal, self.self_sym, self.index_sym, not self.manual_as, self.pos,
-                    self.asof, self.session_close, self.answers, self.shared, self.scope)
-            f._px, f._smap, f._bound, f._flip = self._px, self._smap, self._bound, self
+                    self.asof, self.session_close, self.answers, self.shared, self.scope, self.minute, self.tf)
+            f._px, f._smap, f._bound, f._flip, f._ictx = self._px, self._smap, self._bound, self, self._ictx
             self._flip = f
         return self._flip
 
@@ -76,18 +83,43 @@ class Ctx:
         return sym
 
     def px(self, sym, field, tf="1d"):
-        """심볼·필드의 asof 축 시계열(달력 길이). 일봉(tf="1d")은 날짜별 '확정(settled)' 일봉(장중 asof 면 아직
-        마감 안 된 그날 일봉은 None 으로 가림 — look-ahead 0). 일봉이 아닌 봉(1m·5m)은 시세 경로가 없어 전부 None(모름)."""
-        key = (sym, field, tf)
+        """심볼·필드를 이 문맥의 '축'(cal)으로 읽는다 — tf 가 뭐든 '이 축의 봉'을 그대로 읽을 뿐(봉 종류를 안 가린다).
+        hist 는 이 축의 봉이다: 일봉축이면 일봉, 장중축이면 이미 그 tf 로 집계된(resample) 봉. 축 구성은 문맥이 하고,
+        여기선 '확정 경계(settled)를 넘는 봉만 가린다'는 한 규칙뿐 — 장중 하위 문맥은 세션 캘린더가 없어 settled 가
+        None(안 가림)이 되고 cal 도 이미 asof 로 잘려 있어, 같은 식이 평문 읽기로 떨어진다(일봉·분봉·초봉 한 경로)."""
+        key = (sym, field)
         if key not in self._px:
-            if tf == "1d":
-                by = {c.date: getattr(c, field) for c in (self.hist.get(sym) or [])}
-                settled = self._settled_dates(sym)   # None = 가리지 않음(asof 없음·캘린더 없음)
-                self._px[key] = [by.get(d) if (settled is None or d in settled) else None
-                                 for d in self.cal]
-            else:
-                self._px[key] = [None] * len(self.cal)
+            by = {c.date: getattr(c, field) for c in (self.hist.get(sym) or [])}
+            settled = self._settled_dates(sym)   # None = 안 가림(장중축·asof 없음·캘린더 없음)
+            self._px[key] = [by.get(d) if (settled is None or d in settled) else None for d in self.cal]
         return self._px[key]
+
+    def _intraday_ctx(self, tf):
+        """분봉 노드를 돌릴 '장중축' 하위 문맥 — cal = 최소 단위 봉을 tf 로 집계한 봉들의 타임스탬프(asof 이하),
+        hist = 그 집계 봉. 기존 _series 를 이 cal 로 돌리면 lag·창이 'tf 봉 개수'로 세어진다(COND_DSL 계약).
+        한 tf 에 한 번 만들어 재사용(루트 문맥이 쥔다)."""
+        ic = self._ictx.get(tf)
+        if ic is None:
+            ihist = {s: resample(bars, tf) for s, bars in self.minute.items()}
+            cutoff = None if self.asof is None else int(self.asof.timestamp())   # 에폭 비교 — 봉 정밀도(분·초·ms) 무관
+            keys = {c.date for bars in ihist.values() for c in bars if cutoff is None or _epoch(c.date) <= cutoff}
+            ic = Ctx(ihist, sorted(keys), self.self_sym, self.index_sym, self.manual_as, self.pos,
+                     self.asof, answers=self.answers, minute=self.minute, tf=tf)
+            self._ictx[tf] = ic
+        return ic
+
+    def _collapse(self, raw, ictx):
+        """장중축 결과(raw, ictx.cal 길이) → 일봉 cal 길이. asof 시점(마지막 장중 봉)의 값을 '그날 칸'에 얹고 나머진 None.
+        장중 역사는 되재생하지 않는다(장중 백테스트 보류) — '오늘(asof 일)' 한 칸만 안다."""
+        out = [None] * len(self.cal)
+        if not ictx.cal:
+            return out
+        day = ictx.cal[-1][:8]                       # 마지막 장중 봉의 날짜(YYYYMMDD)
+        idx = next((i for i in range(len(self.cal) - 1, -1, -1) if self.cal[i] == day),
+                   len(self.cal) - 1 if self.cal else None)
+        if idx is not None:
+            out[idx] = raw[-1]
+        return out
 
     def _settled_dates(self, sym):
         """일봉 확정(settled) 규칙: 심볼의 거래소 세션 마감이 asof 이하인 날짜 집합(그 날 일봉은 확정 → 읽어도 됨).
@@ -207,6 +239,13 @@ def series(node, ctx):
         if not isinstance(node, dict):
             return _series(node, ctx)       # 상수·"?" — 기억할 것 없음
         node = bind(node, ctx.self_sym, ctx.index_sym, ctx._bound)
+    if node.grid is not None and node.grid != ctx.tf:   # 이 문맥 축과 다른 봉(분봉) 노드 → 그 봉의 장중축에서 돌려 오늘 칸에 접는다
+        out = ctx._memo.get(node.nid)
+        if out is None:
+            ictx = ctx._intraday_ctx(node.grid)
+            out = ctx._collapse(series(node, ictx), ictx)   # ictx.tf == node.grid 라 재귀는 장중축에서 돈다(_series 그대로)
+            ctx._memo[node.nid] = out
+        return out
     out = ctx._memo.get(node.nid)
     if out is not None:
         return out
