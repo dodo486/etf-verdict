@@ -256,7 +256,7 @@ def uncovered(tree, top):
 
 # ------------------------------------------------------------------ 책 하나
 def render(slug, asof=None, answers=None):
-    """asof = 관측 시각(UTC datetime). None 이면 지금 — 장중(tf="1m") 조건을 이 시점 이하로 자른다.
+    """asof = 관측 시각(UTC datetime). None 이면 지금 — sub-day tf 조건을 이 시점 이하로 자른다.
     answers = 화면에서 사람이 답한 수동 {tree.gateway.answer_key: 참/거짓} — 판단자가 그 답으로 등급·조건 값·금액을 낸다
     (서버 권위 — 화면은 다시 계산하지 않는다). None 이면 답 없는 판정, 주면 top["answers"] 로 되돌려 준다.
 
@@ -266,7 +266,8 @@ def render(slug, asof=None, answers=None):
     if book is None:
         return _format(slug, None, {}, [], answers=answers)
     prices = book.prices()
-    return _format(slug, book, prices, book.decisions(prices, asof=asof, answers=answers), answers=answers)
+    return _format(slug, book, prices,
+                   book.decisions(prices, asof=asof, answers=answers, atom=book.atoms()), answers=answers)
 
 
 def _format(slug, book, prices, decisions, answers=None):

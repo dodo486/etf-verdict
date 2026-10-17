@@ -8,7 +8,6 @@
 from tree.gateway import UNKNOWN
 
 PX = {"open": "시가", "high": "고가", "low": "저가", "close": "종가", "volume": "거래량"}   # 시세 필드
-INTRADAY_TF = ("1m", "5m")                                   # 장중 분봉(확정 일봉과 구분)
 WINDOW = {"highest": "최고", "lowest": "최저", "sum": "합계"}   # k일 창
 SINCE = {"minsince": "최저", "maxsince": "최고"}               # 신호 이후
 EXTREME = {"max": "최대", "min": "최소"}                       # 둘 중
@@ -24,8 +23,8 @@ DIV_UNIT = "배"
 
 
 def intraday(node):
-    """장중 분봉 잎이면 "장중 " 머리말."""
-    return "장중 " if node.get("tf", "1d") in INTRADAY_TF else ""
+    """장중 봉(일봉축이 아닌 sub-day tf) 잎이면 "장중 " 머리말 — 특정 단위를 적지 않는다(tf≠"1d" 면 전부, 5m·1h·1s…)."""
+    return "장중 " if node.get("tf", "1d") != "1d" else ""
 
 
 def px_name(field):
