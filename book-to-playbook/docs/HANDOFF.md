@@ -2,24 +2,7 @@
 
 > 할 일은 이 파일에만 적는다(다른 곳에 TODO 파일을 만들지 않는다 — `entry.verify_rules` 가 막는다).
 > 구조·원칙은 `docs/ARCHITECTURE.md`, 세션 규칙은 레포 맨 위 `CLAUDE.md`.
-> 마지막 갱신 2026-10-12 · `main` 에 합침(작업 브랜치 work/v3-verbs 는 정리함).
-
-## 0-A. 2026-10-17 세션 (환경·검사기·화면) — 미커밋
-
-원래 문제: "체크리스트대로 샀는데 시장보다 못함 → 저자 뜻이 틀어졌거나 웹이 잘못 보여줘 잘못된 정보로 매매."
-
-**완료(미커밋):**
-- ✅ **실행 환경** — etf-verdict 를 맨 `python3`(의존성 0)로 돌려 시세가 전부 빈값→모든 조건 `모름`이던 게 근본 원인. 레포 루트 `.venv`(3.13)+`requirements.txt`(pandas·yfinance·alpaca-py·exchange_calendars·psycopg2-binary), venv 에 `jhts.pth`(PYTHONPATH 불필요). 실행: `.venv/bin/python -m entry.run check`. [[etf-verdict-runtime-venv]] 메모리. 무료 yfinance 로 ^VIX·^NDX·선물·분봉까지 들어옴 실측.
-- ✅ **VIX 검사기 오탐** — `authoring/extract/verify_tree.py` `fire_stats`: 펼친 식(logic_key) 같은 쌍은 "완전히 같은 조건"·"산다⇒안산다"에서 제외(참조로 쌓인 건 정의상 같음=3절 소관). 오탐 사라지고 진짜 신호 보존.
-- ✅ **화면 모름/거짓 구분** — `web/ui/checklist-ui.js`: `참`●/`거짓`○(실선)/**`모름`?(점선)** 3단계 + "(저자 미명시)" 복원 + 범례. playbook.html 재주입(사본 일치). → "모름을 안전으로 오해"하던 원래 문제 직접 해결.
-
-**보류(다음 할 일, 원래 문제 기준 우선순):**
-1. **저자 미명시 숫자(`"?"`)로 매수(산다) 핵심 조건이 늘 `모름`** — 전고점 돌파·5일선 근처 등 BUY 트리거가 평가 불가 → 안산다/관망으로 치우쳐 **오르는 장에 가만있다 시장에 뒤짐**(원래 문제의 큰 축). 숫자를 저자 재확인/사용자 지정할지 결정 필요(일부 이미 '사용자 확인' 항목).
-2. **`to_units` 크래시(③)** — `judge/judge.py` `to_units`/`live_units` `TypeError: dict * float`. 데이터 흐르니 드러난 기존 버그. `web.verify_page` 가 moneycopy 렌더 중 정지. 미수정. (→ 이것 때문에 `run check` 통과 8/정지 3, 깨끗한 커밋 전 손봐야)
-3. **실시간/장중 미소비(②)** — 심볼은 트리(`sym`) 기반이나 봉은 **일봉 하드코딩**: `eval.px`(tf≠1d→None)·`md_feed.minutes()` 미사용·`store` 1d 전용. 의도적 미구현 스텁. 장중 쓰려면 judge/eval(평가)+market/store·bus(배달) 두 층 신설 + 장중 조건 재추출.
-4. **충실성 누락(기존 §0 재추출 대상)** — 3-3 전고점 1% 안쪽 · 4-3 "10%↑+3/3 익절" 누락 · 4-3/5-5 윗꼬리 30% · 장중→일봉 근사(VIX 급등=종가%, 선물 고점=일봉).
-5. **백테스트로 엣지 실측** — "저자 방법이 진짜 시장보다 나은가"를 숫자로. 아직 안 돌림.
-6. **커밋** — 위 완료 3건 미커밋(+사용자 작업 중 `playbook-ui.js`). `to_units`(2) 정리 후 깨끗이 커밋.
+> 마지막 갱신 2026-10-18 · tf 소비·원자 공급·spot_close·to_units 픽스 합침.
 
 ---
 
@@ -37,13 +20,30 @@
 
 - `python -m entry.run check` — 검사 11개 · 정지 2건이 정상: `authoring.extract.verify_tree --quick`(trend 에 tree.json 없음 ·
   moneycopy 트리 문법) · `authoring.extract.verify_tree`(같은 이유 — run3 에서 사라진다). 나머지 9개 통과.
+  > 실행은 `.venv/bin/python`(루트)으로 — 맨 `python3`(의존성 0)이면 시세 전부 빈값→모든 조건 `모름`.
 - 판정 엔진(ARCHITECTURE 1-1·1-2): 판때기(책×상품, 컴파일 1회) · 노드 풀(같은 식 하나) · 시세 칸(market/store) · 구독표 —
   라이브는 바뀐 심볼을 보는 상품만 다시 판정. 진짜 책은 트리가 옛 형식이라(run3 전) 서버가 오류 판정 JSON 을 낸다(화면은 안 그림).
 - 화면 머리글 ①안 산다 ②산다 ③판다 ④얼마나(트리가 다시 생기면 그대로 그린다).
 - 전후 비교: 시세를 `ETF_DEV_CACHE=<캐시 폴더>` 로 고정하고 판정 JSON(`verdict_view.render`)·백테스트(`runner.run`)를 떠서 diff.
   진짜 책 트리가 돌지 않는 동안은 합성 트리(on·$self·$index·atleast·비중·분할·매도)로 판정·비중·백테스트 거래를 떠서 바이트 비교했다.
 
-## 2. 2026-10-12 해결된 것 (main 에 합침)
+## 2. 해결된 것 (main 에 합침)
+
+### 2026-10-17~18
+
+| 커밋 | 내용 |
+|---|---|
+| `6740731` | **실행 환경** — 루트 `.venv`(3.13)+`requirements.txt`, `jhts.pth` venv 안. 맨 python3 실행→시세 빈값 근본원인 해소 |
+| `57cc069`·`0e1bcb8` | **화면** — 책 목록 레일 접기/펴기 · 공통/상품 카드 체크리스트 렌더러 통합 |
+| `6425330` | **엔진이 tf 봉 그대로 소비** — `market/store`: `Candle`, `tf_seconds`, `resample`(단위 무관). `tree/gateway`: `Node.grid`, `tf_ok`. `judge/eval`: `_intraday_ctx`, `_collapse`, `series`가 grid 보고 축 분기 |
+| `ff1c865` | `eval.px`에서 tf 인자 제거 — 봉 단위는 축(ctx)이 정한다 |
+| `6d72369` | **원자 공급 사슬** — `market/store` 원자 칸(need_atom·load_atom·refresh_atom·atoms) · `market/md_feed` ATOM_TF="1m" · `tree/gateway.atom_symbols()` · `judge/judge` atoms 공급 경로 |
+| `87b0cc6` | **라이브 원자 구독** — `entry/live.py` LiveHub 가 atom_symbols 등록·refresh_atom 매 틱 |
+| `52825b4` | **화면 tf 하드코딩 제거** — `web/verdict_view.py` 장중=tf≠1d, render가 atom 공급 |
+| `4e97744` | **pos·현재가 asof 지금값** — `judge/eval.spot_close`(원자 있으면 최근 원자, 없으면 일봉) · pos ret/days/maxret/minret · Decision.close |
+| `ecb74a4` | **`to_units` dict×float 크래시** — `judge/judge.py`: 비스칼라 qty.x(식·모드별)→None |
+
+### 2026-10-12
 
 | 커밋 | 내용 |
 |---|---|
