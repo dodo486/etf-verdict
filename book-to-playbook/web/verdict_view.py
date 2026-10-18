@@ -25,7 +25,7 @@ from datetime import datetime, timedelta, timezone
 from shared.paths import book_meta
 from market import md_feed
 from tree.gateway import BLOCK, BUY, GATES, SELL, VERBS, _uses_pos, product_specific, reads_self
-from judge.judge import GRADES, NO_EXIT_NOTE, Judge, exit_policy, live_units, sell_text
+from judge.judge import GRADES, GRADE_RULES, NO_EXIT_NOTE, Judge, exit_policy, live_units, sell_text
 from web import explain
 from web.raw_tree import e as prose
 
@@ -56,6 +56,20 @@ def reason_of(key, ex, manual):
         ok = labels(BUY, True)
         return "%s: %s" % (BUY, " · ".join(ok[:3]) if ok else "조건 충족")
     return "데이터 부족으로 판정 불가"
+
+
+def _grade_path(d):
+    """등급 결정 경로 — grade_rules 사다리에서 어느 규칙이 적중했는지.
+    시세 없거나 불완전 데이터이면 None(화면이 등급 결정 경로를 보이지 않는다)."""
+    if not d.has_data or d.incomplete:
+        return None
+    views_map = {"opt": d.opt, "pes": d.pes}
+    for i, rule in enumerate(GRADE_RULES["rules"]):
+        view_vals = views_map[rule["view"]]
+        if all(view_vals.get(do) is want for do, want in rule["when"].items()):
+            return {"view": rule["view"], "rule_index": i, "rule_key": rule["key"],
+                    "checked": {do: view_vals.get(do) for do in rule["when"]}}
+    return {"view": "opt", "rule_index": -1, "rule_key": GRADE_RULES["default"], "checked": {}}
 
 
 def gate_views(judge, day=None):
@@ -124,7 +138,9 @@ def product_verdict(judge, d, mine):
         reason = "불완전 데이터(판정 보류) — 확정 봉 %d개 < 필요 워밍업 %d개, 창이 덜 차 신뢰불가" % (d.confirmed, d.warmup)
     v = dict(base, date=d.date, close=d.close,
              chg=(d.close / d.prev_close - 1) * 100 if d.prev_close else None,
-             key=d.key, grade=d.grade, reason=reason, gates=gate_views(judge, d.day),
+             key=d.key, grade=d.grade, reason=reason,
+             grade_path=_grade_path(d),
+             gates=gate_views(judge, d.day),
              opt=d.opt, pes=d.pes, **_rule_views(judge, d.amount))
     pos = [dict(_holding_view(judge, d.day, hs), entry_date=x["entry_date"], entry_px=x["entry_px"], filled=x.get("filled", 1))
            for hs, x in zip(d.holdings, mine)]

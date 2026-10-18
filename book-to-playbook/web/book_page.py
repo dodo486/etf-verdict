@@ -55,6 +55,7 @@ def _inject_source(html, slug):
 
 
 BACKTEST_BEGIN, BACKTEST_END = "<!-- INJECT:backtest -->", "<!-- /INJECT:backtest -->"
+BOARD_BEGIN, BOARD_END = "<!-- INJECT:board-ui -->", "<!-- /INJECT:board-ui -->"
 
 
 def _inject_backtest(html, slug):
@@ -95,6 +96,19 @@ def _inject_rawtree(html, slug, which=None):
     return re.sub(r'<script type="text/markdown" id="src">', lambda m: block + m.group(0), html, count=1)
 
 
+def _inject_board(html):
+    """판정 틀 탭 — board-ui.js 를 checklist-ui 앞에 심는다. JS 가 DOM 에 탭·패널을 직접 추가한다."""
+    html = re.sub(re.escape(BOARD_BEGIN) + r".*?" + re.escape(BOARD_END) + r"\n?", "", html, flags=re.S)
+    ui_p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui", "board-ui.js")
+    if not os.path.exists(ui_p):
+        return html
+    block = "%s\n<script>\n%s\n</script>\n%s\n" % (BOARD_BEGIN, read_text(ui_p), BOARD_END)
+    anchor = "<!-- INJECT:checklist-ui -->"
+    if anchor in html:
+        return html.replace(anchor, block + anchor, 1)
+    return html.replace("</body>", block + "</body>", 1)
+
+
 def assemble(slug, data, tree=None):
     """책 페이지 한 장을 조립한다 — 로컬 실시간 서버(serve)가 쓰는 단일 경로.
     판정(#verdict-data) · 공유 UI(ui/*.js) · 책 레일 · 소절 원문 · 백테스트 탭 · 소절별 원시 트리를 얹는다.
@@ -112,4 +126,5 @@ def assemble(slug, data, tree=None):
     html = _inject_nav(html, slug)
     html = _inject_source(html, slug)
     html = _inject_backtest(html, slug)
+    html = _inject_board(html)
     return _inject_rawtree(html, slug, tree)

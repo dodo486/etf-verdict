@@ -29,6 +29,14 @@
 
 ## 2. 해결된 것 (main 에 합침)
 
+### 2026-10-18 (세션)
+
+| 항목 | 내용 |
+|---|---|
+| **판정 틀 탭 신설** | `web/board_view.py` · `/api/board` 라우트(`entry/serve.py`) · `web/ui/board-ui.js` · `web/book_page.py`(`_inject_board`) — "🧩 판정 틀" 탭: 상품별 필요 심볼·워밍업·게이트 트리 + 등급 사다리. 시세 없이 정적으로 읽는 컴파일 완료 판때기를 외부 시스템에 보여주는 단일 창구 |
+| **이진 등급 체계** | `judge/grade_rules.json` → 규칙 1개(`buy: opt, 안 산다=false·산다=true`) + `default=avoid`. 4단계(`buy/confirm/avoid/wait`)에서 이진으로 단순화 |
+| **중복 안 산다 필터** | `board_view.py._prune_redundant_avoid()` — 이진 체계에서 같은 규칙(`label`)이 `산다`·`안 산다` 둘 다 있으면, `안 산다` 브랜치는 NOT 산다 → default=avoid 로 이미 잡히므로 판정 틀 표시에서 자동 제거. 독립 위험신호(해당 규칙에 `산다` 없음 — VIX·장 초반 세 줄 등)는 그대로 유지 |
+
 ### 2026-10-17~18
 
 | 커밋 | 내용 |

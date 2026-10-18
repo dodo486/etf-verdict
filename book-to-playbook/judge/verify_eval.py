@@ -566,7 +566,7 @@ def t_answers():
     tree = TreeGateway.of(synthetic(["A"], rule("실적", BUY, {"all": [m]})))
     got = [RuleSeries(tree, "A", hist, cal, answers=a).grade_key(2)
            for a in (None, {"A|실적 좋음": True}, {"A|실적 좋음": False})]
-    check(got == ["confirm", "buy", "wait"], "등급까지 답으로 풀린다(확인 대기 → 산다·관망) %r" % got)
+    check(got == ["buy", "buy", "avoid"], "등급까지 답으로 풀린다(확인→산다·거부→회피) %r" % got)
 
 
 # ------------------------------------------------------------------ 6. 데이터 완전성 가드(워밍업 부족 → 불완전)

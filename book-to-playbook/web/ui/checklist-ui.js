@@ -177,6 +177,47 @@
       + '<div class="ck-line">'+circle+'<span class="ck-t">'+esc(txt)+opl+offNote+refChip(it0.ref)+'</span>'+data+'</div>'
       + (kidsHtml?'<div class="ck-kids">'+kidsHtml+'</div>':'') + '</div>';
   }
+  // 판정 근거 패널 — grade_rules 사다리에서 어느 규칙이 어느 가정(비관·낙관)으로 적중했는지.
+  //   비관(pes) = 수동 조건을 불리하게 가정 · 낙관(opt) = 수동 조건을 유리하게 가정.
+  //   buy:     비관에서도 산다=True  → 수동 결과 무관하게 확실한 매수
+  //   confirm: 낙관에서만 산다=True  → 수동 조건 직접 확인 필요
+  //   avoid:   낙관에서도 안산다=True → 확실한 회피
+  //   wait:    낙관에서도 두 게이트 모두 False → 관망
+  const RULE_EXP = {
+    buy:     '비관에서도 산다 조건 충족 — 수동 결과에 관계없이 확실한 매수',
+    confirm: '낙관에서만 산다 조건 충족 — 수동(✋) 조건을 직접 확인해야 매수',
+    avoid:   '낙관에서도 안 산다 조건 발동 — 확실한 회피',
+    wait:    '어느 게이트도 발동 없음 — 관망',
+    unknown: '데이터 불충분 — 판정 보류'
+  };
+  function renderGradePath(v){
+    const gp = v.grade_path;
+    if(!gp) return '';
+    const opt = v.opt || {}, pes = v.pes || {};
+    const VB = VD.verbs || [], BLOCK_V = VB[0], BUY_V = VB[1];
+    const gates = [BLOCK_V, BUY_V].filter(Boolean);
+    const boolStr = x => x===true ? '참' : x===false ? '거짓' : '모름';
+    const rows = gates.map(g=>{
+      const pv = pes[g], ov = opt[g], pol = g===BUY_V ? 'good' : 'bad';
+      const diff = pv !== ov;
+      return '<tr>'
+        +'<td class="gp-gate">'+esc(g)+'</td>'
+        +'<td>'+dot(pv, pol)+' '+boolStr(pv)+'</td>'
+        +'<td>'+dot(ov, pol)+' '+boolStr(ov)+(diff?' <span class="gp-diff">← 수동 있음</span>':'')+'</td>'
+        +'</tr>';
+    }).join('');
+    const hasDiff = gates.some(g=>pes[g]!==opt[g]);
+    const viewLabel = gp.view==='pes' ? '비관(수동=불리)' : '낙관(수동=유리)';
+    const exp = RULE_EXP[gp.rule_key] || gp.rule_key;
+    return '<div class="grade-path">'
+      +'<div class="gp-title">판정 근거 <span class="gp-src">grade_rules['+gp.rule_index+'] · '+esc(viewLabel)+' 가정 적용</span></div>'
+      +'<table class="gp-tbl"><thead><tr><th>게이트</th><th>비관 (수동=불리)</th><th>낙관 (수동=유리)</th></tr></thead>'
+      +'<tbody>'+rows+'</tbody></table>'
+      +(hasDiff?'<p class="gp-note">수동(✋) 조건이 있어 비관·낙관이 다릅니다 — 수동 조건을 체크하면 결과가 바뀝니다.</p>':'')
+      +'<p class="gp-verdict">'+esc(v.grade)+' — '+esc(exp)+'</p>'
+      +'</div>';
+  }
+
   // 판다(매도) 갈래 한 줄 — 매도는 보유분에만 걸리므로 상품별 결과 칩은 '내 포지션'이 있을 때만(없으면 흐린 동그라미).
   //   역할색 bad(방어). 조건 설명은 '언제' 글을 라벨 자리에 둔다(수식 글줄은 따로 넣지 않는다).
   function commonExitFace(sell, vs, lab){
@@ -300,9 +341,8 @@
     if(info.sell){ block += commonExitFace(info.sell, vs, info.label); }
     return '<div class="ck-cm">'+block+'</div>';
   }
-  let cardSeen = new Set();   // 카드(공통 섹션·상품 카드) 하나 안에서 이미 펼친 이름 조건 — 반복 접기
+  let cardSeen = new Set();   // render() 한 번 동안 전역 — 공통 섹션에서 펼친 조건은 상품 카드에서 접힌다(↑ 위에서 펼침).
   function renderCommon(){
-    cardSeen = new Set();
     const vs = VD.verdicts || [];
     if(vs.length < 1) return '';
     const infos = collectRules(vs, isCommon);   // 공통 = 모든 상품에 거는 시장 신호(VIX·금리 등 구체 티커)
@@ -313,7 +353,6 @@
       + body + '</div>';
   }
   function renderProduct(v){
-    cardSeen = new Set();
     const ans = answers();
     const key = v.key;                          // 서버 판정(답한 수동까지 반영) 그대로
     let h = '<div class="ck-head"><h3><span class="tk">'+esc(v.prod)+'</span>'+(v.index?' <span class="subtle">기준 지수 '+esc(v.index)+'</span>':'')+'</h3>'
@@ -321,6 +360,7 @@
     if(v.close != null) h += '<p class="subtle" style="margin:4px 0 2px">'+esc(v.date)+' 종가 <b style="color:var(--head)">'+v.close.toFixed(2)+'</b>'+(v.chg!=null?' · 당일 '+(v.chg>=0?'+':'')+v.chg.toFixed(2)+'%':'')+'</p>';
     const nAns = Object.keys((VD && VD.answers) || {}).length;
     h += '<p class="subtle" style="margin:2px 0 10px">엔진 판정: '+esc(v.reason)+(nAns?' <b style="color:var(--gold)">· 체크한 수동 조건 '+nAns+'개 반영(서버 판정)</b>':'')+'</p>';
+    h += renderGradePath(v);
     if(!v.gates){ return h; }
     // 이 상품의 '상품별' 규칙(공통 아님 — 자기 시세·보유·전용)을 공통과 **같은 블록 렌더러**로. 상품 하나짜리 perProd.
     const infos = collectRules([v], k=>!isCommon(k));
@@ -391,6 +431,7 @@
   }
 
   function render(){
+    cardSeen = new Set();   // render 한 번 = 한 번 리셋 — 공통→상품 카드 순으로 seen 이 유지된다.
     VD = readVD();
     if(!VD || VD.error || !VD.verdicts){
       root.innerHTML = '<div class="note bad">판정 데이터가 없습니다'+(VD && VD.error ? ': '+esc(VD.error) : '')+'</div>';
@@ -510,7 +551,18 @@
       +'#sheet-root .ck-pcl{font-weight:700;color:var(--head)}'
       +'#sheet-root .ck-pc .ck-m{width:16px;height:16px;font-size:10px}'
       +'#sheet-root .ck-row.off{opacity:.6}'
-      +'#sheet-root .ck-row.fold{padding:4px 0}';
+      +'#sheet-root .ck-row.fold{padding:4px 0}'
+      // 판정 근거 패널 — grade_rules 사다리 + 비관·낙관 게이트 비교표
+      +'#sheet-root .grade-path{margin:0 0 14px;padding:10px 13px;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--mute);border-radius:9px}'
+      +'#sheet-root .gp-title{font-size:12.5px;font-weight:700;color:var(--head);margin-bottom:7px}'
+      +'#sheet-root .gp-src{font-size:11px;font-weight:400;color:var(--mute);margin-left:6px}'
+      +'#sheet-root .gp-tbl{width:100%;border-collapse:collapse;font-size:12px;margin:2px 0 5px}'
+      +'#sheet-root .gp-tbl th{font-size:11px;color:var(--mute);font-weight:600;text-align:left;padding:2px 10px 4px 0;border-bottom:1px solid var(--line)}'
+      +'#sheet-root .gp-tbl td{padding:4px 10px 4px 0;vertical-align:middle}'
+      +'#sheet-root .gp-gate{font-weight:700;color:var(--head);white-space:nowrap}'
+      +'#sheet-root .gp-diff{font-size:10.5px;color:var(--gold);margin-left:4px}'
+      +'#sheet-root .gp-note{font-size:11.5px;color:var(--gold);margin:2px 0 4px;line-height:1.5}'
+      +'#sheet-root .gp-verdict{font-size:12.5px;font-weight:700;color:var(--head);margin:6px 0 0;border-top:1px solid var(--line);padding-top:6px}';
     document.head.appendChild(st);
   })();
 

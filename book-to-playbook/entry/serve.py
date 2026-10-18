@@ -133,6 +133,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         route = urllib.parse.urlparse(self.path).path
         if route == "/api/verdict":
             return self._serve_verdict()
+        if route == "/api/board":
+            return self._serve_board()
         if route == "/events":
             return self._serve_sse()
         if route in ("/", "/index.html"):
@@ -182,6 +184,19 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             slug = DEFAULT_SLUG
         try:
             body = json.dumps(verdict(slug), ensure_ascii=False).encode("utf-8")
+            self._send(body, "application/json; charset=utf-8")
+        except Exception as ex:
+            body = json.dumps({"error": str(ex)}, ensure_ascii=False).encode("utf-8")
+            self._send(body, "application/json; charset=utf-8", 500)
+
+    def _serve_board(self):
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        slug = (qs.get("slug") or [DEFAULT_SLUG])[0]
+        if slug not in _slugs():
+            slug = DEFAULT_SLUG
+        try:
+            from web.board_view import board_data
+            body = json.dumps(board_data(slug), ensure_ascii=False).encode("utf-8")
             self._send(body, "application/json; charset=utf-8")
         except Exception as ex:
             body = json.dumps({"error": str(ex)}, ensure_ascii=False).encode("utf-8")
